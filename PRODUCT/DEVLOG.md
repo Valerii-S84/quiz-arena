@@ -197,6 +197,40 @@ Technische Grundlage für Implementierung vollständig definiert.
 
 ---
 
+## [SLICE_06] Implementation Architecture & Engineering Rules
+
+**Status:** DONE
+**Datum:** 2026-02-15
+
+### Scope
+
+* Production-Grade Service-Topologie (Bot/API/Worker)
+* Domain Boundaries und Import-Regeln
+* Concurrency/Consistency (Locks, Idempotenz)
+* Deployment-Topologie (Docker Compose, Webhooks, Backups)
+* Engineering-Gates (Format/Lint/Types/Tests)
+
+### Deliverables
+
+* IMPLEMENTATION_ARCHITECTURE.md
+* CODE_STYLE.md
+* REPO_STRUCTURE.md
+* ENGINEERING_RULES.md
+
+### Entscheidungen
+
+* Async-first Stack (Python 3.12+, FastAPI, Webhooks)
+* PostgreSQL als Source of Truth, Alembic Migrationen verpflichtend
+* Worker-Jobs idempotent, State-Transitions ausschließlich via Use-Cases
+* Celery + Redis als production-grade Scheduler/Worker Basis (Empfehlung)
+* Thin Handlers: keine Business-Logik in `app/bot/*`
+
+### Ergebnis
+
+Implementierungs-Topologie ist eindeutig und dev-fertig dokumentiert.
+
+---
+
 # === CURRENT PROJECT STATUS ===
 
 ## Dokumentierte Systemkomponenten
@@ -219,15 +253,15 @@ Implementierungsphase kann beginnen.
 
 # === NEXT SLICE (Planned) ===
 
-## [SLICE_06] Core Implementation Planning
+## [SLICE_07] Core Implementation Kickoff
 
 Ziel:
 
-* Technischer Implementierungsplan
-* Backend-Architektur (z. B. Python/FastAPI)
-* Datenbank-Setup (PostgreSQL)
-* Hosting-Strategie
-* Telegram Bot API Integration
+* Repo-Bootstrap (app/tests Struktur nach REPO_STRUCTURE)
+* Tooling-Gates (black/isort/ruff/pyright|mypy/pytest) als ausführbare Commands
+* Minimaler Health-Stack (api `/health`, `/ready`) + Bot Webhook Skeleton
+* DB Setup + erste Migrationen (Models + Alembic)
+* Erste End-to-End Slice: Quick Mix Session (start → 5 Fragen → Ergebnis)
 
 Status: NOT STARTED
 
