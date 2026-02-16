@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-02-16T05:25:43.428603+00:00",
+  "generated_at": "2026-02-16T05:47:27.239692+00:00",
   "summary": {
-    "file_count": 20,
+    "file_count": 19,
     "exact_duplicate_groups_total": 0,
     "exact_conflict_groups_total": 0,
     "signature_conflict_groups_total": 0,
@@ -1407,16 +1407,6 @@
     {
       "file": "QuizBank/logik_luecke_sheet_template.csv",
       "row_count": 0,
-      "exact_duplicate_groups": [],
-      "exact_conflict_groups": [],
-      "signature_conflict_groups": [],
-      "fuzzy_conflicts": [],
-      "same_row_multi_logical_candidates": [],
-      "template_repeat_groups": []
-    },
-    {
-      "file": "QuizBank/quiz_bank_W_Fragen_spaced_210_DE_ONLY.xlsx",
-      "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
       "signature_conflict_groups": [],

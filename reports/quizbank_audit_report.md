@@ -1,8 +1,8 @@
 # QuizBank Audit Report
 
-- Generated at: `2026-02-16T05:25:38.419710+00:00`
-- Files audited: `20`
-- Total rows: `4280`
+- Generated at: `2026-02-16T05:47:21.339543+00:00`
+- Files audited: `19`
+- Total rows: `4070`
 
 ## Checklist by file
 
@@ -26,7 +26,6 @@
 | Verb_Conjugation_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | W_Fragen_Bank_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | logik_luecke_sheet_template.csv | 0 | ready | 0 | 0 | 0 | 0 | 0 |
-| quiz_bank_W_Fragen_spaced_210_DE_ONLY.xlsx | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | trennbare_verben_210_korrigiert.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 
 ## Per-file action plan
@@ -117,11 +116,6 @@
 - No blocking issues detected. Keep file under regression QA.
 
 ### logik_luecke_sheet_template.csv
-
-- Status: `ready` (critical `0`, high `0`, medium `0`)
-- No blocking issues detected. Keep file under regression QA.
-
-### quiz_bank_W_Fragen_spaced_210_DE_ONLY.xlsx
 
 - Status: `ready` (critical `0`, high `0`, medium `0`)
 - No blocking issues detected. Keep file under regression QA.

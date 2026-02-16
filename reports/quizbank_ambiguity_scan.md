@@ -1,7 +1,7 @@
 # QuizBank Duplicate & Ambiguity Scan
 
-- Generated at: `2026-02-16T05:25:43.428603+00:00`
-- Files scanned: `20`
+- Generated at: `2026-02-16T05:47:27.239692+00:00`
+- Files scanned: `19`
 
 | File | Rows | Exact duplicate groups | Exact conflict groups | Signature conflict groups | Fuzzy conflicts | Same-row candidates | Template repeat groups |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -23,7 +23,6 @@
 | Verb_Conjugation_Bank_A2_B1_210.csv | 210 | 0 | 0 | 0 | 100 | 0 | 0 |
 | W_Fragen_Bank_210.csv | 210 | 0 | 0 | 0 | 0 | 0 | 0 |
 | logik_luecke_sheet_template.csv | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| quiz_bank_W_Fragen_spaced_210_DE_ONLY.xlsx | 210 | 0 | 0 | 0 | 0 | 0 | 0 |
 | trennbare_verben_210_korrigiert.csv | 210 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 ## Conflict Details
