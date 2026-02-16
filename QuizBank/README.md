@@ -10,9 +10,9 @@
 
 ## Поточний склад
 
-- Файлів у папці: `19`
-- Загальна кількість вікторин: `4070`
-- Продакшн вікторин: `4070`
+- Файлів у папці: `20`
+- Загальна кількість вікторин: `4860`
+- Продакшн вікторин: `4860`
 - Службові шаблони: `1` файл (`0` рядків контенту)
 
 ## Продакшн банки
@@ -20,7 +20,7 @@
 - `Adjektivendungen_Beginner_Bank_A1_A2_210.csv` — `210`
 - `Akkusativ_Dativ_Bank_A1_B1_210.csv` — `210`
 - `Antonym_Match_Bank_A1_B1_210.csv` — `210`
-- `Artikel_Sprint_Bank_A2_B1_210.csv` — `210`
+- `Artikel_Sprint_Bank_A1_B2_1000.csv` — `1000`
 - `LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv` — `500`
 - `Lexical_Gap_Fill_Bank_A2_B1_210.csv` — `210`
 - `Mini_Dialog_Bank_A2_B1_210.csv` — `210`
