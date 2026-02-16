@@ -1,0 +1,194 @@
+{
+  "summary": {
+    "generated_at_utc": "2026-02-16T22:21:16Z",
+    "source_dir": "QuizBank",
+    "total_csv_files": 19,
+    "files_with_level_column": 19,
+    "files_without_level_column": 0,
+    "total_rows": 5570,
+    "levels_total": {
+      "A1": 1077,
+      "A2": 2559,
+      "B1": 1614,
+      "B2": 320
+    }
+  },
+  "per_file": [
+    {
+      "file": "Adjektivendungen_Beginner_Bank_A1_A2_210.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A1": 105,
+        "A2": 105
+      }
+    },
+    {
+      "file": "Akkusativ_Dativ_Bank_A1_B1_210.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A1": 70,
+        "A2": 70,
+        "B1": 70
+      }
+    },
+    {
+      "file": "Antonym_Match_Bank_A1_B1_210.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A1": 70,
+        "A2": 70,
+        "B1": 70
+      }
+    },
+    {
+      "file": "Artikel_Sprint_Bank_A1_B2_1000.csv",
+      "rows": 1000,
+      "has_level_column": true,
+      "levels": {
+        "A1": 210,
+        "A2": 335,
+        "B1": 255,
+        "B2": 200
+      }
+    },
+    {
+      "file": "LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv",
+      "rows": 500,
+      "has_level_column": true,
+      "levels": {
+        "A1": 79,
+        "A2": 222,
+        "B1": 199
+      }
+    },
+    {
+      "file": "Lexical_Gap_Fill_Bank_A2_B1_210.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A2": 105,
+        "B1": 105
+      }
+    },
+    {
+      "file": "Mini_Dialog_Bank_A2_B1_210.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A2": 105,
+        "B1": 105
+      }
+    },
+    {
+      "file": "Modalverben_Bank_210.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A1": 108,
+        "A2": 102
+      }
+    },
+    {
+      "file": "Negation_Quiz_Bank_A2_B1_210.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A2": 105,
+        "B1": 105
+      }
+    },
+    {
+      "file": "Plural_Check_Bank_500.csv",
+      "rows": 500,
+      "has_level_column": true,
+      "levels": {
+        "A1": 135,
+        "A2": 365
+      }
+    },
+    {
+      "file": "Possessive_Adjectives_Bank_A2_B1_210.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A2": 105,
+        "B1": 105
+      }
+    },
+    {
+      "file": "Preposition_Selection_Bank_A2_B1_210.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A2": 105,
+        "B1": 105
+      }
+    },
+    {
+      "file": "Satzbau_Bank_A2_B1_210.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A2": 105,
+        "B1": 105
+      }
+    },
+    {
+      "file": "Synonym_Match_Bank_A1_B1_210.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A1": 70,
+        "A2": 70,
+        "B1": 70
+      }
+    },
+    {
+      "file": "Topic_Vocabulary_Themes_Bank_A2_B1_210.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A2": 105,
+        "B1": 105
+      }
+    },
+    {
+      "file": "Verb_Conjugation_Bank_A2_B1_210.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A2": 105,
+        "B1": 105
+      }
+    },
+    {
+      "file": "W_Fragen_Bank_630.csv",
+      "rows": 630,
+      "has_level_column": true,
+      "levels": {
+        "A1": 90,
+        "A2": 310,
+        "B1": 110,
+        "B2": 120
+      }
+    },
+    {
+      "file": "logik_luecke_sheet_template.csv",
+      "rows": 0,
+      "has_level_column": true,
+      "levels": {}
+    },
+    {
+      "file": "trennbare_verben_210_korrigiert.csv",
+      "rows": 210,
+      "has_level_column": true,
+      "levels": {
+        "A1": 140,
+        "A2": 70
+      }
+    }
+  ]
+}
