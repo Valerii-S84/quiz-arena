@@ -33,7 +33,7 @@
 - `Synonym_Match_Bank_A1_B1_210.csv` — `210`
 - `Topic_Vocabulary_Themes_Bank_A2_B1_210.csv` — `210`
 - `Verb_Conjugation_Bank_A2_B1_210.csv` — `210`
-- `W_Fragen_Bank_210.csv` — `210`
+- `W_Fragen_Bank_630.csv` — `630`
 - `trennbare_verben_210_korrigiert.csv` — `210`
 
 ## Службовий файл
