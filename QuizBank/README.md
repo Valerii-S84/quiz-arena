@@ -11,8 +11,8 @@
 ## Поточний склад
 
 - Файлів у папці: `20`
-- Загальна кількість вікторин: `4860`
-- Продакшн вікторин: `4860`
+- Загальна кількість вікторин: `5150`
+- Продакшн вікторин: `5150`
 - Службові шаблони: `1` файл (`0` рядків контенту)
 
 ## Продакшн банки
@@ -26,7 +26,7 @@
 - `Mini_Dialog_Bank_A2_B1_210.csv` — `210`
 - `Modalverben_Bank_210.csv` — `210`
 - `Negation_Quiz_Bank_A2_B1_210.csv` — `210`
-- `Plural_Check_Bank_210.csv` — `210`
+- `Plural_Check_Bank_500.csv` — `500`
 - `Possessive_Adjectives_Bank_A2_B1_210.csv` — `210`
 - `Preposition_Selection_Bank_A2_B1_210.csv` — `210`
 - `Satzbau_Bank_A2_B1_210.csv` — `210`
