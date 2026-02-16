@@ -1,0 +1,1438 @@
+{
+  "generated_at": "2026-02-16T05:25:43.428603+00:00",
+  "summary": {
+    "file_count": 20,
+    "exact_duplicate_groups_total": 0,
+    "exact_conflict_groups_total": 0,
+    "signature_conflict_groups_total": 0,
+    "fuzzy_conflicts_total": 135,
+    "same_row_candidates_total": 0,
+    "template_repeat_groups_total": 0,
+    "template_repeat_rows_total": 0
+  },
+  "files": [
+    {
+      "file": "QuizBank/Adjektivendungen_Beginner_Bank_A1_A2_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [
+        {
+          "row_1": 110,
+          "row_2": 131,
+          "score": 96.20253164556962,
+          "question_1": "waehrend andere posts untergehen, zieht die ___ notiz weiter aufmerksamkeit an.",
+          "question_2": "waehrend andere posts untergehen, zieht die ___ datei weiter aufmerksamkeit an.",
+          "answer_1": "offene",
+          "answer_2": "coole"
+        },
+        {
+          "row_1": 109,
+          "row_2": 123,
+          "score": 96.0,
+          "question_1": "obwohl alle weiterklicken, wirkt keine ___ app ueberraschend glaubwuerdig.",
+          "question_2": "obwohl alle weiterklicken, wirkt eine ___ gruppe ueberraschend glaubwuerdig.",
+          "answer_1": "aktive",
+          "answer_2": "robuste"
+        }
+      ],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Akkusativ_Dativ_Bank_A1_B1_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Antonym_Match_Bank_A1_B1_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [
+        {
+          "row_1": 22,
+          "row_2": 58,
+          "score": 96.875,
+          "question_1": "was ist das gegenteil von „lang“?",
+          "question_2": "was ist das gegenteil von „an“?",
+          "answer_1": "kurz",
+          "answer_2": "aus"
+        },
+        {
+          "row_1": 100,
+          "row_2": 108,
+          "score": 96.7741935483871,
+          "question_1": "welches wort ist das gegenteil von „steigen“?",
+          "question_2": "welches wort ist das gegenteil von „einsteigen“?",
+          "answer_1": "fallen",
+          "answer_2": "aussteigen"
+        },
+        {
+          "row_1": 56,
+          "row_2": 76,
+          "score": 96.62921348314607,
+          "question_1": "welches wort ist das gegenteil von „innen“?",
+          "question_2": "welches wort ist das gegenteil von „gewinnen“?",
+          "answer_1": "außen",
+          "answer_2": "verlieren"
+        },
+        {
+          "row_1": 48,
+          "row_2": 72,
+          "score": 96.55172413793103,
+          "question_1": "welches wort ist das gegenteil von „offen“?",
+          "question_2": "welches wort ist das gegenteil von „öffnen“?",
+          "answer_1": "geschlossen",
+          "answer_2": "schließen"
+        },
+        {
+          "row_1": 4,
+          "row_2": 8,
+          "score": 96.3855421686747,
+          "question_1": "welches wort ist das gegenteil von „alt“?",
+          "question_2": "welches wort ist das gegenteil von „laut“?",
+          "answer_1": "jung",
+          "answer_2": "leise"
+        },
+        {
+          "row_1": 4,
+          "row_2": 60,
+          "score": 96.2962962962963,
+          "question_1": "welches wort ist das gegenteil von „alt“?",
+          "question_2": "welches wort ist das gegenteil von „ja“?",
+          "answer_1": "jung",
+          "answer_2": "nein"
+        },
+        {
+          "row_1": 44,
+          "row_2": 60,
+          "score": 96.2962962962963,
+          "question_1": "welches wort ist das gegenteil von „arm“?",
+          "question_2": "welches wort ist das gegenteil von „ja“?",
+          "answer_1": "reich",
+          "answer_2": "nein"
+        }
+      ],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Artikel_Sprint_Bank_A2_B1_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [
+        {
+          "row_1": 158,
+          "row_2": 186,
+          "score": 96.41025641025641,
+          "question_1": "nachdem wir mehrere optionen geprüft hatten, blieb ___ plan bei der wochenplanung im mittelpunkt.",
+          "question_2": "nachdem wir mehrere optionen geprüft hatten, blieb ___ liste bei der wochenplanung im mittelpunkt.",
+          "answer_1": "der",
+          "answer_2": "die"
+        }
+      ],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv",
+      "row_count": 500,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Lexical_Gap_Fill_Bank_A2_B1_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [
+        {
+          "row_1": 13,
+          "row_2": 76,
+          "score": 97.47292418772562,
+          "question_1": "a: im bereich zeitmanagement muss der ablauf rund um wecker jetzt sauber gelöst werden. was wäre jetzt der nächste sinnvolle schritt? b: ___",
+          "question_2": "a: im bereich zeitmanagement muss der ablauf rund um uhr jetzt sauber gelöst werden. was wäre jetzt der nächste sinnvolle schritt? b: ___",
+          "answer_1": "den wecker stellen",
+          "answer_2": "die uhr umstellen"
+        },
+        {
+          "row_1": 12,
+          "row_2": 75,
+          "score": 97.07112970711297,
+          "question_1": "a: im bereich zeitmanagement braucht das team jetzt einen klaren schritt rund um wecker. was passt hier am besten? b: ___",
+          "question_2": "a: im bereich zeitmanagement braucht das team jetzt einen klaren schritt rund um uhr. was passt hier am besten? b: ___",
+          "answer_1": "den wecker stellen",
+          "answer_2": "die uhr umstellen"
+        },
+        {
+          "row_1": 82,
+          "row_2": 94,
+          "score": 96.79715302491103,
+          "question_1": "a: für technik im alltag ist unmittelbar ein konkreter schritt mit passwort erforderlich. was wäre jetzt der nächste sinnvolle schritt? b: ___",
+          "question_2": "a: für technik im alltag ist unmittelbar ein konkreter schritt mit datei erforderlich. was wäre jetzt der nächste sinnvolle schritt? b: ___",
+          "answer_1": "ein passwort zurücksetzen",
+          "answer_2": "die datei speichern"
+        },
+        {
+          "row_1": 136,
+          "row_2": 196,
+          "score": 96.60377358490567,
+          "question_1": "a: der nächste punkt im bereich projektmanagement betrifft jetzt klar fristen. was wäre jetzt der nächste sinnvolle schritt? b: ___",
+          "question_2": "a: der nächste punkt im bereich projektmanagement betrifft jetzt klar ressourcen. was wäre jetzt der nächste sinnvolle schritt? b: ___",
+          "answer_1": "fristen einhalten",
+          "answer_2": "ressourcen koordinieren"
+        },
+        {
+          "row_1": 136,
+          "row_2": 205,
+          "score": 96.57794676806084,
+          "question_1": "a: der nächste punkt im bereich projektmanagement betrifft jetzt klar fristen. was wäre jetzt der nächste sinnvolle schritt? b: ___",
+          "question_2": "a: der nächste punkt im bereich projektmanagement betrifft jetzt klar zeitplan. was wäre jetzt der nächste sinnvolle schritt? b: ___",
+          "answer_1": "fristen einhalten",
+          "answer_2": "den zeitplan aktualisieren"
+        },
+        {
+          "row_1": 135,
+          "row_2": 195,
+          "score": 96.20253164556962,
+          "question_1": "a: im arbeitsablauf (projektmanagement) muss jetzt etwas mit fristen geklärt werden. was passt hier am besten? b: ___",
+          "question_2": "a: im arbeitsablauf (projektmanagement) muss jetzt etwas mit ressourcen geklärt werden. was passt hier am besten? b: ___",
+          "answer_1": "fristen einhalten",
+          "answer_2": "ressourcen koordinieren"
+        },
+        {
+          "row_1": 135,
+          "row_2": 204,
+          "score": 96.17021276595746,
+          "question_1": "a: im arbeitsablauf (projektmanagement) muss jetzt etwas mit fristen geklärt werden. was passt hier am besten? b: ___",
+          "question_2": "a: im arbeitsablauf (projektmanagement) muss jetzt etwas mit zeitplan geklärt werden. was passt hier am besten? b: ___",
+          "answer_1": "fristen einhalten",
+          "answer_2": "den zeitplan aktualisieren"
+        },
+        {
+          "row_1": 124,
+          "row_2": 160,
+          "score": 96.113074204947,
+          "question_1": "a: für projektmanagement ist unmittelbar ein konkreter schritt mit ressourcen erforderlich. was wäre jetzt der nächste sinnvolle schritt? b: ___",
+          "question_2": "a: für projektmanagement ist unmittelbar ein konkreter schritt mit ziele erforderlich. was wäre jetzt der nächste sinnvolle schritt? b: ___",
+          "answer_1": "ressourcen einplanen",
+          "answer_2": "ziele definieren"
+        },
+        {
+          "row_1": 64,
+          "row_2": 154,
+          "score": 96.06299212598425,
+          "question_1": "a: der nächste punkt im bereich kommunikation betrifft jetzt klar hilfe. was wäre jetzt der nächste sinnvolle schritt? b: ___",
+          "question_2": "a: der nächste punkt im bereich kommunikation betrifft jetzt klar vorschlag. was wäre jetzt der nächste sinnvolle schritt? b: ___",
+          "answer_1": "um hilfe bitten",
+          "answer_2": "einen vorschlag begründen"
+        }
+      ],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Mini_Dialog_Bank_A2_B1_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Modalverben_Bank_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Negation_Quiz_Bank_A2_B1_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Plural_Check_Bank_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [
+        {
+          "row_1": 83,
+          "row_2": 163,
+          "score": 96.2962962962963,
+          "question_1": "die decke -> ?",
+          "question_2": "die ecke -> ?",
+          "answer_1": "die decken",
+          "answer_2": "die ecken"
+        }
+      ],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Possessive_Adjectives_Bank_A2_B1_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [
+        {
+          "row_1": 178,
+          "row_2": 210,
+          "score": 97.70114942528735,
+          "question_1": "ihr arbeitet seit wochen mit ___ tasche, weil die anforderungen deutlich gestiegen sind.",
+          "question_2": "ihr arbeitet seit wochen mit ___ chef, weil die anforderungen deutlich gestiegen sind.",
+          "answer_1": "eurer",
+          "answer_2": "eurem"
+        },
+        {
+          "row_1": 182,
+          "row_2": 190,
+          "score": 97.07602339181287,
+          "question_1": "ihr arbeitet seit wochen mit ___ auto, weil die anforderungen deutlich gestiegen sind.",
+          "question_2": "ihr arbeitet seit wochen mit ___ app, weil die anforderungen deutlich gestiegen sind.",
+          "answer_1": "eurem",
+          "answer_2": "eurer"
+        },
+        {
+          "row_1": 190,
+          "row_2": 204,
+          "score": 97.07602339181287,
+          "question_1": "ihr arbeitet seit wochen mit ___ app, weil die anforderungen deutlich gestiegen sind.",
+          "question_2": "ihr arbeitet seit wochen mit ___ plan, weil die anforderungen deutlich gestiegen sind.",
+          "answer_1": "eurer",
+          "answer_2": "eurem"
+        },
+        {
+          "row_1": 198,
+          "row_2": 208,
+          "score": 96.66666666666667,
+          "question_1": "ihr arbeitet seit wochen mit ___ bericht, weil die anforderungen deutlich gestiegen sind.",
+          "question_2": "ihr arbeitet seit wochen mit ___ nachricht, weil die anforderungen deutlich gestiegen sind.",
+          "answer_1": "eurem",
+          "answer_2": "eurer"
+        },
+        {
+          "row_1": 202,
+          "row_2": 210,
+          "score": 96.51162790697676,
+          "question_1": "ihr arbeitet seit wochen mit ___ idee, weil die anforderungen deutlich gestiegen sind.",
+          "question_2": "ihr arbeitet seit wochen mit ___ chef, weil die anforderungen deutlich gestiegen sind.",
+          "answer_1": "eurer",
+          "answer_2": "eurem"
+        },
+        {
+          "row_1": 45,
+          "row_2": 49,
+          "score": 96.3855421686747,
+          "question_1": "ihr sucht ___ laptop für die aufgabe heute.",
+          "question_2": "ihr sucht ___ app für die aufgabe heute.",
+          "answer_1": "euren",
+          "answer_2": "eure"
+        },
+        {
+          "row_1": 177,
+          "row_2": 187,
+          "score": 96.15384615384616,
+          "question_1": "er spricht regelmäßig mit ___ termin, damit alle schritte transparent bleiben.",
+          "question_2": "er spricht regelmäßig mit ___ e-mail, damit alle schritte transparent bleiben.",
+          "answer_1": "seinem",
+          "answer_2": "seiner"
+        },
+        {
+          "row_1": 187,
+          "row_2": 203,
+          "score": 96.1038961038961,
+          "question_1": "er spricht regelmäßig mit ___ e-mail, damit alle schritte transparent bleiben.",
+          "question_2": "er spricht regelmäßig mit ___ team, damit alle schritte transparent bleiben.",
+          "answer_1": "seiner",
+          "answer_2": "seinem"
+        },
+        {
+          "row_1": 201,
+          "row_2": 211,
+          "score": 96.1038961038961,
+          "question_1": "er spricht regelmäßig mit ___ kurs, damit alle schritte transparent bleiben.",
+          "question_2": "er spricht regelmäßig mit ___ kamera, damit alle schritte transparent bleiben.",
+          "answer_1": "seinem",
+          "answer_2": "seiner"
+        },
+        {
+          "row_1": 203,
+          "row_2": 211,
+          "score": 96.1038961038961,
+          "question_1": "er spricht regelmäßig mit ___ team, damit alle schritte transparent bleiben.",
+          "question_2": "er spricht regelmäßig mit ___ kamera, damit alle schritte transparent bleiben.",
+          "answer_1": "seinem",
+          "answer_2": "seiner"
+        },
+        {
+          "row_1": 178,
+          "row_2": 180,
+          "score": 96.08938547486034,
+          "question_1": "ihr arbeitet seit wochen mit ___ tasche, weil die anforderungen deutlich gestiegen sind.",
+          "question_2": "ihr arbeitet seit wochen mit ___ schlüssel, weil die anforderungen deutlich gestiegen sind.",
+          "answer_1": "eurer",
+          "answer_2": "eurem"
+        },
+        {
+          "row_1": 178,
+          "row_2": 192,
+          "score": 96.045197740113,
+          "question_1": "ihr arbeitet seit wochen mit ___ tasche, weil die anforderungen deutlich gestiegen sind.",
+          "question_2": "ihr arbeitet seit wochen mit ___ ausweis, weil die anforderungen deutlich gestiegen sind.",
+          "answer_1": "eurer",
+          "answer_2": "eurem"
+        },
+        {
+          "row_1": 148,
+          "row_2": 168,
+          "score": 96.0,
+          "question_1": "anna braucht ___ ticket, damit der nächste schritt ohne verzögerung gelingt.",
+          "question_2": "anna braucht ___ idee, damit der nächste schritt ohne verzögerung gelingt.",
+          "answer_1": "ihr",
+          "answer_2": "ihre"
+        },
+        {
+          "row_1": 182,
+          "row_2": 196,
+          "score": 96.0,
+          "question_1": "ihr arbeitet seit wochen mit ___ auto, weil die anforderungen deutlich gestiegen sind.",
+          "question_2": "ihr arbeitet seit wochen mit ___ aufgabe, weil die anforderungen deutlich gestiegen sind.",
+          "answer_1": "eurem",
+          "answer_2": "eurer"
+        }
+      ],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Preposition_Selection_Bank_A2_B1_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Satzbau_Bank_A2_B1_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Synonym_Match_Bank_A1_B1_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [
+        {
+          "row_1": 62,
+          "row_2": 134,
+          "score": 96.7741935483871,
+          "question_1": "finde das passende synonym zu „helfen“ (thema: verben alltag).",
+          "question_2": "finde das passende synonym zu „wählen“ (thema: verben alltag).",
+          "answer_1": "unterstützen",
+          "answer_2": "aussuchen"
+        }
+      ],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Topic_Vocabulary_Themes_Bank_A2_B1_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/Verb_Conjugation_Bank_A2_B1_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [
+        {
+          "row_1": 179,
+          "row_2": 181,
+          "score": 97.91666666666666,
+          "question_1": "setze im präsens ein: ich ___ in der fokuszeit alle ressourcen auf kernaufgaben. (konzentrieren)",
+          "question_2": "setze im präsens ein: wir ___ in der fokuszeit alle ressourcen auf kernaufgaben. (konzentrieren)",
+          "answer_1": "konzentriere",
+          "answer_2": "konzentrieren"
+        },
+        {
+          "row_1": 176,
+          "row_2": 178,
+          "score": 97.82608695652173,
+          "question_1": "setze im präsens ein: ich ___ im alltag verantwortung an erfahrene kolleginnen. (delegieren)",
+          "question_2": "setze im präsens ein: wir ___ im alltag verantwortung an erfahrene kolleginnen. (delegieren)",
+          "answer_1": "delegiere",
+          "answer_2": "delegieren"
+        },
+        {
+          "row_1": 152,
+          "row_2": 154,
+          "score": 97.8021978021978,
+          "question_1": "setze im präsens ein: ich ___ änderungen frühzeitig mit allen stakeholdern. (kommunizieren)",
+          "question_2": "setze im präsens ein: wir ___ änderungen frühzeitig mit allen stakeholdern. (kommunizieren)",
+          "answer_1": "kommuniziere",
+          "answer_2": "kommunizieren"
+        },
+        {
+          "row_1": 113,
+          "row_2": 115,
+          "score": 97.77777777777777,
+          "question_1": "setze im präsens ein: ich ___ die zusammenarbeit zwischen drei abteilungen. (koordinieren)",
+          "question_2": "setze im präsens ein: wir ___ die zusammenarbeit zwischen drei abteilungen. (koordinieren)",
+          "answer_1": "koordiniere",
+          "answer_2": "koordinieren"
+        },
+        {
+          "row_1": 143,
+          "row_2": 145,
+          "score": 97.77777777777777,
+          "question_1": "setze im präsens ein: ich ___ im workshop offen unterschiedliche positionen. (diskutieren)",
+          "question_2": "setze im präsens ein: wir ___ im workshop offen unterschiedliche positionen. (diskutieren)",
+          "answer_1": "diskutiere",
+          "answer_2": "diskutieren"
+        },
+        {
+          "row_1": 161,
+          "row_2": 163,
+          "score": 97.77777777777777,
+          "question_1": "setze im präsens ein: ich ___ durch automatisierung manuelle arbeitsschritte. (reduzieren)",
+          "question_2": "setze im präsens ein: wir ___ durch automatisierung manuelle arbeitsschritte. (reduzieren)",
+          "answer_1": "reduziere",
+          "answer_2": "reduzieren"
+        },
+        {
+          "row_1": 167,
+          "row_2": 169,
+          "score": 97.77777777777777,
+          "question_1": "setze im präsens ein: ich ___ nach jedem review die produktqualität sichtbar. (verbessern)",
+          "question_2": "setze im präsens ein: wir ___ nach jedem review die produktqualität sichtbar. (verbessern)",
+          "answer_1": "verbessere",
+          "answer_2": "verbessern"
+        },
+        {
+          "row_1": 119,
+          "row_2": 121,
+          "score": 97.75280898876404,
+          "question_1": "setze im präsens ein: ich ___ die ergebnisse morgen im steering committee. (präsentieren)",
+          "question_2": "setze im präsens ein: wir ___ die ergebnisse morgen im steering committee. (präsentieren)",
+          "answer_1": "präsentiere",
+          "answer_2": "präsentieren"
+        },
+        {
+          "row_1": 137,
+          "row_2": 139,
+          "score": 97.75280898876404,
+          "question_1": "setze im präsens ein: ich ___ die risiken im aktuellen szenario realistisch. (beurteilen)",
+          "question_2": "setze im präsens ein: wir ___ die risiken im aktuellen szenario realistisch. (beurteilen)",
+          "answer_1": "beurteile",
+          "answer_2": "beurteilen"
+        },
+        {
+          "row_1": 173,
+          "row_2": 175,
+          "score": 97.75280898876404,
+          "question_1": "setze im präsens ein: ich ___ alle beteiligten rechtzeitig über änderungen. (informieren)",
+          "question_2": "setze im präsens ein: wir ___ alle beteiligten rechtzeitig über änderungen. (informieren)",
+          "answer_1": "informiere",
+          "answer_2": "informieren"
+        },
+        {
+          "row_1": 185,
+          "row_2": 187,
+          "score": 97.75280898876404,
+          "question_1": "setze im präsens ein: ich ___ nach jedem sprint die wichtigsten learnings. (reflektieren)",
+          "question_2": "setze im präsens ein: wir ___ nach jedem sprint die wichtigsten learnings. (reflektieren)",
+          "answer_1": "reflektiere",
+          "answer_2": "reflektieren"
+        },
+        {
+          "row_1": 26,
+          "row_2": 28,
+          "score": 97.70114942528735,
+          "question_1": "setze im präsens ein: ich ___ im kurs die grammatikregel mit einem beispiel. (erklären)",
+          "question_2": "setze im präsens ein: wir ___ im kurs die grammatikregel mit einem beispiel. (erklären)",
+          "answer_1": "erkläre",
+          "answer_2": "erklären"
+        },
+        {
+          "row_1": 128,
+          "row_2": 130,
+          "score": 97.70114942528735,
+          "question_1": "setze im präsens ein: ich ___ nach dem pilotlauf den tatsächlichen nutzen. (evaluieren)",
+          "question_2": "setze im präsens ein: wir ___ nach dem pilotlauf den tatsächlichen nutzen. (evaluieren)",
+          "answer_1": "evaluiere",
+          "answer_2": "evaluieren"
+        },
+        {
+          "row_1": 158,
+          "row_2": 160,
+          "score": 97.70114942528735,
+          "question_1": "setze im präsens ein: ich ___ vor angebotsabgabe alle kosten transparent. (kalkulieren)",
+          "question_2": "setze im präsens ein: wir ___ vor angebotsabgabe alle kosten transparent. (kalkulieren)",
+          "answer_1": "kalkuliere",
+          "answer_2": "kalkulieren"
+        },
+        {
+          "row_1": 188,
+          "row_2": 190,
+          "score": 97.70114942528735,
+          "question_1": "setze im präsens ein: ich ___ im bericht präzise und eindeutige aussagen. (formulieren)",
+          "question_2": "setze im präsens ein: wir ___ im bericht präzise und eindeutige aussagen. (formulieren)",
+          "answer_1": "formuliere",
+          "answer_2": "formulieren"
+        },
+        {
+          "row_1": 197,
+          "row_2": 199,
+          "score": 97.70114942528735,
+          "question_1": "setze im präsens ein: ich ___ die diskussion in der retrospektive neutral. (moderieren)",
+          "question_2": "setze im präsens ein: wir ___ die diskussion in der retrospektive neutral. (moderieren)",
+          "answer_1": "moderiere",
+          "answer_2": "moderieren"
+        },
+        {
+          "row_1": 125,
+          "row_2": 127,
+          "score": 97.67441860465115,
+          "question_1": "setze im präsens ein: ich ___ bei hoher last zuerst kritische aufgaben. (priorisieren)",
+          "question_2": "setze im präsens ein: wir ___ bei hoher last zuerst kritische aufgaben. (priorisieren)",
+          "answer_1": "priorisiere",
+          "answer_2": "priorisieren"
+        },
+        {
+          "row_1": 203,
+          "row_2": 205,
+          "score": 97.67441860465115,
+          "question_1": "setze im präsens ein: ich ___ die neue lösung schrittweise im alltag. (implementieren)",
+          "question_2": "setze im präsens ein: wir ___ die neue lösung schrittweise im alltag. (implementieren)",
+          "answer_1": "implementiere",
+          "answer_2": "implementieren"
+        },
+        {
+          "row_1": 140,
+          "row_2": 142,
+          "score": 97.6470588235294,
+          "question_1": "setze im präsens ein: ich ___ für die auswahl mehrere lösungsvarianten. (vergleichen)",
+          "question_2": "setze im präsens ein: wir ___ für die auswahl mehrere lösungsvarianten. (vergleichen)",
+          "answer_1": "vergleiche",
+          "answer_2": "vergleichen"
+        },
+        {
+          "row_1": 164,
+          "row_2": 166,
+          "score": 97.6470588235294,
+          "question_1": "setze im präsens ein: ich ___ das portfolio um digitale dienstleistungen. (erweitern)",
+          "question_2": "setze im präsens ein: wir ___ das portfolio um digitale dienstleistungen. (erweitern)",
+          "answer_1": "erweitere",
+          "answer_2": "erweitern"
+        },
+        {
+          "row_1": 182,
+          "row_2": 184,
+          "score": 97.6470588235294,
+          "question_1": "setze im präsens ein: ich ___ auf kritisches feedback sachlich und ruhig. (reagieren)",
+          "question_2": "setze im präsens ein: wir ___ auf kritisches feedback sachlich und ruhig. (reagieren)",
+          "answer_1": "reagiere",
+          "answer_2": "reagieren"
+        },
+        {
+          "row_1": 200,
+          "row_2": 202,
+          "score": 97.6470588235294,
+          "question_1": "setze im präsens ein: ich ___ durch monitoring den laufenden betrieb. (stabilisieren)",
+          "question_2": "setze im präsens ein: wir ___ durch monitoring den laufenden betrieb. (stabilisieren)",
+          "answer_1": "stabilisiere",
+          "answer_2": "stabilisieren"
+        },
+        {
+          "row_1": 209,
+          "row_2": 211,
+          "score": 97.61904761904762,
+          "question_1": "setze im präsens ein: ich ___ vor dem rollout alle kritischen annahmen. (validieren)",
+          "question_2": "setze im präsens ein: wir ___ vor dem rollout alle kritischen annahmen. (validieren)",
+          "answer_1": "validiere",
+          "answer_2": "validieren"
+        },
+        {
+          "row_1": 107,
+          "row_2": 109,
+          "score": 97.59036144578313,
+          "question_1": "setze im präsens ein: ich ___ die kennzahlen aus dem letzten quartal. (analysieren)",
+          "question_2": "setze im präsens ein: wir ___ die kennzahlen aus dem letzten quartal. (analysieren)",
+          "answer_1": "analysiere",
+          "answer_2": "analysieren"
+        },
+        {
+          "row_1": 155,
+          "row_2": 157,
+          "score": 97.59036144578313,
+          "question_1": "setze im präsens ein: ich ___ gezielt in die weiterbildung des teams. (investieren)",
+          "question_2": "setze im präsens ein: wir ___ gezielt in die weiterbildung des teams. (investieren)",
+          "answer_1": "investiere",
+          "answer_2": "investieren"
+        },
+        {
+          "row_1": 50,
+          "row_2": 52,
+          "score": 97.5609756097561,
+          "question_1": "setze im präsens ein: ich ___ nach jedem meeting ein kurzes protokoll. (schreiben)",
+          "question_2": "setze im präsens ein: wir ___ nach jedem meeting ein kurzes protokoll. (schreiben)",
+          "answer_1": "schreibe",
+          "answer_2": "schreiben"
+        },
+        {
+          "row_1": 149,
+          "row_2": 151,
+          "score": 97.5609756097561,
+          "question_1": "setze im präsens ein: ich ___ den bericht nach einer festen logik. (strukturieren)",
+          "question_2": "setze im präsens ein: wir ___ den bericht nach einer festen logik. (strukturieren)",
+          "answer_1": "strukturiere",
+          "answer_2": "strukturieren"
+        },
+        {
+          "row_1": 191,
+          "row_2": 193,
+          "score": 97.5609756097561,
+          "question_1": "setze im präsens ein: ich ___ im meeting klar und nachvollziehbar. (argumentieren)",
+          "question_2": "setze im präsens ein: wir ___ im meeting klar und nachvollziehbar. (argumentieren)",
+          "answer_1": "argumentiere",
+          "answer_2": "argumentieren"
+        },
+        {
+          "row_1": 194,
+          "row_2": 196,
+          "score": 97.5609756097561,
+          "question_1": "setze im präsens ein: ich ___ eng mit dem externen entwicklungsteam. (kooperieren)",
+          "question_2": "setze im präsens ein: wir ___ eng mit dem externen entwicklungsteam. (kooperieren)",
+          "answer_1": "kooperiere",
+          "answer_2": "kooperieren"
+        },
+        {
+          "row_1": 2,
+          "row_2": 4,
+          "score": 97.53086419753086,
+          "question_1": "setze im präsens ein: ich ___ heute die hausaufgaben vor dem abendessen. (machen)",
+          "question_2": "setze im präsens ein: wir ___ heute die hausaufgaben vor dem abendessen. (machen)",
+          "answer_1": "mache",
+          "answer_2": "machen"
+        },
+        {
+          "row_1": 20,
+          "row_2": 22,
+          "score": 97.53086419753086,
+          "question_1": "setze im präsens ein: ich ___ im internet schnell eine passende wohnung. (finden)",
+          "question_2": "setze im präsens ein: wir ___ im internet schnell eine passende wohnung. (finden)",
+          "answer_1": "finde",
+          "answer_2": "finden"
+        },
+        {
+          "row_1": 62,
+          "row_2": 64,
+          "score": 97.53086419753086,
+          "question_1": "setze im präsens ein: ich ___ jeden dienstag mit dem fahrrad zur arbeit. (fahren)",
+          "question_2": "setze im präsens ein: wir ___ jeden dienstag mit dem fahrrad zur arbeit. (fahren)",
+          "answer_1": "fahre",
+          "answer_2": "fahren"
+        },
+        {
+          "row_1": 131,
+          "row_2": 133,
+          "score": 97.53086419753086,
+          "question_1": "setze im präsens ein: ich ___ laufend die internen freigabeprozesse. (optimieren)",
+          "question_2": "setze im präsens ein: wir ___ laufend die internen freigabeprozesse. (optimieren)",
+          "answer_1": "optimiere",
+          "answer_2": "optimieren"
+        },
+        {
+          "row_1": 134,
+          "row_2": 136,
+          "score": 97.53086419753086,
+          "question_1": "setze im präsens ein: ich ___ die entscheidung mit belastbaren daten. (begründen)",
+          "question_2": "setze im präsens ein: wir ___ die entscheidung mit belastbaren daten. (begründen)",
+          "answer_1": "begründe",
+          "answer_2": "begründen"
+        },
+        {
+          "row_1": 170,
+          "row_2": 172,
+          "score": 97.53086419753086,
+          "question_1": "setze im präsens ein: ich ___ durch klare standards die lieferqualität. (sichern)",
+          "question_2": "setze im präsens ein: wir ___ durch klare standards die lieferqualität. (sichern)",
+          "answer_1": "sichere",
+          "answer_2": "sichern"
+        },
+        {
+          "row_1": 11,
+          "row_2": 13,
+          "score": 97.5,
+          "question_1": "setze im präsens ein: ich ___ am samstag frisches gemüse auf dem markt. (kaufen)",
+          "question_2": "setze im präsens ein: wir ___ am samstag frisches gemüse auf dem markt. (kaufen)",
+          "answer_1": "kaufe",
+          "answer_2": "kaufen"
+        },
+        {
+          "row_1": 35,
+          "row_2": 37,
+          "score": 97.5,
+          "question_1": "setze im präsens ein: ich ___ die monatskarte immer pünktlich online. (bezahlen)",
+          "question_2": "setze im präsens ein: wir ___ die monatskarte immer pünktlich online. (bezahlen)",
+          "answer_1": "bezahle",
+          "answer_2": "bezahlen"
+        },
+        {
+          "row_1": 116,
+          "row_2": 118,
+          "score": 97.5,
+          "question_1": "setze im präsens ein: ich ___ jeden prozessschritt sehr präzise. (dokumentieren)",
+          "question_2": "setze im präsens ein: wir ___ jeden prozessschritt sehr präzise. (dokumentieren)",
+          "answer_1": "dokumentiere",
+          "answer_2": "dokumentieren"
+        },
+        {
+          "row_1": 206,
+          "row_2": 208,
+          "score": 97.5,
+          "question_1": "setze im präsens ein: ich ___ bei verhandlungen faire kompromisse. (akzeptieren)",
+          "question_2": "setze im präsens ein: wir ___ bei verhandlungen faire kompromisse. (akzeptieren)",
+          "answer_1": "akzeptiere",
+          "answer_2": "akzeptieren"
+        },
+        {
+          "row_1": 29,
+          "row_2": 31,
+          "score": 97.46835443037975,
+          "question_1": "setze im präsens ein: ich ___ den neuen kolleginnen den arbeitsablauf. (zeigen)",
+          "question_2": "setze im präsens ein: wir ___ den neuen kolleginnen den arbeitsablauf. (zeigen)",
+          "answer_1": "zeige",
+          "answer_2": "zeigen"
+        },
+        {
+          "row_1": 38,
+          "row_2": 40,
+          "score": 97.43589743589743,
+          "question_1": "setze im präsens ein: ich ___ am wochenende die großeltern im dorf. (besuchen)",
+          "question_2": "setze im präsens ein: wir ___ am wochenende die großeltern im dorf. (besuchen)",
+          "answer_1": "besuche",
+          "answer_2": "besuchen"
+        },
+        {
+          "row_1": 122,
+          "row_2": 124,
+          "score": 97.43589743589743,
+          "question_1": "setze im präsens ein: ich ___ die ressourcen für das nächste quartal. (planen)",
+          "question_2": "setze im präsens ein: wir ___ die ressourcen für das nächste quartal. (planen)",
+          "answer_1": "plane",
+          "answer_2": "planen"
+        },
+        {
+          "row_1": 146,
+          "row_2": 148,
+          "score": 97.43589743589743,
+          "question_1": "setze im präsens ein: ich ___ zu beginn klare und messbare ziele. (definieren)",
+          "question_2": "setze im präsens ein: wir ___ zu beginn klare und messbare ziele. (definieren)",
+          "answer_1": "definiere",
+          "answer_2": "definieren"
+        },
+        {
+          "row_1": 101,
+          "row_2": 103,
+          "score": 97.40259740259741,
+          "question_1": "setze im präsens ein: ich ___ im chat wichtige informationen sofort. (teilen)",
+          "question_2": "setze im präsens ein: wir ___ im chat wichtige informationen sofort. (teilen)",
+          "answer_1": "teile",
+          "answer_2": "teilen"
+        },
+        {
+          "row_1": 179,
+          "row_2": 180,
+          "score": 97.38219895287958,
+          "question_1": "setze im präsens ein: ich ___ in der fokuszeit alle ressourcen auf kernaufgaben. (konzentrieren)",
+          "question_2": "setze im präsens ein: du ___ in der fokuszeit alle ressourcen auf kernaufgaben. (konzentrieren)",
+          "answer_1": "konzentriere",
+          "answer_2": "konzentrierst"
+        },
+        {
+          "row_1": 180,
+          "row_2": 181,
+          "score": 97.38219895287958,
+          "question_1": "setze im präsens ein: du ___ in der fokuszeit alle ressourcen auf kernaufgaben. (konzentrieren)",
+          "question_2": "setze im präsens ein: wir ___ in der fokuszeit alle ressourcen auf kernaufgaben. (konzentrieren)",
+          "answer_1": "konzentrierst",
+          "answer_2": "konzentrieren"
+        },
+        {
+          "row_1": 89,
+          "row_2": 91,
+          "score": 97.36842105263158,
+          "question_1": "setze im präsens ein: ich ___ am sonntag die wohnung gründlich auf. (räumen)",
+          "question_2": "setze im präsens ein: wir ___ am sonntag die wohnung gründlich auf. (räumen)",
+          "answer_1": "räume",
+          "answer_2": "räumen"
+        },
+        {
+          "row_1": 14,
+          "row_2": 16,
+          "score": 97.33333333333334,
+          "question_1": "setze im präsens ein: ich ___ für den kurs ein neues wörterbuch. (brauchen)",
+          "question_2": "setze im präsens ein: wir ___ für den kurs ein neues wörterbuch. (brauchen)",
+          "answer_1": "brauche",
+          "answer_2": "brauchen"
+        },
+        {
+          "row_1": 47,
+          "row_2": 49,
+          "score": 97.33333333333334,
+          "question_1": "setze im präsens ein: ich ___ jeden morgen einen deutschen podcast. (hören)",
+          "question_2": "setze im präsens ein: wir ___ jeden morgen einen deutschen podcast. (hören)",
+          "answer_1": "höre",
+          "answer_2": "hören"
+        },
+        {
+          "row_1": 80,
+          "row_2": 82,
+          "score": 97.33333333333334,
+          "question_1": "setze im präsens ein: ich ___ am freitag freunde im stadtzentrum. (treffen)",
+          "question_2": "setze im präsens ein: wir ___ am freitag freunde im stadtzentrum. (treffen)",
+          "answer_1": "treffe",
+          "answer_2": "treffen"
+        },
+        {
+          "row_1": 17,
+          "row_2": 19,
+          "score": 97.2972972972973,
+          "question_1": "setze im präsens ein: ich ___ seit gestern den wohnungsschlüssel. (suchen)",
+          "question_2": "setze im präsens ein: wir ___ seit gestern den wohnungsschlüssel. (suchen)",
+          "answer_1": "suche",
+          "answer_2": "suchen"
+        },
+        {
+          "row_1": 44,
+          "row_2": 46,
+          "score": 97.2972972972973,
+          "question_1": "setze im präsens ein: ich ___ nach der arbeit eine runde schach. (spielen)",
+          "question_2": "setze im präsens ein: wir ___ nach der arbeit eine runde schach. (spielen)",
+          "answer_1": "spiele",
+          "answer_2": "spielen"
+        },
+        {
+          "row_1": 65,
+          "row_2": 67,
+          "score": 97.2972972972973,
+          "question_1": "setze im präsens ein: ich ___ bei starkem regen lieber zu hause. (bleiben)",
+          "question_2": "setze im präsens ein: wir ___ bei starkem regen lieber zu hause. (bleiben)",
+          "answer_1": "bleibe",
+          "answer_2": "bleiben"
+        },
+        {
+          "row_1": 104,
+          "row_2": 106,
+          "score": 97.2972972972973,
+          "question_1": "setze im präsens ein: ich ___ nach dem sport immer sehr schnell. (duschen)",
+          "question_2": "setze im präsens ein: wir ___ nach dem sport immer sehr schnell. (duschen)",
+          "answer_1": "dusche",
+          "answer_2": "duschen"
+        },
+        {
+          "row_1": 176,
+          "row_2": 177,
+          "score": 97.26775956284153,
+          "question_1": "setze im präsens ein: ich ___ im alltag verantwortung an erfahrene kolleginnen. (delegieren)",
+          "question_2": "setze im präsens ein: du ___ im alltag verantwortung an erfahrene kolleginnen. (delegieren)",
+          "answer_1": "delegiere",
+          "answer_2": "delegierst"
+        },
+        {
+          "row_1": 177,
+          "row_2": 178,
+          "score": 97.26775956284153,
+          "question_1": "setze im präsens ein: du ___ im alltag verantwortung an erfahrene kolleginnen. (delegieren)",
+          "question_2": "setze im präsens ein: wir ___ im alltag verantwortung an erfahrene kolleginnen. (delegieren)",
+          "answer_1": "delegierst",
+          "answer_2": "delegieren"
+        },
+        {
+          "row_1": 23,
+          "row_2": 25,
+          "score": 97.26027397260275,
+          "question_1": "setze im präsens ein: ich ___ im büro nach dem neuen terminplan. (fragen)",
+          "question_2": "setze im präsens ein: wir ___ im büro nach dem neuen terminplan. (fragen)",
+          "answer_1": "frage",
+          "answer_2": "fragen"
+        },
+        {
+          "row_1": 77,
+          "row_2": 79,
+          "score": 97.26027397260275,
+          "question_1": "setze im präsens ein: ich ___ heute den laptop ins büro zurück. (bringen)",
+          "question_2": "setze im präsens ein: wir ___ heute den laptop ins büro zurück. (bringen)",
+          "answer_1": "bringe",
+          "answer_2": "bringen"
+        },
+        {
+          "row_1": 152,
+          "row_2": 153,
+          "score": 97.23756906077348,
+          "question_1": "setze im präsens ein: ich ___ änderungen frühzeitig mit allen stakeholdern. (kommunizieren)",
+          "question_2": "setze im präsens ein: du ___ änderungen frühzeitig mit allen stakeholdern. (kommunizieren)",
+          "answer_1": "kommuniziere",
+          "answer_2": "kommunizierst"
+        },
+        {
+          "row_1": 153,
+          "row_2": 154,
+          "score": 97.23756906077348,
+          "question_1": "setze im präsens ein: du ___ änderungen frühzeitig mit allen stakeholdern. (kommunizieren)",
+          "question_2": "setze im präsens ein: wir ___ änderungen frühzeitig mit allen stakeholdern. (kommunizieren)",
+          "answer_1": "kommunizierst",
+          "answer_2": "kommunizieren"
+        },
+        {
+          "row_1": 32,
+          "row_2": 34,
+          "score": 97.22222222222221,
+          "question_1": "setze im präsens ein: ich ___ im café einen tee ohne zucker. (bestellen)",
+          "question_2": "setze im präsens ein: wir ___ im café einen tee ohne zucker. (bestellen)",
+          "answer_1": "bestelle",
+          "answer_2": "bestellen"
+        },
+        {
+          "row_1": 41,
+          "row_2": 43,
+          "score": 97.22222222222221,
+          "question_1": "setze im präsens ein: ich ___ abends oft eine suppe mit gemüse. (kochen)",
+          "question_2": "setze im präsens ein: wir ___ abends oft eine suppe mit gemüse. (kochen)",
+          "answer_1": "koche",
+          "answer_2": "kochen"
+        },
+        {
+          "row_1": 74,
+          "row_2": 76,
+          "score": 97.22222222222221,
+          "question_1": "setze im präsens ein: ich ___ im unterricht ein kurzes feedback. (geben)",
+          "question_2": "setze im präsens ein: wir ___ im unterricht ein kurzes feedback. (geben)",
+          "answer_1": "gebe",
+          "answer_2": "geben"
+        },
+        {
+          "row_1": 83,
+          "row_2": 85,
+          "score": 97.22222222222221,
+          "question_1": "setze im präsens ein: ich ___ abends oft eine serie auf deutsch. (sehen)",
+          "question_2": "setze im präsens ein: wir ___ abends oft eine serie auf deutsch. (sehen)",
+          "answer_1": "sehe",
+          "answer_2": "sehen"
+        },
+        {
+          "row_1": 113,
+          "row_2": 114,
+          "score": 97.20670391061452,
+          "question_1": "setze im präsens ein: ich ___ die zusammenarbeit zwischen drei abteilungen. (koordinieren)",
+          "question_2": "setze im präsens ein: du ___ die zusammenarbeit zwischen drei abteilungen. (koordinieren)",
+          "answer_1": "koordiniere",
+          "answer_2": "koordinierst"
+        },
+        {
+          "row_1": 114,
+          "row_2": 115,
+          "score": 97.20670391061452,
+          "question_1": "setze im präsens ein: du ___ die zusammenarbeit zwischen drei abteilungen. (koordinieren)",
+          "question_2": "setze im präsens ein: wir ___ die zusammenarbeit zwischen drei abteilungen. (koordinieren)",
+          "answer_1": "koordinierst",
+          "answer_2": "koordinieren"
+        },
+        {
+          "row_1": 143,
+          "row_2": 144,
+          "score": 97.20670391061452,
+          "question_1": "setze im präsens ein: ich ___ im workshop offen unterschiedliche positionen. (diskutieren)",
+          "question_2": "setze im präsens ein: du ___ im workshop offen unterschiedliche positionen. (diskutieren)",
+          "answer_1": "diskutiere",
+          "answer_2": "diskutierst"
+        },
+        {
+          "row_1": 144,
+          "row_2": 145,
+          "score": 97.20670391061452,
+          "question_1": "setze im präsens ein: du ___ im workshop offen unterschiedliche positionen. (diskutieren)",
+          "question_2": "setze im präsens ein: wir ___ im workshop offen unterschiedliche positionen. (diskutieren)",
+          "answer_1": "diskutierst",
+          "answer_2": "diskutieren"
+        },
+        {
+          "row_1": 161,
+          "row_2": 162,
+          "score": 97.20670391061452,
+          "question_1": "setze im präsens ein: ich ___ durch automatisierung manuelle arbeitsschritte. (reduzieren)",
+          "question_2": "setze im präsens ein: du ___ durch automatisierung manuelle arbeitsschritte. (reduzieren)",
+          "answer_1": "reduziere",
+          "answer_2": "reduzierst"
+        },
+        {
+          "row_1": 162,
+          "row_2": 163,
+          "score": 97.20670391061452,
+          "question_1": "setze im präsens ein: du ___ durch automatisierung manuelle arbeitsschritte. (reduzieren)",
+          "question_2": "setze im präsens ein: wir ___ durch automatisierung manuelle arbeitsschritte. (reduzieren)",
+          "answer_1": "reduzierst",
+          "answer_2": "reduzieren"
+        },
+        {
+          "row_1": 167,
+          "row_2": 168,
+          "score": 97.20670391061452,
+          "question_1": "setze im präsens ein: ich ___ nach jedem review die produktqualität sichtbar. (verbessern)",
+          "question_2": "setze im präsens ein: du ___ nach jedem review die produktqualität sichtbar. (verbessern)",
+          "answer_1": "verbessere",
+          "answer_2": "verbesserst"
+        },
+        {
+          "row_1": 168,
+          "row_2": 169,
+          "score": 97.20670391061452,
+          "question_1": "setze im präsens ein: du ___ nach jedem review die produktqualität sichtbar. (verbessern)",
+          "question_2": "setze im präsens ein: wir ___ nach jedem review die produktqualität sichtbar. (verbessern)",
+          "answer_1": "verbesserst",
+          "answer_2": "verbessern"
+        },
+        {
+          "row_1": 71,
+          "row_2": 73,
+          "score": 97.1830985915493,
+          "question_1": "setze im präsens ein: ich ___ bei kopfschmerzen eine tablette. (nehmen)",
+          "question_2": "setze im präsens ein: wir ___ bei kopfschmerzen eine tablette. (nehmen)",
+          "answer_1": "nehme",
+          "answer_2": "nehmen"
+        },
+        {
+          "row_1": 98,
+          "row_2": 100,
+          "score": 97.1830985915493,
+          "question_1": "setze im präsens ein: ich ___ jeden monat einen festen betrag. (sparen)",
+          "question_2": "setze im präsens ein: wir ___ jeden monat einen festen betrag. (sparen)",
+          "answer_1": "spare",
+          "answer_2": "sparen"
+        },
+        {
+          "row_1": 119,
+          "row_2": 120,
+          "score": 97.17514124293785,
+          "question_1": "setze im präsens ein: ich ___ die ergebnisse morgen im steering committee. (präsentieren)",
+          "question_2": "setze im präsens ein: du ___ die ergebnisse morgen im steering committee. (präsentieren)",
+          "answer_1": "präsentiere",
+          "answer_2": "präsentierst"
+        },
+        {
+          "row_1": 120,
+          "row_2": 121,
+          "score": 97.17514124293785,
+          "question_1": "setze im präsens ein: du ___ die ergebnisse morgen im steering committee. (präsentieren)",
+          "question_2": "setze im präsens ein: wir ___ die ergebnisse morgen im steering committee. (präsentieren)",
+          "answer_1": "präsentierst",
+          "answer_2": "präsentieren"
+        },
+        {
+          "row_1": 137,
+          "row_2": 138,
+          "score": 97.17514124293785,
+          "question_1": "setze im präsens ein: ich ___ die risiken im aktuellen szenario realistisch. (beurteilen)",
+          "question_2": "setze im präsens ein: du ___ die risiken im aktuellen szenario realistisch. (beurteilen)",
+          "answer_1": "beurteile",
+          "answer_2": "beurteilst"
+        },
+        {
+          "row_1": 138,
+          "row_2": 139,
+          "score": 97.17514124293785,
+          "question_1": "setze im präsens ein: du ___ die risiken im aktuellen szenario realistisch. (beurteilen)",
+          "question_2": "setze im präsens ein: wir ___ die risiken im aktuellen szenario realistisch. (beurteilen)",
+          "answer_1": "beurteilst",
+          "answer_2": "beurteilen"
+        },
+        {
+          "row_1": 173,
+          "row_2": 174,
+          "score": 97.17514124293785,
+          "question_1": "setze im präsens ein: ich ___ alle beteiligten rechtzeitig über änderungen. (informieren)",
+          "question_2": "setze im präsens ein: du ___ alle beteiligten rechtzeitig über änderungen. (informieren)",
+          "answer_1": "informiere",
+          "answer_2": "informierst"
+        },
+        {
+          "row_1": 174,
+          "row_2": 175,
+          "score": 97.17514124293785,
+          "question_1": "setze im präsens ein: du ___ alle beteiligten rechtzeitig über änderungen. (informieren)",
+          "question_2": "setze im präsens ein: wir ___ alle beteiligten rechtzeitig über änderungen. (informieren)",
+          "answer_1": "informierst",
+          "answer_2": "informieren"
+        },
+        {
+          "row_1": 185,
+          "row_2": 186,
+          "score": 97.17514124293785,
+          "question_1": "setze im präsens ein: ich ___ nach jedem sprint die wichtigsten learnings. (reflektieren)",
+          "question_2": "setze im präsens ein: du ___ nach jedem sprint die wichtigsten learnings. (reflektieren)",
+          "answer_1": "reflektiere",
+          "answer_2": "reflektierst"
+        },
+        {
+          "row_1": 186,
+          "row_2": 187,
+          "score": 97.17514124293785,
+          "question_1": "setze im präsens ein: du ___ nach jedem sprint die wichtigsten learnings. (reflektieren)",
+          "question_2": "setze im präsens ein: wir ___ nach jedem sprint die wichtigsten learnings. (reflektieren)",
+          "answer_1": "reflektierst",
+          "answer_2": "reflektieren"
+        },
+        {
+          "row_1": 59,
+          "row_2": 61,
+          "score": 97.14285714285714,
+          "question_1": "setze im präsens ein: ich ___ nach dem kurs direkt nach hause. (gehen)",
+          "question_2": "setze im präsens ein: wir ___ nach dem kurs direkt nach hause. (gehen)",
+          "answer_1": "gehe",
+          "answer_2": "gehen"
+        },
+        {
+          "row_1": 92,
+          "row_2": 94,
+          "score": 97.14285714285714,
+          "question_1": "setze im präsens ein: ich ___ heute nur wenig zeit für pausen. (haben)",
+          "question_2": "setze im präsens ein: wir ___ heute nur wenig zeit für pausen. (haben)",
+          "answer_1": "habe",
+          "answer_2": "haben"
+        },
+        {
+          "row_1": 95,
+          "row_2": 97,
+          "score": 97.14285714285714,
+          "question_1": "setze im präsens ein: ich ___ in einer ruhigen straße am park. (leben)",
+          "question_2": "setze im präsens ein: wir ___ in einer ruhigen straße am park. (leben)",
+          "answer_1": "lebe",
+          "answer_2": "leben"
+        },
+        {
+          "row_1": 110,
+          "row_2": 112,
+          "score": 97.14285714285714,
+          "question_1": "setze im präsens ein: ich ___ die aufgaben im team neu. (organisieren)",
+          "question_2": "setze im präsens ein: wir ___ die aufgaben im team neu. (organisieren)",
+          "answer_1": "organisiere",
+          "answer_2": "organisieren"
+        },
+        {
+          "row_1": 26,
+          "row_2": 27,
+          "score": 97.10982658959537,
+          "question_1": "setze im präsens ein: ich ___ im kurs die grammatikregel mit einem beispiel. (erklären)",
+          "question_2": "setze im präsens ein: du ___ im kurs die grammatikregel mit einem beispiel. (erklären)",
+          "answer_1": "erkläre",
+          "answer_2": "erklärst"
+        },
+        {
+          "row_1": 27,
+          "row_2": 28,
+          "score": 97.10982658959537,
+          "question_1": "setze im präsens ein: du ___ im kurs die grammatikregel mit einem beispiel. (erklären)",
+          "question_2": "setze im präsens ein: wir ___ im kurs die grammatikregel mit einem beispiel. (erklären)",
+          "answer_1": "erklärst",
+          "answer_2": "erklären"
+        },
+        {
+          "row_1": 128,
+          "row_2": 129,
+          "score": 97.10982658959537,
+          "question_1": "setze im präsens ein: ich ___ nach dem pilotlauf den tatsächlichen nutzen. (evaluieren)",
+          "question_2": "setze im präsens ein: du ___ nach dem pilotlauf den tatsächlichen nutzen. (evaluieren)",
+          "answer_1": "evaluiere",
+          "answer_2": "evaluierst"
+        },
+        {
+          "row_1": 129,
+          "row_2": 130,
+          "score": 97.10982658959537,
+          "question_1": "setze im präsens ein: du ___ nach dem pilotlauf den tatsächlichen nutzen. (evaluieren)",
+          "question_2": "setze im präsens ein: wir ___ nach dem pilotlauf den tatsächlichen nutzen. (evaluieren)",
+          "answer_1": "evaluierst",
+          "answer_2": "evaluieren"
+        },
+        {
+          "row_1": 158,
+          "row_2": 159,
+          "score": 97.10982658959537,
+          "question_1": "setze im präsens ein: ich ___ vor angebotsabgabe alle kosten transparent. (kalkulieren)",
+          "question_2": "setze im präsens ein: du ___ vor angebotsabgabe alle kosten transparent. (kalkulieren)",
+          "answer_1": "kalkuliere",
+          "answer_2": "kalkulierst"
+        },
+        {
+          "row_1": 159,
+          "row_2": 160,
+          "score": 97.10982658959537,
+          "question_1": "setze im präsens ein: du ___ vor angebotsabgabe alle kosten transparent. (kalkulieren)",
+          "question_2": "setze im präsens ein: wir ___ vor angebotsabgabe alle kosten transparent. (kalkulieren)",
+          "answer_1": "kalkulierst",
+          "answer_2": "kalkulieren"
+        },
+        {
+          "row_1": 188,
+          "row_2": 189,
+          "score": 97.10982658959537,
+          "question_1": "setze im präsens ein: ich ___ im bericht präzise und eindeutige aussagen. (formulieren)",
+          "question_2": "setze im präsens ein: du ___ im bericht präzise und eindeutige aussagen. (formulieren)",
+          "answer_1": "formuliere",
+          "answer_2": "formulierst"
+        },
+        {
+          "row_1": 189,
+          "row_2": 190,
+          "score": 97.10982658959537,
+          "question_1": "setze im präsens ein: du ___ im bericht präzise und eindeutige aussagen. (formulieren)",
+          "question_2": "setze im präsens ein: wir ___ im bericht präzise und eindeutige aussagen. (formulieren)",
+          "answer_1": "formulierst",
+          "answer_2": "formulieren"
+        },
+        {
+          "row_1": 197,
+          "row_2": 198,
+          "score": 97.10982658959537,
+          "question_1": "setze im präsens ein: ich ___ die diskussion in der retrospektive neutral. (moderieren)",
+          "question_2": "setze im präsens ein: du ___ die diskussion in der retrospektive neutral. (moderieren)",
+          "answer_1": "moderiere",
+          "answer_2": "moderierst"
+        },
+        {
+          "row_1": 198,
+          "row_2": 199,
+          "score": 97.10982658959537,
+          "question_1": "setze im präsens ein: du ___ die diskussion in der retrospektive neutral. (moderieren)",
+          "question_2": "setze im präsens ein: wir ___ die diskussion in der retrospektive neutral. (moderieren)",
+          "answer_1": "moderierst",
+          "answer_2": "moderieren"
+        },
+        {
+          "row_1": 5,
+          "row_2": 7,
+          "score": 97.10144927536231,
+          "question_1": "setze im präsens ein: ich ___ jeden tag zwanzig neue wörter. (lernen)",
+          "question_2": "setze im präsens ein: wir ___ jeden tag zwanzig neue wörter. (lernen)",
+          "answer_1": "lerne",
+          "answer_2": "lernen"
+        },
+        {
+          "row_1": 53,
+          "row_2": 55,
+          "score": 97.10144927536231,
+          "question_1": "setze im präsens ein: ich ___ im team offen über probleme. (sprechen)",
+          "question_2": "setze im präsens ein: wir ___ im team offen über probleme. (sprechen)",
+          "answer_1": "spreche",
+          "answer_2": "sprechen"
+        },
+        {
+          "row_1": 68,
+          "row_2": 70,
+          "score": 97.10144927536231,
+          "question_1": "setze im präsens ein: ich ___ den neuen nachbarn beim umzug. (helfen)",
+          "question_2": "setze im präsens ein: wir ___ den neuen nachbarn beim umzug. (helfen)",
+          "answer_1": "helfe",
+          "answer_2": "helfen"
+        },
+        {
+          "row_1": 125,
+          "row_2": 126,
+          "score": 97.07602339181287,
+          "question_1": "setze im präsens ein: ich ___ bei hoher last zuerst kritische aufgaben. (priorisieren)",
+          "question_2": "setze im präsens ein: du ___ bei hoher last zuerst kritische aufgaben. (priorisieren)",
+          "answer_1": "priorisiere",
+          "answer_2": "priorisierst"
+        }
+      ],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/W_Fragen_Bank_210.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/logik_luecke_sheet_template.csv",
+      "row_count": 0,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/quiz_bank_W_Fragen_spaced_210_DE_ONLY.xlsx",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank/trennbare_verben_210_korrigiert.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    }
+  ]
+}
