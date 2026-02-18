@@ -37,3 +37,11 @@ docker compose up -d
 ```bash
 TMPDIR=/tmp .venv/bin/python -m pytest -q -s
 ```
+
+## 7. Production skeleton
+
+- Compose stack: `docker-compose.prod.yml`
+- Production env template: `.env.production.example`
+- Reverse proxy config: `deploy/Caddyfile`
+- Deploy helper: `scripts/deploy.sh`
+- Runbook: `docs/runbooks/first_deploy_and_rollback.md`
