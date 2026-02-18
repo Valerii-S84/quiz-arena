@@ -32,6 +32,13 @@ class Purchase(Base):
         Index("idx_purchases_user_created", "user_id", "created_at"),
         Index("idx_purchases_product", "product_code"),
         Index("idx_purchases_promo_code", "applied_promo_code_id"),
+        Index(
+            "uq_purchases_active_invoice_user_product",
+            "user_id",
+            "product_code",
+            unique=True,
+            postgresql_where=text("status IN ('CREATED','INVOICE_SENT','PRECHECKOUT_OK')"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)

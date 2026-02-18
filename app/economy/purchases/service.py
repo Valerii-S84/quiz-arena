@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from math import ceil
-from datetime import timezone
 from uuid import UUID, uuid4
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.ledger_entries import LedgerEntry
@@ -89,6 +89,19 @@ class PurchaseService:
             idempotency_key=idempotency_key,
             invoice_payload=PurchaseService._build_invoice_payload(),
             created_at=now_utc,
+        )
+
+    @staticmethod
+    def _as_init_result(purchase: Purchase, *, idempotent_replay: bool) -> PurchaseInitResult:
+        return PurchaseInitResult(
+            purchase_id=purchase.id,
+            invoice_payload=purchase.invoice_payload,
+            product_code=purchase.product_code,
+            final_stars_amount=purchase.stars_amount,
+            base_stars_amount=purchase.base_stars_amount,
+            discount_stars_amount=purchase.discount_stars_amount,
+            applied_promo_code_id=purchase.applied_promo_code_id,
+            idempotent_replay=idempotent_replay,
         )
 
     @staticmethod
@@ -242,16 +255,7 @@ class PurchaseService:
 
         existing = await PurchasesRepo.get_by_idempotency_key(session, idempotency_key)
         if existing is not None:
-            return PurchaseInitResult(
-                purchase_id=existing.id,
-                invoice_payload=existing.invoice_payload,
-                product_code=existing.product_code,
-                final_stars_amount=existing.stars_amount,
-                base_stars_amount=existing.base_stars_amount,
-                discount_stars_amount=existing.discount_stars_amount,
-                applied_promo_code_id=existing.applied_promo_code_id,
-                idempotent_replay=True,
-            )
+            return PurchaseService._as_init_result(existing, idempotent_replay=True)
 
         discount_stars_amount = 0
         applied_promo_code_id: int | None = None
@@ -272,18 +276,36 @@ class PurchaseService:
                 if next_rank <= active_rank:
                     raise PremiumDowngradeNotAllowedError
 
-        purchase = await PurchasesRepo.create(
+        active_invoice = await PurchasesRepo.get_active_invoice_for_user_product(
             session,
-            purchase=PurchaseService._build_purchase(
-                product,
-                user_id=user_id,
-                idempotency_key=idempotency_key,
-                discount_stars_amount=discount_stars_amount,
-                applied_promo_code_id=applied_promo_code_id,
-                now_utc=now_utc,
-            ),
-            created_at=now_utc,
+            user_id=user_id,
+            product_code=product.product_code,
         )
+        if active_invoice is not None:
+            return PurchaseService._as_init_result(active_invoice, idempotent_replay=True)
+
+        try:
+            purchase = await PurchasesRepo.create(
+                session,
+                purchase=PurchaseService._build_purchase(
+                    product,
+                    user_id=user_id,
+                    idempotency_key=idempotency_key,
+                    discount_stars_amount=discount_stars_amount,
+                    applied_promo_code_id=applied_promo_code_id,
+                    now_utc=now_utc,
+                ),
+                created_at=now_utc,
+            )
+        except IntegrityError:
+            active_invoice = await PurchasesRepo.get_active_invoice_for_user_product(
+                session,
+                user_id=user_id,
+                product_code=product.product_code,
+            )
+            if active_invoice is None:
+                raise
+            return PurchaseService._as_init_result(active_invoice, idempotent_replay=True)
 
         if promo_redemption_id is not None:
             redemption = await PromoRepo.get_redemption_by_id_for_update(session, promo_redemption_id)
@@ -292,16 +314,7 @@ class PurchaseService:
             redemption.applied_purchase_id = purchase.id
             redemption.updated_at = now_utc
 
-        return PurchaseInitResult(
-            purchase_id=purchase.id,
-            invoice_payload=purchase.invoice_payload,
-            product_code=purchase.product_code,
-            final_stars_amount=purchase.stars_amount,
-            base_stars_amount=purchase.base_stars_amount,
-            discount_stars_amount=purchase.discount_stars_amount,
-            applied_promo_code_id=purchase.applied_promo_code_id,
-            idempotent_replay=False,
-        )
+        return PurchaseService._as_init_result(purchase, idempotent_replay=False)
 
     @staticmethod
     async def mark_invoice_sent(

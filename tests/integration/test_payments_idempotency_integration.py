@@ -109,6 +109,43 @@ async def test_duplicate_payment_callbacks_credit_only_once() -> None:
 
 
 @pytest.mark.asyncio
+async def test_init_purchase_reuses_active_invoice_for_same_user_product() -> None:
+    now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
+    user_id = await _create_user("active-invoice-lock")
+
+    async with SessionLocal.begin() as session:
+        first = await PurchaseService.init_purchase(
+            session,
+            user_id=user_id,
+            product_code="ENERGY_10",
+            idempotency_key="buy:active-lock:1",
+            now_utc=now_utc,
+        )
+        await PurchaseService.mark_invoice_sent(session, purchase_id=first.purchase_id)
+
+    async with SessionLocal.begin() as session:
+        second = await PurchaseService.init_purchase(
+            session,
+            user_id=user_id,
+            product_code="ENERGY_10",
+            idempotency_key="buy:active-lock:2",
+            now_utc=now_utc + timedelta(seconds=1),
+        )
+
+    assert second.idempotent_replay is True
+    assert second.purchase_id == first.purchase_id
+    assert second.invoice_payload == first.invoice_payload
+
+    async with SessionLocal.begin() as session:
+        count_stmt = select(func.count(Purchase.id)).where(
+            Purchase.user_id == user_id,
+            Purchase.product_code == "ENERGY_10",
+        )
+        purchase_count = await session.scalar(count_stmt)
+        assert purchase_count == 1
+
+
+@pytest.mark.asyncio
 async def test_recovery_job_credits_stale_paid_uncredited_purchase() -> None:
     now_utc = datetime.now(UTC)
     user_id = await _create_user("recovery-success")

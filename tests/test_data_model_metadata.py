@@ -55,6 +55,8 @@ def test_critical_constraints_present() -> None:
         constraint.name for constraint in purchases.constraints if isinstance(constraint, CheckConstraint)
     }
     assert "ck_purchases_final_amount" in purchase_check_names
+    purchase_index_names = {index.name for index in purchases.indexes}
+    assert "uq_purchases_active_invoice_user_product" in purchase_index_names
 
     entitlements = Base.metadata.tables["entitlements"]
     entitlements_indexes = {index.name for index in entitlements.indexes}

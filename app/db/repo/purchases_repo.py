@@ -39,6 +39,26 @@ class PurchasesRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_active_invoice_for_user_product(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        product_code: str,
+    ) -> Purchase | None:
+        stmt = (
+            select(Purchase)
+            .where(
+                Purchase.user_id == user_id,
+                Purchase.product_code == product_code,
+                Purchase.status.in_(("CREATED", "INVOICE_SENT", "PRECHECKOUT_OK")),
+            )
+            .order_by(Purchase.created_at.desc())
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_for_credit_lock(session: AsyncSession, purchase_id: UUID) -> Purchase | None:
         stmt = select(Purchase).where(Purchase.id == purchase_id).with_for_update()
         result = await session.execute(stmt)
