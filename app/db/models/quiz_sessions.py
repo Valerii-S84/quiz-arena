@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String
+from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,6 +25,13 @@ class QuizSession(Base):
         Index("idx_sessions_user_started", "user_id", "started_at"),
         Index("idx_sessions_mode", "mode_code"),
         Index("idx_sessions_local_date", "local_date_berlin"),
+        Index(
+            "uq_daily_challenge_user_date",
+            "user_id",
+            "local_date_berlin",
+            unique=True,
+            postgresql_where=text("source = 'DAILY_CHALLENGE'"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)

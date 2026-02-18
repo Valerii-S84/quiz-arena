@@ -58,6 +58,10 @@ def test_critical_constraints_present() -> None:
     purchase_index_names = {index.name for index in purchases.indexes}
     assert "uq_purchases_active_invoice_user_product" in purchase_index_names
 
+    quiz_sessions = Base.metadata.tables["quiz_sessions"]
+    quiz_sessions_indexes = {index.name for index in quiz_sessions.indexes}
+    assert "uq_daily_challenge_user_date" in quiz_sessions_indexes
+
     entitlements = Base.metadata.tables["entitlements"]
     entitlements_indexes = {index.name for index in entitlements.indexes}
     assert "uq_entitlements_active_premium_per_user" in entitlements_indexes

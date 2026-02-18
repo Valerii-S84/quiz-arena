@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.quiz_attempts import QuizAttempt
@@ -124,21 +125,26 @@ class GameSessionService:
             selection_seed=idempotency_key,
         )
 
-        created = await QuizSessionsRepo.create(
-            session,
-            quiz_session=QuizSession(
-                id=uuid4(),
-                user_id=user_id,
-                mode_code=mode_code,
-                source=source,
-                status="STARTED",
-                energy_cost_total=energy_cost_total,
-                question_id=question.question_id,
-                started_at=now_utc,
-                local_date_berlin=local_date,
-                idempotency_key=idempotency_key,
-            ),
-        )
+        try:
+            created = await QuizSessionsRepo.create(
+                session,
+                quiz_session=QuizSession(
+                    id=uuid4(),
+                    user_id=user_id,
+                    mode_code=mode_code,
+                    source=source,
+                    status="STARTED",
+                    energy_cost_total=energy_cost_total,
+                    question_id=question.question_id,
+                    started_at=now_utc,
+                    local_date_berlin=local_date,
+                    idempotency_key=idempotency_key,
+                ),
+            )
+        except IntegrityError as exc:
+            if source == "DAILY_CHALLENGE":
+                raise DailyChallengeAlreadyPlayedError from exc
+            raise
 
         return StartSessionResult(
             session=SessionQuestionView(
