@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+from datetime import date
+from uuid import UUID
+
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.models.quiz_sessions import QuizSession
+
+
+class QuizSessionsRepo:
+    @staticmethod
+    async def get_by_id(session: AsyncSession, session_id: UUID) -> QuizSession | None:
+        return await session.get(QuizSession, session_id)
+
+    @staticmethod
+    async def get_by_id_for_update(session: AsyncSession, session_id: UUID) -> QuizSession | None:
+        stmt = select(QuizSession).where(QuizSession.id == session_id).with_for_update()
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_by_idempotency_key(session: AsyncSession, idempotency_key: str) -> QuizSession | None:
+        stmt = select(QuizSession).where(QuizSession.idempotency_key == idempotency_key)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def has_daily_challenge_on_date(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        local_date_berlin: date,
+    ) -> bool:
+        stmt = select(QuizSession.id).where(
+            and_(
+                QuizSession.user_id == user_id,
+                QuizSession.source == "DAILY_CHALLENGE",
+                QuizSession.local_date_berlin == local_date_berlin,
+            )
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def create(session: AsyncSession, *, quiz_session: QuizSession) -> QuizSession:
+        session.add(quiz_session)
+        await session.flush()
+        return quiz_session

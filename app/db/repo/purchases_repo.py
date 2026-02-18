@@ -15,8 +15,26 @@ class PurchasesRepo:
         return await session.get(Purchase, purchase_id)
 
     @staticmethod
+    async def get_by_id_for_update(session: AsyncSession, purchase_id: UUID) -> Purchase | None:
+        stmt = select(Purchase).where(Purchase.id == purchase_id).with_for_update()
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_by_idempotency_key(session: AsyncSession, idempotency_key: str) -> Purchase | None:
         stmt = select(Purchase).where(Purchase.idempotency_key == idempotency_key)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_by_invoice_payload(session: AsyncSession, invoice_payload: str) -> Purchase | None:
+        stmt = select(Purchase).where(Purchase.invoice_payload == invoice_payload)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_by_invoice_payload_for_update(session: AsyncSession, invoice_payload: str) -> Purchase | None:
+        stmt = select(Purchase).where(Purchase.invoice_payload == invoice_payload).with_for_update()
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 

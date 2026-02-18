@@ -34,3 +34,21 @@ class StreakRepo:
         session.add(state)
         await session.flush()
         return state
+
+    @staticmethod
+    async def add_streak_saver_token(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        now_utc: datetime,
+    ) -> StreakState:
+        state = await StreakRepo.get_by_user_id_for_update(session, user_id)
+        if state is None:
+            state = await StreakRepo.create_default_state(session, user_id=user_id, now_utc=now_utc)
+
+        state.streak_saver_tokens += 1
+        state.streak_saver_last_purchase_at = now_utc
+        state.updated_at = now_utc
+        state.version += 1
+        await session.flush()
+        return state

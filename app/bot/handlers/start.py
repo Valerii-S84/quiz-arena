@@ -4,6 +4,7 @@ from aiogram import Router
 from aiogram.filters import CommandStart
 from aiogram.types import Message
 
+from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
 from app.services.user_onboarding import UserOnboardingService
@@ -33,4 +34,4 @@ async def handle_start(message: Message) -> None:
             TEXTS_DE["msg.home.streak"].format(streak=snapshot.current_streak),
         ]
     )
-    await message.answer(response_text)
+    await message.answer(response_text, reply_markup=build_home_keyboard())

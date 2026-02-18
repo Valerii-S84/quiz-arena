@@ -4,7 +4,8 @@
 - M2 completed: full section-6 schema + migrations + base repositories.
 - M3 completed: energy engine domain + service + tests.
 - M4 completed: streak engine domain + service + tests.
-- M5 phase 1 completed: `/start` onboarding integrated with DB, energy, and streak sync.
+- M5 completed as functional free-loop slice (start/menu/play/answer/locked/daily challenge).
+- M6 slice 1 completed: Telegram micro-purchase callback flow (buy -> pre_checkout -> successful_payment -> credit apply).
 - Technical spec source of truth: `TECHNICAL_SPEC_ENERGY_STARS_BOT.md`.
 
 ## Critical Notes
@@ -14,10 +15,10 @@
 - Postgres integration/load checks are still pending in this runtime.
 
 ## Immediate Next Steps (Priority)
-1. Continue Milestone 5: implement free gameplay handlers (`play`, answer flow, locked checks, daily challenge zero-cost path).
-2. Implement webhook handlers and Telegram Stars payment skeleton (Milestone 6).
-3. Add DB integration tests for transactional paths (onboarding, energy consume, streak activity).
-4. Run migration and transaction rehearsal on staging-like Postgres runtime.
+1. Implement webhook endpoint and queued update processing (`/webhook/telegram`).
+2. Add payment recovery and reconciliation jobs for `PAID_UNCREDITED` and ledger consistency.
+3. Replace static question bank with real selection/anti-repeat logic.
+4. Add DB integration tests for payment and callback idempotency under duplicates.
 
 ## Validation Commands
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q -s`

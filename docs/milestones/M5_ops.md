@@ -1,9 +1,10 @@
 # M5 Ops
 
 ## Added
-- `/start` now triggers persistent user/session bootstrap via DB transaction.
+- Callback gameplay flow now persists sessions and attempts in DB tables.
+- Daily challenge one-per-day gating is enforced through session history.
 
 ## Missing for Next Milestones
-- Operational alerts around onboarding DB failures.
-- Handler latency monitoring under load.
-- End-to-end Telegram webhook/polling smoke for gameplay callbacks.
+- Handler-level observability for callback duplication and lock contention.
+- Runtime dashboards for session start/answer conversion.
+- Production question-content pipeline and moderation operations.
