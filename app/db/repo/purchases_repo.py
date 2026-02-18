@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.purchases import Purchase
@@ -43,6 +43,46 @@ class PurchasesRepo:
         stmt = select(Purchase).where(Purchase.id == purchase_id).with_for_update()
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_paid_uncredited_older_than(
+        session: AsyncSession,
+        *,
+        older_than_utc: datetime,
+        limit: int = 100,
+    ) -> list[Purchase]:
+        stmt = (
+            select(Purchase)
+            .where(
+                Purchase.status == "PAID_UNCREDITED",
+                Purchase.paid_at.is_not(None),
+                Purchase.paid_at <= older_than_utc,
+            )
+            .order_by(Purchase.paid_at.asc())
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def count_paid_purchases(session: AsyncSession) -> int:
+        stmt = select(func.count(Purchase.id)).where(Purchase.paid_at.is_not(None))
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_paid_uncredited_older_than(
+        session: AsyncSession,
+        *,
+        older_than_utc: datetime,
+    ) -> int:
+        stmt = select(func.count(Purchase.id)).where(
+            Purchase.status == "PAID_UNCREDITED",
+            Purchase.paid_at.is_not(None),
+            Purchase.paid_at <= older_than_utc,
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
 
     @staticmethod
     async def create(

@@ -7,6 +7,7 @@ from app.db.repo.promo_repo import PromoRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
+from app.db.repo.reconciliation_runs_repo import ReconciliationRunsRepo
 from app.db.repo.streak_repo import StreakRepo
 from app.db.repo.users_repo import UsersRepo
 
@@ -20,6 +21,7 @@ __all__ = [
     "PurchasesRepo",
     "QuizAttemptsRepo",
     "QuizSessionsRepo",
+    "ReconciliationRunsRepo",
     "StreakRepo",
     "UsersRepo",
 ]

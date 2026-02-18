@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.ledger_entries import LedgerEntry
@@ -18,3 +18,13 @@ class LedgerRepo:
         session.add(entry)
         await session.flush()
         return entry
+
+    @staticmethod
+    async def count_distinct_purchase_credits(session: AsyncSession) -> int:
+        stmt = select(func.count(distinct(LedgerEntry.purchase_id))).where(
+            LedgerEntry.purchase_id.is_not(None),
+            LedgerEntry.entry_type == "PURCHASE_CREDIT",
+            LedgerEntry.direction == "CREDIT",
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
