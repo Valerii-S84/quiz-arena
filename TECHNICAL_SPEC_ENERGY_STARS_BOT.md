@@ -1375,7 +1375,7 @@ VALUES (9001, 101, 'MODE_ACCESS', 'CASES_PRACTICE', 'ACTIVE', '2026-02-17T19:01:
 ### 8.4 Retry policy
 
 - Внутрішні transient помилки: exponential backoff `250ms, 1s, 3s`, max 3.
-- Purchase credit retries: max 10 спроб протягом 30 хв, далі manual review.
+- Purchase credit retries: max `3` спроби (1 спроба на цикл `recover_paid_uncredited`, кожні 5 хв), далі `FAILED_CREDIT_PENDING_REVIEW` + manual review.
 - Telegram API `429`: враховувати `retry_after`.
 
 ---
