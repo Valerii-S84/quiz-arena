@@ -33,6 +33,7 @@ class QuizSession(Base):
     source: Mapped[str] = mapped_column(String(16), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     energy_cost_total: Mapped[int] = mapped_column(Integer, nullable=False)
+    question_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     local_date_berlin: Mapped[date] = mapped_column(Date, nullable=False)

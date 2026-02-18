@@ -15,7 +15,11 @@ from app.economy.energy.service import EnergyService
 from app.economy.streak.service import StreakService
 from app.economy.streak.time import berlin_local_date
 from app.game.modes.rules import is_mode_allowed, is_zero_cost_source
-from app.game.questions.static_bank import get_question_for_mode
+from app.game.questions.static_bank import (
+    get_question_by_id,
+    get_question_for_mode,
+    select_question_for_mode,
+)
 from app.game.sessions.errors import (
     DailyChallengeAlreadyPlayedError,
     EnergyInsufficientError,
@@ -41,7 +45,19 @@ class GameSessionService:
         local_date = berlin_local_date(now_utc)
 
         if existing is not None:
-            question = get_question_for_mode(existing.mode_code, local_date_berlin=existing.local_date_berlin)
+            question = None
+            if existing.question_id is not None:
+                question = get_question_by_id(
+                    existing.mode_code,
+                    question_id=existing.question_id,
+                    local_date_berlin=existing.local_date_berlin,
+                )
+            if question is None:
+                question = get_question_for_mode(
+                    existing.mode_code,
+                    local_date_berlin=existing.local_date_berlin,
+                )
+
             return StartSessionResult(
                 session=SessionQuestionView(
                     session_id=existing.id,
@@ -95,6 +111,19 @@ class GameSessionService:
             energy_paid = energy_result.paid_energy
             energy_cost_total = 1
 
+        recent_question_ids = await QuizAttemptsRepo.get_recent_question_ids_for_mode(
+            session,
+            user_id=user_id,
+            mode_code=mode_code,
+            limit=20,
+        )
+        question = select_question_for_mode(
+            mode_code,
+            local_date_berlin=local_date,
+            recent_question_ids=recent_question_ids,
+            selection_seed=idempotency_key,
+        )
+
         created = await QuizSessionsRepo.create(
             session,
             quiz_session=QuizSession(
@@ -104,13 +133,13 @@ class GameSessionService:
                 source=source,
                 status="STARTED",
                 energy_cost_total=energy_cost_total,
+                question_id=question.question_id,
                 started_at=now_utc,
                 local_date_berlin=local_date,
                 idempotency_key=idempotency_key,
             ),
         )
 
-        question = get_question_for_mode(mode_code, local_date_berlin=local_date)
         return StartSessionResult(
             session=SessionQuestionView(
                 session_id=created.id,
@@ -154,10 +183,19 @@ class GameSessionService:
         if quiz_session is None or quiz_session.user_id != user_id:
             raise SessionNotFoundError
 
-        question = get_question_for_mode(
-            quiz_session.mode_code,
-            local_date_berlin=quiz_session.local_date_berlin,
-        )
+        question = None
+        if quiz_session.question_id is not None:
+            question = get_question_by_id(
+                quiz_session.mode_code,
+                question_id=quiz_session.question_id,
+                local_date_berlin=quiz_session.local_date_berlin,
+            )
+        if question is None:
+            question = get_question_for_mode(
+                quiz_session.mode_code,
+                local_date_berlin=quiz_session.local_date_berlin,
+            )
+
         is_correct = selected_option == question.correct_option
 
         await QuizAttemptsRepo.create(

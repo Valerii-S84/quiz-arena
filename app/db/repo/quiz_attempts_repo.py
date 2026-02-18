@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.quiz_attempts import QuizAttempt
+from app.db.models.quiz_sessions import QuizSession
 
 
 class QuizAttemptsRepo:
@@ -18,3 +19,24 @@ class QuizAttemptsRepo:
         session.add(attempt)
         await session.flush()
         return attempt
+
+    @staticmethod
+    async def get_recent_question_ids_for_mode(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        mode_code: str,
+        limit: int = 20,
+    ) -> list[str]:
+        stmt = (
+            select(QuizAttempt.question_id)
+            .join(QuizSession, QuizAttempt.session_id == QuizSession.id)
+            .where(
+                QuizAttempt.user_id == user_id,
+                QuizSession.mode_code == mode_code,
+            )
+            .order_by(QuizAttempt.answered_at.desc())
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
