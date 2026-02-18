@@ -21,5 +21,4 @@
 - Worker wrapper tests cover promo Celery task entrypoints.
 
 ## Missing
-- Concurrent redeem collision tests with real parallel transactions.
 - End-to-end bot + webhook + promo payment chain smoke in Telegram sandbox.
