@@ -143,10 +143,12 @@ class PurchaseService:
         if purchase.status not in {"PRECHECKOUT_OK", "INVOICE_SENT", "CREATED", "PAID_UNCREDITED"}:
             raise PurchasePrecheckoutValidationError
 
+        previous_status = purchase.status
         purchase.telegram_payment_charge_id = telegram_payment_charge_id
         purchase.raw_successful_payment = raw_successful_payment
         purchase.status = "PAID_UNCREDITED"
-        purchase.paid_at = now_utc
+        if purchase.paid_at is None or previous_status != "PAID_UNCREDITED":
+            purchase.paid_at = now_utc
 
         product = get_product(purchase.product_code)
         if product is None:
