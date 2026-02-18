@@ -1,26 +1,40 @@
 # NEXT_AGENT_BRIEF
 
 ## Current State
-- M2 completed: full section-6 schema + migrations + base repositories.
-- M3 completed: energy engine domain + service + tests.
-- M4 completed: streak engine domain + service + tests.
-- M5 completed as functional free-loop slice (start/menu/play/answer/locked/daily challenge).
-- M6 slice 1 completed: Telegram micro-purchase callback flow (buy -> pre_checkout -> successful_payment -> credit apply).
+- M1-M5 completed (foundation, schema, energy, streak, free-loop gameplay).
+- M6 completed beyond slice 1:
+  - webhook endpoint + async update queue (`/webhook/telegram`);
+  - payment recovery + reconciliation jobs;
+  - anti-repeat question selection and persisted `question_id`;
+  - Postgres integration tests for idempotent payment credit replay;
+  - promo discount settlement in purchase flow.
+- M7 completed:
+  - all 4 premium plans in catalog;
+  - premium entitlement grant on payment;
+  - upgrade extension behavior + downgrade block.
+- M10 core promo module is now implemented:
+  - `POST /internal/promo/redeem` (`PREMIUM_GRANT`, `PERCENT_DISCOUNT`);
+  - promo anti-abuse throttling (per-user + global brute-force autopause);
+  - promo maintenance jobs (reservation expiry, campaign rollover, brute-force guard);
+  - bot-level promo UX (`/promo <code>`, `promo:open`).
 - Technical spec source of truth: `TECHNICAL_SPEC_ENERGY_STARS_BOT.md`.
 
 ## Critical Notes
 - `.env` is local-only and must never be committed.
 - Bot token is already configured locally; rotate token before production webhook go-live.
-- Docker is currently unavailable in this WSL runtime until Docker Desktop WSL integration is enabled.
-- Postgres integration/load checks are still pending in this runtime.
+- Docker services are available in this runtime (`postgres`, `redis`) and currently running.
+- Latest full validation run in this branch: `94 passed`.
 
 ## Immediate Next Steps (Priority)
-1. Implement webhook endpoint and queued update processing (`/webhook/telegram`).
-2. Add payment recovery and reconciliation jobs for `PAID_UNCREDITED` and ledger consistency.
-3. Replace static question bank with real selection/anti-repeat logic.
-4. Add DB integration tests for payment and callback idempotency under duplicates.
+1. Milestone 8: implement offer trigger engine + `offers_impressions` idempotent logging and caps.
+2. Milestone 9: implement referral qualification + anti-fraud checks and reward flow.
+3. M10 remaining hardening:
+  - promo code generation/import tooling (batch/admin path),
+  - alert hooks for brute-force autopause and promo failure spikes,
+  - targeted concurrency tests for parallel redeem collisions.
+4. Add Telegram sandbox end-to-end smoke for webhook -> payment -> promo flows.
 
 ## Validation Commands
-- `TMPDIR=/tmp .venv/bin/python -m pytest -q -s`
+- `TMPDIR=/tmp .venv/bin/python -m pytest -q`
 - `.venv/bin/ruff check app tests alembic scripts`
 - `TMPDIR=/tmp .venv/bin/alembic heads`
