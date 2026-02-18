@@ -15,6 +15,7 @@ from app.economy.purchases.errors import (
     PurchaseInitValidationError,
     PurchaseNotFoundError,
     PurchasePrecheckoutValidationError,
+    StreakSaverPurchaseLimitError,
 )
 from app.economy.purchases.service import PurchaseService
 from app.services.user_onboarding import UserOnboardingService
@@ -50,6 +51,9 @@ async def handle_buy(callback: CallbackQuery) -> None:
             )
     except PremiumDowngradeNotAllowedError:
         await callback.answer(TEXTS_DE["msg.premium.downgrade.blocked"], show_alert=True)
+        return
+    except StreakSaverPurchaseLimitError:
+        await callback.answer(TEXTS_DE["msg.purchase.error.streaksaver.limit"], show_alert=True)
         return
     except (ProductNotFoundError, PurchaseInitValidationError):
         await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)

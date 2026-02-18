@@ -18,6 +18,7 @@ TEXTS_DE: dict[str, str] = {
     "msg.purchase.success.streaksaver": "Streak Saver ist bereit. Ein Fehltag wird automatisch geschützt.",
     "msg.purchase.success.premium": "Premium ist jetzt aktiv. Dein Zugriff wurde aktualisiert.",
     "msg.purchase.error.failed": "Zahlung fehlgeschlagen. Bitte versuche es erneut.",
+    "msg.purchase.error.streaksaver.limit": "Streak Saver ist nur einmal in 7 Tagen verfügbar.",
     "msg.premium.downgrade.blocked": "Ein niedrigerer Plan ist während aktivem Premium nicht verfügbar.",
     "msg.promo.input.hint": "Gib deinen Promo-Code ein. Beispiel: /promo WILLKOMMEN-50",
     "msg.promo.success.grant": "Promo-Code aktiviert. Premium wurde freigeschaltet.",

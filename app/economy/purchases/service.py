@@ -27,10 +27,12 @@ from app.economy.purchases.errors import (
     PurchaseInitValidationError,
     PurchaseNotFoundError,
     PurchasePrecheckoutValidationError,
+    StreakSaverPurchaseLimitError,
 )
 from app.economy.purchases.types import PurchaseCreditResult, PurchaseInitResult
 
 PROMO_RESERVATION_TTL_MINUTES = 15
+STREAK_SAVER_PURCHASE_LOCK_WINDOW = timedelta(days=7)
 PREMIUM_PLAN_RANKS: dict[str, int] = {
     "PREMIUM_STARTER": 1,
     "PREMIUM_MONTH": 2,
@@ -103,6 +105,24 @@ class PurchaseService:
             applied_promo_code_id=purchase.applied_promo_code_id,
             idempotent_replay=idempotent_replay,
         )
+
+    @staticmethod
+    async def _validate_streak_saver_purchase_limit(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        now_utc: datetime,
+    ) -> None:
+        streak_state = await StreakRepo.get_by_user_id_for_update(session, user_id)
+        if streak_state is None:
+            return
+
+        last_purchase_at = streak_state.streak_saver_last_purchase_at
+        if last_purchase_at is None:
+            return
+
+        if now_utc < last_purchase_at + STREAK_SAVER_PURCHASE_LOCK_WINDOW:
+            raise StreakSaverPurchaseLimitError
 
     @staticmethod
     async def _validate_and_reserve_discount_redemption(
@@ -256,6 +276,13 @@ class PurchaseService:
         existing = await PurchasesRepo.get_by_idempotency_key(session, idempotency_key)
         if existing is not None:
             return PurchaseService._as_init_result(existing, idempotent_replay=True)
+
+        if product.product_code == "STREAK_SAVER_20":
+            await PurchaseService._validate_streak_saver_purchase_limit(
+                session,
+                user_id=user_id,
+                now_utc=now_utc,
+            )
 
         discount_stars_amount = 0
         applied_promo_code_id: int | None = None

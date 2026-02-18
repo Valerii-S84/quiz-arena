@@ -20,3 +20,7 @@ class PurchaseInitValidationError(PurchaseError):
 
 class PremiumDowngradeNotAllowedError(PurchaseInitValidationError):
     pass
+
+
+class StreakSaverPurchaseLimitError(PurchaseInitValidationError):
+    pass
