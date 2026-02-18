@@ -403,7 +403,10 @@ async def test_reconciliation_detects_diff_and_persists_run() -> None:
     assert result["paid_purchases_count"] == 2
     assert result["credited_purchases_count"] == 1
     assert result["stale_paid_uncredited_count"] == 1
-    assert result["diff_count"] == 2
+    assert result["paid_stars_total"] == 20
+    assert result["credited_stars_total"] == 10
+    assert result["product_stars_mismatch_count"] == 1
+    assert result["diff_count"] == 4
     assert result["status"] == "DIFF"
 
     async with SessionLocal.begin() as session:
@@ -411,5 +414,5 @@ async def test_reconciliation_detects_diff_and_persists_run() -> None:
         latest_run = await session.scalar(run_stmt)
         assert latest_run is not None
         assert latest_run.status == "DIFF"
-        assert latest_run.diff_count == 2
+        assert latest_run.diff_count == 4
         assert latest_run.finished_at is not None

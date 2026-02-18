@@ -18,7 +18,11 @@ from app.economy.purchases.errors import (
 )
 from app.economy.purchases.recovery import MAX_CREDIT_RECOVERY_ATTEMPTS, increment_recovery_failures
 from app.economy.purchases.service import PurchaseService
-from app.services.payments_reliability import compute_reconciliation_diff, reconciliation_status
+from app.services.payments_reliability import (
+    compute_product_stars_mismatch_count,
+    compute_reconciliation_diff,
+    reconciliation_status,
+)
 from app.workers.celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
@@ -103,6 +107,14 @@ async def run_payments_reconciliation_async(*, stale_minutes: int = 30) -> dict[
     async with SessionLocal.begin() as session:
         paid_purchases_count = await PurchasesRepo.count_paid_purchases(session)
         credited_purchases_count = await LedgerRepo.count_distinct_purchase_credits(session)
+        paid_stars_total = await PurchasesRepo.sum_paid_stars_amount(session)
+        credited_stars_total = await LedgerRepo.sum_distinct_purchase_stars_for_credits(session)
+        paid_stars_by_product = await PurchasesRepo.sum_paid_stars_amount_by_product(session)
+        credited_stars_by_product = await LedgerRepo.sum_distinct_purchase_stars_for_credits_by_product(session)
+        product_stars_mismatch_count = compute_product_stars_mismatch_count(
+            paid_stars_by_product=paid_stars_by_product,
+            credited_stars_by_product=credited_stars_by_product,
+        )
         stale_paid_uncredited_count = await PurchasesRepo.count_paid_uncredited_older_than(
             session,
             older_than_utc=stale_cutoff,
@@ -111,6 +123,9 @@ async def run_payments_reconciliation_async(*, stale_minutes: int = 30) -> dict[
             paid_purchases_count=paid_purchases_count,
             credited_purchases_count=credited_purchases_count,
             stale_paid_uncredited_count=stale_paid_uncredited_count,
+            paid_stars_total=paid_stars_total,
+            credited_stars_total=credited_stars_total,
+            product_stars_mismatch_count=product_stars_mismatch_count,
         )
         status = reconciliation_status(diff_count)
 
@@ -126,10 +141,16 @@ async def run_payments_reconciliation_async(*, stale_minutes: int = 30) -> dict[
         "paid_purchases_count": paid_purchases_count,
         "credited_purchases_count": credited_purchases_count,
         "stale_paid_uncredited_count": stale_paid_uncredited_count,
+        "paid_stars_total": paid_stars_total,
+        "credited_stars_total": credited_stars_total,
+        "product_stars_mismatch_count": product_stars_mismatch_count,
         "diff_count": diff_count,
         "status": status,
     }
-    logger.info("payments_reconciliation_finished", **result)
+    if diff_count > 0:
+        logger.warning("payments_reconciliation_diff_detected", **result)
+    else:
+        logger.info("payments_reconciliation_finished", **result)
     return result
 
 

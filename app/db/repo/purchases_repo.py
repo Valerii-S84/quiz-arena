@@ -91,6 +91,25 @@ class PurchasesRepo:
         return int(result.scalar_one() or 0)
 
     @staticmethod
+    async def sum_paid_stars_amount(session: AsyncSession) -> int:
+        stmt = select(func.coalesce(func.sum(Purchase.stars_amount), 0)).where(Purchase.paid_at.is_not(None))
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def sum_paid_stars_amount_by_product(session: AsyncSession) -> dict[str, int]:
+        stmt = (
+            select(
+                Purchase.product_code,
+                func.coalesce(func.sum(Purchase.stars_amount), 0),
+            )
+            .where(Purchase.paid_at.is_not(None))
+            .group_by(Purchase.product_code)
+        )
+        result = await session.execute(stmt)
+        return {product_code: int(total or 0) for product_code, total in result.all()}
+
+    @staticmethod
     async def count_by_user(session: AsyncSession, *, user_id: int) -> int:
         stmt = select(func.count(Purchase.id)).where(Purchase.user_id == user_id)
         result = await session.execute(stmt)
