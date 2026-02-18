@@ -23,11 +23,36 @@ from app.game.sessions.errors import (
     SessionNotFoundError,
 )
 from app.game.sessions.service import GameSessionService
+from app.game.sessions.types import StartSessionResult
 from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="gameplay")
 
 ANSWER_RE = re.compile(r"^answer:([0-9a-f\-]{36}):([0-3])$")
+
+
+def _build_question_text(
+    *,
+    source: str,
+    snapshot_free_energy: int,
+    snapshot_paid_energy: int,
+    start_result: StartSessionResult,
+) -> str:
+    return "\n".join(
+        [
+            TEXTS_DE["msg.game.mode"].format(mode_code=start_result.session.mode_code),
+            TEXTS_DE["msg.game.energy.left"].format(
+                free_energy=(
+                    snapshot_free_energy if is_zero_cost_source(source) else start_result.energy_free
+                ),
+                paid_energy=(
+                    snapshot_paid_energy if is_zero_cost_source(source) else start_result.energy_paid
+                ),
+            ),
+            start_result.session.text,
+            TEXTS_DE["msg.game.choose_option"],
+        ]
+    )
 
 
 async def _start_mode(
@@ -114,20 +139,11 @@ async def _start_mode(
             await callback.answer()
             return
 
-    question_text = "\n".join(
-        [
-            TEXTS_DE["msg.game.mode"].format(mode_code=result.session.mode_code),
-            TEXTS_DE["msg.game.energy.left"].format(
-                free_energy=(
-                    snapshot.free_energy if is_zero_cost_source(source) else result.energy_free
-                ),
-                paid_energy=(
-                    snapshot.paid_energy if is_zero_cost_source(source) else result.energy_paid
-                ),
-            ),
-            result.session.text,
-            TEXTS_DE["msg.game.choose_option"],
-        ]
+    question_text = _build_question_text(
+        source=source,
+        snapshot_free_energy=snapshot.free_energy,
+        snapshot_paid_energy=snapshot.paid_energy,
+        start_result=result,
     )
 
     await callback.message.answer(
@@ -137,6 +153,15 @@ async def _start_mode(
             options=result.session.options,
         ),
     )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "game:stop")
+async def handle_game_stop(callback: CallbackQuery) -> None:
+    if callback.message is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    await callback.message.answer(TEXTS_DE["msg.game.stopped"], reply_markup=build_home_keyboard())
     await callback.answer()
 
 
@@ -231,6 +256,73 @@ async def handle_answer(callback: CallbackQuery) -> None:
         )
     )
     response = "\n".join(response_lines)
+    await callback.message.answer(response)
 
-    await callback.message.answer(response, reply_markup=build_home_keyboard())
+    if result.mode_code is None or result.source is None:
+        await callback.message.answer(TEXTS_DE["msg.game.stopped"], reply_markup=build_home_keyboard())
+        await callback.answer()
+        return
+    if result.source == "DAILY_CHALLENGE":
+        await callback.message.answer(TEXTS_DE["msg.game.daily.finished"], reply_markup=build_home_keyboard())
+        await callback.answer()
+        return
+
+    async with SessionLocal.begin() as session:
+        snapshot = await UserOnboardingService.ensure_home_snapshot(
+            session,
+            telegram_user=callback.from_user,
+        )
+
+        try:
+            next_result = await GameSessionService.start_session(
+                session,
+                user_id=snapshot.user_id,
+                mode_code=result.mode_code,
+                source=result.source,
+                idempotency_key=f"start:auto:{result.mode_code}:{callback.id}",
+                now_utc=now_utc,
+            )
+        except ModeLockedError:
+            await callback.message.answer(TEXTS_DE["msg.locked.mode"], reply_markup=build_home_keyboard())
+            await callback.answer()
+            return
+        except EnergyInsufficientError:
+            offer_selection = None
+            try:
+                offer_selection = await OfferService.evaluate_and_log_offer(
+                    session,
+                    user_id=snapshot.user_id,
+                    idempotency_key=f"offer:energy:auto:{callback.id}",
+                    now_utc=now_utc,
+                )
+            except OfferLoggingError:
+                offer_selection = None
+
+            text = (
+                TEXTS_DE[offer_selection.text_key]
+                if offer_selection is not None
+                else TEXTS_DE["msg.energy.empty.body"]
+            )
+            keyboard = (
+                build_offer_keyboard(offer_selection)
+                if offer_selection is not None
+                else build_home_keyboard()
+            )
+            await callback.message.answer(text, reply_markup=keyboard)
+            await callback.answer()
+            return
+
+    question_text = _build_question_text(
+        source=result.source,
+        snapshot_free_energy=snapshot.free_energy,
+        snapshot_paid_energy=snapshot.paid_energy,
+        start_result=next_result,
+    )
+    await callback.message.answer(
+        question_text,
+        reply_markup=build_quiz_keyboard(
+            session_id=str(next_result.session.session_id),
+            options=next_result.session.options,
+        ),
+    )
     await callback.answer()

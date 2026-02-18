@@ -30,5 +30,7 @@ class AnswerSessionResult:
     current_streak: int
     best_streak: int
     idempotent_replay: bool
+    mode_code: str | None = None
+    source: str | None = None
     selected_answer_text: str | None = None
     correct_answer_text: str | None = None

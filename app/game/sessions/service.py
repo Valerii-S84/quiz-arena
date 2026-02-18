@@ -176,13 +176,16 @@ class GameSessionService:
         existing_attempt = await QuizAttemptsRepo.get_by_idempotency_key(session, idempotency_key)
         if existing_attempt is not None:
             streak_snapshot = await StreakService.sync_rollover(session, user_id=user_id, now_utc=now_utc)
+            replay_session = await QuizSessionsRepo.get_by_id(session, existing_attempt.session_id)
             return AnswerSessionResult(
-                session_id=session_id,
+                session_id=existing_attempt.session_id,
                 question_id=existing_attempt.question_id,
                 is_correct=existing_attempt.is_correct,
                 current_streak=streak_snapshot.current_streak,
                 best_streak=streak_snapshot.best_streak,
                 idempotent_replay=True,
+                mode_code=replay_session.mode_code if replay_session is not None else None,
+                source=replay_session.source if replay_session is not None else None,
                 selected_answer_text=None,
                 correct_answer_text=None,
             )
@@ -234,6 +237,8 @@ class GameSessionService:
             current_streak=streak_result.current_streak,
             best_streak=streak_result.best_streak,
             idempotent_replay=False,
+            mode_code=quiz_session.mode_code,
+            source=quiz_session.source,
             selected_answer_text=question.options[selected_option],
             correct_answer_text=question.options[question.correct_option],
         )
