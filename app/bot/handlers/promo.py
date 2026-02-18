@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 
 from aiogram import F, Router
@@ -22,6 +23,15 @@ from app.economy.promo.service import PromoService
 from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="promo")
+PROMO_INPUT_RE = re.compile(r"^/?promo\s+(.+)$", re.IGNORECASE)
+
+
+def _extract_promo_code(text: str) -> str | None:
+    match = PROMO_INPUT_RE.match(text.strip())
+    if match is None:
+        return None
+    promo_code = match.group(1).strip()
+    return promo_code or None
 
 
 @router.callback_query(F.data == "promo:open")
@@ -33,16 +43,24 @@ async def handle_promo_open(callback: CallbackQuery) -> None:
 
 @router.message(Command("promo"))
 async def handle_promo_command(message: Message) -> None:
+    await _redeem_promo_from_text(message)
+
+
+@router.message(F.text.regexp(r"(?i)^promo\s+"))
+async def handle_promo_text(message: Message) -> None:
+    await _redeem_promo_from_text(message)
+
+
+async def _redeem_promo_from_text(message: Message) -> None:
     if message.from_user is None:
         await message.answer(TEXTS_DE["msg.system.error"], reply_markup=build_home_keyboard())
         return
 
     text = message.text or ""
-    parts = text.split(maxsplit=1)
-    if len(parts) < 2 or not parts[1].strip():
+    promo_code = _extract_promo_code(text)
+    if promo_code is None:
         await message.answer(TEXTS_DE["msg.promo.input.hint"], reply_markup=build_home_keyboard())
         return
-    promo_code = parts[1].strip()
 
     now_utc = datetime.now(timezone.utc)
 
