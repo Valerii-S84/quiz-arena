@@ -29,8 +29,8 @@
 1. Milestone 8: implement offer trigger engine + `offers_impressions` idempotent logging and caps.
 2. Milestone 9: implement referral qualification + anti-fraud checks and reward flow.
 3. M10 remaining hardening:
-  - promo code generation/import tooling (batch/admin path),
-  - targeted concurrency tests for parallel redeem collisions.
+  - provider-specific alert routing (PagerDuty/Slack templates + escalation policy),
+  - Telegram sandbox smoke for promo redeem -> purchase flow.
 4. Add Telegram sandbox end-to-end smoke for webhook -> payment -> promo flows.
 
 ## Validation Commands

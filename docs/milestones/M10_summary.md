@@ -21,9 +21,12 @@
   - `/promo <code>` command,
   - `promo:open` callback hint,
   - German success/error texts for promo outcomes.
+- Added promo batch admin tooling:
+  - `scripts/promo_batch_tool.py` supports code generation and CSV import,
+  - writes normalized output report with inserted `promo_code_id`.
 
 ## Not Implemented
-- Promo code batch generation/import tooling (admin path).
+- Dedicated admin UI/workflow for promo campaign operations (CLI is available).
 - Provider-specific alert routing templates (PagerDuty/Slack formatting, escalation policy bindings).
 - Refund-driven promo rollback (`PR_REVOKED`) automation.
 
