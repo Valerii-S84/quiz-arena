@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import distinct, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.promo_attempts import PromoAttempt
@@ -188,6 +188,50 @@ class PromoRepo:
                 PromoCode.used_total >= PromoCode.max_total_uses,
             )
             .values(status="DEPLETED", updated_at=now_utc)
+        )
+        result = await session.execute(stmt)
+        return int(result.rowcount or 0)
+
+    @staticmethod
+    async def get_abusive_code_hashes(
+        session: AsyncSession,
+        *,
+        since_utc: datetime,
+        min_failed_attempts: int,
+        min_distinct_users: int,
+    ) -> list[str]:
+        stmt = (
+            select(PromoAttempt.normalized_code_hash)
+            .where(
+                PromoAttempt.attempted_at >= since_utc,
+                PromoAttempt.result.in_(("INVALID", "EXPIRED", "NOT_APPLICABLE")),
+            )
+            .group_by(PromoAttempt.normalized_code_hash)
+            .having(
+                func.count(PromoAttempt.id) > min_failed_attempts,
+                func.count(distinct(PromoAttempt.user_id)) >= min_distinct_users,
+            )
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def pause_active_codes_by_hashes(
+        session: AsyncSession,
+        *,
+        code_hashes: list[str],
+        now_utc: datetime,
+    ) -> int:
+        if not code_hashes:
+            return 0
+
+        stmt = (
+            update(PromoCode)
+            .where(
+                PromoCode.code_hash.in_(code_hashes),
+                PromoCode.status == "ACTIVE",
+            )
+            .values(status="PAUSED", updated_at=now_utc)
         )
         result = await session.execute(stmt)
         return int(result.rowcount or 0)

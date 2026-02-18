@@ -6,11 +6,13 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
+from app.db.models.promo_attempts import PromoAttempt
 from app.db.models.promo_codes import PromoCode
 from app.db.models.promo_redemptions import PromoRedemption
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.workers.tasks.promo_maintenance import (
+    run_promo_bruteforce_guard_async,
     run_promo_campaign_status_rollover_async,
     run_promo_reservation_expiry_async,
 )
@@ -173,3 +175,57 @@ async def test_promo_campaign_status_rollover_expires_and_depletes_active_codes(
         assert rows[expired_code_id] == "EXPIRED"
         assert rows[depleted_code_id] == "DEPLETED"
         assert rows[active_code_id] == "ACTIVE"
+
+
+@pytest.mark.asyncio
+async def test_promo_bruteforce_guard_pauses_active_campaign_for_abusive_hash() -> None:
+    now_utc = datetime.now(UTC)
+    code_hash = "a" * 64
+    user_id_1 = await _create_user("promo-brute-1")
+    user_id_2 = await _create_user("promo-brute-2")
+
+    promo_code = PromoCode(
+        id=301,
+        code_hash=code_hash,
+        code_prefix="PROMO",
+        campaign_name="promo-bruteforce",
+        promo_type="PERCENT_DISCOUNT",
+        grant_premium_days=None,
+        discount_percent=20,
+        target_scope="ENERGY_10",
+        status="ACTIVE",
+        valid_from=now_utc - timedelta(days=1),
+        valid_until=now_utc + timedelta(days=1),
+        max_total_uses=1000,
+        used_total=0,
+        max_uses_per_user=1,
+        new_users_only=False,
+        first_purchase_only=False,
+        created_by="integration-test",
+        created_at=now_utc,
+        updated_at=now_utc,
+    )
+
+    async with SessionLocal.begin() as session:
+        session.add(promo_code)
+        for idx in range(102):
+            session.add(
+                PromoAttempt(
+                    user_id=user_id_1 if idx % 2 == 0 else user_id_2,
+                    normalized_code_hash=code_hash,
+                    result="INVALID",
+                    source="API",
+                    attempted_at=now_utc - timedelta(minutes=1),
+                    metadata_={},
+                )
+            )
+        await session.flush()
+
+    result = await run_promo_bruteforce_guard_async()
+    assert result["abusive_hashes"] == 1
+    assert result["paused_campaigns"] == 1
+
+    async with SessionLocal.begin() as session:
+        updated_code = await session.get(PromoCode, promo_code.id)
+        assert updated_code is not None
+        assert updated_code.status == "PAUSED"

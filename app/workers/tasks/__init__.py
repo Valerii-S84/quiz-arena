@@ -1,5 +1,6 @@
 from app.workers.tasks.payments_reliability import recover_paid_uncredited, run_payments_reconciliation
 from app.workers.tasks.promo_maintenance import (
+    run_promo_bruteforce_guard,
     run_promo_campaign_status_rollover,
     run_promo_reservation_expiry,
 )
@@ -11,4 +12,5 @@ __all__ = [
     "run_payments_reconciliation",
     "run_promo_reservation_expiry",
     "run_promo_campaign_status_rollover",
+    "run_promo_bruteforce_guard",
 ]
