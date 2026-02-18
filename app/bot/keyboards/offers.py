@@ -20,13 +20,4 @@ def build_offer_keyboard(selection: OfferSelection) -> InlineKeyboardMarkup:
                 )
             ]
         )
-
-    rows.append(
-        [
-            InlineKeyboardButton(
-                text="Nicht zeigen (72h)",
-                callback_data=f"offer:dismiss:{selection.impression_id}",
-            )
-        ]
-    )
     return InlineKeyboardMarkup(inline_keyboard=rows)
