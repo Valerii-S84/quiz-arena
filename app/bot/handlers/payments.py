@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import UUID
 
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, LabeledPrice, Message, PreCheckoutQuery
@@ -23,13 +24,27 @@ from app.services.user_onboarding import UserOnboardingService
 router = Router(name="payments")
 
 
+def _parse_buy_callback_data(callback_data: str) -> tuple[str, UUID | None]:
+    parts = callback_data.split(":")
+    if len(parts) == 2:
+        return parts[1], None
+    if len(parts) == 4 and parts[2] == "promo":
+        return parts[1], UUID(parts[3])
+    raise ValueError("invalid buy callback")
+
+
 @router.callback_query(F.data.startswith("buy:"))
 async def handle_buy(callback: CallbackQuery) -> None:
     if callback.data is None or callback.from_user is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
 
-    product_code = callback.data.split(":", maxsplit=1)[1]
+    try:
+        product_code, promo_redemption_id = _parse_buy_callback_data(callback.data)
+    except ValueError:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
     product = get_product(product_code)
     if product is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
@@ -48,6 +63,7 @@ async def handle_buy(callback: CallbackQuery) -> None:
                 product_code=product_code,
                 idempotency_key=f"buy:{product_code}:{callback.id}",
                 now_utc=now_utc,
+                promo_redemption_id=promo_redemption_id,
             )
     except PremiumDowngradeNotAllowedError:
         await callback.answer(TEXTS_DE["msg.premium.downgrade.blocked"], show_alert=True)

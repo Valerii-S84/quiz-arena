@@ -53,6 +53,13 @@
   - provider-specific on-call alert routing:
     - event templates for Slack/PagerDuty/generic webhook;
     - escalation policy tiers (`ops_l1/ops_l2/ops_l3`) with per-event overrides via env JSON.
+  - bot promo purchase wiring:
+    - promo discount success now returns targeted `buy:<product_code>:promo:<redemption_id>` callbacks;
+    - payment handler accepts promo-bound buy callbacks and settles discount through purchase flow.
+  - Telegram webhook smoke scenarios:
+    - `/promo` redeem -> buy callback -> precheckout -> successful payment -> credit;
+    - referral reward choice callback duplicate replay safety;
+    - dispatcher router-attachment issue fixed via singleton dispatcher reuse.
 - Technical spec source of truth: `TECHNICAL_SPEC_ENERGY_STARS_BOT.md`.
 
 ## Critical Notes
@@ -64,9 +71,10 @@
 
 ## Immediate Next Steps (Priority)
 1. M10/M11 remaining hardening:
-  - Telegram sandbox smoke for promo redeem -> purchase flow;
-  - Telegram sandbox smoke for referral reward choice callback flow (incl. duplicate callback replay).
-2. Add Telegram sandbox end-to-end smoke for webhook -> payment -> promo flows.
+  - dedicated external Telegram sandbox runbook for real Stars provider validation;
+  - promo incident response runbook (campaign unpause/manual handling).
+2. Product/ops maturity:
+  - dashboard for promo conversion/failure/guard triggers.
 
 ## Validation Commands
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q`

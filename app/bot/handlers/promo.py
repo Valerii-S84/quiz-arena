@@ -7,6 +7,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from app.bot.keyboards.home import build_home_keyboard
+from app.bot.keyboards.promo import build_promo_discount_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
 from app.economy.promo.errors import (
@@ -74,5 +75,16 @@ async def handle_promo_command(message: Message) -> None:
         await message.answer(TEXTS_DE["msg.promo.error.rate_limited"], reply_markup=build_home_keyboard())
         return
 
-    text_key = "msg.promo.success.grant" if result.result_type == "PREMIUM_GRANT" else "msg.promo.success.discount"
-    await message.answer(TEXTS_DE[text_key], reply_markup=build_home_keyboard())
+    if result.result_type == "PREMIUM_GRANT":
+        await message.answer(TEXTS_DE["msg.promo.success.grant"], reply_markup=build_home_keyboard())
+        return
+
+    discount_keyboard = build_promo_discount_keyboard(
+        redemption_id=result.redemption_id,
+        target_scope=result.target_scope,
+        discount_percent=result.discount_percent,
+    )
+    await message.answer(
+        TEXTS_DE["msg.promo.success.discount"],
+        reply_markup=discount_keyboard or build_home_keyboard(),
+    )

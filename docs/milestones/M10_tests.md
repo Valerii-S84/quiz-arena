@@ -5,6 +5,7 @@
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q tests/integration/test_internal_promo_redeem_integration.py` -> pass.
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q tests/integration/test_promo_maintenance_jobs_integration.py` -> pass.
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q tests/workers/test_promo_maintenance_task.py` -> pass.
+- `TMPDIR=/tmp .venv/bin/python -m pytest -q tests/integration/test_telegram_sandbox_smoke_integration.py` -> pass.
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q` -> pass (`94 passed`).
 
 ## Coverage Status
@@ -19,6 +20,9 @@
   - campaign rollover to `EXPIRED`/`DEPLETED`;
   - brute-force guard autopause on abusive hash.
 - Worker wrapper tests cover promo Celery task entrypoints.
+- Telegram webhook E2E smoke coverage includes:
+  - `/promo <code>` discount redeem -> `buy` callback with promo reservation -> pre-checkout -> successful payment -> credit;
+  - referral reward choice callback claim and duplicate callback replay safety.
 
 ## Missing
-- End-to-end bot + webhook + promo payment chain smoke in Telegram sandbox.
+- Dedicated external Telegram sandbox runbook (real Bot API + Stars payment provider) on top of local webhook smoke automation.

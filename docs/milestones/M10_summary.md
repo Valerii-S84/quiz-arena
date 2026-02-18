@@ -20,7 +20,8 @@
 - Added bot promo entry flow:
   - `/promo <code>` command,
   - `promo:open` callback hint,
-  - German success/error texts for promo outcomes.
+  - German success/error texts for promo outcomes;
+  - discount purchase CTA keyboard with `promo_redemption_id` callback wiring.
 - Added promo batch admin tooling:
   - `scripts/promo_batch_tool.py` supports code generation and CSV import,
   - writes normalized output report with inserted `promo_code_id`.
@@ -28,6 +29,9 @@
   - event -> channel/severity/tier templates for `generic`, `slack`, `pagerduty`;
   - policy overrides via `OPS_ALERT_ESCALATION_POLICY_JSON`;
   - backward-compatible generic webhook fallback.
+- Added Telegram webhook smoke integration coverage:
+  - promo discount redeem -> purchase/payment credit chain;
+  - referral reward choice callback flow with duplicate replay.
 
 ## Not Implemented
 - Dedicated admin UI/workflow for promo campaign operations (CLI is available).

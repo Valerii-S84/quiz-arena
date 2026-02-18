@@ -9,6 +9,8 @@ from app.bot.handlers.referral import router as referral_router
 from app.bot.handlers.start import router as start_router
 from app.core.config import get_settings
 
+_dispatcher: Dispatcher | None = None
+
 
 def build_bot() -> Bot:
     settings = get_settings()
@@ -16,6 +18,10 @@ def build_bot() -> Bot:
 
 
 def build_dispatcher() -> Dispatcher:
+    global _dispatcher
+    if _dispatcher is not None:
+        return _dispatcher
+
     dispatcher = Dispatcher()
     dispatcher.include_router(start_router)
     dispatcher.include_router(gameplay_router)
@@ -23,4 +29,5 @@ def build_dispatcher() -> Dispatcher:
     dispatcher.include_router(payments_router)
     dispatcher.include_router(promo_router)
     dispatcher.include_router(referral_router)
+    _dispatcher = dispatcher
     return dispatcher
