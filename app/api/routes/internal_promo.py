@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+import structlog
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.economy.promo.errors import (
     PromoAlreadyUsedError,
@@ -18,8 +20,14 @@ from app.economy.promo.errors import (
 )
 from app.economy.promo.service import PromoService
 from app.economy.promo.types import PromoRedeemResult
+from app.services.internal_auth import (
+    extract_client_ip,
+    is_client_ip_allowed,
+    is_valid_internal_token,
+)
 
 router = APIRouter(tags=["internal", "promo"])
+logger = structlog.get_logger(__name__)
 
 
 class PromoRedeemRequest(BaseModel):
@@ -51,7 +59,22 @@ def _as_response(result: PromoRedeemResult) -> PromoRedeemResponse:
 
 
 @router.post("/internal/promo/redeem", response_model=PromoRedeemResponse)
-async def redeem_promo(payload: PromoRedeemRequest) -> PromoRedeemResponse:
+async def redeem_promo(payload: PromoRedeemRequest, request: Request) -> PromoRedeemResponse:
+    settings = get_settings()
+    client_ip = extract_client_ip(request)
+    token = request.headers.get("X-Internal-Token")
+
+    if not is_valid_internal_token(
+        expected_token=settings.internal_api_token,
+        received_token=token,
+    ):
+        logger.warning("internal_promo_auth_failed", reason="invalid_token", client_ip=client_ip)
+        raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
+
+    if not is_client_ip_allowed(client_ip=client_ip, allowlist=settings.internal_api_allowlist):
+        logger.warning("internal_promo_auth_failed", reason="ip_not_allowed", client_ip=client_ip)
+        raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
+
     now_utc = datetime.now(timezone.utc)
     try:
         async with SessionLocal.begin() as session:

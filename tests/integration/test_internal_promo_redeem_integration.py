@@ -82,8 +82,15 @@ async def _create_promo_code(
 
 
 async def _post_redeem(payload: dict[str, object]) -> tuple[int, dict[str, object]]:
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
-        response = await client.post("/internal/promo/redeem", json=payload)
+    async with AsyncClient(
+        transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.post(
+            "/internal/promo/redeem",
+            json=payload,
+            headers={"X-Internal-Token": get_settings().internal_api_token},
+        )
     return response.status_code, response.json()
 
 

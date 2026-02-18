@@ -18,6 +18,14 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = Field(alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_secret: str = Field(alias="TELEGRAM_WEBHOOK_SECRET")
+    internal_api_token: str = Field(
+        default="dev_internal_token_change_me",
+        alias="INTERNAL_API_TOKEN",
+    )
+    internal_api_allowlist: str = Field(
+        default="127.0.0.1/32,::1/128",
+        alias="INTERNAL_API_ALLOWLIST",
+    )
     promo_secret_pepper: str = Field(default="dev_promo_pepper_change_me", alias="PROMO_SECRET_PEPPER")
 
     database_url: str = Field(alias="DATABASE_URL")
