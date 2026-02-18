@@ -1,5 +1,6 @@
 TEXTS_DE: dict[str, str] = {
-    "msg.home.title": "Willkommen bei Quiz Arena.",
+    "msg.home.title": "🎮 QUIZ ARENA",
+    "msg.home.hint": "👇 Waehle unten eine Aktion.",
     "msg.home.energy": "Energie: {free_energy}/20 + {paid_energy} Bonus.",
     "msg.home.streak": "Serie: {streak} Tage.",
     "msg.shop.title": "Shop: Wähle ein Paket.",

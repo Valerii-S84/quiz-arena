@@ -38,6 +38,7 @@ def _build_home_text(*, free_energy: int, paid_energy: int, current_streak: int)
                 paid_energy=paid_energy,
             ),
             TEXTS_DE["msg.home.streak"].format(streak=current_streak),
+            TEXTS_DE["msg.home.hint"],
         ]
     )
 
