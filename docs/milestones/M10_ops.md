@@ -26,6 +26,7 @@
   - payment recovery review-required outcomes.
 - New runbook:
   - `docs/runbooks/telegram_sandbox_stars_smoke.md` for external Telegram sandbox validation of promo/payment and referral duplicate-callback safety.
+  - `docs/runbooks/promo_incident_response.md` for promo autopause triage and safe manual unpause procedure.
 
 ## Missing for Next Milestones
 - Dedicated dashboard for promo conversion, failure rates, and guard triggers.

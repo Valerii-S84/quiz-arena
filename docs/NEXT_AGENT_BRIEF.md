@@ -62,6 +62,8 @@
     - dispatcher router-attachment issue fixed via singleton dispatcher reuse.
   - external Telegram sandbox runbook:
     - `docs/runbooks/telegram_sandbox_stars_smoke.md` with webhook binding, scenario steps, DB validation and cleanup.
+  - promo incident response runbook:
+    - `docs/runbooks/promo_incident_response.md` for autopause triage and safe manual unpause.
 - Technical spec source of truth: `TECHNICAL_SPEC_ENERGY_STARS_BOT.md`.
 
 ## Critical Notes
@@ -72,9 +74,7 @@
 - Current Alembic head: `f6a7b8c9d0e1`.
 
 ## Immediate Next Steps (Priority)
-1. M10/M11 remaining hardening:
-  - promo incident response runbook (campaign unpause/manual handling).
-2. Product/ops maturity:
+1. Product/ops maturity:
   - dashboard for promo conversion/failure/guard triggers.
 
 ## Validation Commands
