@@ -19,4 +19,12 @@ TEXTS_DE: dict[str, str] = {
     "msg.purchase.success.premium": "Premium ist jetzt aktiv. Dein Zugriff wurde aktualisiert.",
     "msg.purchase.error.failed": "Zahlung fehlgeschlagen. Bitte versuche es erneut.",
     "msg.premium.downgrade.blocked": "Ein niedrigerer Plan ist während aktivem Premium nicht verfügbar.",
+    "msg.promo.input.hint": "Gib deinen Promo-Code ein. Beispiel: /promo WILLKOMMEN-50",
+    "msg.promo.success.grant": "Promo-Code aktiviert. Premium wurde freigeschaltet.",
+    "msg.promo.success.discount": "Promo-Code akzeptiert. Dein Rabatt ist 15 Minuten reserviert.",
+    "msg.promo.error.invalid": "Dieser Promo-Code ist ungültig.",
+    "msg.promo.error.expired": "Dieser Promo-Code ist abgelaufen.",
+    "msg.promo.error.used": "Du hast diesen Promo-Code bereits verwendet.",
+    "msg.promo.error.not_applicable": "Dieser Promo-Code passt nicht zu diesem Produkt.",
+    "msg.promo.error.rate_limited": "Zu viele Versuche. Bitte versuche es später erneut.",
 }
