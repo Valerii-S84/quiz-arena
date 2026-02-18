@@ -11,6 +11,9 @@ class PurchaseInitResult:
     product_code: str
     final_stars_amount: int
     idempotent_replay: bool
+    base_stars_amount: int = 0
+    discount_stars_amount: int = 0
+    applied_promo_code_id: int | None = None
 
 
 @dataclass(slots=True)

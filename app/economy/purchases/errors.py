@@ -12,3 +12,7 @@ class PurchaseNotFoundError(PurchaseError):
 
 class PurchasePrecheckoutValidationError(PurchaseError):
     pass
+
+
+class PurchaseInitValidationError(PurchaseError):
+    pass

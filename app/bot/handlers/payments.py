@@ -11,6 +11,7 @@ from app.db.session import SessionLocal
 from app.economy.purchases.catalog import get_product
 from app.economy.purchases.errors import (
     ProductNotFoundError,
+    PurchaseInitValidationError,
     PurchaseNotFoundError,
     PurchasePrecheckoutValidationError,
 )
@@ -33,18 +34,22 @@ async def handle_buy(callback: CallbackQuery) -> None:
         return
 
     now_utc = datetime.now(timezone.utc)
-    async with SessionLocal.begin() as session:
-        snapshot = await UserOnboardingService.ensure_home_snapshot(
-            session,
-            telegram_user=callback.from_user,
-        )
-        init_result = await PurchaseService.init_purchase(
-            session,
-            user_id=snapshot.user_id,
-            product_code=product_code,
-            idempotency_key=f"buy:{product_code}:{callback.id}",
-            now_utc=now_utc,
-        )
+    try:
+        async with SessionLocal.begin() as session:
+            snapshot = await UserOnboardingService.ensure_home_snapshot(
+                session,
+                telegram_user=callback.from_user,
+            )
+            init_result = await PurchaseService.init_purchase(
+                session,
+                user_id=snapshot.user_id,
+                product_code=product_code,
+                idempotency_key=f"buy:{product_code}:{callback.id}",
+                now_utc=now_utc,
+            )
+    except (ProductNotFoundError, PurchaseInitValidationError):
+        await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)
+        return
 
     await callback.bot.send_invoice(
         chat_id=callback.from_user.id,
