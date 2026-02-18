@@ -64,13 +64,25 @@
     - `docs/runbooks/telegram_sandbox_stars_smoke.md` with webhook binding, scenario steps, DB validation and cleanup.
   - promo incident response runbook:
     - `docs/runbooks/promo_incident_response.md` for autopause triage and safe manual unpause.
+- Latest UX/runtime adjustments (2026-02-18):
+  - quiz loop remains continuous in standard modes until energy is depleted;
+  - home/shop buttons were made more visible (uppercase + emoji labels + explicit home action hint);
+  - shop now keeps focused premium lineup (`PREMIUM_STARTER`, `PREMIUM_MONTH`) and promo entry inside shop;
+  - promo input UX accepts `/promo CODE`, `promo CODE`, reply-to-prompt, and standalone code message; success/error texts were clarified for user feedback;
+  - question rendering improved with stronger visual separation (`Frage:` + bold question body);
+  - offer keyboard no longer includes the dismiss CTA (`Nicht zeigen (72h)`);
+  - when energy is empty, purchase options are shown immediately (offer CTA buttons remain visible, dismiss action removed).
+- Local environment data change (manual, non-migration):
+  - promo code `CHIK` created directly in local Postgres via `scripts/promo_batch_tool.py`;
+  - campaign `manual_chik_starter`, type `PREMIUM_GRANT`, grant `7` days, scope `PREMIUM_ANY`, status `ACTIVE`;
+  - validity window: `2026-02-18T00:00:00Z` -> `2027-12-31T23:59:59Z`.
 - Technical spec source of truth: `TECHNICAL_SPEC_ENERGY_STARS_BOT.md`.
 
 ## Critical Notes
 - `.env` is local-only and must never be committed.
 - Bot token is already configured locally; rotate token before production webhook go-live.
-- Docker services are available in this runtime (`postgres`, `redis`) and currently running.
-- Latest full validation run in this branch: `139 passed`.
+- Local runtime services are expected to be started manually when needed (`postgres`, `redis`, API, bot, worker).
+- Latest full validation run in this branch: `148 passed` (2026-02-18).
 - Current Alembic head: `f6a7b8c9d0e1`.
 
 ## Immediate Next Steps (Priority)
