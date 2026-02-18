@@ -24,10 +24,13 @@
 - Added promo batch admin tooling:
   - `scripts/promo_batch_tool.py` supports code generation and CSV import,
   - writes normalized output report with inserted `promo_code_id`.
+- Added provider-specific alert routing:
+  - event -> channel/severity/tier templates for `generic`, `slack`, `pagerduty`;
+  - policy overrides via `OPS_ALERT_ESCALATION_POLICY_JSON`;
+  - backward-compatible generic webhook fallback.
 
 ## Not Implemented
 - Dedicated admin UI/workflow for promo campaign operations (CLI is available).
-- Provider-specific alert routing templates (PagerDuty/Slack formatting, escalation policy bindings).
 - Refund-driven promo rollback (`PR_REVOKED`) automation.
 
 ## Risks

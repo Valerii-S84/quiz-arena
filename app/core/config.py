@@ -27,6 +27,10 @@ class Settings(BaseSettings):
         alias="INTERNAL_API_ALLOWLIST",
     )
     ops_alert_webhook_url: str = Field(default="", alias="OPS_ALERT_WEBHOOK_URL")
+    ops_alert_slack_webhook_url: str = Field(default="", alias="OPS_ALERT_SLACK_WEBHOOK_URL")
+    ops_alert_pagerduty_events_url: str = Field(default="", alias="OPS_ALERT_PAGERDUTY_EVENTS_URL")
+    ops_alert_pagerduty_routing_key: str = Field(default="", alias="OPS_ALERT_PAGERDUTY_ROUTING_KEY")
+    ops_alert_escalation_policy_json: str = Field(default="", alias="OPS_ALERT_ESCALATION_POLICY_JSON")
     promo_secret_pepper: str = Field(default="dev_promo_pepper_change_me", alias="PROMO_SECRET_PEPPER")
 
     database_url: str = Field(alias="DATABASE_URL")

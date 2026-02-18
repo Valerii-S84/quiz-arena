@@ -50,6 +50,9 @@
     - parallel redeem collision integration test;
     - promo batch generation/import CLI (`scripts/promo_batch_tool.py`);
     - generic ops alert webhook for promo autopause events.
+  - provider-specific on-call alert routing:
+    - event templates for Slack/PagerDuty/generic webhook;
+    - escalation policy tiers (`ops_l1/ops_l2/ops_l3`) with per-event overrides via env JSON.
 - Technical spec source of truth: `TECHNICAL_SPEC_ENERGY_STARS_BOT.md`.
 
 ## Critical Notes
@@ -61,7 +64,6 @@
 
 ## Immediate Next Steps (Priority)
 1. M10/M11 remaining hardening:
-  - provider-specific alert routing (PagerDuty/Slack templates + escalation policy),
   - Telegram sandbox smoke for promo redeem -> purchase flow;
   - Telegram sandbox smoke for referral reward choice callback flow (incl. duplicate callback replay).
 2. Add Telegram sandbox end-to-end smoke for webhook -> payment -> promo flows.
