@@ -62,3 +62,48 @@ class EntitlementsRepo:
         session.add(entitlement)
         await session.flush()
         return entitlement
+
+    @staticmethod
+    async def has_recently_ended_premium_scope(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        scope: str,
+        since_utc: datetime,
+        until_utc: datetime,
+    ) -> bool:
+        stmt = select(Entitlement.id).where(
+            Entitlement.user_id == user_id,
+            Entitlement.entitlement_type == "PREMIUM",
+            Entitlement.scope == scope,
+            Entitlement.status != "REVOKED",
+            Entitlement.ends_at.is_not(None),
+            Entitlement.ends_at >= since_utc,
+            Entitlement.ends_at <= until_utc,
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def has_active_premium_scope_ending_within(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        scope: str,
+        now_utc: datetime,
+        until_utc: datetime,
+    ) -> bool:
+        stmt = select(Entitlement.id).where(
+            and_(
+                Entitlement.user_id == user_id,
+                Entitlement.entitlement_type == "PREMIUM",
+                Entitlement.scope == scope,
+                Entitlement.status == "ACTIVE",
+                Entitlement.starts_at <= now_utc,
+                Entitlement.ends_at.is_not(None),
+                Entitlement.ends_at > now_utc,
+                Entitlement.ends_at <= until_utc,
+            )
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None

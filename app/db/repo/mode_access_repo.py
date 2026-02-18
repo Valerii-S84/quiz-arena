@@ -10,6 +10,16 @@ from app.db.models.mode_access import ModeAccess
 
 class ModeAccessRepo:
     @staticmethod
+    async def get_by_idempotency_key(
+        session: AsyncSession,
+        *,
+        idempotency_key: str,
+    ) -> ModeAccess | None:
+        stmt = select(ModeAccess).where(ModeAccess.idempotency_key == idempotency_key)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def has_active_access(
         session: AsyncSession,
         *,

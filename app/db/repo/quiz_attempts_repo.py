@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from datetime import datetime
+
+from sqlalchemy import Date, cast, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.quiz_attempts import QuizAttempt
@@ -40,3 +42,36 @@ class QuizAttemptsRepo:
         )
         result = await session.execute(stmt)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def count_user_attempts_between(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        from_utc: datetime,
+        to_utc: datetime,
+    ) -> int:
+        stmt = select(func.count(QuizAttempt.id)).where(
+            QuizAttempt.user_id == user_id,
+            QuizAttempt.answered_at >= from_utc,
+            QuizAttempt.answered_at < to_utc,
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_user_active_local_days_between(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        from_utc: datetime,
+        to_utc: datetime,
+    ) -> int:
+        local_day_expr = cast(func.timezone("Europe/Berlin", QuizAttempt.answered_at), Date)
+        stmt = select(func.count(distinct(local_day_expr))).where(
+            QuizAttempt.user_id == user_id,
+            QuizAttempt.answered_at >= from_utc,
+            QuizAttempt.answered_at < to_utc,
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)

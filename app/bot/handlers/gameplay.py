@@ -8,9 +8,12 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
 from app.bot.keyboards.home import build_home_keyboard
+from app.bot.keyboards.offers import build_offer_keyboard
 from app.bot.keyboards.quiz import build_quiz_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
+from app.economy.offers.constants import TRG_LOCKED_MODE_CLICK
+from app.economy.offers.service import OfferLoggingError, OfferService
 from app.game.sessions.errors import (
     DailyChallengeAlreadyPlayedError,
     EnergyInsufficientError,
@@ -55,11 +58,54 @@ async def _start_mode(
                 now_utc=now_utc,
             )
         except ModeLockedError:
-            await callback.message.answer(TEXTS_DE["msg.locked.mode"], reply_markup=build_home_keyboard())
+            offer_selection = None
+            try:
+                offer_selection = await OfferService.evaluate_and_log_offer(
+                    session,
+                    user_id=snapshot.user_id,
+                    idempotency_key=f"offer:locked:{callback.id}",
+                    now_utc=now_utc,
+                    trigger_event=TRG_LOCKED_MODE_CLICK,
+                )
+            except OfferLoggingError:
+                offer_selection = None
+
+            text = (
+                TEXTS_DE[offer_selection.text_key]
+                if offer_selection is not None
+                else TEXTS_DE["msg.locked.mode"]
+            )
+            keyboard = (
+                build_offer_keyboard(offer_selection)
+                if offer_selection is not None
+                else build_home_keyboard()
+            )
+            await callback.message.answer(text, reply_markup=keyboard)
             await callback.answer()
             return
         except EnergyInsufficientError:
-            await callback.message.answer(TEXTS_DE["msg.energy.empty.body"], reply_markup=build_home_keyboard())
+            offer_selection = None
+            try:
+                offer_selection = await OfferService.evaluate_and_log_offer(
+                    session,
+                    user_id=snapshot.user_id,
+                    idempotency_key=f"offer:energy:{callback.id}",
+                    now_utc=now_utc,
+                )
+            except OfferLoggingError:
+                offer_selection = None
+
+            text = (
+                TEXTS_DE[offer_selection.text_key]
+                if offer_selection is not None
+                else TEXTS_DE["msg.energy.empty.body"]
+            )
+            keyboard = (
+                build_offer_keyboard(offer_selection)
+                if offer_selection is not None
+                else build_home_keyboard()
+            )
+            await callback.message.answer(text, reply_markup=keyboard)
             await callback.answer()
             return
         except DailyChallengeAlreadyPlayedError:

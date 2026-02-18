@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.referral_codes import generate_referral_code
 from app.db.repo.users_repo import UsersRepo
 from app.economy.energy.service import EnergyService
+from app.economy.referrals.service import ReferralService
 from app.economy.streak.service import StreakService
 
 
@@ -35,6 +36,7 @@ class UserOnboardingService:
         session: AsyncSession,
         *,
         telegram_user: TelegramUser,
+        start_payload: str | None = None,
     ) -> HomeSnapshot:
         now_utc = datetime.now(timezone.utc)
 
@@ -54,6 +56,14 @@ class UserOnboardingService:
 
             await EnergyService.initialize_user_state(session, user_id=user.id, now_utc=now_utc)
             await StreakService.sync_rollover(session, user_id=user.id, now_utc=now_utc)
+            referral_code_from_payload = ReferralService.extract_referral_code_from_start_payload(start_payload)
+            if referral_code_from_payload is not None:
+                await ReferralService.register_start_for_new_user(
+                    session,
+                    referred_user=user,
+                    referral_code=referral_code_from_payload,
+                    now_utc=now_utc,
+                )
 
         await UsersRepo.touch_last_seen(session, user.id, now_utc)
         energy_snapshot = await EnergyService.sync_energy_clock(session, user_id=user.id, now_utc=now_utc)

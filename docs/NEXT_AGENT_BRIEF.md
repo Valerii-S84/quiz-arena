@@ -12,6 +12,16 @@
   - all 4 premium plans in catalog;
   - premium entitlement grant on payment;
   - upgrade extension behavior + downgrade block.
+- M8 completed:
+  - offer trigger engine with deterministic priority resolver;
+  - anti-spam caps (6h blocking modal, 3/day, same offer 24h, mute 72h);
+  - idempotent `offers_impressions` logging and bot offer surfaces (`/start`, locked mode, energy empty);
+  - offer dismiss callback flow (`offer:dismiss:<impression_id>`).
+- M9 completed:
+  - referral start tracking via `/start ref_<code>` onboarding payload;
+  - referral qualification checks (20 attempts / 14d / 2 local days);
+  - anti-fraud guards (cyclic pair + velocity limit);
+  - reward distribution with 48h delay, `3 qualified -> 1 reward`, monthly cap `2`, deferred rollover.
 - M10 core promo module is now implemented:
   - `POST /internal/promo/redeem` (`PREMIUM_GRANT`, `PERCENT_DISCOUNT`);
   - promo anti-abuse throttling (per-user + global brute-force autopause);
@@ -36,16 +46,17 @@
 - `.env` is local-only and must never be committed.
 - Bot token is already configured locally; rotate token before production webhook go-live.
 - Docker services are available in this runtime (`postgres`, `redis`) and currently running.
-- Latest full validation run in this branch: `114 passed`.
+- Latest full validation run in this branch: `130 passed`.
 - Current Alembic head: `f6a7b8c9d0e1`.
 
 ## Immediate Next Steps (Priority)
-1. Milestone 8: implement offer trigger engine + `offers_impressions` idempotent logging and caps.
-2. Milestone 9: implement referral qualification + anti-fraud checks and reward flow.
-3. M10/M11 remaining hardening:
+1. M10/M11 remaining hardening:
   - provider-specific alert routing (PagerDuty/Slack templates + escalation policy),
   - Telegram sandbox smoke for promo redeem -> purchase flow.
-4. Add Telegram sandbox end-to-end smoke for webhook -> payment -> promo flows.
+2. Add Telegram sandbox end-to-end smoke for webhook -> payment -> promo flows.
+3. Referral UX follow-up:
+  - reward choice flow (Mega Pack vs Premium Starter) in bot UI;
+  - referral progress/invite command UX.
 
 ## Validation Commands
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q`
