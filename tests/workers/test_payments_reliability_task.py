@@ -20,6 +20,16 @@ def test_recover_paid_uncredited_task_wrapper(monkeypatch) -> None:
     assert result["credited"] == 5
 
 
+def test_expire_stale_unpaid_invoices_task_wrapper(monkeypatch) -> None:
+    async def fake_async(*, stale_minutes: int) -> dict[str, int]:
+        return {"expired_invoices": stale_minutes}
+
+    monkeypatch.setattr(payments_reliability, "expire_stale_unpaid_invoices_async", fake_async)
+
+    result = payments_reliability.expire_stale_unpaid_invoices(stale_minutes=45)
+    assert result["expired_invoices"] == 45
+
+
 def test_run_payments_reconciliation_task_wrapper(monkeypatch) -> None:
     async def fake_async(*, stale_minutes: int) -> dict[str, int | str]:
         return {

@@ -28,6 +28,21 @@ from app.workers.celery_app import celery_app
 logger = structlog.get_logger(__name__)
 
 
+async def expire_stale_unpaid_invoices_async(*, stale_minutes: int = 30) -> dict[str, int]:
+    now_utc = datetime.now(timezone.utc)
+    stale_cutoff = now_utc - timedelta(minutes=stale_minutes)
+
+    async with SessionLocal.begin() as session:
+        expired_invoices = await PurchasesRepo.expire_stale_unpaid_invoices(
+            session,
+            older_than_utc=stale_cutoff,
+        )
+
+    result = {"expired_invoices": expired_invoices}
+    logger.info("stale_unpaid_invoices_expiry_finished", **result)
+    return result
+
+
 async def _recover_single_purchase(purchase_id: UUID, *, now_utc: datetime) -> str:
     async with SessionLocal.begin() as session:
         purchase = await PurchasesRepo.get_for_credit_lock(session, purchase_id)
@@ -164,6 +179,11 @@ def recover_paid_uncredited(batch_size: int = 100, stale_minutes: int = 2) -> di
     )
 
 
+@celery_app.task(name="app.workers.tasks.payments_reliability.expire_stale_unpaid_invoices")
+def expire_stale_unpaid_invoices(stale_minutes: int = 30) -> dict[str, int]:
+    return asyncio.run(expire_stale_unpaid_invoices_async(stale_minutes=stale_minutes))
+
+
 @celery_app.task(name="app.workers.tasks.payments_reliability.run_payments_reconciliation")
 def run_payments_reconciliation(stale_minutes: int = 30) -> dict[str, int | str]:
     return asyncio.run(run_payments_reconciliation_async(stale_minutes=stale_minutes))
@@ -176,6 +196,11 @@ celery_app.conf.beat_schedule.update(
             "task": "app.workers.tasks.payments_reliability.recover_paid_uncredited",
             "schedule": 300.0,
             "options": {"queue": "q_high"},
+        },
+        "expire-stale-unpaid-invoices-every-5-minutes": {
+            "task": "app.workers.tasks.payments_reliability.expire_stale_unpaid_invoices",
+            "schedule": 300.0,
+            "options": {"queue": "q_normal"},
         },
         "payments-reconciliation-every-15-minutes": {
             "task": "app.workers.tasks.payments_reliability.run_payments_reconciliation",

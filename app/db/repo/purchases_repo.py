@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.purchases import Purchase
@@ -128,6 +128,24 @@ class PurchasesRepo:
         )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def expire_stale_unpaid_invoices(
+        session: AsyncSession,
+        *,
+        older_than_utc: datetime,
+    ) -> int:
+        stmt = (
+            update(Purchase)
+            .where(
+                Purchase.status.in_(("CREATED", "INVOICE_SENT")),
+                Purchase.created_at <= older_than_utc,
+                Purchase.paid_at.is_(None),
+            )
+            .values(status="FAILED")
+        )
+        result = await session.execute(stmt)
+        return int(result.rowcount or 0)
 
     @staticmethod
     async def create(

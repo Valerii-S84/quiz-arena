@@ -17,6 +17,7 @@ from app.economy.purchases.errors import StreakSaverPurchaseLimitError
 from app.economy.purchases.recovery import RECOVERY_FAILURES_KEY
 from app.economy.purchases.service import PurchaseService
 from app.workers.tasks.payments_reliability import (
+    expire_stale_unpaid_invoices_async,
     recover_paid_uncredited_async,
     run_payments_reconciliation_async,
 )
@@ -330,6 +331,79 @@ async def test_recovery_marks_purchase_for_review_after_three_failures() -> None
         assert purchase.status == "FAILED_CREDIT_PENDING_REVIEW"
         assert isinstance(purchase.raw_successful_payment, dict)
         assert purchase.raw_successful_payment[RECOVERY_FAILURES_KEY] == 3
+
+
+@pytest.mark.asyncio
+async def test_expire_stale_unpaid_invoices_marks_created_and_invoice_sent_as_failed() -> None:
+    now_utc = datetime.now(UTC)
+    user_id = await _create_user("stale-unpaid-invoices")
+
+    created_old_id = uuid4()
+    invoice_sent_old_id = uuid4()
+    created_recent_id = uuid4()
+
+    async with SessionLocal.begin() as session:
+        session.add(
+            Purchase(
+                id=created_old_id,
+                user_id=user_id,
+                product_code="ENERGY_10",
+                product_type="MICRO",
+                base_stars_amount=10,
+                discount_stars_amount=0,
+                stars_amount=10,
+                currency="XTR",
+                status="CREATED",
+                idempotency_key="stale-created-old-1",
+                invoice_payload="inv_stale_created_old_1",
+                created_at=now_utc - timedelta(minutes=45),
+            )
+        )
+        session.add(
+            Purchase(
+                id=invoice_sent_old_id,
+                user_id=user_id,
+                product_code="MEGA_PACK_15",
+                product_type="MICRO",
+                base_stars_amount=15,
+                discount_stars_amount=0,
+                stars_amount=15,
+                currency="XTR",
+                status="INVOICE_SENT",
+                idempotency_key="stale-invoice-old-1",
+                invoice_payload="inv_stale_invoice_old_1",
+                created_at=now_utc - timedelta(minutes=44),
+            )
+        )
+        session.add(
+            Purchase(
+                id=created_recent_id,
+                user_id=user_id,
+                product_code="STREAK_SAVER_20",
+                product_type="MICRO",
+                base_stars_amount=20,
+                discount_stars_amount=0,
+                stars_amount=20,
+                currency="XTR",
+                status="CREATED",
+                idempotency_key="stale-created-recent-1",
+                invoice_payload="inv_stale_created_recent_1",
+                created_at=now_utc - timedelta(minutes=10),
+            )
+        )
+        await session.flush()
+
+    result = await expire_stale_unpaid_invoices_async(stale_minutes=30)
+    assert result["expired_invoices"] == 2
+
+    async with SessionLocal.begin() as session:
+        created_old = await PurchasesRepo.get_by_id(session, created_old_id)
+        invoice_sent_old = await PurchasesRepo.get_by_id(session, invoice_sent_old_id)
+        created_recent = await PurchasesRepo.get_by_id(session, created_recent_id)
+
+        assert created_old is not None and created_old.status == "FAILED"
+        assert invoice_sent_old is not None and invoice_sent_old.status == "FAILED"
+        assert created_recent is not None and created_recent.status == "CREATED"
 
 
 @pytest.mark.asyncio
