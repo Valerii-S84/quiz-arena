@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.promo_attempts import PromoAttempt
@@ -150,3 +150,44 @@ class PromoRepo:
 
         result = await session.execute(stmt)
         return result.scalar_one()
+
+    @staticmethod
+    async def expire_reserved_redemptions(session: AsyncSession, *, now_utc: datetime) -> int:
+        stmt = (
+            update(PromoRedemption)
+            .where(
+                PromoRedemption.status == "RESERVED",
+                PromoRedemption.reserved_until.is_not(None),
+                PromoRedemption.reserved_until <= now_utc,
+            )
+            .values(status="EXPIRED", updated_at=now_utc)
+        )
+        result = await session.execute(stmt)
+        return int(result.rowcount or 0)
+
+    @staticmethod
+    async def expire_active_codes(session: AsyncSession, *, now_utc: datetime) -> int:
+        stmt = (
+            update(PromoCode)
+            .where(
+                PromoCode.status == "ACTIVE",
+                PromoCode.valid_until <= now_utc,
+            )
+            .values(status="EXPIRED", updated_at=now_utc)
+        )
+        result = await session.execute(stmt)
+        return int(result.rowcount or 0)
+
+    @staticmethod
+    async def deplete_active_codes(session: AsyncSession, *, now_utc: datetime) -> int:
+        stmt = (
+            update(PromoCode)
+            .where(
+                PromoCode.status == "ACTIVE",
+                PromoCode.max_total_uses.is_not(None),
+                PromoCode.used_total >= PromoCode.max_total_uses,
+            )
+            .values(status="DEPLETED", updated_at=now_utc)
+        )
+        result = await session.execute(stmt)
+        return int(result.rowcount or 0)

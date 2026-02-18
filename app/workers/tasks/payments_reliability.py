@@ -148,20 +148,23 @@ def run_payments_reconciliation(stale_minutes: int = 30) -> dict[str, int | str]
     return asyncio.run(run_payments_reconciliation_async(stale_minutes=stale_minutes))
 
 
-celery_app.conf.beat_schedule = {
-    "recover-paid-uncredited-every-5-minutes": {
-        "task": "app.workers.tasks.payments_reliability.recover_paid_uncredited",
-        "schedule": 300.0,
-        "options": {"queue": "q_high"},
-    },
-    "payments-reconciliation-every-15-minutes": {
-        "task": "app.workers.tasks.payments_reliability.run_payments_reconciliation",
-        "schedule": 900.0,
-        "options": {"queue": "q_normal"},
-    },
-    "payments-reconciliation-daily-0330-berlin": {
-        "task": "app.workers.tasks.payments_reliability.run_payments_reconciliation",
-        "schedule": crontab(hour=3, minute=30),
-        "options": {"queue": "q_normal"},
-    },
-}
+celery_app.conf.beat_schedule = celery_app.conf.beat_schedule or {}
+celery_app.conf.beat_schedule.update(
+    {
+        "recover-paid-uncredited-every-5-minutes": {
+            "task": "app.workers.tasks.payments_reliability.recover_paid_uncredited",
+            "schedule": 300.0,
+            "options": {"queue": "q_high"},
+        },
+        "payments-reconciliation-every-15-minutes": {
+            "task": "app.workers.tasks.payments_reliability.run_payments_reconciliation",
+            "schedule": 900.0,
+            "options": {"queue": "q_normal"},
+        },
+        "payments-reconciliation-daily-0330-berlin": {
+            "task": "app.workers.tasks.payments_reliability.run_payments_reconciliation",
+            "schedule": crontab(hour=3, minute=30),
+            "options": {"queue": "q_normal"},
+        },
+    }
+)

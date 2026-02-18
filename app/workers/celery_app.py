@@ -11,6 +11,7 @@ celery_app = Celery(
     include=[
         "app.workers.tasks.telegram_updates",
         "app.workers.tasks.payments_reliability",
+        "app.workers.tasks.promo_maintenance",
     ],
 )
 
