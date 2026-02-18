@@ -1,22 +1,22 @@
 # NEXT_AGENT_BRIEF
 
 ## Current State
-- Backend bootstrap completed (FastAPI + aiogram + Celery + Alembic skeleton).
-- Milestone 2 completed: section-6 schema models + Alembic migrations + base repositories.
-- Milestone 3 implemented at domain level: energy engine rules + service + unit tests.
+- Milestone 2 completed: full section-6 schema + migrations + base repositories.
+- Milestone 3 completed (domain level): energy engine rules + service + tests.
+- Milestone 4 completed (domain level): streak engine rules + service + tests.
 - Technical spec source of truth: `TECHNICAL_SPEC_ENERGY_STARS_BOT.md`.
 
 ## Critical Notes
 - `.env` is local-only and must never be committed.
 - Bot token is already configured locally; rotate token before production webhook go-live.
 - Docker is currently unavailable in this WSL runtime until Docker Desktop WSL integration is enabled.
-- Postgres migration `upgrade/downgrade` rehearsal and M3 concurrency checks were not run locally due missing DB runtime.
+- Postgres integration/load checks are still pending in this runtime.
 
 ## Immediate Next Steps (Priority)
-1. Implement Milestone 4: Streak engine with Berlin timezone and DST-safe day logic.
-2. Integrate M3 energy service into handlers/webhook flow (play start, payment credit paths).
-3. Add DB integration tests for migration up/down and transactional idempotency paths.
-4. Implement webhook handlers and payment flow stubs for Telegram Stars.
+1. Implement Milestone 5: Free Tier gameplay handlers integrated with M3/M4 services.
+2. Implement webhook handlers and Telegram Stars payment flow skeleton (Milestone 6 prep).
+3. Add DB integration tests for idempotent transactional flows (energy consume, purchase credit, streak update).
+4. Run migration up/down rehearsal on staging-like Postgres runtime.
 
 ## Validation Commands
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q -s`
