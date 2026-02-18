@@ -20,6 +20,12 @@ class UsersRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_referral_code(session: AsyncSession, referral_code: str) -> User | None:
+        stmt = select(User).where(User.referral_code == referral_code)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def create(
         session: AsyncSession,
         *,

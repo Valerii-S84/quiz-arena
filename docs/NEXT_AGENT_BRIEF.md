@@ -1,9 +1,10 @@
 # NEXT_AGENT_BRIEF
 
 ## Current State
-- Milestone 2 completed: full section-6 schema + migrations + base repositories.
-- Milestone 3 completed (domain level): energy engine rules + service + tests.
-- Milestone 4 completed (domain level): streak engine rules + service + tests.
+- M2 completed: full section-6 schema + migrations + base repositories.
+- M3 completed: energy engine domain + service + tests.
+- M4 completed: streak engine domain + service + tests.
+- M5 phase 1 completed: `/start` onboarding integrated with DB, energy, and streak sync.
 - Technical spec source of truth: `TECHNICAL_SPEC_ENERGY_STARS_BOT.md`.
 
 ## Critical Notes
@@ -13,10 +14,10 @@
 - Postgres integration/load checks are still pending in this runtime.
 
 ## Immediate Next Steps (Priority)
-1. Implement Milestone 5: Free Tier gameplay handlers integrated with M3/M4 services.
-2. Implement webhook handlers and Telegram Stars payment flow skeleton (Milestone 6 prep).
-3. Add DB integration tests for idempotent transactional flows (energy consume, purchase credit, streak update).
-4. Run migration up/down rehearsal on staging-like Postgres runtime.
+1. Continue Milestone 5: implement free gameplay handlers (`play`, answer flow, locked checks, daily challenge zero-cost path).
+2. Implement webhook handlers and Telegram Stars payment skeleton (Milestone 6).
+3. Add DB integration tests for transactional paths (onboarding, energy consume, streak activity).
+4. Run migration and transaction rehearsal on staging-like Postgres runtime.
 
 ## Validation Commands
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q -s`
