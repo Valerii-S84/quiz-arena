@@ -631,12 +631,14 @@ Referral вважається кваліфікованим, якщо invited use
 
 `РІШЕННЯ SPEC-REF-02`: максимум `2` реферальні нагороди на календарний місяць.
 
+`РІШЕННЯ SPEC-REF-03`: після досягнення milestone слот винагороди переходить у `awaiting choice` (derived runtime state, без окремого DB status) і видається тільки після явного вибору користувача через callback `referral:reward:<reward_code>`.
+
 #### 4.8.4 Anti-fraud
 
 - Заборонено self-ref: `referrer_user_id != referred_user_id`.
 - Заборонено циклічні пари (`A->B` і `B->A`) у межах 30 днів.
 - Velocity rule: >10 нових referral starts/добу для одного referrer -> ручна/автоматична перевірка.
-- Reward delay: винагорода видається через `48 год` після досягнення умов; за цей час виконується risk check.
+- Reward delay: слот винагороди стає доступним для claim не раніше ніж через `48 год` після досягнення умов; за цей час виконується risk check.
 - Підозрілі ланцюжки позначаються `status=REJECTED_FRAUD`, без видачі нагороди.
 
 #### 4.8.5 Edge cases
@@ -1339,12 +1341,16 @@ VALUES (9001, 101, 'MODE_ACCESS', 'CASES_PRACTICE', 'ACTIVE', '2026-02-17T19:01:
 - `/start`
 - `callback:play`
 - `callback:mode:<mode_code>`
+- `callback:daily_challenge`
+- `callback:answer:<session_id>:<option_idx>`
 - `callback:buy:<product_code>`
 - `callback:promo:open`
-- `callback:daily_challenge`
-- `callback:premium`
-- `callback:offers:dismiss:<offer_code>`
+- `callback:offer:dismiss:<impression_id>`
+- `callback:referral:open`
+- `callback:referral:reward:<reward_code>`
 - `/promo <code>`
+- `/referral`
+- `/invite`
 - `pre_checkout_query`
 - `message.successful_payment`
 
@@ -1460,6 +1466,8 @@ VALUES (9001, 101, 'MODE_ACCESS', 'CASES_PRACTICE', 'ACTIVE', '2026-02-17T19:01:
 
 - Два worker-и одночасно взяли ту саму recovery job -> advisory lock на `purchase_id`.
 - Повторне натискання buy під лагом мережі -> idem key зі сторони клієнтської callback-сесії.
+- Дубль `referral:reward:<reward_code>` callback -> перший успішний claim видає reward, повторний повертає `NO_REWARD` (без подвійного grant).
+- Race `run_reward_distribution(reward_code=None)` vs user claim -> `SELECT ... FOR UPDATE` на referral rows гарантує консистентний одноразовий grant.
 
 ### 10.7 Promo anti-abuse
 
@@ -1706,8 +1714,9 @@ DoD:
 - referral tracking, qualification, rewards, fraud scoring.
 
 DoD:
-- reward only after qualification + delay 48h.
+- reward slot стає claimable тільки після qualification + delay 48h, видача reward лише через user choice callback.
 - self-ref і cyclic-ref заблоковані.
+- duplicate reward-choice callback не дає подвійної видачі (idempotent behavior).
 
 Ризики + перевірка:
 - false positives fraud -> review dashboard + threshold tuning.
@@ -1824,6 +1833,15 @@ DoD:
 | msg.referral.invite | Lade Freunde ein und verdiene Belohnungen. | Link teilen |
 | msg.referral.progress | Dein Fortschritt: {qualified}/3 qualifizierte Freunde. | Weiter einladen |
 | msg.referral.reward.choice | Du hast eine Belohnung erreicht. Wähle deinen Bonus. | Mega Pack; Premium Starter |
+| msg.referral.link | Dein Einladungslink: {invite_link} | - |
+| msg.referral.link.fallback | Teile diesen Start-Code: ref_{referral_code} | - |
+| msg.referral.pending | Offene Belohnungen: {pending}. Jetzt wählbar: {claimable}. | - |
+| msg.referral.next_reward_at | Nächste Belohnung verfügbar ab: {next_reward_at} (Berlin). | - |
+| msg.referral.reward.claimed.megapack | Belohnung aktiviert: Mega Pack. | - |
+| msg.referral.reward.claimed.premium | Belohnung aktiviert: Premium Starter. | - |
+| msg.referral.reward.unavailable | Aktuell ist keine Belohnung verfügbar. | - |
+| msg.referral.reward.too_early | Noch nicht freigeschaltet. Bitte warte auf den Delay. | - |
+| msg.referral.reward.monthly_cap | Monatslimit erreicht. Neue Belohnungen folgen nächsten Monat. | - |
 | msg.referral.rejected | Diese Einladung zählt nicht für Belohnungen. | Details |
 | msg.error.generic | Etwas ist schiefgelaufen. Bitte erneut versuchen. | Erneut |
 | msg.error.rate_limit | Zu schnell. Bitte kurz warten. | OK |
