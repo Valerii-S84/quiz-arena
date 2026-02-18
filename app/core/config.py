@@ -26,6 +26,7 @@ class Settings(BaseSettings):
         default="127.0.0.1/32,::1/128",
         alias="INTERNAL_API_ALLOWLIST",
     )
+    ops_alert_webhook_url: str = Field(default="", alias="OPS_ALERT_WEBHOOK_URL")
     promo_secret_pepper: str = Field(default="dev_promo_pepper_change_me", alias="PROMO_SECRET_PEPPER")
 
     database_url: str = Field(alias="DATABASE_URL")

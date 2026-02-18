@@ -24,11 +24,10 @@
 
 ## Not Implemented
 - Promo code batch generation/import tooling (admin path).
-- Alert delivery integrations (Pager/Slack/etc.) for promo abuse and failure anomalies.
+- Provider-specific alert routing templates (PagerDuty/Slack formatting, escalation policy bindings).
 - Refund-driven promo rollback (`PR_REVOKED`) automation.
 
 ## Risks
-- Brute-force guard currently auto-pauses campaigns but only logs events; external alert fan-out is pending.
 - Promo rate limiting behavior is transactional and tested in integration, but large-scale concurrent load behavior is still unprofiled.
 
 ## Decisions

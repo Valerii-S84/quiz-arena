@@ -7,6 +7,7 @@ import structlog
 
 from app.db.repo.promo_repo import PromoRepo
 from app.db.session import SessionLocal
+from app.services.alerts import send_ops_alert
 from app.workers.celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
@@ -62,6 +63,10 @@ async def run_promo_bruteforce_guard_async() -> dict[str, int]:
         "paused_campaigns": paused_campaigns,
     }
     if paused_campaigns > 0:
+        await send_ops_alert(
+            event="promo_campaign_auto_paused",
+            payload=result,
+        )
         logger.warning("promo_campaign_auto_paused", **result)
     else:
         logger.info("promo_bruteforce_guard_finished", **result)

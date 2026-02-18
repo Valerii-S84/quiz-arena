@@ -30,7 +30,6 @@
 2. Milestone 9: implement referral qualification + anti-fraud checks and reward flow.
 3. M10 remaining hardening:
   - promo code generation/import tooling (batch/admin path),
-  - alert hooks for brute-force autopause and promo failure spikes,
   - targeted concurrency tests for parallel redeem collisions.
 4. Add Telegram sandbox end-to-end smoke for webhook -> payment -> promo flows.
 

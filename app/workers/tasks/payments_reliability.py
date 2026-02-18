@@ -18,6 +18,7 @@ from app.economy.purchases.errors import (
 )
 from app.economy.purchases.recovery import MAX_CREDIT_RECOVERY_ATTEMPTS, increment_recovery_failures
 from app.economy.purchases.service import PurchaseService
+from app.services.alerts import send_ops_alert
 from app.services.payments_reliability import (
     compute_product_stars_mismatch_count,
     compute_reconciliation_diff,
@@ -111,6 +112,12 @@ async def recover_paid_uncredited_async(*, batch_size: int = 100, stale_minutes:
 
         summary[outcome] = summary.get(outcome, 0) + 1
 
+    if summary["review"] > 0 or summary["errors"] > 0:
+        await send_ops_alert(
+            event="payments_recovery_review_required",
+            payload=summary,
+        )
+
     logger.info("paid_uncredited_recovery_finished", **summary)
     return summary
 
@@ -163,6 +170,10 @@ async def run_payments_reconciliation_async(*, stale_minutes: int = 30) -> dict[
         "status": status,
     }
     if diff_count > 0:
+        await send_ops_alert(
+            event="payments_reconciliation_diff_detected",
+            payload=result,
+        )
         logger.warning("payments_reconciliation_diff_detected", **result)
     else:
         logger.info("payments_reconciliation_finished", **result)
