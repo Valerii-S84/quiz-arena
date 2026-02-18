@@ -8,4 +8,8 @@ def test_shop_keyboard_contains_products_and_back() -> None:
     assert "buy:ENERGY_10" in callbacks
     assert "buy:MEGA_PACK_15" in callbacks
     assert "buy:PREMIUM_STARTER" in callbacks
+    assert "buy:PREMIUM_MONTH" in callbacks
+    assert "buy:PREMIUM_SEASON" in callbacks
+    assert "buy:PREMIUM_YEAR" in callbacks
+    assert "promo:open" in callbacks
     assert "home:open" in callbacks

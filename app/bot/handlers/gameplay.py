@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import re
 from datetime import datetime, timezone
 from uuid import UUID
@@ -38,19 +39,24 @@ def _build_question_text(
     snapshot_paid_energy: int,
     start_result: StartSessionResult,
 ) -> str:
+    mode_line = TEXTS_DE["msg.game.mode"].format(mode_code=start_result.session.mode_code)
+    energy_line = TEXTS_DE["msg.game.energy.left"].format(
+        free_energy=(
+            snapshot_free_energy if is_zero_cost_source(source) else start_result.energy_free
+        ),
+        paid_energy=(
+            snapshot_paid_energy if is_zero_cost_source(source) else start_result.energy_paid
+        ),
+    )
     return "\n".join(
         [
-            TEXTS_DE["msg.game.mode"].format(mode_code=start_result.session.mode_code),
-            TEXTS_DE["msg.game.energy.left"].format(
-                free_energy=(
-                    snapshot_free_energy if is_zero_cost_source(source) else start_result.energy_free
-                ),
-                paid_energy=(
-                    snapshot_paid_energy if is_zero_cost_source(source) else start_result.energy_paid
-                ),
-            ),
-            start_result.session.text,
-            TEXTS_DE["msg.game.choose_option"],
+            f"<b>{html.escape(mode_line)}</b>",
+            html.escape(energy_line),
+            "",
+            "<b>Frage:</b>",
+            f"<b>{html.escape(start_result.session.text)}</b>",
+            "",
+            html.escape(TEXTS_DE["msg.game.choose_option"]),
         ]
     )
 
@@ -152,6 +158,7 @@ async def _start_mode(
             session_id=str(result.session.session_id),
             options=result.session.options,
         ),
+        parse_mode="HTML",
     )
     await callback.answer()
 
@@ -324,5 +331,6 @@ async def handle_answer(callback: CallbackQuery) -> None:
             session_id=str(next_result.session.session_id),
             options=next_result.session.options,
         ),
+        parse_mode="HTML",
     )
     await callback.answer()

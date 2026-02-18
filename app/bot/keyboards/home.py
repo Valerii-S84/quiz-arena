@@ -10,6 +10,5 @@ def build_home_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Cases Practice", callback_data="mode:CASES_PRACTICE")],
             [InlineKeyboardButton(text="🛒 Shop", callback_data="shop:open")],
             [InlineKeyboardButton(text="👥 Freunde einladen", callback_data="referral:open")],
-            [InlineKeyboardButton(text="🎟 Promo", callback_data="promo:open")],
         ]
     )
