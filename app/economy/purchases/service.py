@@ -9,9 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.ledger_entries import LedgerEntry
 from app.db.models.mode_access import ModeAccess
+from app.db.models.entitlements import Entitlement
 from app.db.models.promo_codes import PromoCode
 from app.db.models.promo_redemptions import PromoRedemption
 from app.db.models.purchases import Purchase
+from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.ledger_repo import LedgerRepo
 from app.db.repo.mode_access_repo import ModeAccessRepo
 from app.db.repo.promo_repo import PromoRepo
@@ -20,6 +22,7 @@ from app.db.repo.streak_repo import StreakRepo
 from app.economy.energy.service import EnergyService
 from app.economy.purchases.catalog import MEGA_PACK_MODE_CODES, ProductSpec, get_product
 from app.economy.purchases.errors import (
+    PremiumDowngradeNotAllowedError,
     ProductNotFoundError,
     PurchaseInitValidationError,
     PurchaseNotFoundError,
@@ -28,12 +31,22 @@ from app.economy.purchases.errors import (
 from app.economy.purchases.types import PurchaseCreditResult, PurchaseInitResult
 
 PROMO_RESERVATION_TTL_MINUTES = 15
+PREMIUM_PLAN_RANKS: dict[str, int] = {
+    "PREMIUM_STARTER": 1,
+    "PREMIUM_MONTH": 2,
+    "PREMIUM_SEASON": 3,
+    "PREMIUM_YEAR": 4,
+}
 
 
 class PurchaseService:
     @staticmethod
     def _build_invoice_payload() -> str:
         return f"inv_{uuid4().hex}"
+
+    @staticmethod
+    def _premium_plan_rank(plan_code: str | None) -> int:
+        return PREMIUM_PLAN_RANKS.get(plan_code or "", 0)
 
     @staticmethod
     def _calculate_discount_amount(base_price: int, discount_percent: int) -> int:
@@ -152,6 +165,68 @@ class PurchaseService:
         return redemption, promo_code
 
     @staticmethod
+    async def _apply_premium_entitlement(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        purchase: Purchase,
+        product: ProductSpec,
+        now_utc: datetime,
+    ) -> None:
+        if product.premium_days <= 0:
+            raise PurchasePrecheckoutValidationError
+
+        active_entitlement = await EntitlementsRepo.get_active_premium_for_update(session, user_id, now_utc)
+        starts_at = now_utc
+        ends_at = now_utc + timedelta(days=product.premium_days)
+
+        if active_entitlement is not None:
+            active_rank = PurchaseService._premium_plan_rank(active_entitlement.scope)
+            next_rank = PurchaseService._premium_plan_rank(product.product_code)
+            if next_rank <= active_rank:
+                raise PurchasePrecheckoutValidationError
+
+            active_end = active_entitlement.ends_at if active_entitlement.ends_at is not None else now_utc
+            if active_end > now_utc:
+                ends_at = active_end + timedelta(days=product.premium_days)
+            active_entitlement.status = "REVOKED"
+            active_entitlement.updated_at = now_utc
+
+        await EntitlementsRepo.create(
+            session,
+            entitlement=Entitlement(
+                user_id=user_id,
+                entitlement_type="PREMIUM",
+                scope=product.product_code,
+                status="ACTIVE",
+                starts_at=starts_at,
+                ends_at=ends_at,
+                source_purchase_id=purchase.id,
+                idempotency_key=f"entitlement:premium:{purchase.id}",
+                metadata_={},
+                created_at=now_utc,
+                updated_at=now_utc,
+            ),
+        )
+
+        await LedgerRepo.create(
+            session,
+            entry=LedgerEntry(
+                user_id=user_id,
+                purchase_id=purchase.id,
+                entry_type="PURCHASE_CREDIT",
+                asset="PREMIUM",
+                direction="CREDIT",
+                amount=product.premium_days,
+                balance_after=None,
+                source="PURCHASE",
+                idempotency_key=f"credit:premium:{purchase.id}",
+                metadata_={"scope": product.product_code},
+                created_at=now_utc,
+            ),
+        )
+
+    @staticmethod
     async def init_purchase(
         session: AsyncSession,
         *,
@@ -188,6 +263,14 @@ class PurchaseService:
                 product=product,
                 now_utc=now_utc,
             )
+
+        if product.product_type == "PREMIUM":
+            active_premium = await EntitlementsRepo.get_active_premium_for_update(session, user_id, now_utc)
+            if active_premium is not None:
+                active_rank = PurchaseService._premium_plan_rank(active_premium.scope)
+                next_rank = PurchaseService._premium_plan_rank(product.product_code)
+                if next_rank <= active_rank:
+                    raise PremiumDowngradeNotAllowedError
 
         purchase = await PurchasesRepo.create(
             session,
@@ -296,6 +379,15 @@ class PurchaseService:
         product = get_product(purchase.product_code)
         if product is None:
             raise ProductNotFoundError
+
+        if product.product_type == "PREMIUM":
+            await PurchaseService._apply_premium_entitlement(
+                session,
+                user_id=user_id,
+                purchase=purchase,
+                product=product,
+                now_utc=now_utc,
+            )
 
         if product.energy_credit > 0:
             await EnergyService.credit_paid_energy(

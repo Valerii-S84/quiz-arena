@@ -10,6 +10,7 @@ from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
 from app.economy.purchases.catalog import get_product
 from app.economy.purchases.errors import (
+    PremiumDowngradeNotAllowedError,
     ProductNotFoundError,
     PurchaseInitValidationError,
     PurchaseNotFoundError,
@@ -47,6 +48,9 @@ async def handle_buy(callback: CallbackQuery) -> None:
                 idempotency_key=f"buy:{product_code}:{callback.id}",
                 now_utc=now_utc,
             )
+    except PremiumDowngradeNotAllowedError:
+        await callback.answer(TEXTS_DE["msg.premium.downgrade.blocked"], show_alert=True)
+        return
     except (ProductNotFoundError, PurchaseInitValidationError):
         await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)
         return
@@ -125,6 +129,10 @@ async def handle_successful_payment(message: Message) -> None:
         "ENERGY_10": "msg.purchase.success.energy10",
         "MEGA_PACK_15": "msg.purchase.success.megapack",
         "STREAK_SAVER_20": "msg.purchase.success.streaksaver",
+        "PREMIUM_STARTER": "msg.purchase.success.premium",
+        "PREMIUM_MONTH": "msg.purchase.success.premium",
+        "PREMIUM_SEASON": "msg.purchase.success.premium",
+        "PREMIUM_YEAR": "msg.purchase.success.premium",
     }.get(credit_result.product_code, "msg.purchase.success.energy10")
 
     await message.answer(TEXTS_DE[text_key], reply_markup=build_home_keyboard())

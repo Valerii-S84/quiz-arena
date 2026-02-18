@@ -16,3 +16,7 @@ class PurchasePrecheckoutValidationError(PurchaseError):
 
 class PurchaseInitValidationError(PurchaseError):
     pass
+
+
+class PremiumDowngradeNotAllowedError(PurchaseInitValidationError):
+    pass

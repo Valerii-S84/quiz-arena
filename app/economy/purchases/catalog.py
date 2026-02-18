@@ -11,6 +11,7 @@ class ProductSpec:
     description: str
     stars_amount: int
     energy_credit: int
+    premium_days: int = 0
     grants_streak_saver: bool = False
     grants_mega_mode_access: bool = False
 
@@ -47,6 +48,42 @@ PRODUCTS: dict[str, ProductSpec] = {
         stars_amount=20,
         energy_credit=0,
         grants_streak_saver=True,
+    ),
+    "PREMIUM_STARTER": ProductSpec(
+        product_code="PREMIUM_STARTER",
+        product_type="PREMIUM",
+        title="Premium Starter",
+        description="7 Tage Premium ohne Limits.",
+        stars_amount=29,
+        energy_credit=0,
+        premium_days=7,
+    ),
+    "PREMIUM_MONTH": ProductSpec(
+        product_code="PREMIUM_MONTH",
+        product_type="PREMIUM",
+        title="Premium Month",
+        description="30 Tage Premium ohne Limits.",
+        stars_amount=99,
+        energy_credit=0,
+        premium_days=30,
+    ),
+    "PREMIUM_SEASON": ProductSpec(
+        product_code="PREMIUM_SEASON",
+        product_type="PREMIUM",
+        title="Premium Season",
+        description="90 Tage Premium ohne Limits.",
+        stars_amount=249,
+        energy_credit=0,
+        premium_days=90,
+    ),
+    "PREMIUM_YEAR": ProductSpec(
+        product_code="PREMIUM_YEAR",
+        product_type="PREMIUM",
+        title="Premium Year",
+        description="365 Tage Premium ohne Limits.",
+        stars_amount=499,
+        energy_credit=0,
+        premium_days=365,
     ),
 }
 

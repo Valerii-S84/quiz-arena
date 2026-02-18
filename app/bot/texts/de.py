@@ -16,5 +16,7 @@ TEXTS_DE: dict[str, str] = {
     "msg.purchase.success.energy10": "Erfolg! +10 Energie wurde gutgeschrieben.",
     "msg.purchase.success.megapack": "Mega Pack aktiv. +15 Energie und 3 Modi sind jetzt freigeschaltet.",
     "msg.purchase.success.streaksaver": "Streak Saver ist bereit. Ein Fehltag wird automatisch geschützt.",
+    "msg.purchase.success.premium": "Premium ist jetzt aktiv. Dein Zugriff wurde aktualisiert.",
     "msg.purchase.error.failed": "Zahlung fehlgeschlagen. Bitte versuche es erneut.",
+    "msg.premium.downgrade.blocked": "Ein niedrigerer Plan ist während aktivem Premium nicht verfügbar.",
 }

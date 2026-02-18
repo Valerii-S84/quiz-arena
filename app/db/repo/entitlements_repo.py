@@ -14,6 +14,7 @@ class EntitlementsRepo:
         session: AsyncSession,
         user_id: int,
         now_utc: datetime,
+        for_update: bool = False,
     ) -> Entitlement | None:
         stmt = select(Entitlement).where(
             and_(
@@ -24,6 +25,8 @@ class EntitlementsRepo:
                 or_(Entitlement.ends_at.is_(None), Entitlement.ends_at > now_utc),
             )
         )
+        if for_update:
+            stmt = stmt.with_for_update()
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -40,3 +43,22 @@ class EntitlementsRepo:
     ) -> str | None:
         entitlement = await EntitlementsRepo._get_active_premium_entitlement(session, user_id, now_utc)
         return entitlement.scope if entitlement is not None else None
+
+    @staticmethod
+    async def get_active_premium_for_update(
+        session: AsyncSession,
+        user_id: int,
+        now_utc: datetime,
+    ) -> Entitlement | None:
+        return await EntitlementsRepo._get_active_premium_entitlement(
+            session,
+            user_id,
+            now_utc,
+            for_update=True,
+        )
+
+    @staticmethod
+    async def create(session: AsyncSession, *, entitlement: Entitlement) -> Entitlement:
+        session.add(entitlement)
+        await session.flush()
+        return entitlement
