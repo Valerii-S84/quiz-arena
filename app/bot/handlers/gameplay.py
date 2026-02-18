@@ -14,6 +14,7 @@ from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
 from app.economy.offers.constants import TRG_LOCKED_MODE_CLICK
 from app.economy.offers.service import OfferLoggingError, OfferService
+from app.game.modes.rules import is_zero_cost_source
 from app.game.sessions.errors import (
     DailyChallengeAlreadyPlayedError,
     EnergyInsufficientError,
@@ -116,7 +117,16 @@ async def _start_mode(
     question_text = "\n".join(
         [
             TEXTS_DE["msg.game.mode"].format(mode_code=result.session.mode_code),
+            TEXTS_DE["msg.game.energy.left"].format(
+                free_energy=(
+                    snapshot.free_energy if is_zero_cost_source(source) else result.energy_free
+                ),
+                paid_energy=(
+                    snapshot.paid_energy if is_zero_cost_source(source) else result.energy_paid
+                ),
+            ),
             result.session.text,
+            TEXTS_DE["msg.game.choose_option"],
         ]
     )
 
@@ -205,15 +215,22 @@ async def handle_answer(callback: CallbackQuery) -> None:
             return
 
     answer_key = "msg.game.answer.correct" if result.is_correct else "msg.game.answer.incorrect"
-    response = "\n".join(
-        [
-            TEXTS_DE[answer_key],
-            TEXTS_DE["msg.game.streak"].format(
-                current_streak=result.current_streak,
-                best_streak=result.best_streak,
-            ),
-        ]
+    response_lines = [TEXTS_DE[answer_key]]
+    if result.selected_answer_text is not None:
+        response_lines.append(
+            TEXTS_DE["msg.game.answer.selected"].format(answer=result.selected_answer_text)
+        )
+    if result.correct_answer_text is not None:
+        response_lines.append(
+            TEXTS_DE["msg.game.answer.correct_label"].format(answer=result.correct_answer_text)
+        )
+    response_lines.append(
+        TEXTS_DE["msg.game.streak"].format(
+            current_streak=result.current_streak,
+            best_streak=result.best_streak,
+        )
     )
+    response = "\n".join(response_lines)
 
     await callback.message.answer(response, reply_markup=build_home_keyboard())
     await callback.answer()

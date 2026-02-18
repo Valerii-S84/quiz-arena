@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
+import structlog
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, LabeledPrice, Message, PreCheckoutQuery
 
@@ -22,6 +23,7 @@ from app.economy.purchases.service import PurchaseService
 from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="payments")
+logger = structlog.get_logger(__name__)
 
 
 def _parse_buy_callback_data(callback_data: str) -> tuple[str, UUID | None]:
@@ -75,15 +77,26 @@ async def handle_buy(callback: CallbackQuery) -> None:
         await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)
         return
 
-    await callback.bot.send_invoice(
-        chat_id=callback.from_user.id,
-        title=product.title,
-        description=product.description,
-        payload=init_result.invoice_payload,
-        currency="XTR",
-        prices=[LabeledPrice(label=product.title, amount=init_result.final_stars_amount)],
-        provider_token=None,
-    )
+    try:
+        await callback.bot.send_invoice(
+            chat_id=callback.from_user.id,
+            title=product.title,
+            description=product.description,
+            payload=init_result.invoice_payload,
+            currency="XTR",
+            prices=[LabeledPrice(label=product.title, amount=init_result.final_stars_amount)],
+            provider_token=None,
+        )
+    except Exception as exc:
+        logger.exception(
+            "telegram_send_invoice_failed",
+            user_id=callback.from_user.id,
+            purchase_id=str(init_result.purchase_id),
+            product_code=product_code,
+            error_type=type(exc).__name__,
+        )
+        await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)
+        return
 
     async with SessionLocal.begin() as session:
         await PurchaseService.mark_invoice_sent(

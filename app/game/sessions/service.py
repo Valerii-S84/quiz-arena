@@ -183,6 +183,8 @@ class GameSessionService:
                 current_streak=streak_snapshot.current_streak,
                 best_streak=streak_snapshot.best_streak,
                 idempotent_replay=True,
+                selected_answer_text=None,
+                correct_answer_text=None,
             )
 
         quiz_session = await QuizSessionsRepo.get_by_id_for_update(session, session_id)
@@ -232,6 +234,8 @@ class GameSessionService:
             current_streak=streak_result.current_streak,
             best_streak=streak_result.best_streak,
             idempotent_replay=False,
+            selected_answer_text=question.options[selected_option],
+            correct_answer_text=question.options[question.correct_option],
         )
 
     @staticmethod
