@@ -24,7 +24,8 @@
   - promo campaign autopause events;
   - payment reconciliation diffs;
   - payment recovery review-required outcomes.
+- New runbook:
+  - `docs/runbooks/telegram_sandbox_stars_smoke.md` for external Telegram sandbox validation of promo/payment and referral duplicate-callback safety.
 
 ## Missing for Next Milestones
-- Operational runbook for campaign unpause / manual promo incident handling.
 - Dedicated dashboard for promo conversion, failure rates, and guard triggers.

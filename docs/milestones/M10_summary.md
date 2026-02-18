@@ -32,6 +32,8 @@
 - Added Telegram webhook smoke integration coverage:
   - promo discount redeem -> purchase/payment credit chain;
   - referral reward choice callback flow with duplicate replay.
+- Added external Telegram sandbox runbook:
+  - `docs/runbooks/telegram_sandbox_stars_smoke.md`.
 
 ## Not Implemented
 - Dedicated admin UI/workflow for promo campaign operations (CLI is available).

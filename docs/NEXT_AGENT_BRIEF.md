@@ -60,6 +60,8 @@
     - `/promo` redeem -> buy callback -> precheckout -> successful payment -> credit;
     - referral reward choice callback duplicate replay safety;
     - dispatcher router-attachment issue fixed via singleton dispatcher reuse.
+  - external Telegram sandbox runbook:
+    - `docs/runbooks/telegram_sandbox_stars_smoke.md` with webhook binding, scenario steps, DB validation and cleanup.
 - Technical spec source of truth: `TECHNICAL_SPEC_ENERGY_STARS_BOT.md`.
 
 ## Critical Notes
@@ -71,7 +73,6 @@
 
 ## Immediate Next Steps (Priority)
 1. M10/M11 remaining hardening:
-  - dedicated external Telegram sandbox runbook for real Stars provider validation;
   - promo incident response runbook (campaign unpause/manual handling).
 2. Product/ops maturity:
   - dashboard for promo conversion/failure/guard triggers.
