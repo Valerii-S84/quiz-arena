@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = Field(alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_secret: str = Field(alias="TELEGRAM_WEBHOOK_SECRET")
+    promo_secret_pepper: str = Field(default="dev_promo_pepper_change_me", alias="PROMO_SECRET_PEPPER")
 
     database_url: str = Field(alias="DATABASE_URL")
     redis_url: str = Field(alias="REDIS_URL")

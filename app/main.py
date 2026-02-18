@@ -2,6 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from app.api.routes.health import router as health_router
+from app.api.routes.internal_promo import router as internal_promo_router
 from app.api.routes.telegram_webhook import router as telegram_webhook_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
@@ -19,6 +20,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router)
     app.include_router(telegram_webhook_router)
+    app.include_router(internal_promo_router)
     return app
 
 
