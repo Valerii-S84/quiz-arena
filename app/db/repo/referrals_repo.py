@@ -121,6 +121,23 @@ class ReferralsRepo:
         return list(result.scalars().all())
 
     @staticmethod
+    async def list_for_referrer(
+        session: AsyncSession,
+        *,
+        referrer_user_id: int,
+    ) -> list[Referral]:
+        stmt = (
+            select(Referral)
+            .where(
+                Referral.referrer_user_id == referrer_user_id,
+                Referral.status.in_(("QUALIFIED", "DEFERRED_LIMIT", "REWARDED", "REJECTED_FRAUD")),
+            )
+            .order_by(Referral.qualified_at.asc().nulls_last(), Referral.created_at.asc())
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
     async def count_rewards_for_referrer_between(
         session: AsyncSession,
         *,

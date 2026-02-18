@@ -5,6 +5,7 @@ from app.bot.handlers.gameplay import router as gameplay_router
 from app.bot.handlers.offers import router as offers_router
 from app.bot.handlers.payments import router as payments_router
 from app.bot.handlers.promo import router as promo_router
+from app.bot.handlers.referral import router as referral_router
 from app.bot.handlers.start import router as start_router
 from app.core.config import get_settings
 
@@ -21,4 +22,5 @@ def build_dispatcher() -> Dispatcher:
     dispatcher.include_router(offers_router)
     dispatcher.include_router(payments_router)
     dispatcher.include_router(promo_router)
+    dispatcher.include_router(referral_router)
     return dispatcher

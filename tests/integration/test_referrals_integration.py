@@ -8,6 +8,7 @@ import pytest
 from aiogram.types import User as TelegramUser
 from sqlalchemy import func, select
 
+from app.db.models.entitlements import Entitlement
 from app.db.models.quiz_attempts import QuizAttempt
 from app.db.models.quiz_sessions import QuizSession
 from app.db.models.referrals import Referral
@@ -15,7 +16,7 @@ from app.db.models.users import User
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.energy.constants import BERLIN_TIMEZONE
-from app.economy.referrals.constants import REFERRAL_STARTS_DAILY_LIMIT
+from app.economy.referrals.constants import REFERRAL_STARTS_DAILY_LIMIT, REWARD_CODE_PREMIUM_STARTER
 from app.economy.referrals.service import ReferralService
 from app.services.user_onboarding import UserOnboardingService
 
@@ -325,3 +326,107 @@ async def test_velocity_limit_marks_extra_referral_as_rejected_fraud() -> None:
         last_referral = await session.scalar(stmt)
         assert last_referral is not None
         assert last_referral.status == "REJECTED_FRAUD"
+
+
+@pytest.mark.asyncio
+async def test_referrer_overview_reports_progress_and_claimable_reward() -> None:
+    now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
+    referrer = await _create_user("referrer-overview")
+    referred_users = [await _create_user(f"referred-overview-{idx}") for idx in range(3)]
+
+    for referred in referred_users:
+        await _create_referral_row(
+            referrer_user_id=referrer.id,
+            referred_user_id=referred.id,
+            referral_code=referrer.referral_code,
+            status="QUALIFIED",
+            created_at=now_utc - timedelta(days=5),
+            qualified_at=now_utc - timedelta(hours=49),
+        )
+
+    async with SessionLocal.begin() as session:
+        overview = await ReferralService.get_referrer_overview(
+            session,
+            user_id=referrer.id,
+            now_utc=now_utc,
+        )
+        assert overview is not None
+        assert overview.qualified_total == 3
+        assert overview.progress_qualified == 3
+        assert overview.pending_rewards_total == 1
+        assert overview.claimable_rewards == 1
+        assert overview.next_reward_at_utc is None
+
+
+@pytest.mark.asyncio
+async def test_reward_distribution_without_reward_code_keeps_reward_for_choice() -> None:
+    now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
+    referrer = await _create_user("referrer-awaiting-choice")
+    referred_users = [await _create_user(f"referred-awaiting-choice-{idx}") for idx in range(3)]
+
+    for referred in referred_users:
+        await _create_referral_row(
+            referrer_user_id=referrer.id,
+            referred_user_id=referred.id,
+            referral_code=referrer.referral_code,
+            status="QUALIFIED",
+            created_at=now_utc - timedelta(days=4),
+            qualified_at=now_utc - timedelta(hours=49),
+        )
+
+    async with SessionLocal.begin() as session:
+        result = await ReferralService.run_reward_distribution(
+            session,
+            now_utc=now_utc,
+            reward_code=None,
+        )
+        assert result["rewards_granted"] == 0
+        assert result["awaiting_choice"] == 1
+
+        rewarded_stmt = select(func.count(Referral.id)).where(
+            Referral.referrer_user_id == referrer.id,
+            Referral.status == "REWARDED",
+        )
+        assert int(await session.scalar(rewarded_stmt) or 0) == 0
+
+
+@pytest.mark.asyncio
+async def test_claim_next_reward_choice_grants_selected_reward() -> None:
+    now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
+    referrer = await _create_user("referrer-claim-choice")
+    referred_users = [await _create_user(f"referred-claim-choice-{idx}") for idx in range(3)]
+
+    for referred in referred_users:
+        await _create_referral_row(
+            referrer_user_id=referrer.id,
+            referred_user_id=referred.id,
+            referral_code=referrer.referral_code,
+            status="QUALIFIED",
+            created_at=now_utc - timedelta(days=4),
+            qualified_at=now_utc - timedelta(hours=49),
+        )
+
+    async with SessionLocal.begin() as session:
+        claim = await ReferralService.claim_next_reward_choice(
+            session,
+            user_id=referrer.id,
+            reward_code=REWARD_CODE_PREMIUM_STARTER,
+            now_utc=now_utc,
+        )
+        assert claim is not None
+        assert claim.status == "CLAIMED"
+        assert claim.reward_code == REWARD_CODE_PREMIUM_STARTER
+        assert claim.overview.rewarded_total == 1
+
+        rewarded_stmt = select(func.count(Referral.id)).where(
+            Referral.referrer_user_id == referrer.id,
+            Referral.status == "REWARDED",
+        )
+        assert int(await session.scalar(rewarded_stmt) or 0) == 1
+
+        entitlement_stmt = select(func.count(Entitlement.id)).where(
+            Entitlement.user_id == referrer.id,
+            Entitlement.entitlement_type == "PREMIUM",
+            Entitlement.status == "ACTIVE",
+        )
+        assert int(await session.scalar(entitlement_stmt) or 0) == 1

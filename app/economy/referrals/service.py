@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
@@ -40,6 +41,26 @@ from app.economy.referrals.constants import (
 START_PAYLOAD_REFERRAL_RE = re.compile(r"^ref_([A-Za-z0-9]{3,16})$")
 
 
+@dataclass(frozen=True, slots=True)
+class ReferralOverview:
+    referral_code: str
+    qualified_total: int
+    rewarded_total: int
+    progress_qualified: int
+    progress_target: int
+    pending_rewards_total: int
+    claimable_rewards: int
+    deferred_rewards: int
+    next_reward_at_utc: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class ReferralClaimResult:
+    status: str
+    reward_code: str | None
+    overview: ReferralOverview
+
+
 class ReferralService:
     @staticmethod
     def extract_referral_code_from_start_payload(start_payload: str | None) -> str | None:
@@ -75,6 +96,99 @@ class ReferralService:
         return (
             local_month_start.astimezone(now_utc.tzinfo),
             local_next_month.astimezone(now_utc.tzinfo),
+        )
+
+    @staticmethod
+    def _build_reward_anchors(referrals: list[Referral]) -> list[Referral]:
+        qualified_sequence = [
+            referral
+            for referral in referrals
+            if referral.status in {"QUALIFIED", "DEFERRED_LIMIT", "REWARDED"}
+            and referral.qualified_at is not None
+        ]
+        target_rewards_total = len(qualified_sequence) // QUALIFIED_REFERRALS_PER_REWARD
+        return [
+            qualified_sequence[(slot_index + 1) * QUALIFIED_REFERRALS_PER_REWARD - 1]
+            for slot_index in range(target_rewards_total)
+        ]
+
+    @staticmethod
+    def _build_overview_from_referrals(
+        *,
+        referral_code: str,
+        referrals: list[Referral],
+        now_utc: datetime,
+        rewarded_this_month: int,
+    ) -> ReferralOverview:
+        anchors = ReferralService._build_reward_anchors(referrals)
+        qualified_total = sum(
+            1 for referral in referrals if referral.status in {"QUALIFIED", "DEFERRED_LIMIT", "REWARDED"}
+        )
+        rewarded_total = sum(1 for referral in referrals if referral.status == "REWARDED")
+        pending_rewards_total = max(0, len(anchors) - rewarded_total)
+        progress_qualified = min(
+            QUALIFIED_REFERRALS_PER_REWARD,
+            max(0, qualified_total - (rewarded_total * QUALIFIED_REFERRALS_PER_REWARD)),
+        )
+
+        claimable_rewards = 0
+        deferred_rewards = 0
+        next_reward_at_utc: datetime | None = None
+        monthly_slots_used = rewarded_this_month
+        eligible_before_utc = now_utc - REWARD_DELAY
+        for anchor in anchors:
+            if anchor.status == "REWARDED" or anchor.qualified_at is None:
+                continue
+            if anchor.qualified_at > eligible_before_utc:
+                available_at_utc = anchor.qualified_at + REWARD_DELAY
+                if next_reward_at_utc is None or available_at_utc < next_reward_at_utc:
+                    next_reward_at_utc = available_at_utc
+                continue
+            if monthly_slots_used >= REFERRAL_REWARDS_PER_MONTH_CAP:
+                deferred_rewards += 1
+                continue
+            claimable_rewards += 1
+            monthly_slots_used += 1
+
+        return ReferralOverview(
+            referral_code=referral_code,
+            qualified_total=qualified_total,
+            rewarded_total=rewarded_total,
+            progress_qualified=progress_qualified,
+            progress_target=QUALIFIED_REFERRALS_PER_REWARD,
+            pending_rewards_total=pending_rewards_total,
+            claimable_rewards=claimable_rewards,
+            deferred_rewards=deferred_rewards,
+            next_reward_at_utc=next_reward_at_utc,
+        )
+
+    @staticmethod
+    async def get_referrer_overview(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        now_utc: datetime,
+    ) -> ReferralOverview | None:
+        user = await UsersRepo.get_by_id(session, user_id)
+        if user is None:
+            return None
+
+        referrals = await ReferralsRepo.list_for_referrer(
+            session,
+            referrer_user_id=user_id,
+        )
+        month_start_utc, next_month_start_utc = ReferralService._berlin_month_bounds_utc(now_utc)
+        rewarded_this_month = await ReferralsRepo.count_rewards_for_referrer_between(
+            session,
+            referrer_user_id=user_id,
+            from_utc=month_start_utc,
+            to_utc=next_month_start_utc,
+        )
+        return ReferralService._build_overview_from_referrals(
+            referral_code=user.referral_code,
+            referrals=referrals,
+            now_utc=now_utc,
+            rewarded_this_month=rewarded_this_month,
         )
 
     @staticmethod
@@ -296,7 +410,11 @@ class ReferralService:
     ) -> None:
         active_entitlement = await EntitlementsRepo.get_active_premium_for_update(session, user_id, now_utc)
         if active_entitlement is not None:
-            base_end = active_entitlement.ends_at if active_entitlement.ends_at and active_entitlement.ends_at > now_utc else now_utc
+            base_end = (
+                active_entitlement.ends_at
+                if active_entitlement.ends_at and active_entitlement.ends_at > now_utc
+                else now_utc
+            )
             active_entitlement.ends_at = base_end + timedelta(days=7)
             active_entitlement.updated_at = now_utc
         else:
@@ -359,12 +477,92 @@ class ReferralService:
         )
 
     @staticmethod
+    async def claim_next_reward_choice(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        reward_code: str,
+        now_utc: datetime,
+    ) -> ReferralClaimResult | None:
+        normalized_reward_code = reward_code.strip().upper()
+        if normalized_reward_code not in {REWARD_CODE_MEGA_PACK, REWARD_CODE_PREMIUM_STARTER}:
+            raise ValueError(f"unsupported reward code: {reward_code}")
+
+        user = await UsersRepo.get_by_id(session, user_id)
+        if user is None:
+            return None
+
+        referrals = await ReferralsRepo.list_for_referrer_for_update(
+            session,
+            referrer_user_id=user_id,
+        )
+        month_start_utc, next_month_start_utc = ReferralService._berlin_month_bounds_utc(now_utc)
+        rewarded_this_month = await ReferralsRepo.count_rewards_for_referrer_between(
+            session,
+            referrer_user_id=user_id,
+            from_utc=month_start_utc,
+            to_utc=next_month_start_utc,
+        )
+
+        anchors = ReferralService._build_reward_anchors(referrals)
+        eligible_before_utc = now_utc - REWARD_DELAY
+
+        status = "NO_REWARD"
+        deferred_limit_hit = False
+        next_reward_at_utc: datetime | None = None
+        for anchor in anchors:
+            if anchor.status == "REWARDED" or anchor.qualified_at is None:
+                continue
+            if anchor.qualified_at > eligible_before_utc:
+                available_at_utc = anchor.qualified_at + REWARD_DELAY
+                if next_reward_at_utc is None or available_at_utc < next_reward_at_utc:
+                    next_reward_at_utc = available_at_utc
+                continue
+
+            if rewarded_this_month >= REFERRAL_REWARDS_PER_MONTH_CAP:
+                if anchor.status != "DEFERRED_LIMIT":
+                    anchor.status = "DEFERRED_LIMIT"
+                deferred_limit_hit = True
+                continue
+
+            await ReferralService._grant_reward(
+                session,
+                user_id=user_id,
+                referral_id=anchor.id,
+                reward_code=normalized_reward_code,
+                now_utc=now_utc,
+            )
+            anchor.status = "REWARDED"
+            anchor.rewarded_at = now_utc
+            rewarded_this_month += 1
+            status = "CLAIMED"
+            break
+
+        if status != "CLAIMED":
+            if deferred_limit_hit:
+                status = "MONTHLY_CAP"
+            elif next_reward_at_utc is not None:
+                status = "TOO_EARLY"
+
+        overview = ReferralService._build_overview_from_referrals(
+            referral_code=user.referral_code,
+            referrals=referrals,
+            now_utc=now_utc,
+            rewarded_this_month=rewarded_this_month,
+        )
+        return ReferralClaimResult(
+            status=status,
+            reward_code=normalized_reward_code if status == "CLAIMED" else None,
+            overview=overview,
+        )
+
+    @staticmethod
     async def run_reward_distribution(
         session: AsyncSession,
         *,
         now_utc: datetime,
         batch_size: int = 200,
-        reward_code: str = DEFAULT_REFERRAL_REWARD_CODE,
+        reward_code: str | None = DEFAULT_REFERRAL_REWARD_CODE,
     ) -> dict[str, int]:
         qualified_before_utc = now_utc - REWARD_DELAY
         referrer_ids = await ReferralsRepo.list_referrer_ids_with_reward_candidates(
@@ -378,6 +576,7 @@ class ReferralService:
             "referrers_examined": len(referrer_ids),
             "rewards_granted": 0,
             "deferred_limit": 0,
+            "awaiting_choice": 0,
         }
 
         for referrer_user_id in referrer_ids:
@@ -388,14 +587,8 @@ class ReferralService:
             if not referrals:
                 continue
 
-            qualified_sequence = [
-                referral
-                for referral in referrals
-                if referral.status in {"QUALIFIED", "DEFERRED_LIMIT", "REWARDED"}
-                and referral.qualified_at is not None
-            ]
-            target_rewards_total = len(qualified_sequence) // QUALIFIED_REFERRALS_PER_REWARD
-            if target_rewards_total == 0:
+            anchors = ReferralService._build_reward_anchors(referrals)
+            if not anchors:
                 continue
 
             rewarded_this_month = await ReferralsRepo.count_rewards_for_referrer_between(
@@ -405,9 +598,7 @@ class ReferralService:
                 to_utc=next_month_start_utc,
             )
 
-            for slot_index in range(target_rewards_total):
-                anchor_idx = (slot_index + 1) * QUALIFIED_REFERRALS_PER_REWARD - 1
-                referral = qualified_sequence[anchor_idx]
+            for referral in anchors:
                 if referral.qualified_at is None or referral.qualified_at > qualified_before_utc:
                     continue
                 if referral.status == "REWARDED":
@@ -417,6 +608,14 @@ class ReferralService:
                     if referral.status != "DEFERRED_LIMIT":
                         referral.status = "DEFERRED_LIMIT"
                         result["deferred_limit"] += 1
+                    continue
+
+                if referral.status == "DEFERRED_LIMIT":
+                    referral.status = "QUALIFIED"
+
+                if reward_code is None:
+                    result["awaiting_choice"] += 1
+                    rewarded_this_month += 1
                     continue
 
                 await ReferralService._grant_reward(

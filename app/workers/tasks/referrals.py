@@ -32,6 +32,7 @@ async def run_referral_reward_distribution_async(*, batch_size: int = 200) -> di
             session,
             now_utc=now_utc,
             batch_size=batch_size,
+            reward_code=None,
         )
     logger.info("referral_reward_distribution_finished", **result)
     return result

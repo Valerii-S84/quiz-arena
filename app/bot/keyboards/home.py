@@ -8,6 +8,7 @@ def build_home_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Daily Challenge", callback_data="daily_challenge")],
             [InlineKeyboardButton(text="Artikel Sprint", callback_data="mode:ARTIKEL_SPRINT")],
             [InlineKeyboardButton(text="Cases Practice", callback_data="mode:CASES_PRACTICE")],
+            [InlineKeyboardButton(text="👥 Freunde einladen", callback_data="referral:open")],
             [InlineKeyboardButton(text="🎟 Promo", callback_data="promo:open")],
             [InlineKeyboardButton(text="⚡ +10 Energie (10⭐)", callback_data="buy:ENERGY_10")],
             [InlineKeyboardButton(text="📦 Mega Pack (15⭐)", callback_data="buy:MEGA_PACK_15")],
