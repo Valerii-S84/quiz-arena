@@ -2,6 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from app.api.routes.health import router as health_router
+from app.api.routes.telegram_webhook import router as telegram_webhook_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 
@@ -17,6 +18,7 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
     app.include_router(health_router)
+    app.include_router(telegram_webhook_router)
     return app
 
 
