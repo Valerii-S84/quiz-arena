@@ -303,3 +303,18 @@ class ReferralsRepo:
                 }
             )
         return rows
+
+    @staticmethod
+    async def list_for_review_since(
+        session: AsyncSession,
+        *,
+        since_utc: datetime,
+        status: str | None = None,
+        limit: int = 100,
+    ) -> list[Referral]:
+        stmt = select(Referral).where(Referral.created_at >= since_utc)
+        if status is not None:
+            stmt = stmt.where(Referral.status == status)
+        stmt = stmt.order_by(Referral.fraud_score.desc(), Referral.created_at.desc(), Referral.id.desc()).limit(limit)
+        result = await session.execute(stmt)
+        return list(result.scalars().all())

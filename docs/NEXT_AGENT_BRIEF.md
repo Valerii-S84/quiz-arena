@@ -40,6 +40,10 @@
   - internal referral dashboard endpoint `GET /internal/referrals/dashboard`;
   - referral fraud triage metrics (status funnel, fraud rates, top suspicious referrers, recent fraud cases);
   - periodic referral fraud-spike monitor with threshold-based ops alerting.
+- Referral manual-review workflow delivered:
+  - `GET /internal/referrals/review-queue`;
+  - `POST /internal/referrals/{referral_id}/review` with decisions `CONFIRM_FRAUD|REOPEN|CANCEL`;
+  - runbook `docs/runbooks/referrals_fraud_review.md` for triage/tuning flow.
 - M10 core promo module is now implemented:
   - `POST /internal/promo/redeem` (`PREMIUM_GRANT`, `PERCENT_DISCOUNT`);
   - promo anti-abuse throttling (per-user + global brute-force autopause);
@@ -107,16 +111,16 @@
 - Bot token is already configured locally; rotate token before production webhook go-live.
 - Local runtime services are expected to be started manually when needed (`postgres`, `redis`, API, bot, worker).
 - Latest full validation run in this branch: `148 passed` (2026-02-18).
-- Latest targeted validation run (2026-02-20): promo admin + refund rollback tests passed.
+- Latest targeted validation run (2026-02-20): referral review queue/decision tests passed.
 - Current Alembic head: `d5e6f7a8b9c0`.
 
 ## Immediate Next Steps (Priority)
-1. Referral ops maturity:
-  - manual-review workflow/playbook for fraud threshold tuning and triage actions.
-2. Product notifications:
+1. Product notifications:
   - external notification channel for referral milestone/reward events.
-3. Promo ops UX:
+2. Promo ops UX:
   - standalone visual admin UI over implemented internal promo admin endpoints.
+3. Referral ops UX:
+  - standalone visual review UI over implemented referral triage APIs.
 
 ## Validation Commands
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q`

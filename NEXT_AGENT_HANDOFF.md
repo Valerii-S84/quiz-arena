@@ -1,5 +1,20 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-20, referral manual review workflow)
+- Delivered referral triage internal APIs:
+  - `GET /internal/referrals/review-queue` (window/status-filtered queue);
+  - `POST /internal/referrals/{referral_id}/review` (manual decisions).
+- Implemented safe decision transitions:
+  - `CONFIRM_FRAUD` -> `REJECTED_FRAUD` (with enforced minimum fraud score);
+  - `REOPEN` -> `STARTED` (for `REJECTED_FRAUD`/`CANCELED`);
+  - `CANCEL` -> `CANCELED` (for `STARTED`/`REJECTED_FRAUD`);
+  - invalid transitions return `E_REFERRAL_REVIEW_DECISION_CONFLICT`.
+- Added tests:
+  - `tests/api/test_internal_referrals_auth.py` (auth coverage for new endpoints),
+  - `tests/integration/test_internal_referrals_review_integration.py` (queue + decision flow).
+- Added ops runbook:
+  - `docs/runbooks/referrals_fraud_review.md`.
+
 ## Update (2026-02-20, promo admin workflow + refund rollback automation)
 - Delivered internal promo admin operations endpoints:
   - `GET /internal/promo/campaigns` (filters: `status`, `campaign_name`, `limit`);

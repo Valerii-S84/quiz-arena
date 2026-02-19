@@ -11,6 +11,11 @@
   - `app/workers/tasks/referrals.py`.
 - New internal referral dashboard endpoint:
   - `GET /internal/referrals/dashboard` (internal token + IP allowlist).
+- New internal referral triage endpoints:
+  - `GET /internal/referrals/review-queue`;
+  - `POST /internal/referrals/{referral_id}/review`.
+- New runbook:
+  - `docs/runbooks/referrals_fraud_review.md`.
 - Updated task registration:
   - `app/workers/celery_app.py`
   - `app/workers/tasks/__init__.py`
@@ -28,5 +33,5 @@
   - `REFERRALS_ALERT_MAX_REFERRER_REJECTED_FRAUD`.
 
 ## Missing for Next Milestones
-- Dedicated manual-review workflow/UI for fraud investigation and threshold tuning actions.
+- Standalone visual manual-review UI for fraud investigation and threshold tuning actions (API workflow available).
 - External notification channel for referral milestone/reward events.

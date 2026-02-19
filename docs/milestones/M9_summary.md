@@ -34,9 +34,14 @@
   - internal dashboard endpoint `GET /internal/referrals/dashboard`;
   - fraud-triage metrics (funnel/status/fraud rates, suspicious referrers, recent fraud cases);
   - periodic threshold-based fraud spike alerting (`referral_fraud_spike_detected`).
+- Added referral manual-review workflow (internal API):
+  - `GET /internal/referrals/review-queue` for triage queue filtering;
+  - `POST /internal/referrals/{referral_id}/review` with decisions `CONFIRM_FRAUD`, `REOPEN`, `CANCEL`;
+  - conflict-safe decision transitions with idempotent replay behavior.
 
 ## Not Implemented
 - External notification channel for referral milestone/reward events is not implemented.
+- Standalone visual admin UI for fraud triage (API workflow is implemented).
 
 ## Risks
 - Referral reward choice is currently not interactive; business may require explicit user selection before production.
