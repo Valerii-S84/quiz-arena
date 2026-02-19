@@ -1,5 +1,28 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-20, referrals dashboard + fraud triage)
+- Delivered referral fraud-triage dashboard endpoint:
+  - `GET /internal/referrals/dashboard`
+  - internal auth parity (`X-Internal-Token` + IP allowlist).
+- Dashboard output includes:
+  - referral funnel/status metrics in selected time window;
+  - fraud rates and rejected-fraud totals;
+  - top suspicious referrers and recent fraud cases for manual triage.
+- Added periodic referral fraud observability monitor:
+  - `run_referrals_fraud_alerts` every 15 minutes;
+  - threshold-based alert event `referral_fraud_spike_detected`.
+- Added env-driven thresholds:
+  - `REFERRALS_ALERT_WINDOW_HOURS`,
+  - `REFERRALS_ALERT_MIN_STARTED`,
+  - `REFERRALS_ALERT_MAX_FRAUD_REJECTED_RATE`,
+  - `REFERRALS_ALERT_MAX_REJECTED_FRAUD_TOTAL`,
+  - `REFERRALS_ALERT_MAX_REFERRER_REJECTED_FRAUD`.
+- Added tests:
+  - `tests/api/test_internal_referrals_auth.py`,
+  - `tests/integration/test_internal_referrals_dashboard_integration.py`,
+  - `tests/services/test_referrals_observability.py`,
+  - `tests/workers/test_referrals_observability_task.py`.
+
 ## Update (2026-02-20, offers dashboard + thresholds)
 - Delivered dedicated offers funnel dashboard endpoint:
   - `GET /internal/offers/dashboard`

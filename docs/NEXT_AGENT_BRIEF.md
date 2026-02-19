@@ -36,6 +36,10 @@
   - hardening coverage added:
     - duplicate claim idempotency (sequential + concurrent callback replay);
     - worker-vs-choice race safety test.
+- Referral observability hardening completed:
+  - internal referral dashboard endpoint `GET /internal/referrals/dashboard`;
+  - referral fraud triage metrics (status funnel, fraud rates, top suspicious referrers, recent fraud cases);
+  - periodic referral fraud-spike monitor with threshold-based ops alerting.
 - M10 core promo module is now implemented:
   - `POST /internal/promo/redeem` (`PREMIUM_GRANT`, `PERCENT_DISCOUNT`);
   - promo anti-abuse throttling (per-user + global brute-force autopause);
@@ -92,15 +96,17 @@
 - Bot token is already configured locally; rotate token before production webhook go-live.
 - Local runtime services are expected to be started manually when needed (`postgres`, `redis`, API, bot, worker).
 - Latest full validation run in this branch: `148 passed` (2026-02-18).
-- Latest targeted validation run (2026-02-19): promo dashboard/auth tests passed.
+- Latest targeted validation run (2026-02-20): offers + referrals observability/dashboard tests passed.
 - Current Alembic head: `d5e6f7a8b9c0`.
 
 ## Immediate Next Steps (Priority)
-1. Referral ops maturity:
-  - fraud-review dashboard/triage workflow and threshold tuning playbook.
-2. Promo operations:
+1. Promo operations:
   - dedicated admin workflow/UI for campaign operations (safe manual unpause/audit trail).
   - refund-driven promo rollback automation (`PR_REVOKED` flow).
+2. Referral ops maturity:
+  - manual-review workflow/playbook for fraud threshold tuning and triage actions.
+3. Product notifications:
+  - external notification channel for referral milestone/reward events.
 
 ## Validation Commands
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q`

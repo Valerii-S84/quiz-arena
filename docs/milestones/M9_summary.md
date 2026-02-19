@@ -30,10 +30,12 @@
 - Added referral reward application pipeline:
   - default reward grant implemented as `MEGA_PACK_15` equivalent (+15 paid energy + 24h mode access grant);
   - premium-starter reward grant path is also implemented in domain service.
+- Added referral ops observability:
+  - internal dashboard endpoint `GET /internal/referrals/dashboard`;
+  - fraud-triage metrics (funnel/status/fraud rates, suspicious referrers, recent fraud cases);
+  - periodic threshold-based fraud spike alerting (`referral_fraud_spike_detected`).
 
 ## Not Implemented
-- User-facing reward choice UX (`Mega Pack` vs `Premium Starter`) is not yet wired into bot handlers; default automatic reward path is used.
-- Dedicated manual review UI/dashboard for fraud investigation and threshold tuning is not implemented.
 - External notification channel for referral milestone/reward events is not implemented.
 
 ## Risks

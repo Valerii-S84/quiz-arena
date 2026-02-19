@@ -66,6 +66,11 @@ EVENT_ALERT_ROUTES = {
         severity="warning",
         escalation_tier="ops_l2",
     ),
+    "referral_fraud_spike_detected": AlertRoute(
+        channels=("slack", "generic"),
+        severity="warning",
+        escalation_tier="ops_l2",
+    ),
 }
 
 

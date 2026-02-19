@@ -39,6 +39,20 @@ class Settings(BaseSettings):
         default=4.0,
         alias="OFFERS_ALERT_MAX_IMPRESSIONS_PER_USER",
     )
+    referrals_alert_window_hours: int = Field(default=24, alias="REFERRALS_ALERT_WINDOW_HOURS")
+    referrals_alert_min_started: int = Field(default=20, alias="REFERRALS_ALERT_MIN_STARTED")
+    referrals_alert_max_fraud_rejected_rate: float = Field(
+        default=0.25,
+        alias="REFERRALS_ALERT_MAX_FRAUD_REJECTED_RATE",
+    )
+    referrals_alert_max_rejected_fraud_total: int = Field(
+        default=10,
+        alias="REFERRALS_ALERT_MAX_REJECTED_FRAUD_TOTAL",
+    )
+    referrals_alert_max_referrer_rejected_fraud: int = Field(
+        default=3,
+        alias="REFERRALS_ALERT_MAX_REFERRER_REJECTED_FRAUD",
+    )
     promo_secret_pepper: str = Field(default="dev_promo_pepper_change_me", alias="PROMO_SECRET_PEPPER")
 
     database_url: str = Field(alias="DATABASE_URL")
