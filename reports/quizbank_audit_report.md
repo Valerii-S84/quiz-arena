@@ -1,8 +1,8 @@
 # QuizBank Audit Report
 
-- Generated at: `2026-02-16T05:47:21.339543+00:00`
+- Generated at: `2026-02-19T16:43:55.661483+00:00`
 - Files audited: `19`
-- Total rows: `4070`
+- Total rows: `5570`
 
 ## Checklist by file
 
@@ -11,20 +11,20 @@
 | Adjektivendungen_Beginner_Bank_A1_A2_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Akkusativ_Dativ_Bank_A1_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Antonym_Match_Bank_A1_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
-| Artikel_Sprint_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
+| Artikel_Sprint_Bank_A1_B2_1000.csv | 1000 | ready | 0 | 0 | 0 | 0 | 0 |
 | LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv | 500 | ready | 0 | 0 | 0 | 0 | 0 |
 | Lexical_Gap_Fill_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Mini_Dialog_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Modalverben_Bank_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Negation_Quiz_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
-| Plural_Check_Bank_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
+| Plural_Check_Bank_500.csv | 500 | ready | 0 | 0 | 0 | 0 | 0 |
 | Possessive_Adjectives_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Preposition_Selection_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Satzbau_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Synonym_Match_Bank_A1_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Topic_Vocabulary_Themes_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Verb_Conjugation_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
-| W_Fragen_Bank_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
+| W_Fragen_Bank_630.csv | 630 | ready | 0 | 0 | 0 | 0 | 0 |
 | logik_luecke_sheet_template.csv | 0 | ready | 0 | 0 | 0 | 0 | 0 |
 | trennbare_verben_210_korrigiert.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 
@@ -45,7 +45,7 @@
 - Status: `ready` (critical `0`, high `0`, medium `0`)
 - Review question punctuation and end marks.
 
-### Artikel_Sprint_Bank_A2_B1_210.csv
+### Artikel_Sprint_Bank_A1_B2_1000.csv
 
 - Status: `ready` (critical `0`, high `0`, medium `0`)
 - Review question punctuation and end marks.
@@ -75,7 +75,7 @@
 - Status: `ready` (critical `0`, high `0`, medium `0`)
 - Review question punctuation and end marks.
 
-### Plural_Check_Bank_210.csv
+### Plural_Check_Bank_500.csv
 
 - Status: `ready` (critical `0`, high `0`, medium `0`)
 - No blocking issues detected. Keep file under regression QA.
@@ -110,7 +110,7 @@
 - Status: `ready` (critical `0`, high `0`, medium `0`)
 - Review question punctuation and end marks.
 
-### W_Fragen_Bank_210.csv
+### W_Fragen_Bank_630.csv
 
 - Status: `ready` (critical `0`, high `0`, medium `0`)
 - No blocking issues detected. Keep file under regression QA.

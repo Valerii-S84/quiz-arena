@@ -15,6 +15,7 @@ from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
 from app.economy.offers.constants import TRG_LOCKED_MODE_CLICK
 from app.economy.offers.service import OfferLoggingError, OfferService
+from app.game.modes.presentation import display_mode_label
 from app.game.modes.rules import is_zero_cost_source
 from app.game.sessions.errors import (
     DailyChallengeAlreadyPlayedError,
@@ -39,7 +40,9 @@ def _build_question_text(
     snapshot_paid_energy: int,
     start_result: StartSessionResult,
 ) -> str:
-    mode_line = TEXTS_DE["msg.game.mode"].format(mode_code=start_result.session.mode_code)
+    mode_line = TEXTS_DE["msg.game.mode"].format(
+        mode_code=display_mode_label(start_result.session.mode_code)
+    )
     energy_line = TEXTS_DE["msg.game.energy.left"].format(
         free_energy=(
             snapshot_free_energy if is_zero_cost_source(source) else start_result.energy_free

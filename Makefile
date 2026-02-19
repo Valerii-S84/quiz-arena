@@ -28,3 +28,9 @@ lint:
 
 test:
 	.venv/bin/pytest -q
+
+migrate:
+	$(PYTHON) -m alembic upgrade head
+
+import-quizbank:
+	$(PYTHON) -m scripts.quizbank_import_tool --replace-all

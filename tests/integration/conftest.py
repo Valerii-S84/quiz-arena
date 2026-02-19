@@ -11,6 +11,7 @@ TRUNCATE_TABLES = (
     "referrals",
     "offers_impressions",
     "quiz_attempts",
+    "quiz_questions",
     "quiz_sessions",
     "mode_access",
     "entitlements",

@@ -11,6 +11,7 @@ from app.db.models.promo_codes import PromoCode
 from app.db.models.promo_redemptions import PromoRedemption
 from app.db.models.purchases import Purchase
 from app.db.models.quiz_attempts import QuizAttempt
+from app.db.models.quiz_questions import QuizQuestion
 from app.db.models.quiz_sessions import QuizSession
 from app.db.models.reconciliation_runs import ReconciliationRun
 from app.db.models.referrals import Referral
@@ -31,6 +32,7 @@ __all__ = [
     "PromoRedemption",
     "Purchase",
     "QuizAttempt",
+    "QuizQuestion",
     "QuizSession",
     "ReconciliationRun",
     "Referral",

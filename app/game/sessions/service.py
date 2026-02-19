@@ -16,7 +16,7 @@ from app.economy.energy.service import EnergyService
 from app.economy.streak.service import StreakService
 from app.economy.streak.time import berlin_local_date
 from app.game.modes.rules import is_mode_allowed, is_zero_cost_source
-from app.game.questions.static_bank import (
+from app.game.questions.runtime_bank import (
     get_question_by_id,
     get_question_for_mode,
     select_question_for_mode,
@@ -48,13 +48,15 @@ class GameSessionService:
         if existing is not None:
             question = None
             if existing.question_id is not None:
-                question = get_question_by_id(
+                question = await get_question_by_id(
+                    session,
                     existing.mode_code,
                     question_id=existing.question_id,
                     local_date_berlin=existing.local_date_berlin,
                 )
             if question is None:
-                question = get_question_for_mode(
+                question = await get_question_for_mode(
+                    session,
                     existing.mode_code,
                     local_date_berlin=existing.local_date_berlin,
                 )
@@ -118,7 +120,8 @@ class GameSessionService:
             mode_code=mode_code,
             limit=20,
         )
-        question = select_question_for_mode(
+        question = await select_question_for_mode(
+            session,
             mode_code,
             local_date_berlin=local_date,
             recent_question_ids=recent_question_ids,
@@ -196,13 +199,15 @@ class GameSessionService:
 
         question = None
         if quiz_session.question_id is not None:
-            question = get_question_by_id(
+            question = await get_question_by_id(
+                session,
                 quiz_session.mode_code,
                 question_id=quiz_session.question_id,
                 local_date_berlin=quiz_session.local_date_berlin,
             )
         if question is None:
-            question = get_question_for_mode(
+            question = await get_question_for_mode(
+                session,
                 quiz_session.mode_code,
                 local_date_berlin=quiz_session.local_date_berlin,
             )

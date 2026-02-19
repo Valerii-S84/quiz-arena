@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-02-16T05:47:21.339543+00:00",
+  "generated_at": "2026-02-19T16:43:55.661483+00:00",
   "input_dir": "QuizBank",
   "summary": {
     "file_count": 19,
-    "row_count": 4070,
+    "row_count": 5570,
     "ready_count": 19,
     "ready_with_cleanup_count": 0,
     "needs_fix_count": 0,
@@ -496,10 +496,10 @@
       }
     },
     {
-      "file": "QuizBank/Artikel_Sprint_Bank_A2_B1_210.csv",
+      "file": "QuizBank/Artikel_Sprint_Bank_A1_B2_1000.csv",
       "parser": "csv",
       "warnings": [],
-      "row_count": 210,
+      "row_count": 1000,
       "column_count": 18,
       "columns": [
         "quiz_id",
@@ -539,7 +539,7 @@
       "trailing_space_samples": [],
       "double_space_issue_count": 0,
       "double_space_samples": [],
-      "question_terminal_punctuation_issue_count": 210,
+      "question_terminal_punctuation_issue_count": 1000,
       "question_terminal_punctuation_issue_rows": [
         2,
         3,
@@ -647,7 +647,7 @@
       "date_parse_issue_count": 0,
       "date_parse_issue_samples": [],
       "status_distribution": {
-        "ready": 210
+        "ready": 1000
       },
       "readiness": "ready",
       "severity": {
@@ -1425,6 +1425,7 @@
         74,
         75,
         76,
+        77,
         78,
         79,
         80,
@@ -1448,8 +1449,7 @@
         98,
         99,
         100,
-        101,
-        102
+        101
       ],
       "explanation_terminal_punctuation_issue_count": 0,
       "explanation_terminal_punctuation_issue_rows": [],
@@ -1466,10 +1466,10 @@
       }
     },
     {
-      "file": "QuizBank/Plural_Check_Bank_210.csv",
+      "file": "QuizBank/Plural_Check_Bank_500.csv",
       "parser": "csv",
       "warnings": [],
-      "row_count": 210,
+      "row_count": 500,
       "column_count": 18,
       "columns": [
         "quiz_id",
@@ -1516,7 +1516,7 @@
       "date_parse_issue_count": 0,
       "date_parse_issue_samples": [],
       "status_distribution": {
-        "ready": 210
+        "ready": 500
       },
       "readiness": "ready",
       "severity": {
@@ -2462,10 +2462,10 @@
       }
     },
     {
-      "file": "QuizBank/W_Fragen_Bank_210.csv",
+      "file": "QuizBank/W_Fragen_Bank_630.csv",
       "parser": "csv",
       "warnings": [],
-      "row_count": 210,
+      "row_count": 630,
       "column_count": 18,
       "columns": [
         "quiz_id",
@@ -2512,7 +2512,7 @@
       "date_parse_issue_count": 0,
       "date_parse_issue_samples": [],
       "status_distribution": {
-        "ready": 210
+        "ready": 630
       },
       "readiness": "ready",
       "severity": {

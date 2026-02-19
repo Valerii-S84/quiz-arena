@@ -17,6 +17,8 @@ docker compose up -d
 ## 3. Run API
 
 ```bash
+.venv/bin/python -m alembic upgrade head
+.venv/bin/python -m scripts.quizbank_import_tool --replace-all
 .venv/bin/python -m app.main
 ```
 
