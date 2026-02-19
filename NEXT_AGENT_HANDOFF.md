@@ -1,5 +1,17 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-20, referral reward notifications channel)
+- Added external notification events for referral reward lifecycle:
+  - `referral_reward_milestone_available`,
+  - `referral_reward_granted`.
+- Wired notification dispatch into referral reward-distribution worker:
+  - `run_referral_reward_distribution_async` now emits alerts via `send_ops_alert` when milestone/reward counts are present.
+- Added alert routing defaults in provider-aware alerts service:
+  - both events route as `info` / `ops_l3` to `slack + generic` by default.
+- Added tests:
+  - `tests/workers/test_referrals_task.py` (worker notification dispatch helper),
+  - `tests/services/test_alerts.py` (event routing for referral milestone notification).
+
 ## Update (2026-02-20, referral manual review workflow)
 - Delivered referral triage internal APIs:
   - `GET /internal/referrals/review-queue` (window/status-filtered queue);

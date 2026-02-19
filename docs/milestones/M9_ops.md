@@ -21,6 +21,9 @@
   - `app/workers/tasks/__init__.py`
 - New referral fraud alert event:
   - `referral_fraud_spike_detected` (`slack + generic`, `warning`, `ops_l2`).
+- New referral reward notification events:
+  - `referral_reward_milestone_available` (`slack + generic`, `info`, `ops_l3`);
+  - `referral_reward_granted` (`slack + generic`, `info`, `ops_l3`).
 
 ## Operational Notes
 - Referral reward distribution can run in `awaiting_choice` mode (no auto-grant) and is finalized by explicit user reward-choice callback.
@@ -34,4 +37,3 @@
 
 ## Missing for Next Milestones
 - Standalone visual manual-review UI for fraud investigation and threshold tuning actions (API workflow available).
-- External notification channel for referral milestone/reward events.

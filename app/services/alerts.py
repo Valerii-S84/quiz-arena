@@ -71,6 +71,16 @@ EVENT_ALERT_ROUTES = {
         severity="warning",
         escalation_tier="ops_l2",
     ),
+    "referral_reward_milestone_available": AlertRoute(
+        channels=("slack", "generic"),
+        severity="info",
+        escalation_tier="ops_l3",
+    ),
+    "referral_reward_granted": AlertRoute(
+        channels=("slack", "generic"),
+        severity="info",
+        escalation_tier="ops_l3",
+    ),
 }
 
 

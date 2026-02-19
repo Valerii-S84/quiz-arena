@@ -44,6 +44,11 @@
   - `GET /internal/referrals/review-queue`;
   - `POST /internal/referrals/{referral_id}/review` with decisions `CONFIRM_FRAUD|REOPEN|CANCEL`;
   - runbook `docs/runbooks/referrals_fraud_review.md` for triage/tuning flow.
+- Referral external notifications delivered:
+  - reward distribution worker emits alert events:
+    - `referral_reward_milestone_available`,
+    - `referral_reward_granted`;
+  - events route through configured ops channels (Slack/generic/PagerDuty policy-aware router).
 - M10 core promo module is now implemented:
   - `POST /internal/promo/redeem` (`PREMIUM_GRANT`, `PERCENT_DISCOUNT`);
   - promo anti-abuse throttling (per-user + global brute-force autopause);
@@ -111,16 +116,16 @@
 - Bot token is already configured locally; rotate token before production webhook go-live.
 - Local runtime services are expected to be started manually when needed (`postgres`, `redis`, API, bot, worker).
 - Latest full validation run in this branch: `148 passed` (2026-02-18).
-- Latest targeted validation run (2026-02-20): referral review queue/decision tests passed.
+- Latest targeted validation run (2026-02-20): referral review + notification routing tests passed.
 - Current Alembic head: `d5e6f7a8b9c0`.
 
 ## Immediate Next Steps (Priority)
-1. Product notifications:
-  - external notification channel for referral milestone/reward events.
-2. Promo ops UX:
+1. Promo ops UX:
   - standalone visual admin UI over implemented internal promo admin endpoints.
-3. Referral ops UX:
+2. Referral ops UX:
   - standalone visual review UI over implemented referral triage APIs.
+3. Notification UX:
+  - optional product-facing feed/dashboard over emitted referral reward events.
 
 ## Validation Commands
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q`

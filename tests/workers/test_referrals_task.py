@@ -1,3 +1,5 @@
+import asyncio
+
 from app.workers.tasks import referrals
 
 
@@ -21,3 +23,33 @@ def test_run_referral_reward_distribution_task_wrapper(monkeypatch) -> None:
     result = referrals.run_referral_reward_distribution(batch_size=3)
     assert result["referrers_examined"] == 3
     assert result["rewards_granted"] == 1
+
+
+def test_send_referral_reward_alerts_sends_milestone_and_reward_events(monkeypatch) -> None:
+    events: list[str] = []
+
+    async def fake_send_ops_alert(*, event: str, payload: dict[str, object]) -> bool:
+        events.append(event)
+        return True
+
+    monkeypatch.setattr(referrals, "send_ops_alert", fake_send_ops_alert)
+
+    result = asyncio.run(
+        referrals._send_referral_reward_alerts(
+            result={
+                "referrers_examined": 1,
+                "rewards_granted": 1,
+                "deferred_limit": 0,
+                "awaiting_choice": 2,
+            }
+        )
+    )
+
+    assert events == [
+        "referral_reward_milestone_available",
+        "referral_reward_granted",
+    ]
+    assert result == {
+        "milestone_alert_sent": 1,
+        "reward_alert_sent": 1,
+    }

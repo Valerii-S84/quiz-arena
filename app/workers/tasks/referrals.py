@@ -8,6 +8,7 @@ from celery.schedules import crontab
 
 from app.db.session import SessionLocal
 from app.economy.referrals.service import ReferralService
+from app.services.alerts import send_ops_alert
 from app.workers.celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
@@ -34,8 +35,37 @@ async def run_referral_reward_distribution_async(*, batch_size: int = 200) -> di
             batch_size=batch_size,
             reward_code=None,
         )
+
+    alerts_sent = await _send_referral_reward_alerts(result=result)
+    result = {**result, **alerts_sent}
     logger.info("referral_reward_distribution_finished", **result)
     return result
+
+
+async def _send_referral_reward_alerts(*, result: dict[str, int]) -> dict[str, int]:
+    milestone_alert_sent = 0
+    reward_alert_sent = 0
+
+    if result.get("awaiting_choice", 0) > 0:
+        milestone_alert_sent = int(
+            await send_ops_alert(
+                event="referral_reward_milestone_available",
+                payload=result,
+            )
+        )
+
+    if result.get("rewards_granted", 0) > 0:
+        reward_alert_sent = int(
+            await send_ops_alert(
+                event="referral_reward_granted",
+                payload=result,
+            )
+        )
+
+    return {
+        "milestone_alert_sent": milestone_alert_sent,
+        "reward_alert_sent": reward_alert_sent,
+    }
 
 
 @celery_app.task(name="app.workers.tasks.referrals.run_referral_qualification_checks")

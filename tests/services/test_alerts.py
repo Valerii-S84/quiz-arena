@@ -155,3 +155,29 @@ async def test_send_ops_alert_returns_true_when_one_provider_fails(monkeypatch) 
 
     assert sent is True
     assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_send_ops_alert_routes_referral_reward_milestone_as_info(monkeypatch) -> None:
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        alerts,
+        "get_settings",
+        lambda: _settings(
+            ops_alert_webhook_url="https://ops.example.local/hook",
+            ops_alert_slack_webhook_url="https://slack.example.local/hook",
+        ),
+    )
+    _patch_http_client(monkeypatch, calls)
+
+    sent = await alerts.send_ops_alert(
+        event="referral_reward_milestone_available",
+        payload={"awaiting_choice": 2},
+    )
+
+    assert sent is True
+    assert len(calls) == 2
+    assert calls[0]["url"] == "https://slack.example.local/hook"
+    assert "[INFO][ops_l3]" in calls[0]["json"]["text"]
+    assert calls[1]["url"] == "https://ops.example.local/hook"
+    assert calls[1]["json"]["severity"] == "info"

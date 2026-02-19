@@ -5,6 +5,7 @@
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q tests/integration/test_referrals_integration.py` -> pass (`7 passed`).
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q tests/workers/test_referrals_task.py` -> pass (`2 passed`).
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q tests/integration/test_internal_referrals_review_integration.py` -> pass.
+- `TMPDIR=/tmp .venv/bin/python -m pytest -q tests/workers/test_referrals_task.py tests/services/test_alerts.py` -> pass.
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q` -> pass (`130 passed`).
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q -s tests/api/test_internal_referrals_auth.py tests/integration/test_internal_referrals_dashboard_integration.py tests/services/test_referrals_observability.py tests/workers/test_referrals_observability_task.py` -> pass (`7 passed`).
 
@@ -28,6 +29,9 @@
   - auth checks for triage endpoints;
   - review queue filtering;
   - decision transitions (`CONFIRM_FRAUD`, idempotent replay, `REOPEN`).
+- External notification coverage includes:
+  - worker-level reward milestone/reward alert dispatch behavior;
+  - alert routing for `referral_reward_milestone_available` (`info`, `ops_l3`).
 
 ## Missing
 - Telegram sandbox E2E scenario for `/start ref_<code>` -> qualification progression -> reward user notification flow.

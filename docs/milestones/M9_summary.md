@@ -38,9 +38,12 @@
   - `GET /internal/referrals/review-queue` for triage queue filtering;
   - `POST /internal/referrals/{referral_id}/review` with decisions `CONFIRM_FRAUD`, `REOPEN`, `CANCEL`;
   - conflict-safe decision transitions with idempotent replay behavior.
+- Added external notification channel for referral milestone/reward events:
+  - worker emits `referral_reward_milestone_available` when reward choice becomes available;
+  - worker emits `referral_reward_granted` when reward grants are processed;
+  - events are routed through existing provider-aware ops alert channels (`slack` + `generic` by default).
 
 ## Not Implemented
-- External notification channel for referral milestone/reward events is not implemented.
 - Standalone visual admin UI for fraud triage (API workflow is implemented).
 
 ## Risks
