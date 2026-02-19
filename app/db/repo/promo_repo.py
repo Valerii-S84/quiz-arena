@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.promo_attempts import PromoAttempt
 from app.db.models.promo_codes import PromoCode
+from app.db.models.purchases import Purchase
 from app.db.models.promo_redemptions import PromoRedemption
 
 
@@ -78,27 +79,47 @@ class PromoRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def revoke_redemption_and_decrement_usage(
+    async def revoke_redemption_for_refund(
         session: AsyncSession,
         *,
         purchase_id: UUID,
         promo_code_id: int,
         now_utc: datetime,
-    ) -> tuple[PromoRedemption | None, PromoCode | None]:
+    ) -> tuple[PromoRedemption | None, PromoCode | None, bool]:
         redemption = await PromoRepo.get_redemption_by_applied_purchase_id_for_update(
             session,
             applied_purchase_id=purchase_id,
         )
         promo_code = await PromoRepo.get_code_by_id_for_update(session, promo_code_id)
 
+        was_revoked = False
         if redemption is not None and redemption.status != "REVOKED":
             redemption.status = "REVOKED"
             redemption.updated_at = now_utc
-        if promo_code is not None and promo_code.used_total > 0:
-            promo_code.used_total -= 1
-            promo_code.updated_at = now_utc
+            was_revoked = True
 
-        return redemption, promo_code
+        return redemption, promo_code, was_revoked
+
+    @staticmethod
+    async def get_refunded_purchase_ids_with_pending_redemption_revoke(
+        session: AsyncSession,
+        *,
+        limit: int = 100,
+    ) -> list[UUID]:
+        stmt = (
+            select(PromoRedemption.applied_purchase_id)
+            .join(Purchase, Purchase.id == PromoRedemption.applied_purchase_id)
+            .where(
+                PromoRedemption.applied_purchase_id.is_not(None),
+                PromoRedemption.status != "REVOKED",
+                Purchase.status == "REFUNDED",
+                Purchase.applied_promo_code_id.is_not(None),
+            )
+            .order_by(Purchase.refunded_at.asc().nullsfirst(), Purchase.id.asc())
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        return [purchase_id for purchase_id in result.scalars().all() if purchase_id is not None]
 
     @staticmethod
     async def get_redemption_by_idempotency_key(

@@ -112,6 +112,29 @@ async def test_internal_promo_campaign_status_update_and_listing() -> None:
 
 
 @pytest.mark.asyncio
+async def test_internal_promo_campaign_status_rejects_unpause_from_depleted() -> None:
+    now_utc = datetime.now(UTC)
+    promo_code = await _create_discount_campaign(code_id=9003, now_utc=now_utc)
+    async with SessionLocal.begin() as session:
+        db_promo_code = await session.get(PromoCode, promo_code.id)
+        assert db_promo_code is not None
+        db_promo_code.status = "DEPLETED"
+        db_promo_code.updated_at = now_utc - timedelta(minutes=5)
+
+    status_code, payload = await _post_json(
+        f"/internal/promo/campaigns/{promo_code.id}/status",
+        {
+            "status": "ACTIVE",
+            "reason": "unsafe unpause attempt",
+            "expected_current_status": "DEPLETED",
+        },
+    )
+
+    assert status_code == 409
+    assert payload == {"detail": {"code": "E_PROMO_STATUS_CONFLICT"}}
+
+
+@pytest.mark.asyncio
 async def test_internal_promo_refund_rollback_revokes_redemption_and_is_idempotent() -> None:
     now_utc = datetime.now(UTC)
     user_id = await _create_user("promo-admin-refund")
@@ -185,11 +208,11 @@ async def test_internal_promo_refund_rollback_revokes_redemption_and_is_idempote
     assert first_payload["promo_redemption_id"] == str(redemption_id)
     assert first_payload["promo_redemption_status"] == "REVOKED"
     assert first_payload["promo_code_id"] == promo_code.id
-    assert first_payload["promo_code_used_total"] == 0
+    assert first_payload["promo_code_used_total"] == 1
     assert first_payload["idempotent_replay"] is False
 
     assert second_status == 200
     assert second_payload["purchase_status"] == "REFUNDED"
     assert second_payload["promo_redemption_status"] == "REVOKED"
-    assert second_payload["promo_code_used_total"] == 0
+    assert second_payload["promo_code_used_total"] == 1
     assert second_payload["idempotent_replay"] is True

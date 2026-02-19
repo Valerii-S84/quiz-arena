@@ -30,6 +30,23 @@ def test_expire_stale_unpaid_invoices_task_wrapper(monkeypatch) -> None:
     assert result["expired_invoices"] == 45
 
 
+def test_run_refund_promo_rollback_task_wrapper(monkeypatch) -> None:
+    async def fake_async(*, batch_size: int) -> dict[str, int]:
+        return {
+            "examined": batch_size,
+            "rolled_back": 2,
+            "skipped": 0,
+            "missing": 0,
+            "errors": 0,
+        }
+
+    monkeypatch.setattr(payments_reliability, "run_refund_promo_rollback_async", fake_async)
+
+    result = payments_reliability.run_refund_promo_rollback(batch_size=11)
+    assert result["examined"] == 11
+    assert result["rolled_back"] == 2
+
+
 def test_run_payments_reconciliation_task_wrapper(monkeypatch) -> None:
     async def fake_async(*, stale_minutes: int) -> dict[str, int | str]:
         return {

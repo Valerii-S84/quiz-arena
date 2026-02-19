@@ -36,10 +36,19 @@
   - `docs/runbooks/telegram_sandbox_stars_smoke.md`.
 - Added promo incident response runbook:
   - `docs/runbooks/promo_incident_response.md`.
+- Added internal promo admin operations workflow (API-first):
+  - `GET /internal/promo/campaigns` for filtered campaign listing;
+  - `POST /internal/promo/campaigns/{promo_code_id}/status` for safe status transitions;
+  - `POST /internal/promo/refund-rollback` for manual refund rollback with idempotent replay behavior.
+- Added safe campaign transition guardrails:
+  - only `ACTIVE <-> PAUSED` transitions are mutable from admin API;
+  - reactivating `DEPLETED/EXPIRED` campaigns through this endpoint is rejected.
+- Added refund-driven promo rollback automation (`PR_REVOKED` flow):
+  - periodic worker `run_refund_promo_rollback` finds `REFUNDED` purchases with non-revoked promo redemptions;
+  - marks `promo_redemptions.status='REVOKED'` idempotently.
 
 ## Not Implemented
-- Dedicated admin UI/workflow for promo campaign operations (CLI is available).
-- Refund-driven promo rollback (`PR_REVOKED`) automation.
+- Standalone visual admin UI for promo campaign operations (API workflow is implemented).
 
 ## Risks
 - Promo rate limiting behavior is transactional and tested in integration, but large-scale concurrent load behavior is still unprofiled.
@@ -47,3 +56,4 @@
 ## Decisions
 - Failure attempts are persisted in separate short transactions to avoid rollback loss on redeem errors.
 - Promo discount settlement remains anchored to purchase flow (`init -> precheckout -> successful_payment`) to preserve fixed-price semantics.
+- On refund rollback, `promo_codes.used_total` is intentionally not decremented (audit-conservative accounting model from spec).

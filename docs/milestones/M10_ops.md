@@ -6,10 +6,15 @@
   - Returns promo conversion metrics (attempt acceptance, discount reservation->applied),
   - failure-rate breakdown by promo attempt result,
   - guard indicators (candidate abusive hashes, paused campaigns totals/recent).
+- New internal admin promo endpoints:
+  - `GET /internal/promo/campaigns` (campaign listing with filters);
+  - `POST /internal/promo/campaigns/{promo_code_id}/status` (safe `ACTIVE <-> PAUSED` transitions);
+  - `POST /internal/promo/refund-rollback` (manual refund rollback to `PR_REVOKED` path).
 - New Celery periodic jobs:
   - `run_promo_reservation_expiry` every 1 minute;
   - `run_promo_campaign_status_rollover` every 10 minutes;
   - `run_promo_bruteforce_guard` every 1 minute.
+  - `run_refund_promo_rollback` every 5 minutes (idempotent rollback for refunded purchases with promo redemptions).
 - Structured logs for promo maintenance and autopause outcomes.
 - Provider-specific ops alert routing with escalation policy:
   - channels: `generic`, `slack`, `pagerduty`;

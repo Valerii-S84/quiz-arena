@@ -50,6 +50,17 @@
   - conversion metrics (attempt acceptance + discount reservation->applied);
   - failure breakdown by promo attempt result;
   - guard indicators (candidate abusive hashes, paused campaign totals/recent).
+- Promo operations hardening completed:
+  - internal campaign admin workflow endpoints:
+    - `GET /internal/promo/campaigns`;
+    - `POST /internal/promo/campaigns/{promo_code_id}/status`;
+    - `POST /internal/promo/refund-rollback`.
+  - safe mutable status transitions limited to `ACTIVE <-> PAUSED`.
+  - refund-driven promo rollback automation:
+    - worker `run_refund_promo_rollback` every 5 minutes;
+    - `promo_redemptions.status` transitions to `REVOKED` for refunded promo purchases.
+  - refund rollback accounting invariant:
+    - `promo_codes.used_total` is not decremented on refund rollback.
 - Additional hardening completed in this session:
   - internal endpoint auth for promo redeem (`X-Internal-Token` + IP allowlist);
   - single active invoice lock per `(user_id, product_code)` (service + DB partial unique index);
@@ -96,17 +107,16 @@
 - Bot token is already configured locally; rotate token before production webhook go-live.
 - Local runtime services are expected to be started manually when needed (`postgres`, `redis`, API, bot, worker).
 - Latest full validation run in this branch: `148 passed` (2026-02-18).
-- Latest targeted validation run (2026-02-20): offers + referrals observability/dashboard tests passed.
+- Latest targeted validation run (2026-02-20): promo admin + refund rollback tests passed.
 - Current Alembic head: `d5e6f7a8b9c0`.
 
 ## Immediate Next Steps (Priority)
-1. Promo operations:
-  - dedicated admin workflow/UI for campaign operations (safe manual unpause/audit trail).
-  - refund-driven promo rollback automation (`PR_REVOKED` flow).
-2. Referral ops maturity:
+1. Referral ops maturity:
   - manual-review workflow/playbook for fraud threshold tuning and triage actions.
-3. Product notifications:
+2. Product notifications:
   - external notification channel for referral milestone/reward events.
+3. Promo ops UX:
+  - standalone visual admin UI over implemented internal promo admin endpoints.
 
 ## Validation Commands
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q`

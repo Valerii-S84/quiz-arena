@@ -1,5 +1,23 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-20, promo admin workflow + refund rollback automation)
+- Delivered internal promo admin operations endpoints:
+  - `GET /internal/promo/campaigns` (filters: `status`, `campaign_name`, `limit`);
+  - `POST /internal/promo/campaigns/{promo_code_id}/status` (safe mutable transitions);
+  - `POST /internal/promo/refund-rollback` (manual refund rollback, idempotent response behavior).
+- Added campaign safety rules for manual unpause flow:
+  - mutable transitions restricted to `ACTIVE <-> PAUSED`;
+  - attempts to reactivate `DEPLETED/EXPIRED` via this endpoint return `E_PROMO_STATUS_CONFLICT`.
+- Added refund-driven promo rollback automation (`PR_REVOKED` flow):
+  - new periodic worker task `run_refund_promo_rollback` every 5 minutes;
+  - scans refunded promo purchases and idempotently sets linked `promo_redemptions.status='REVOKED'`.
+- Accounting decision implemented per spec:
+  - refund rollback does not decrement `promo_codes.used_total`.
+- Added tests:
+  - `tests/integration/test_internal_promo_admin_integration.py`,
+  - `tests/integration/test_payments_idempotency_integration.py::test_refund_promo_rollback_job_revokes_discount_redemption_without_decrementing_usage`,
+  - `tests/workers/test_payments_reliability_task.py` (new wrapper coverage for rollback task).
+
 ## Update (2026-02-20, referrals dashboard + fraud triage)
 - Delivered referral fraud-triage dashboard endpoint:
   - `GET /internal/referrals/dashboard`

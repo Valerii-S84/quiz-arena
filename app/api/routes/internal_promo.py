@@ -36,6 +36,7 @@ PROMO_GUARD_MIN_FAILED_ATTEMPTS = 100
 PROMO_GUARD_MIN_DISTINCT_USERS = 2
 PROMO_CAMPAIGN_STATUSES = {"ACTIVE", "PAUSED", "EXPIRED", "DEPLETED"}
 PROMO_MUTABLE_CAMPAIGN_STATUSES = {"ACTIVE", "PAUSED"}
+PROMO_ALLOWED_STATUS_TRANSITIONS = {("ACTIVE", "PAUSED"), ("PAUSED", "ACTIVE")}
 REFUNDABLE_PURCHASE_STATUSES = {"CREDITED", "PAID_UNCREDITED"}
 
 
@@ -310,6 +311,10 @@ async def update_promo_campaign_status(
             raise HTTPException(status_code=404, detail={"code": "E_PROMO_NOT_FOUND"})
         if expected_status is not None and campaign.status != expected_status:
             raise HTTPException(status_code=409, detail={"code": "E_PROMO_STATUS_CONFLICT"})
+        if campaign.status not in PROMO_MUTABLE_CAMPAIGN_STATUSES and campaign.status != desired_status:
+            raise HTTPException(status_code=409, detail={"code": "E_PROMO_STATUS_CONFLICT"})
+        if campaign.status != desired_status and (campaign.status, desired_status) not in PROMO_ALLOWED_STATUS_TRANSITIONS:
+            raise HTTPException(status_code=409, detail={"code": "E_PROMO_STATUS_CONFLICT"})
         if campaign.status != desired_status:
             previous_status = campaign.status
             campaign.status = desired_status
@@ -337,11 +342,18 @@ async def rollback_promo_for_refund(
         if purchase is None:
             raise HTTPException(status_code=404, detail={"code": "E_PURCHASE_NOT_FOUND"})
 
+        redemption = None
+        promo_code = None
+        rollback_applied = False
+
         if purchase.status == "REFUNDED":
-            redemption = await PromoRepo.get_redemption_by_applied_purchase_id_for_update(session, purchase.id)
-            promo_code = None
             if purchase.applied_promo_code_id is not None:
-                promo_code = await PromoRepo.get_code_by_id(session, purchase.applied_promo_code_id)
+                redemption, promo_code, rollback_applied = await PromoRepo.revoke_redemption_for_refund(
+                    session,
+                    purchase_id=purchase.id,
+                    promo_code_id=purchase.applied_promo_code_id,
+                    now_utc=now_utc,
+                )
             return PromoRefundRollbackResponse(
                 purchase_id=purchase.id,
                 purchase_status=purchase.status,
@@ -349,7 +361,7 @@ async def rollback_promo_for_refund(
                 promo_redemption_status=None if redemption is None else redemption.status,
                 promo_code_id=purchase.applied_promo_code_id,
                 promo_code_used_total=None if promo_code is None else promo_code.used_total,
-                idempotent_replay=True,
+                idempotent_replay=not rollback_applied,
             )
 
         if purchase.status not in REFUNDABLE_PURCHASE_STATUSES:
@@ -358,10 +370,8 @@ async def rollback_promo_for_refund(
         purchase.status = "REFUNDED"
         purchase.refunded_at = now_utc
 
-        redemption = None
-        promo_code = None
         if purchase.applied_promo_code_id is not None:
-            redemption, promo_code = await PromoRepo.revoke_redemption_and_decrement_usage(
+            redemption, promo_code, rollback_applied = await PromoRepo.revoke_redemption_for_refund(
                 session,
                 purchase_id=purchase.id,
                 promo_code_id=purchase.applied_promo_code_id,

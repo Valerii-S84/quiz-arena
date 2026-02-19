@@ -8,6 +8,7 @@ import structlog
 from celery.schedules import crontab
 
 from app.db.repo.ledger_repo import LedgerRepo
+from app.db.repo.promo_repo import PromoRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.reconciliation_runs_repo import ReconciliationRunsRepo
 from app.db.session import SessionLocal
@@ -42,6 +43,51 @@ async def expire_stale_unpaid_invoices_async(*, stale_minutes: int = 30) -> dict
     result = {"expired_invoices": expired_invoices}
     logger.info("stale_unpaid_invoices_expiry_finished", **result)
     return result
+
+
+async def run_refund_promo_rollback_async(*, batch_size: int = 100) -> dict[str, int]:
+    now_utc = datetime.now(timezone.utc)
+    async with SessionLocal.begin() as session:
+        purchase_ids = await PromoRepo.get_refunded_purchase_ids_with_pending_redemption_revoke(
+            session,
+            limit=batch_size,
+        )
+
+    summary: dict[str, int] = {
+        "examined": len(purchase_ids),
+        "rolled_back": 0,
+        "skipped": 0,
+        "missing": 0,
+        "errors": 0,
+    }
+
+    for purchase_id in purchase_ids:
+        try:
+            async with SessionLocal.begin() as session:
+                purchase = await PurchasesRepo.get_by_id_for_update(session, purchase_id)
+                if purchase is None:
+                    summary["missing"] += 1
+                    continue
+                if purchase.status != "REFUNDED" or purchase.applied_promo_code_id is None:
+                    summary["skipped"] += 1
+                    continue
+
+                _, _, rollback_applied = await PromoRepo.revoke_redemption_for_refund(
+                    session,
+                    purchase_id=purchase.id,
+                    promo_code_id=purchase.applied_promo_code_id,
+                    now_utc=now_utc,
+                )
+                if rollback_applied:
+                    summary["rolled_back"] += 1
+                else:
+                    summary["skipped"] += 1
+        except Exception:
+            summary["errors"] += 1
+            logger.exception("promo_refund_rollback_error", purchase_id=str(purchase_id))
+
+    logger.info("promo_refund_rollback_finished", **summary)
+    return summary
 
 
 async def _recover_single_purchase(purchase_id: UUID, *, now_utc: datetime) -> str:
@@ -195,6 +241,11 @@ def expire_stale_unpaid_invoices(stale_minutes: int = 30) -> dict[str, int]:
     return asyncio.run(expire_stale_unpaid_invoices_async(stale_minutes=stale_minutes))
 
 
+@celery_app.task(name="app.workers.tasks.payments_reliability.run_refund_promo_rollback")
+def run_refund_promo_rollback(batch_size: int = 100) -> dict[str, int]:
+    return asyncio.run(run_refund_promo_rollback_async(batch_size=batch_size))
+
+
 @celery_app.task(name="app.workers.tasks.payments_reliability.run_payments_reconciliation")
 def run_payments_reconciliation(stale_minutes: int = 30) -> dict[str, int | str]:
     return asyncio.run(run_payments_reconciliation_async(stale_minutes=stale_minutes))
@@ -210,6 +261,11 @@ celery_app.conf.beat_schedule.update(
         },
         "expire-stale-unpaid-invoices-every-5-minutes": {
             "task": "app.workers.tasks.payments_reliability.expire_stale_unpaid_invoices",
+            "schedule": 300.0,
+            "options": {"queue": "q_normal"},
+        },
+        "refund-promo-rollback-every-5-minutes": {
+            "task": "app.workers.tasks.payments_reliability.run_refund_promo_rollback",
             "schedule": 300.0,
             "options": {"queue": "q_normal"},
         },
