@@ -2,6 +2,10 @@
 
 ## Added
 - New internal endpoint: `POST /internal/promo/redeem`.
+- New internal metrics endpoint: `GET /internal/promo/dashboard`.
+  - Returns promo conversion metrics (attempt acceptance, discount reservation->applied),
+  - failure-rate breakdown by promo attempt result,
+  - guard indicators (candidate abusive hashes, paused campaigns totals/recent).
 - New Celery periodic jobs:
   - `run_promo_reservation_expiry` every 1 minute;
   - `run_promo_campaign_status_rollover` every 10 minutes;
@@ -27,6 +31,3 @@
 - New runbook:
   - `docs/runbooks/telegram_sandbox_stars_smoke.md` for external Telegram sandbox validation of promo/payment and referral duplicate-callback safety.
   - `docs/runbooks/promo_incident_response.md` for promo autopause triage and safe manual unpause procedure.
-
-## Missing for Next Milestones
-- Dedicated dashboard for promo conversion, failure rates, and guard triggers.

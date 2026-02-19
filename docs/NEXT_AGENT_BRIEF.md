@@ -37,6 +37,11 @@
   - promo anti-abuse throttling (per-user + global brute-force autopause);
   - promo maintenance jobs (reservation expiry, campaign rollover, brute-force guard);
   - bot-level promo UX (`/promo <code>`, `promo:open`).
+- Promo observability dashboard endpoint delivered:
+  - `GET /internal/promo/dashboard` (internal token + IP allowlist protected);
+  - conversion metrics (attempt acceptance + discount reservation->applied);
+  - failure breakdown by promo attempt result;
+  - guard indicators (candidate abusive hashes, paused campaign totals/recent).
 - Additional hardening completed in this session:
   - internal endpoint auth for promo redeem (`X-Internal-Token` + IP allowlist);
   - single active invoice lock per `(user_id, product_code)` (service + DB partial unique index);
@@ -83,11 +88,17 @@
 - Bot token is already configured locally; rotate token before production webhook go-live.
 - Local runtime services are expected to be started manually when needed (`postgres`, `redis`, API, bot, worker).
 - Latest full validation run in this branch: `148 passed` (2026-02-18).
-- Current Alembic head: `f6a7b8c9d0e1`.
+- Latest targeted validation run (2026-02-19): promo dashboard/auth tests passed.
+- Current Alembic head: `d5e6f7a8b9c0`.
 
 ## Immediate Next Steps (Priority)
 1. Product/ops maturity:
-  - dashboard for promo conversion/failure/guard triggers.
+  - dedicated offer funnel dashboard + alert thresholds.
+2. Referral ops maturity:
+  - fraud-review dashboard/triage workflow and threshold tuning playbook.
+3. Promo operations:
+  - dedicated admin workflow/UI for campaign operations (safe manual unpause/audit trail).
+  - refund-driven promo rollback automation (`PR_REVOKED` flow).
 
 ## Validation Commands
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q`

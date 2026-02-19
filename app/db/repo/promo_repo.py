@@ -131,6 +131,20 @@ class PromoRepo:
         return int(result.scalar_one() or 0)
 
     @staticmethod
+    async def count_attempts_by_result(
+        session: AsyncSession,
+        *,
+        since_utc: datetime,
+    ) -> dict[str, int]:
+        stmt = (
+            select(PromoAttempt.result, func.count(PromoAttempt.id))
+            .where(PromoAttempt.attempted_at >= since_utc)
+            .group_by(PromoAttempt.result)
+        )
+        result = await session.execute(stmt)
+        return {str(status): int(count) for status, count in result.all()}
+
+    @staticmethod
     async def get_last_user_attempt_at(
         session: AsyncSession,
         *,
@@ -193,6 +207,57 @@ class PromoRepo:
         return int(result.rowcount or 0)
 
     @staticmethod
+    async def count_redemptions_by_status(
+        session: AsyncSession,
+        *,
+        since_utc: datetime,
+    ) -> dict[str, int]:
+        stmt = (
+            select(PromoRedemption.status, func.count(PromoRedemption.id))
+            .where(PromoRedemption.created_at >= since_utc)
+            .group_by(PromoRedemption.status)
+        )
+        result = await session.execute(stmt)
+        return {str(status): int(count) for status, count in result.all()}
+
+    @staticmethod
+    async def count_discount_redemptions_by_status(
+        session: AsyncSession,
+        *,
+        since_utc: datetime,
+    ) -> dict[str, int]:
+        stmt = (
+            select(PromoRedemption.status, func.count(PromoRedemption.id))
+            .join(PromoCode, PromoCode.id == PromoRedemption.promo_code_id)
+            .where(
+                PromoRedemption.created_at >= since_utc,
+                PromoCode.promo_type == "PERCENT_DISCOUNT",
+            )
+            .group_by(PromoRedemption.status)
+        )
+        result = await session.execute(stmt)
+        return {str(status): int(count) for status, count in result.all()}
+
+    @staticmethod
+    async def count_campaigns_by_status(session: AsyncSession) -> dict[str, int]:
+        stmt = select(PromoCode.status, func.count(PromoCode.id)).group_by(PromoCode.status)
+        result = await session.execute(stmt)
+        return {str(status): int(count) for status, count in result.all()}
+
+    @staticmethod
+    async def count_paused_campaigns_since(
+        session: AsyncSession,
+        *,
+        since_utc: datetime,
+    ) -> int:
+        stmt = select(func.count(PromoCode.id)).where(
+            PromoCode.status == "PAUSED",
+            PromoCode.updated_at >= since_utc,
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
     async def get_abusive_code_hashes(
         session: AsyncSession,
         *,
@@ -214,6 +279,22 @@ class PromoRepo:
         )
         result = await session.execute(stmt)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def count_abusive_code_hashes(
+        session: AsyncSession,
+        *,
+        since_utc: datetime,
+        min_failed_attempts: int,
+        min_distinct_users: int,
+    ) -> int:
+        code_hashes = await PromoRepo.get_abusive_code_hashes(
+            session,
+            since_utc=since_utc,
+            min_failed_attempts=min_failed_attempts,
+            min_distinct_users=min_distinct_users,
+        )
+        return len(code_hashes)
 
     @staticmethod
     async def pause_active_codes_by_hashes(
