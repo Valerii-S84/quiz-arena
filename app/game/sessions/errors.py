@@ -20,3 +20,23 @@ class SessionNotFoundError(GameSessionError):
 
 class InvalidAnswerOptionError(GameSessionError):
     pass
+
+
+class FriendChallengeNotFoundError(GameSessionError):
+    pass
+
+
+class FriendChallengeAccessError(GameSessionError):
+    pass
+
+
+class FriendChallengeFullError(GameSessionError):
+    pass
+
+
+class FriendChallengeCompletedError(GameSessionError):
+    pass
+
+
+class FriendChallengePaymentRequiredError(GameSessionError):
+    pass

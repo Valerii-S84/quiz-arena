@@ -144,6 +144,7 @@ def select_question_for_mode(
     local_date_berlin: date,
     recent_question_ids: Sequence[str],
     selection_seed: str,
+    preferred_level: str | None = None,
 ) -> QuizQuestion:
     if mode_code == "DAILY_CHALLENGE":
         return _daily_challenge_question(local_date_berlin)

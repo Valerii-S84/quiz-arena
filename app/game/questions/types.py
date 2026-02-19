@@ -9,3 +9,5 @@ class QuizQuestion:
     text: str
     options: tuple[str, str, str, str]
     correct_option: int
+    level: str | None = None
+    category: str | None = None

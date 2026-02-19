@@ -14,6 +14,12 @@ class UsersRepo:
         return await session.get(User, user_id)
 
     @staticmethod
+    async def get_by_id_for_update(session: AsyncSession, user_id: int) -> User | None:
+        stmt = select(User).where(User.id == user_id).with_for_update()
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_by_telegram_user_id(session: AsyncSession, telegram_user_id: int) -> User | None:
         stmt = select(User).where(User.telegram_user_id == telegram_user_id)
         result = await session.execute(stmt)

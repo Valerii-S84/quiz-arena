@@ -133,6 +133,21 @@ class PurchasesRepo:
         return int(result.scalar_one() or 0)
 
     @staticmethod
+    async def count_credited_product(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        product_code: str,
+    ) -> int:
+        stmt = select(func.count(Purchase.id)).where(
+            Purchase.user_id == user_id,
+            Purchase.product_code == product_code,
+            Purchase.status == "CREDITED",
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
     async def count_paid_uncredited_older_than(
         session: AsyncSession,
         *,

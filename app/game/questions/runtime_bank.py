@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 import hashlib
 from datetime import date
 from typing import Sequence
@@ -39,6 +40,29 @@ def _to_quiz_question(record: QuizQuestionRecord) -> QuizQuestion:
             record.option_4,
         ),
         correct_option=record.correct_option_id,
+        level=record.level,
+        category=record.category,
+    )
+
+
+async def _list_candidate_ids_for_mode(
+    session: AsyncSession,
+    *,
+    mode_code: str,
+    exclude_question_ids: Sequence[str] | None,
+    preferred_levels: Sequence[str] | None,
+) -> list[str]:
+    if mode_code == QUICK_MIX_MODE_CODE:
+        return await QuizQuestionsRepo.list_question_ids_all_active(
+            session,
+            exclude_question_ids=exclude_question_ids,
+            preferred_levels=preferred_levels,
+        )
+    return await QuizQuestionsRepo.list_question_ids_for_mode(
+        session,
+        mode_code=mode_code,
+        exclude_question_ids=exclude_question_ids,
+        preferred_levels=preferred_levels,
     )
 
 
@@ -48,30 +72,36 @@ async def _pick_from_mode(
     mode_code: str,
     recent_question_ids: Sequence[str],
     selection_seed: str,
+    preferred_level: str | None,
 ) -> QuizQuestion | None:
-    if mode_code == QUICK_MIX_MODE_CODE:
-        candidate_ids = await QuizQuestionsRepo.list_question_ids_all_active(
+    preferred_levels = (preferred_level,) if preferred_level is not None else None
+    candidate_ids = await _list_candidate_ids_for_mode(
+        session,
+        mode_code=mode_code,
+        exclude_question_ids=recent_question_ids,
+        preferred_levels=preferred_levels,
+    )
+    if not candidate_ids:
+        candidate_ids = await _list_candidate_ids_for_mode(
             session,
-            exclude_question_ids=recent_question_ids,
+            mode_code=mode_code,
+            exclude_question_ids=None,
+            preferred_levels=preferred_levels,
         )
-    else:
-        candidate_ids = await QuizQuestionsRepo.list_question_ids_for_mode(
+    if not candidate_ids and preferred_levels is not None:
+        candidate_ids = await _list_candidate_ids_for_mode(
             session,
             mode_code=mode_code,
             exclude_question_ids=recent_question_ids,
+            preferred_levels=None,
         )
-    if not candidate_ids:
-        if mode_code == QUICK_MIX_MODE_CODE:
-            candidate_ids = await QuizQuestionsRepo.list_question_ids_all_active(
-                session,
-                exclude_question_ids=None,
-            )
-        else:
-            candidate_ids = await QuizQuestionsRepo.list_question_ids_for_mode(
-                session,
-                mode_code=mode_code,
-                exclude_question_ids=None,
-            )
+    if not candidate_ids and preferred_levels is not None:
+        candidate_ids = await _list_candidate_ids_for_mode(
+            session,
+            mode_code=mode_code,
+            exclude_question_ids=None,
+            preferred_levels=None,
+        )
     if not candidate_ids:
         return None
 
@@ -80,6 +110,95 @@ async def _pick_from_mode(
     if selected is None:
         return None
     return _to_quiz_question(selected)
+
+
+async def select_friend_challenge_question(
+    session: AsyncSession,
+    mode_code: str,
+    *,
+    local_date_berlin: date,
+    previous_round_question_ids: Sequence[str],
+    selection_seed: str,
+    preferred_level: str | None,
+) -> QuizQuestion:
+    db_mode_code = DAILY_CHALLENGE_SOURCE_MODE if mode_code == "DAILY_CHALLENGE" else mode_code
+    preferred_levels = (preferred_level,) if preferred_level is not None else None
+
+    def _filtered_records(
+        all_records: Sequence[QuizQuestionRecord],
+        *,
+        ids: Sequence[str],
+    ) -> list[QuizQuestionRecord]:
+        by_id = {record.question_id: record for record in all_records}
+        ordered: list[QuizQuestionRecord] = []
+        for question_id in ids:
+            record = by_id.get(question_id)
+            if record is not None and record.status == "ACTIVE":
+                ordered.append(record)
+        return ordered
+
+    candidate_ids = await _list_candidate_ids_for_mode(
+        session,
+        mode_code=db_mode_code,
+        exclude_question_ids=previous_round_question_ids,
+        preferred_levels=preferred_levels,
+    )
+    if not candidate_ids:
+        candidate_ids = await _list_candidate_ids_for_mode(
+            session,
+            mode_code=db_mode_code,
+            exclude_question_ids=None,
+            preferred_levels=preferred_levels,
+        )
+    if not candidate_ids and preferred_levels is not None:
+        candidate_ids = await _list_candidate_ids_for_mode(
+            session,
+            mode_code=db_mode_code,
+            exclude_question_ids=previous_round_question_ids,
+            preferred_levels=None,
+        )
+    if not candidate_ids and preferred_levels is not None:
+        candidate_ids = await _list_candidate_ids_for_mode(
+            session,
+            mode_code=db_mode_code,
+            exclude_question_ids=None,
+            preferred_levels=None,
+        )
+
+    if candidate_ids:
+        candidate_records = _filtered_records(
+            await QuizQuestionsRepo.list_by_ids(session, question_ids=candidate_ids),
+            ids=candidate_ids,
+        )
+        if candidate_records:
+            previous_records = await QuizQuestionsRepo.list_by_ids(
+                session,
+                question_ids=list(previous_round_question_ids),
+            )
+            category_counts: Counter[str] = Counter()
+            for record in previous_records:
+                category_counts[record.category] += 1
+
+            min_count = min(category_counts.get(record.category, 0) for record in candidate_records)
+            least_used_candidates = [
+                record
+                for record in candidate_records
+                if category_counts.get(record.category, 0) == min_count
+            ]
+            least_used_candidates.sort(key=lambda record: record.question_id)
+            selected = least_used_candidates[
+                _stable_index(selection_seed, len(least_used_candidates))
+            ]
+            return _to_quiz_question(selected)
+
+    return await select_question_for_mode(
+        session,
+        mode_code,
+        local_date_berlin=local_date_berlin,
+        recent_question_ids=previous_round_question_ids,
+        selection_seed=selection_seed,
+        preferred_level=preferred_level,
+    )
 
 
 async def get_question_by_id(
@@ -106,6 +225,7 @@ async def select_question_for_mode(
     local_date_berlin: date,
     recent_question_ids: Sequence[str],
     selection_seed: str,
+    preferred_level: str | None = None,
 ) -> QuizQuestion:
     db_mode_code = DAILY_CHALLENGE_SOURCE_MODE if mode_code == "DAILY_CHALLENGE" else mode_code
     db_seed = (
@@ -119,6 +239,7 @@ async def select_question_for_mode(
         mode_code=db_mode_code,
         recent_question_ids=db_recent,
         selection_seed=db_seed,
+        preferred_level=preferred_level,
     )
     if selected is not None:
         return selected
@@ -128,6 +249,7 @@ async def select_question_for_mode(
         local_date_berlin=local_date_berlin,
         recent_question_ids=recent_question_ids,
         selection_seed=selection_seed,
+        preferred_level=preferred_level,
     )
 
 
@@ -143,6 +265,7 @@ async def get_question_for_mode(
         local_date_berlin=local_date_berlin,
         recent_question_ids=(),
         selection_seed=f"fallback:{mode_code}:{local_date_berlin.isoformat()}",
+        preferred_level=None,
     )
     if selected is not None:
         return selected

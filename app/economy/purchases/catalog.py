@@ -14,6 +14,7 @@ class ProductSpec:
     premium_days: int = 0
     grants_streak_saver: bool = False
     grants_mega_mode_access: bool = False
+    friend_challenge_tickets: int = 0
 
 
 MEGA_PACK_MODE_CODES = (
@@ -28,7 +29,7 @@ PRODUCTS: dict[str, ProductSpec] = {
         product_type="MICRO",
         title="+10 Energie",
         description="Sofort weiterspielen mit +10 Energie.",
-        stars_amount=10,
+        stars_amount=5,
         energy_credit=10,
     ),
     "MEGA_PACK_15": ProductSpec(
@@ -48,6 +49,15 @@ PRODUCTS: dict[str, ProductSpec] = {
         stars_amount=20,
         energy_credit=0,
         grants_streak_saver=True,
+    ),
+    "FRIEND_CHALLENGE_5": ProductSpec(
+        product_code="FRIEND_CHALLENGE_5",
+        product_type="MICRO",
+        title="Duell Ticket",
+        description="Ein zusaetzliches Freundes-Duell.",
+        stars_amount=5,
+        energy_credit=0,
+        friend_challenge_tickets=1,
     ),
     "PREMIUM_STARTER": ProductSpec(
         product_code="PREMIUM_STARTER",

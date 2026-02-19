@@ -107,18 +107,18 @@ async def test_init_purchase_applies_discount_and_reserves_redemption() -> None:
             promo_redemption_id=redemption_id,
         )
 
-    assert result.base_stars_amount == 10
-    assert result.discount_stars_amount == 5
-    assert result.final_stars_amount == 5
+    assert result.base_stars_amount == 5
+    assert result.discount_stars_amount == 2
+    assert result.final_stars_amount == 3
     assert result.applied_promo_code_id == promo_code_id
     assert result.idempotent_replay is False
 
     async with SessionLocal.begin() as session:
         purchase = await PurchasesRepo.get_by_id(session, result.purchase_id)
         assert purchase is not None
-        assert purchase.base_stars_amount == 10
-        assert purchase.discount_stars_amount == 5
-        assert purchase.stars_amount == 5
+        assert purchase.base_stars_amount == 5
+        assert purchase.discount_stars_amount == 2
+        assert purchase.stars_amount == 3
         assert purchase.applied_promo_code_id == promo_code_id
 
         redemption = await PromoRepo.get_redemption_by_id(session, redemption_id)

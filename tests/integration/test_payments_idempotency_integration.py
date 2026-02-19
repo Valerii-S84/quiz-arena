@@ -56,13 +56,13 @@ async def test_duplicate_payment_callbacks_credit_only_once() -> None:
             session,
             user_id=user_id,
             invoice_payload=init.invoice_payload,
-            total_amount=10,
+            total_amount=5,
         )
         await PurchaseService.validate_precheckout(
             session,
             user_id=user_id,
             invoice_payload=init.invoice_payload,
-            total_amount=10,
+            total_amount=5,
         )
 
         first = await PurchaseService.apply_successful_payment(
@@ -259,9 +259,9 @@ async def test_recovery_job_credits_stale_paid_uncredited_purchase() -> None:
                 user_id=user_id,
                 product_code="ENERGY_10",
                 product_type="MICRO",
-                base_stars_amount=10,
+                base_stars_amount=5,
                 discount_stars_amount=0,
-                stars_amount=10,
+                stars_amount=5,
                 currency="XTR",
                 status="PAID_UNCREDITED",
                 idempotency_key="recovery-success-1",
@@ -349,9 +349,9 @@ async def test_expire_stale_unpaid_invoices_marks_created_and_invoice_sent_as_fa
                 user_id=user_id,
                 product_code="ENERGY_10",
                 product_type="MICRO",
-                base_stars_amount=10,
+                base_stars_amount=5,
                 discount_stars_amount=0,
-                stars_amount=10,
+                stars_amount=5,
                 currency="XTR",
                 status="CREATED",
                 idempotency_key="stale-created-old-1",
@@ -421,9 +421,9 @@ async def test_reconciliation_detects_diff_and_persists_run() -> None:
                 user_id=user_id,
                 product_code="ENERGY_10",
                 product_type="MICRO",
-                base_stars_amount=10,
+                base_stars_amount=5,
                 discount_stars_amount=0,
-                stars_amount=10,
+                stars_amount=5,
                 currency="XTR",
                 status="CREDITED",
                 idempotency_key="recon-credited-1",
@@ -441,9 +441,9 @@ async def test_reconciliation_detects_diff_and_persists_run() -> None:
                 user_id=user_id,
                 product_code="ENERGY_10",
                 product_type="MICRO",
-                base_stars_amount=10,
+                base_stars_amount=5,
                 discount_stars_amount=0,
-                stars_amount=10,
+                stars_amount=5,
                 currency="XTR",
                 status="PAID_UNCREDITED",
                 idempotency_key="recon-stale-1",
@@ -477,8 +477,8 @@ async def test_reconciliation_detects_diff_and_persists_run() -> None:
     assert result["paid_purchases_count"] == 2
     assert result["credited_purchases_count"] == 1
     assert result["stale_paid_uncredited_count"] == 1
-    assert result["paid_stars_total"] == 20
-    assert result["credited_stars_total"] == 10
+    assert result["paid_stars_total"] == 10
+    assert result["credited_stars_total"] == 5
     assert result["product_stars_mismatch_count"] == 1
     assert result["diff_count"] == 4
     assert result["status"] == "DIFF"

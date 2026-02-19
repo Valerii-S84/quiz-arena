@@ -4,7 +4,12 @@ from app.economy.purchases.catalog import PRODUCTS, get_product
 
 
 def test_purchase_catalog_contains_core_micro_products() -> None:
-    assert {"ENERGY_10", "MEGA_PACK_15", "STREAK_SAVER_20"}.issubset(PRODUCTS)
+    assert {
+        "ENERGY_10",
+        "MEGA_PACK_15",
+        "STREAK_SAVER_20",
+        "FRIEND_CHALLENGE_5",
+    }.issubset(PRODUCTS)
 
 
 def test_purchase_catalog_contains_core_premium_products() -> None:

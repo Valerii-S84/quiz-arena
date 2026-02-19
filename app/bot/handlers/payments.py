@@ -160,6 +160,7 @@ async def handle_successful_payment(message: Message) -> None:
 
     text_key = {
         "ENERGY_10": "msg.purchase.success.energy10",
+        "FRIEND_CHALLENGE_5": "msg.purchase.success.friend_challenge_ticket",
         "MEGA_PACK_15": "msg.purchase.success.megapack",
         "STREAK_SAVER_20": "msg.purchase.success.streaksaver",
         "PREMIUM_STARTER": "msg.purchase.success.premium",

@@ -438,6 +438,24 @@ class PurchaseService:
                 now_utc=now_utc,
             )
 
+        if product.friend_challenge_tickets > 0:
+            await LedgerRepo.create(
+                session,
+                entry=LedgerEntry(
+                    user_id=user_id,
+                    purchase_id=purchase.id,
+                    entry_type="PURCHASE_CREDIT",
+                    asset="MODE_ACCESS",
+                    direction="CREDIT",
+                    amount=product.friend_challenge_tickets,
+                    balance_after=None,
+                    source="PURCHASE",
+                    idempotency_key=f"credit:friend_challenge_ticket:{purchase.id}",
+                    metadata_={"product_code": product.product_code},
+                    created_at=now_utc,
+                ),
+            )
+
         if product.grants_streak_saver:
             streak_state = await StreakRepo.add_streak_saver_token(
                 session,

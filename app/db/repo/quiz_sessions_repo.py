@@ -27,6 +27,62 @@ class QuizSessionsRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_friend_challenge_round_user(
+        session: AsyncSession,
+        *,
+        friend_challenge_id: UUID,
+        friend_challenge_round: int,
+        user_id: int,
+    ) -> QuizSession | None:
+        stmt = select(QuizSession).where(
+            QuizSession.friend_challenge_id == friend_challenge_id,
+            QuizSession.friend_challenge_round == friend_challenge_round,
+            QuizSession.user_id == user_id,
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_by_friend_challenge_round_any_user(
+        session: AsyncSession,
+        *,
+        friend_challenge_id: UUID,
+        friend_challenge_round: int,
+    ) -> QuizSession | None:
+        stmt = (
+            select(QuizSession)
+            .where(
+                QuizSession.friend_challenge_id == friend_challenge_id,
+                QuizSession.friend_challenge_round == friend_challenge_round,
+            )
+            .order_by(QuizSession.started_at.asc(), QuizSession.id.asc())
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def list_friend_challenge_question_ids_before_round(
+        session: AsyncSession,
+        *,
+        friend_challenge_id: UUID,
+        before_round: int,
+    ) -> list[str]:
+        stmt = (
+            select(QuizSession.question_id)
+            .where(
+                QuizSession.friend_challenge_id == friend_challenge_id,
+                QuizSession.friend_challenge_round.is_not(None),
+                QuizSession.friend_challenge_round < before_round,
+                QuizSession.question_id.is_not(None),
+            )
+            .distinct()
+            .order_by(QuizSession.question_id.asc())
+        )
+        result = await session.execute(stmt)
+        return [question_id for question_id in result.scalars().all() if question_id is not None]
+
+    @staticmethod
     async def has_daily_challenge_on_date(
         session: AsyncSession,
         *,

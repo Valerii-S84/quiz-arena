@@ -24,8 +24,6 @@ from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="promo")
 PROMO_INPUT_RE = re.compile(r"^/?promo\s+(.+)$", re.IGNORECASE)
-PROMO_STANDALONE_PATTERN = r"(?i)^(?=.*[-\d])[A-Z0-9][A-Z0-9_-]{3,39}$"
-PROMO_STANDALONE_RE = re.compile(PROMO_STANDALONE_PATTERN)
 
 
 def _is_reply_to_promo_prompt(message: Message) -> bool:
@@ -48,9 +46,9 @@ def _extract_promo_code(message: Message) -> str | None:
         return promo_code or None
 
     if _is_reply_to_promo_prompt(message):
-        return text
-
-    if PROMO_STANDALONE_RE.fullmatch(text):
+        # Ignore bot commands in reply flow to prevent accidental promo attempts.
+        if text.startswith("/") and PROMO_INPUT_RE.match(text) is None:
+            return None
         return text
 
     return None
@@ -72,16 +70,6 @@ async def handle_promo_open(callback: CallbackQuery) -> None:
 
 @router.message(Command("promo"))
 async def handle_promo_command(message: Message) -> None:
-    await _redeem_promo_from_text(message)
-
-
-@router.message(F.text.regexp(r"(?i)^promo\s+"))
-async def handle_promo_text(message: Message) -> None:
-    await _redeem_promo_from_text(message)
-
-
-@router.message(F.text.regexp(PROMO_STANDALONE_PATTERN))
-async def handle_promo_plain_code(message: Message) -> None:
     await _redeem_promo_from_text(message)
 
 

@@ -6,6 +6,7 @@ def test_shop_keyboard_contains_products_and_back() -> None:
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
 
     assert "buy:ENERGY_10" in callbacks
+    assert "buy:FRIEND_CHALLENGE_5" in callbacks
     assert "buy:MEGA_PACK_15" in callbacks
     assert "buy:PREMIUM_STARTER" in callbacks
     assert "buy:PREMIUM_MONTH" in callbacks

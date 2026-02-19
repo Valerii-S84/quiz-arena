@@ -5,8 +5,10 @@ from sqlalchemy import CheckConstraint, UniqueConstraint
 from app.db.models import (  # noqa: F401
     EnergyState,
     Entitlement,
+    FriendChallenge,
     LedgerEntry,
     ModeAccess,
+    ModeProgress,
     OfferImpression,
     OutboxEvent,
     ProcessedUpdate,
@@ -35,9 +37,11 @@ def test_all_m2_tables_registered() -> None:
         "ledger_entries",
         "entitlements",
         "mode_access",
+        "mode_progress",
         "quiz_sessions",
         "quiz_attempts",
         "quiz_questions",
+        "friend_challenges",
         "offers_impressions",
         "promo_codes",
         "promo_redemptions",
@@ -63,6 +67,15 @@ def test_critical_constraints_present() -> None:
     quiz_sessions = Base.metadata.tables["quiz_sessions"]
     quiz_sessions_indexes = {index.name for index in quiz_sessions.indexes}
     assert "uq_daily_challenge_user_date" in quiz_sessions_indexes
+    assert "uq_sessions_friend_challenge_user_round" in quiz_sessions_indexes
+
+    friend_challenges = Base.metadata.tables["friend_challenges"]
+    friend_check_names = {
+        constraint.name
+        for constraint in friend_challenges.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    assert "ck_friend_challenges_access_type" in friend_check_names
 
     entitlements = Base.metadata.tables["entitlements"]
     entitlements_indexes = {index.name for index in entitlements.indexes}
