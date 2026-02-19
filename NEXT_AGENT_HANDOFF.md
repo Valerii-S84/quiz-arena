@@ -1,5 +1,30 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-20, offers dashboard + thresholds)
+- Delivered dedicated offers funnel dashboard endpoint:
+  - `GET /internal/offers/dashboard`
+  - internal auth parity (`X-Internal-Token` + IP allowlist).
+- Added offers CTA attribution in purchase flow:
+  - offer keyboard callbacks now include `offer` payload (`buy:<product>:offer:<impression_id>`);
+  - payment handler writes `clicked_at` and `converted_purchase_id` into `offers_impressions`.
+- Added periodic offers monitoring job:
+  - `run_offers_funnel_alerts` every 15 minutes;
+  - threshold-based ops alerts:
+    - `offers_conversion_drop_detected`,
+    - `offers_spam_anomaly_detected`.
+- Added env-driven thresholds:
+  - `OFFERS_ALERT_WINDOW_HOURS`,
+  - `OFFERS_ALERT_MIN_IMPRESSIONS`,
+  - `OFFERS_ALERT_MIN_CONVERSION_RATE`,
+  - `OFFERS_ALERT_MAX_DISMISS_RATE`,
+  - `OFFERS_ALERT_MAX_IMPRESSIONS_PER_USER`.
+- Added tests:
+  - `tests/api/test_internal_offers_auth.py`,
+  - `tests/integration/test_internal_offers_dashboard_integration.py`,
+  - `tests/bot/test_payments_handler.py`,
+  - `tests/services/test_offers_observability.py`,
+  - `tests/workers/test_offers_observability_task.py`.
+
 ## Update (2026-02-19, promo dashboard)
 - Delivered dedicated promo observability endpoint:
   - `GET /internal/promo/dashboard`

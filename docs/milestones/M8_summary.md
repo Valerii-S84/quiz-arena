@@ -27,11 +27,15 @@
   - `OffersRepo` for impression history/logging/dismiss;
   - purchase history window count methods for trigger conditions;
   - entitlement window checks for starter-expired and month-expiring triggers.
+- Added offer CTA attribution wiring:
+  - offer CTA callbacks now carry `offer_impression_id`;
+  - payment handler records `clicked_at` and `converted_purchase_id` on matching impressions.
+- Added offer funnel observability surfaces:
+  - internal dashboard endpoint `GET /internal/offers/dashboard`;
+  - periodic alert thresholds for conversion-drop and spam anomalies.
 
 ## Not Implemented
 - Push-notification offer channel and push cap enforcement (`max 2/day`) are not implemented in this slice.
-- Offer click-through and purchase conversion attribution (`clicked_at` from CTA click, `converted_purchase_id`) is not yet wired to purchase flow.
-- Dedicated analytics/dashboard/reporting for offer funnel is not implemented.
 
 ## Risks
 - Trigger evaluation currently executes several DB reads per check; high-throughput optimization (pre-aggregates/caching) may be needed under load.

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -93,3 +94,101 @@ class OffersRepo:
         )
         result = await session.execute(stmt)
         return bool(result.rowcount)
+
+    @staticmethod
+    async def mark_clicked(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        impression_id: int,
+        clicked_at: datetime,
+    ) -> bool:
+        stmt = (
+            update(OfferImpression)
+            .where(
+                OfferImpression.id == impression_id,
+                OfferImpression.user_id == user_id,
+                OfferImpression.clicked_at.is_(None),
+            )
+            .values(clicked_at=clicked_at)
+        )
+        result = await session.execute(stmt)
+        return bool(result.rowcount)
+
+    @staticmethod
+    async def mark_converted_purchase(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        impression_id: int,
+        purchase_id: UUID,
+    ) -> bool:
+        stmt = (
+            update(OfferImpression)
+            .where(
+                OfferImpression.id == impression_id,
+                OfferImpression.user_id == user_id,
+                OfferImpression.converted_purchase_id.is_(None),
+            )
+            .values(converted_purchase_id=purchase_id)
+        )
+        result = await session.execute(stmt)
+        return bool(result.rowcount)
+
+    @staticmethod
+    async def count_impressions_since(session: AsyncSession, *, shown_since_utc: datetime) -> int:
+        stmt = select(func.count(OfferImpression.id)).where(OfferImpression.shown_at >= shown_since_utc)
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_distinct_users_since(session: AsyncSession, *, shown_since_utc: datetime) -> int:
+        stmt = select(func.count(func.distinct(OfferImpression.user_id))).where(
+            OfferImpression.shown_at >= shown_since_utc
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_clicked_since(session: AsyncSession, *, shown_since_utc: datetime) -> int:
+        stmt = select(func.count(OfferImpression.id)).where(
+            OfferImpression.shown_at >= shown_since_utc,
+            OfferImpression.clicked_at.is_not(None),
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_dismissed_since(session: AsyncSession, *, shown_since_utc: datetime) -> int:
+        stmt = select(func.count(OfferImpression.id)).where(
+            OfferImpression.shown_at >= shown_since_utc,
+            OfferImpression.dismiss_reason.is_not(None),
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_converted_since(session: AsyncSession, *, shown_since_utc: datetime) -> int:
+        stmt = select(func.count(OfferImpression.id)).where(
+            OfferImpression.shown_at >= shown_since_utc,
+            OfferImpression.converted_purchase_id.is_not(None),
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_impressions_by_offer_code_since(
+        session: AsyncSession,
+        *,
+        shown_since_utc: datetime,
+        limit: int = 10,
+    ) -> dict[str, int]:
+        stmt = (
+            select(OfferImpression.offer_code, func.count(OfferImpression.id))
+            .where(OfferImpression.shown_at >= shown_since_utc)
+            .group_by(OfferImpression.offer_code)
+            .order_by(func.count(OfferImpression.id).desc(), OfferImpression.offer_code.asc())
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        return {str(code): int(count) for code, count in result.all()}

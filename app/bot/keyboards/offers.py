@@ -16,7 +16,7 @@ def build_offer_keyboard(selection: OfferSelection) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text=f"{product.title} ({product.stars_amount}⭐)",
-                    callback_data=f"buy:{product_code}",
+                    callback_data=f"buy:{product_code}:offer:{selection.impression_id}",
                 )
             ]
         )

@@ -56,6 +56,16 @@ EVENT_ALERT_ROUTES = {
         severity="error",
         escalation_tier="ops_l1",
     ),
+    "offers_conversion_drop_detected": AlertRoute(
+        channels=("slack", "generic"),
+        severity="warning",
+        escalation_tier="ops_l2",
+    ),
+    "offers_spam_anomaly_detected": AlertRoute(
+        channels=("slack", "generic"),
+        severity="warning",
+        escalation_tier="ops_l2",
+    ),
 }
 
 

@@ -15,5 +15,5 @@ def test_offer_keyboard_contains_only_cta_buttons() -> None:
 
     keyboard = build_offer_keyboard(selection)
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
-    assert "buy:ENERGY_10" in callbacks
+    assert "buy:ENERGY_10:offer:42" in callbacks
     assert "offer:dismiss:42" not in callbacks

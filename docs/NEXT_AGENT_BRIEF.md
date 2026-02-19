@@ -17,6 +17,10 @@
   - anti-spam caps (6h blocking modal, 3/day, same offer 24h, mute 72h);
   - idempotent `offers_impressions` logging and bot offer surfaces (`/start`, locked mode, energy empty);
   - offer dismiss callback flow (`offer:dismiss:<impression_id>`).
+- Offer observability hardening completed:
+  - CTA attribution in payments (`buy:<product>:offer:<impression_id>` -> `clicked_at` + `converted_purchase_id`);
+  - internal offers dashboard endpoint `GET /internal/offers/dashboard`;
+  - periodic offers monitor with threshold-based ops alerts (conversion drop + spam anomalies).
 - M9 completed:
   - referral start tracking via `/start ref_<code>` onboarding payload;
   - referral qualification checks (20 attempts / 14d / 2 local days);
@@ -92,11 +96,9 @@
 - Current Alembic head: `d5e6f7a8b9c0`.
 
 ## Immediate Next Steps (Priority)
-1. Product/ops maturity:
-  - dedicated offer funnel dashboard + alert thresholds.
-2. Referral ops maturity:
+1. Referral ops maturity:
   - fraud-review dashboard/triage workflow and threshold tuning playbook.
-3. Promo operations:
+2. Promo operations:
   - dedicated admin workflow/UI for campaign operations (safe manual unpause/audit trail).
   - refund-driven promo rollback automation (`PR_REVOKED` flow).
 

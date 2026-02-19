@@ -10,6 +10,7 @@ from aiogram.types import CallbackQuery, LabeledPrice, Message, PreCheckoutQuery
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
+from app.economy.offers.service import OfferService
 from app.economy.purchases.catalog import get_product
 from app.economy.purchases.errors import (
     PremiumDowngradeNotAllowedError,
@@ -26,12 +27,14 @@ router = Router(name="payments")
 logger = structlog.get_logger(__name__)
 
 
-def _parse_buy_callback_data(callback_data: str) -> tuple[str, UUID | None]:
+def _parse_buy_callback_data(callback_data: str) -> tuple[str, UUID | None, int | None]:
     parts = callback_data.split(":")
     if len(parts) == 2:
-        return parts[1], None
+        return parts[1], None, None
     if len(parts) == 4 and parts[2] == "promo":
-        return parts[1], UUID(parts[3])
+        return parts[1], UUID(parts[3]), None
+    if len(parts) == 4 and parts[2] == "offer":
+        return parts[1], None, int(parts[3])
     raise ValueError("invalid buy callback")
 
 
@@ -42,7 +45,7 @@ async def handle_buy(callback: CallbackQuery) -> None:
         return
 
     try:
-        product_code, promo_redemption_id = _parse_buy_callback_data(callback.data)
+        product_code, promo_redemption_id, offer_impression_id = _parse_buy_callback_data(callback.data)
     except ValueError:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
@@ -59,6 +62,13 @@ async def handle_buy(callback: CallbackQuery) -> None:
                 session,
                 telegram_user=callback.from_user,
             )
+            if offer_impression_id is not None:
+                await OfferService.mark_offer_clicked(
+                    session,
+                    user_id=snapshot.user_id,
+                    impression_id=offer_impression_id,
+                    clicked_at=now_utc,
+                )
             init_result = await PurchaseService.init_purchase(
                 session,
                 user_id=snapshot.user_id,
@@ -67,6 +77,13 @@ async def handle_buy(callback: CallbackQuery) -> None:
                 now_utc=now_utc,
                 promo_redemption_id=promo_redemption_id,
             )
+            if offer_impression_id is not None:
+                await OfferService.mark_offer_converted_purchase(
+                    session,
+                    user_id=snapshot.user_id,
+                    impression_id=offer_impression_id,
+                    purchase_id=init_result.purchase_id,
+                )
     except PremiumDowngradeNotAllowedError:
         await callback.answer(TEXTS_DE["msg.premium.downgrade.blocked"], show_alert=True)
         return
