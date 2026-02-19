@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
 from app.db.repo.promo_repo import PromoRepo
+from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.session import SessionLocal
 from app.economy.promo.errors import (
     PromoAlreadyUsedError,
@@ -33,6 +34,9 @@ PROMO_FAILURE_RESULTS = ("INVALID", "EXPIRED", "NOT_APPLICABLE", "RATE_LIMITED")
 PROMO_GUARD_LOOKBACK_MINUTES = 10
 PROMO_GUARD_MIN_FAILED_ATTEMPTS = 100
 PROMO_GUARD_MIN_DISTINCT_USERS = 2
+PROMO_CAMPAIGN_STATUSES = {"ACTIVE", "PAUSED", "EXPIRED", "DEPLETED"}
+PROMO_MUTABLE_CAMPAIGN_STATUSES = {"ACTIVE", "PAUSED"}
+REFUNDABLE_PURCHASE_STATUSES = {"CREDITED", "PAID_UNCREDITED"}
 
 
 class PromoRedeemRequest(BaseModel):
@@ -75,6 +79,44 @@ class PromoDashboardResponse(BaseModel):
     paused_campaigns_recent: int = Field(ge=0)
 
 
+class PromoCampaignResponse(BaseModel):
+    id: int
+    campaign_name: str
+    promo_type: str
+    target_scope: str
+    status: str
+    valid_from: datetime
+    valid_until: datetime
+    max_total_uses: int | None = None
+    used_total: int = Field(ge=0)
+    updated_at: datetime
+
+
+class PromoCampaignStatusUpdateRequest(BaseModel):
+    status: str = Field(min_length=1, max_length=16)
+    reason: str | None = Field(default=None, max_length=256)
+    expected_current_status: str | None = Field(default=None, max_length=16)
+
+
+class PromoCampaignListResponse(BaseModel):
+    campaigns: list[PromoCampaignResponse]
+
+
+class PromoRefundRollbackRequest(BaseModel):
+    purchase_id: UUID
+    reason: str | None = Field(default=None, max_length=256)
+
+
+class PromoRefundRollbackResponse(BaseModel):
+    purchase_id: UUID
+    purchase_status: str
+    promo_redemption_id: UUID | None = None
+    promo_redemption_status: str | None = None
+    promo_code_id: int | None = None
+    promo_code_used_total: int | None = None
+    idempotent_replay: bool
+
+
 def _as_response(result: PromoRedeemResult) -> PromoRedeemResponse:
     return PromoRedeemResponse(
         redemption_id=result.redemption_id,
@@ -84,6 +126,21 @@ def _as_response(result: PromoRedeemResult) -> PromoRedeemResponse:
         discount_percent=result.discount_percent,
         reserved_until=result.reserved_until,
         target_scope=result.target_scope,
+    )
+
+
+def _campaign_as_response(campaign: object) -> PromoCampaignResponse:
+    return PromoCampaignResponse(
+        id=int(getattr(campaign, "id")),
+        campaign_name=str(getattr(campaign, "campaign_name")),
+        promo_type=str(getattr(campaign, "promo_type")),
+        target_scope=str(getattr(campaign, "target_scope")),
+        status=str(getattr(campaign, "status")),
+        valid_from=getattr(campaign, "valid_from"),
+        valid_until=getattr(campaign, "valid_until"),
+        max_total_uses=getattr(campaign, "max_total_uses"),
+        used_total=int(getattr(campaign, "used_total")),
+        updated_at=getattr(campaign, "updated_at"),
     )
 
 
@@ -205,3 +262,125 @@ async def get_promo_dashboard(
         paused_campaigns_total=campaign_counts.get("PAUSED", 0),
         paused_campaigns_recent=paused_recent,
     )
+
+
+@router.get("/internal/promo/campaigns", response_model=PromoCampaignListResponse)
+async def list_promo_campaigns(
+    request: Request,
+    status: str | None = Query(default=None, min_length=1, max_length=16),
+    campaign_name: str | None = Query(default=None, min_length=1, max_length=128),
+    limit: int = Query(default=50, ge=1, le=200),
+) -> PromoCampaignListResponse:
+    _assert_internal_access(request)
+    normalized_status: str | None = status.strip().upper() if status is not None else None
+    if normalized_status is not None and normalized_status not in PROMO_CAMPAIGN_STATUSES:
+        raise HTTPException(status_code=422, detail={"code": "E_PROMO_STATUS_INVALID"})
+
+    async with SessionLocal.begin() as session:
+        campaigns = await PromoRepo.list_codes(
+            session,
+            status=normalized_status,
+            campaign_name=campaign_name.strip() if campaign_name else None,
+            limit=limit,
+        )
+    return PromoCampaignListResponse(campaigns=[_campaign_as_response(campaign) for campaign in campaigns])
+
+
+@router.post("/internal/promo/campaigns/{promo_code_id}/status", response_model=PromoCampaignResponse)
+async def update_promo_campaign_status(
+    promo_code_id: int,
+    payload: PromoCampaignStatusUpdateRequest,
+    request: Request,
+) -> PromoCampaignResponse:
+    _assert_internal_access(request)
+    desired_status = payload.status.strip().upper()
+    if desired_status not in PROMO_MUTABLE_CAMPAIGN_STATUSES:
+        raise HTTPException(status_code=422, detail={"code": "E_PROMO_STATUS_INVALID"})
+
+    expected_status: str | None = None
+    if payload.expected_current_status is not None:
+        expected_status = payload.expected_current_status.strip().upper()
+        if expected_status not in PROMO_CAMPAIGN_STATUSES:
+            raise HTTPException(status_code=422, detail={"code": "E_PROMO_STATUS_INVALID"})
+
+    now_utc = datetime.now(timezone.utc)
+    async with SessionLocal.begin() as session:
+        campaign = await PromoRepo.get_code_by_id_for_update(session, promo_code_id)
+        if campaign is None:
+            raise HTTPException(status_code=404, detail={"code": "E_PROMO_NOT_FOUND"})
+        if expected_status is not None and campaign.status != expected_status:
+            raise HTTPException(status_code=409, detail={"code": "E_PROMO_STATUS_CONFLICT"})
+        if campaign.status != desired_status:
+            previous_status = campaign.status
+            campaign.status = desired_status
+            campaign.updated_at = now_utc
+            logger.info(
+                "internal_promo_campaign_status_changed",
+                promo_code_id=promo_code_id,
+                campaign_name=campaign.campaign_name,
+                previous_status=previous_status,
+                next_status=desired_status,
+                reason=(payload.reason or "").strip() or None,
+            )
+        return _campaign_as_response(campaign)
+
+
+@router.post("/internal/promo/refund-rollback", response_model=PromoRefundRollbackResponse)
+async def rollback_promo_for_refund(
+    payload: PromoRefundRollbackRequest,
+    request: Request,
+) -> PromoRefundRollbackResponse:
+    _assert_internal_access(request)
+    now_utc = datetime.now(timezone.utc)
+    async with SessionLocal.begin() as session:
+        purchase = await PurchasesRepo.get_by_id_for_update(session, payload.purchase_id)
+        if purchase is None:
+            raise HTTPException(status_code=404, detail={"code": "E_PURCHASE_NOT_FOUND"})
+
+        if purchase.status == "REFUNDED":
+            redemption = await PromoRepo.get_redemption_by_applied_purchase_id_for_update(session, purchase.id)
+            promo_code = None
+            if purchase.applied_promo_code_id is not None:
+                promo_code = await PromoRepo.get_code_by_id(session, purchase.applied_promo_code_id)
+            return PromoRefundRollbackResponse(
+                purchase_id=purchase.id,
+                purchase_status=purchase.status,
+                promo_redemption_id=None if redemption is None else redemption.id,
+                promo_redemption_status=None if redemption is None else redemption.status,
+                promo_code_id=purchase.applied_promo_code_id,
+                promo_code_used_total=None if promo_code is None else promo_code.used_total,
+                idempotent_replay=True,
+            )
+
+        if purchase.status not in REFUNDABLE_PURCHASE_STATUSES:
+            raise HTTPException(status_code=409, detail={"code": "E_PURCHASE_REFUND_NOT_ALLOWED"})
+
+        purchase.status = "REFUNDED"
+        purchase.refunded_at = now_utc
+
+        redemption = None
+        promo_code = None
+        if purchase.applied_promo_code_id is not None:
+            redemption, promo_code = await PromoRepo.revoke_redemption_and_decrement_usage(
+                session,
+                purchase_id=purchase.id,
+                promo_code_id=purchase.applied_promo_code_id,
+                now_utc=now_utc,
+            )
+
+        logger.info(
+            "internal_promo_refund_rollback_applied",
+            purchase_id=str(purchase.id),
+            promo_code_id=purchase.applied_promo_code_id,
+            promo_redemption_id=None if redemption is None else str(redemption.id),
+            reason=(payload.reason or "").strip() or None,
+        )
+        return PromoRefundRollbackResponse(
+            purchase_id=purchase.id,
+            purchase_status=purchase.status,
+            promo_redemption_id=None if redemption is None else redemption.id,
+            promo_redemption_status=None if redemption is None else redemption.status,
+            promo_code_id=purchase.applied_promo_code_id,
+            promo_code_used_total=None if promo_code is None else promo_code.used_total,
+            idempotent_replay=False,
+        )

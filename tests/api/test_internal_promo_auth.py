@@ -90,3 +90,40 @@ def test_internal_promo_dashboard_rejects_disallowed_ip(monkeypatch) -> None:
 
     assert response.status_code == 403
     assert response.json() == {"detail": {"code": "E_FORBIDDEN"}}
+
+
+def test_internal_promo_campaigns_rejects_missing_token(monkeypatch) -> None:
+    monkeypatch.setattr(
+        internal_promo,
+        "get_settings",
+        lambda: SimpleNamespace(
+            internal_api_token="internal-secret",
+            internal_api_allowlist="127.0.0.1/32",
+        ),
+    )
+
+    client = TestClient(app)
+    response = client.get("/internal/promo/campaigns")
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": {"code": "E_FORBIDDEN"}}
+
+
+def test_internal_promo_refund_rollback_rejects_missing_token(monkeypatch) -> None:
+    monkeypatch.setattr(
+        internal_promo,
+        "get_settings",
+        lambda: SimpleNamespace(
+            internal_api_token="internal-secret",
+            internal_api_allowlist="127.0.0.1/32",
+        ),
+    )
+
+    client = TestClient(app)
+    response = client.post(
+        "/internal/promo/refund-rollback",
+        json={"purchase_id": "123e4567-e89b-12d3-a456-426614174000"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": {"code": "E_FORBIDDEN"}}

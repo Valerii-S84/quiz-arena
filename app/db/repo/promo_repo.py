@@ -36,6 +36,22 @@ class PromoRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def list_codes(
+        session: AsyncSession,
+        *,
+        status: str | None = None,
+        campaign_name: str | None = None,
+        limit: int = 50,
+    ) -> list[PromoCode]:
+        stmt = select(PromoCode).order_by(PromoCode.updated_at.desc(), PromoCode.id.desc()).limit(limit)
+        if status is not None:
+            stmt = stmt.where(PromoCode.status == status)
+        if campaign_name:
+            stmt = stmt.where(PromoCode.campaign_name == campaign_name)
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
     async def get_redemption_by_id(session: AsyncSession, redemption_id: UUID) -> PromoRedemption | None:
         return await session.get(PromoRedemption, redemption_id)
 
@@ -60,6 +76,29 @@ class PromoRepo:
         )
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
+
+    @staticmethod
+    async def revoke_redemption_and_decrement_usage(
+        session: AsyncSession,
+        *,
+        purchase_id: UUID,
+        promo_code_id: int,
+        now_utc: datetime,
+    ) -> tuple[PromoRedemption | None, PromoCode | None]:
+        redemption = await PromoRepo.get_redemption_by_applied_purchase_id_for_update(
+            session,
+            applied_purchase_id=purchase_id,
+        )
+        promo_code = await PromoRepo.get_code_by_id_for_update(session, promo_code_id)
+
+        if redemption is not None and redemption.status != "REVOKED":
+            redemption.status = "REVOKED"
+            redemption.updated_at = now_utc
+        if promo_code is not None and promo_code.used_total > 0:
+            promo_code.used_total -= 1
+            promo_code.updated_at = now_utc
+
+        return redemption, promo_code
 
     @staticmethod
     async def get_redemption_by_idempotency_key(
