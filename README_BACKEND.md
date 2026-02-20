@@ -37,7 +37,28 @@ docker compose up -d
 ## 6. Run tests
 
 ```bash
+DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test \
 TMPDIR=/tmp .venv/bin/python -m pytest -q -s
+```
+
+Important:
+- Integration tests execute destructive `TRUNCATE` in test fixtures.
+- Use only an isolated local test database whose name contains `test` (for example `quiz_arena_test`).
+
+Recommended safe flow:
+```bash
+DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test \
+.venv/bin/python -m scripts.ensure_test_db
+DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test \
+.venv/bin/python -m alembic upgrade head
+DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test \
+TMPDIR=/tmp .venv/bin/python -m pytest -q -s tests/integration
+```
+
+Or via Makefile:
+```bash
+make test
+make test-integration
 ```
 
 ## 7. Production skeleton

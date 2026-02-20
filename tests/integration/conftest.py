@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import text
 
+from app.core.integration_db_safety import assert_safe_integration_db
 from app.db.session import engine
 
 TRUNCATE_TABLES = (
@@ -32,6 +33,11 @@ TRUNCATE_TABLES = (
 )
 
 TRUNCATE_SQL = f"TRUNCATE TABLE {', '.join(TRUNCATE_TABLES)} RESTART IDENTITY CASCADE"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def guard_integration_db_target() -> None:
+    assert_safe_integration_db(str(engine.url))
 
 
 @pytest.fixture(autouse=True)
