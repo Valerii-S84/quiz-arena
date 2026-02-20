@@ -68,7 +68,12 @@ async def test_handle_referral_command_renders_overview(monkeypatch) -> None:
     message = _ReferralMessage(from_user=SimpleNamespace(id=1))
     await referral.handle_referral_command(message)
 
-    assert TEXTS_DE["msg.referral.invite"] in (message.answers[0].text or "")
+    response = message.answers[0]
+    assert TEXTS_DE["msg.referral.invite"] in (response.text or "")
+    assert "https://t.me/" not in (response.text or "")
+    keyboard = response.kwargs["reply_markup"]
+    share_urls = [button.url for row in keyboard.inline_keyboard for button in row if button.url]
+    assert any("start%3Dref_ABC123" in url for url in share_urls)
 
 
 @pytest.mark.asyncio
@@ -107,4 +112,6 @@ async def test_handle_referral_reward_choice_success(monkeypatch) -> None:
     )
     await referral.handle_referral_reward_choice(callback)
 
-    assert TEXTS_DE["msg.referral.reward.claimed.megapack"] in (callback.message.answers[0].text or "")
+    response = callback.message.answers[0]
+    assert TEXTS_DE["msg.referral.reward.claimed.megapack"] in (response.text or "")
+    assert "https://t.me/" not in (response.text or "")

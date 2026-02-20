@@ -43,7 +43,7 @@ def _build_overview_text(*, overview: ReferralOverview, invite_link: str | None)
     ]
 
     if invite_link:
-        lines.append(TEXTS_DE["msg.referral.link"].format(invite_link=invite_link))
+        lines.append(TEXTS_DE["msg.referral.link"])
     else:
         lines.append(TEXTS_DE["msg.referral.link.fallback"].format(referral_code=overview.referral_code))
 

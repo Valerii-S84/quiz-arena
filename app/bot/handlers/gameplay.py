@@ -422,7 +422,7 @@ async def handle_friend_challenge_create(callback: CallbackQuery) -> None:
     else:
         body_lines.insert(
             0,
-            TEXTS_DE["msg.friend.challenge.created"].format(invite_link=invite_link),
+            TEXTS_DE["msg.friend.challenge.created"],
         )
         await callback.message.answer(
             "\n".join(body_lines),

@@ -96,6 +96,51 @@ async def test_build_friend_invite_link_returns_none_on_bot_error() -> None:
 
 
 @pytest.mark.asyncio
+async def test_handle_friend_challenge_create_hides_raw_url_and_keeps_share_link(monkeypatch) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        return SimpleNamespace(user_id=17)
+
+    async def _fake_create_friend_challenge(*args, **kwargs):
+        return FriendChallengeSnapshot(
+            challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            invite_token="0123456789abcdef0123456789abcdef",
+            mode_code="QUICK_MIX_A1A2",
+            access_type="FREE",
+            status="ACTIVE",
+            creator_user_id=17,
+            opponent_user_id=None,
+            current_round=1,
+            total_rounds=12,
+            creator_score=0,
+            opponent_score=0,
+            winner_user_id=None,
+        )
+
+    async def _fake_friend_invite_link(callback, *, invite_token: str):
+        assert invite_token == "0123456789abcdef0123456789abcdef"
+        return "https://t.me/testbot?start=fc_0123456789abcdef0123456789abcdef"
+
+    monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(gameplay.GameSessionService, "create_friend_challenge", _fake_create_friend_challenge)
+    monkeypatch.setattr(gameplay, "_build_friend_invite_link", _fake_friend_invite_link)
+
+    callback = DummyCallback(
+        data="friend:challenge:create",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+    await gameplay.handle_friend_challenge_create(callback)
+
+    response = callback.message.answers[0]
+    assert "https://t.me/" not in (response.text or "")
+    keyboard = response.kwargs["reply_markup"]
+    share_urls = [button.url for row in keyboard.inline_keyboard for button in row if button.url]
+    assert any("start%3Dfc_0123456789abcdef0123456789abcdef" in url for url in share_urls)
+
+
+@pytest.mark.asyncio
 async def test_handle_game_stop_with_missing_message_returns_error() -> None:
     callback = DummyCallback(data="game:stop", from_user=SimpleNamespace(id=1))
     callback.message = None
