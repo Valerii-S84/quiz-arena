@@ -7,6 +7,7 @@
 ## Prerequisites
 - Internal API token (`X-Internal-Token`).
 - Source IP included in `INTERNAL_API_ALLOWLIST`.
+- Reverse proxy/LB egress IP included in `INTERNAL_API_TRUSTED_PROXIES` (otherwise `X-Forwarded-For` is ignored).
 - API service running and reachable.
 
 ## 1) Fetch review queue

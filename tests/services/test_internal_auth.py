@@ -22,12 +22,36 @@ def test_is_client_ip_allowed_supports_exact_ip_and_cidr() -> None:
     assert is_client_ip_allowed(client_ip="192.168.1.5", allowlist=allowlist) is False
 
 
-def test_extract_client_ip_prefers_forwarded_header() -> None:
+def test_extract_client_ip_uses_forwarded_header_only_for_trusted_proxy() -> None:
     request = SimpleNamespace(
         headers={"X-Forwarded-For": "10.1.1.8, 127.0.0.1"},
         client=SimpleNamespace(host="127.0.0.1"),
     )
-    assert extract_client_ip(request) == "10.1.1.8"
+    assert extract_client_ip(request, trusted_proxies="127.0.0.1/32") == "10.1.1.8"
+
+
+def test_extract_client_ip_ignores_forwarded_header_for_untrusted_proxy() -> None:
+    request = SimpleNamespace(
+        headers={"X-Forwarded-For": "10.1.1.8, 127.0.0.1"},
+        client=SimpleNamespace(host="198.51.100.10"),
+    )
+    assert extract_client_ip(request, trusted_proxies="127.0.0.1/32") == "198.51.100.10"
+
+
+def test_extract_client_ip_rejects_invalid_forwarded_header_for_trusted_proxy() -> None:
+    request = SimpleNamespace(
+        headers={"X-Forwarded-For": "not-an-ip, 127.0.0.1"},
+        client=SimpleNamespace(host="127.0.0.1"),
+    )
+    assert extract_client_ip(request, trusted_proxies="127.0.0.1/32") is None
+
+
+def test_extract_client_ip_supports_ipv6_forwarded_header() -> None:
+    request = SimpleNamespace(
+        headers={"X-Forwarded-For": "2001:db8::10, 127.0.0.1"},
+        client=SimpleNamespace(host="127.0.0.1"),
+    )
+    assert extract_client_ip(request, trusted_proxies="127.0.0.1/32") == "2001:db8::10"
 
 
 def test_extract_client_ip_falls_back_to_client_host() -> None:

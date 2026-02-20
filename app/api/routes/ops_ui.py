@@ -23,7 +23,10 @@ OPS_UI_PAGES = {
 
 def _assert_internal_ip_access(request: Request) -> None:
     settings = get_settings()
-    client_ip = extract_client_ip(request)
+    client_ip = extract_client_ip(
+        request,
+        trusted_proxies=getattr(settings, "internal_api_trusted_proxies", ""),
+    )
     if not is_client_ip_allowed(client_ip=client_ip, allowlist=settings.internal_api_allowlist):
         logger.warning("ops_ui_auth_failed", reason="ip_not_allowed", client_ip=client_ip)
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})

@@ -26,6 +26,10 @@ class Settings(BaseSettings):
         default="127.0.0.1/32,::1/128",
         alias="INTERNAL_API_ALLOWLIST",
     )
+    internal_api_trusted_proxies: str = Field(
+        default="127.0.0.1/32,::1/128",
+        alias="INTERNAL_API_TRUSTED_PROXIES",
+    )
     ops_alert_webhook_url: str = Field(default="", alias="OPS_ALERT_WEBHOOK_URL")
     ops_alert_slack_webhook_url: str = Field(default="", alias="OPS_ALERT_SLACK_WEBHOOK_URL")
     ops_alert_pagerduty_events_url: str = Field(default="", alias="OPS_ALERT_PAGERDUTY_EVENTS_URL")

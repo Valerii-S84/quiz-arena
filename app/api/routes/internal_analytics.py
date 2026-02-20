@@ -57,7 +57,10 @@ class InternalAnalyticsDashboardResponse(BaseModel):
 
 def _assert_internal_access(request: Request) -> None:
     settings = get_settings()
-    client_ip = extract_client_ip(request)
+    client_ip = extract_client_ip(
+        request,
+        trusted_proxies=getattr(settings, "internal_api_trusted_proxies", ""),
+    )
     token = request.headers.get("X-Internal-Token")
 
     if not is_valid_internal_token(

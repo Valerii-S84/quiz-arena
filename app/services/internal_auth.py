@@ -34,17 +34,36 @@ def _parse_allowlist(allowlist: str) -> tuple[ipaddress.IPv4Network | ipaddress.
     return tuple(networks)
 
 
-def extract_client_ip(request: Request) -> str | None:
+def _parse_ip(value: str | None) -> str | None:
+    if value is None:
+        return None
+    candidate = value.strip()
+    if not candidate:
+        return None
+    try:
+        return str(ipaddress.ip_address(candidate))
+    except ValueError:
+        return None
+
+
+def _is_trusted_proxy(*, proxy_ip: str | None, trusted_proxies: str) -> bool:
+    return is_client_ip_allowed(client_ip=proxy_ip, allowlist=trusted_proxies)
+
+
+def extract_client_ip(
+    request: Request,
+    *,
+    trusted_proxies: str = "",
+) -> str | None:
+    client_host = _parse_ip(request.client.host if request.client is not None else None)
     forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        candidate = forwarded_for.split(",", maxsplit=1)[0].strip()
-        if candidate:
+    if forwarded_for and _is_trusted_proxy(proxy_ip=client_host, trusted_proxies=trusted_proxies):
+        candidate = _parse_ip(forwarded_for.split(",", maxsplit=1)[0])
+        if candidate is not None:
             return candidate
+        return None
 
-    if request.client is not None:
-        return request.client.host
-
-    return None
+    return client_host
 
 
 def is_client_ip_allowed(*, client_ip: str | None, allowlist: str) -> bool:
