@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
 from app.db.models.referrals import Referral
+from app.db.repo.outbox_events_repo import OutboxEventsRepo
 from app.db.repo.referrals_repo import ReferralsRepo
 from app.db.session import SessionLocal
 from app.economy.referrals.constants import FRAUD_SCORE_VELOCITY
@@ -34,6 +35,10 @@ REFERRAL_REVIEW_STATUSES = {
     "DEFERRED_LIMIT",
 }
 REFERRAL_REVIEW_DECISIONS = {"CONFIRM_FRAUD", "REOPEN", "CANCEL"}
+REFERRAL_NOTIFICATION_EVENT_TYPES = {
+    "referral_reward_milestone_available",
+    "referral_reward_granted",
+}
 
 
 class ReferralTopReferrerStatsResponse(BaseModel):
@@ -113,6 +118,24 @@ class ReferralReviewActionRequest(BaseModel):
 class ReferralReviewActionResponse(BaseModel):
     referral: ReferralReviewCaseResponse
     idempotent_replay: bool
+
+
+class ReferralNotificationEventResponse(BaseModel):
+    id: int = Field(gt=0)
+    event_type: str
+    status: str
+    created_at: datetime
+    payload: dict[str, object]
+
+
+class ReferralNotificationsFeedResponse(BaseModel):
+    generated_at: datetime
+    window_hours: int = Field(ge=1, le=720)
+    event_type_filter: str | None = None
+    total_events: int = Field(ge=0)
+    by_type: dict[str, int]
+    by_status: dict[str, int]
+    events: list[ReferralNotificationEventResponse]
 
 
 def _assert_internal_access(request: Request) -> None:
@@ -311,3 +334,60 @@ async def apply_referral_review_decision(
             idempotent_replay=idempotent_replay,
         )
     return response
+
+
+@router.get("/internal/referrals/events", response_model=ReferralNotificationsFeedResponse)
+async def get_referrals_notification_events(
+    request: Request,
+    window_hours: int = Query(default=168, ge=1, le=720),
+    event_type: str | None = Query(default=None, min_length=1, max_length=64),
+    limit: int = Query(default=200, ge=1, le=500),
+) -> ReferralNotificationsFeedResponse:
+    _assert_internal_access(request)
+    now_utc = datetime.now(timezone.utc)
+    since_utc = now_utc - timedelta(hours=window_hours)
+
+    normalized_type: str | None = None
+    event_types: tuple[str, ...] = tuple(sorted(REFERRAL_NOTIFICATION_EVENT_TYPES))
+    if event_type is not None:
+        normalized_type = event_type.strip()
+        if normalized_type not in REFERRAL_NOTIFICATION_EVENT_TYPES:
+            raise HTTPException(status_code=422, detail={"code": "E_REFERRAL_EVENT_TYPE_INVALID"})
+        event_types = (normalized_type,)
+
+    async with SessionLocal.begin() as session:
+        events = await OutboxEventsRepo.list_events_since(
+            session,
+            since_utc=since_utc,
+            event_types=event_types,
+            limit=limit,
+        )
+        by_type = await OutboxEventsRepo.count_by_type_since(
+            session,
+            since_utc=since_utc,
+            event_types=event_types,
+        )
+        by_status = await OutboxEventsRepo.count_by_status_since(
+            session,
+            since_utc=since_utc,
+            event_types=event_types,
+        )
+
+    return ReferralNotificationsFeedResponse(
+        generated_at=now_utc,
+        window_hours=window_hours,
+        event_type_filter=normalized_type,
+        total_events=sum(by_type.values()),
+        by_type=by_type,
+        by_status=by_status,
+        events=[
+            ReferralNotificationEventResponse(
+                id=int(item.id),
+                event_type=str(item.event_type),
+                status=str(item.status),
+                created_at=item.created_at,
+                payload=item.payload,
+            )
+            for item in events
+        ],
+    )

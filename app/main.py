@@ -1,10 +1,13 @@
 import uvicorn
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.health import router as health_router
 from app.api.routes.internal_offers import router as internal_offers_router
 from app.api.routes.internal_promo import router as internal_promo_router
 from app.api.routes.internal_referrals import router as internal_referrals_router
+from app.api.routes.ops_ui import OPS_UI_STATIC_DIR
+from app.api.routes.ops_ui import router as ops_ui_router
 from app.api.routes.telegram_webhook import router as telegram_webhook_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
@@ -25,6 +28,8 @@ def create_app() -> FastAPI:
     app.include_router(internal_promo_router)
     app.include_router(internal_offers_router)
     app.include_router(internal_referrals_router)
+    app.include_router(ops_ui_router)
+    app.mount("/ops/static", StaticFiles(directory=str(OPS_UI_STATIC_DIR)), name="ops-static")
     return app
 
 

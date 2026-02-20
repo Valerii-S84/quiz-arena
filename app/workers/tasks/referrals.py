@@ -6,12 +6,17 @@ from datetime import datetime, timezone
 import structlog
 from celery.schedules import crontab
 
+from app.db.repo.outbox_events_repo import OutboxEventsRepo
 from app.db.session import SessionLocal
 from app.economy.referrals.service import ReferralService
 from app.services.alerts import send_ops_alert
 from app.workers.celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
+REFERRAL_REWARD_EVENT_TYPES = (
+    "referral_reward_milestone_available",
+    "referral_reward_granted",
+)
 
 
 async def run_referral_qualification_checks_async(*, batch_size: int = 200) -> dict[str, int]:
@@ -47,25 +52,58 @@ async def _send_referral_reward_alerts(*, result: dict[str, int]) -> dict[str, i
     reward_alert_sent = 0
 
     if result.get("awaiting_choice", 0) > 0:
+        milestone_event = REFERRAL_REWARD_EVENT_TYPES[0]
         milestone_alert_sent = int(
             await send_ops_alert(
-                event="referral_reward_milestone_available",
+                event=milestone_event,
                 payload=result,
             )
         )
+        await _record_referral_reward_event(
+            event_type=milestone_event,
+            payload=result,
+            sent=bool(milestone_alert_sent),
+        )
 
     if result.get("rewards_granted", 0) > 0:
+        reward_event = REFERRAL_REWARD_EVENT_TYPES[1]
         reward_alert_sent = int(
             await send_ops_alert(
-                event="referral_reward_granted",
+                event=reward_event,
                 payload=result,
             )
+        )
+        await _record_referral_reward_event(
+            event_type=reward_event,
+            payload=result,
+            sent=bool(reward_alert_sent),
         )
 
     return {
         "milestone_alert_sent": milestone_alert_sent,
         "reward_alert_sent": reward_alert_sent,
     }
+
+
+async def _record_referral_reward_event(
+    *,
+    event_type: str,
+    payload: dict[str, int],
+    sent: bool,
+) -> None:
+    try:
+        async with SessionLocal.begin() as session:
+            await OutboxEventsRepo.create(
+                session,
+                event_type=event_type,
+                payload={**payload, "delivery_sent": sent},
+                status="SENT" if sent else "FAILED",
+            )
+    except Exception:
+        logger.exception(
+            "referral_reward_event_record_failed",
+            event_type=event_type,
+        )
 
 
 @celery_app.task(name="app.workers.tasks.referrals.run_referral_qualification_checks")

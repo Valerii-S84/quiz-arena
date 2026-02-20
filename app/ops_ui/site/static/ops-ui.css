@@ -1,0 +1,373 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap");
+
+:root {
+  --bg: #f4f1ea;
+  --bg-2: #fffdf8;
+  --text: #1f1c18;
+  --muted: #6a645d;
+  --ink: #17324d;
+  --ink-soft: #e5eef8;
+  --warn: #ef6f2e;
+  --ok: #21835b;
+  --err: #b92f2f;
+  --card: #ffffff;
+  --line: #d7cec2;
+  --shadow: 0 18px 35px rgba(47, 32, 12, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 10% 10%, #fff2cf 0%, transparent 32%),
+    radial-gradient(circle at 80% 5%, #d7ebff 0%, transparent 36%),
+    linear-gradient(135deg, var(--bg), var(--bg-2));
+  min-height: 100vh;
+}
+
+.background-grid {
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(23, 50, 77, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(23, 50, 77, 0.05) 1px, transparent 1px);
+  background-size: 34px 34px;
+  pointer-events: none;
+}
+
+.topbar,
+.layout {
+  position: relative;
+  z-index: 1;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: end;
+  padding: 26px 28px 10px;
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+h1 {
+  margin: 4px 0 0;
+  font-size: clamp(24px, 2.8vw, 38px);
+  letter-spacing: -0.02em;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  text-decoration: none;
+  color: var(--ink);
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+  padding: 9px 13px;
+  border-radius: 999px;
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.tab:hover {
+  transform: translateY(-1px);
+}
+
+.tab.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+.layout {
+  display: grid;
+  gap: 16px;
+  padding: 8px 28px 32px;
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+  animation: rise 280ms ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.inline-controls,
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-controls.wrap {
+  flex-wrap: wrap;
+}
+
+label {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+input,
+select,
+button {
+  font: inherit;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  padding: 7px 10px;
+  min-height: 38px;
+}
+
+input,
+select {
+  background: #fff;
+}
+
+button {
+  background: var(--ink);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  border-color: var(--ink);
+}
+
+button:hover {
+  filter: brightness(1.05);
+}
+
+button.ghost {
+  background: #fff;
+  color: var(--ink);
+}
+
+button.warn {
+  background: var(--warn);
+  border-color: var(--warn);
+}
+
+button.ok {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+button.tiny {
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(155deg, #fff, #faf7f2);
+  padding: 11px;
+}
+
+.card .label {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.card .value {
+  margin: 6px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  padding: 10px 8px;
+  font-size: 13px;
+  vertical-align: top;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.mono,
+.json-view,
+.event-payload {
+  font-family: "IBM Plex Mono", "Fira Code", monospace;
+}
+
+.json-view {
+  margin: 10px 0 0;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #f9f5ef;
+  white-space: pre-wrap;
+  min-height: 56px;
+}
+
+.event-feed {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.event-item {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+}
+
+.event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.event-type {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.pill.ok {
+  color: var(--ok);
+  border-color: rgba(33, 131, 91, 0.35);
+  background: rgba(33, 131, 91, 0.12);
+}
+
+.pill.err {
+  color: var(--err);
+  border-color: rgba(185, 47, 47, 0.35);
+  background: rgba(185, 47, 47, 0.1);
+}
+
+.flash {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  min-width: 220px;
+  max-width: 420px;
+  border-radius: 12px;
+  padding: 12px 13px;
+  color: #fff;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 200ms ease, transform 200ms ease;
+  pointer-events: none;
+  background: #102c47;
+  box-shadow: var(--shadow);
+}
+
+.flash.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.flash.ok {
+  background: #1f6f4f;
+}
+
+.flash.err {
+  background: #8f2f2f;
+}
+
+@media (max-width: 900px) {
+  .topbar,
+  .layout {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .field-row,
+  .inline-controls {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .auth-panel input {
+    width: 100%;
+  }
+
+  table {
+    min-width: 720px;
+  }
+}

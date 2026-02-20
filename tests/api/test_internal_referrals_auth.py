@@ -99,3 +99,24 @@ def test_internal_referrals_review_action_rejects_missing_token(monkeypatch) -> 
 
     assert response.status_code == 403
     assert response.json() == {"detail": {"code": "E_FORBIDDEN"}}
+
+
+def test_internal_referrals_events_rejects_missing_token(monkeypatch) -> None:
+    monkeypatch.setattr(
+        internal_referrals,
+        "get_settings",
+        lambda: SimpleNamespace(
+            internal_api_token="internal-secret",
+            internal_api_allowlist="127.0.0.1/32",
+            referrals_alert_min_started=20,
+            referrals_alert_max_fraud_rejected_rate=0.25,
+            referrals_alert_max_rejected_fraud_total=10,
+            referrals_alert_max_referrer_rejected_fraud=3,
+        ),
+    )
+
+    client = TestClient(app)
+    response = client.get("/internal/referrals/events")
+
+    assert response.status_code == 403
+    assert response.json() == {"detail": {"code": "E_FORBIDDEN"}}

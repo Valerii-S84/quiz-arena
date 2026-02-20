@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quiz Arena Ops - Promo</title>
+    <link rel="stylesheet" href="/ops/static/ops-ui.css" />
+  </head>
+  <body data-page="promo">
+    <div class="background-grid" aria-hidden="true"></div>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Quiz Arena</p>
+        <h1>Promo Ops Console</h1>
+      </div>
+      <nav class="tabs" aria-label="Ops sections">
+        <a class="tab active" href="/ops/promo">Promo</a>
+        <a class="tab" href="/ops/referrals">Referrals</a>
+        <a class="tab" href="/ops/notifications">Notifications</a>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <section class="panel auth-panel">
+        <h2>Internal Auth</h2>
+        <div class="field-row">
+          <label for="internal-token">X-Internal-Token</label>
+          <input id="internal-token" type="password" autocomplete="off" placeholder="Paste token for internal API" />
+          <button id="save-token" type="button">Save Token</button>
+        </div>
+        <p class="muted">Token is stored in browser localStorage and used only for API requests from this page.</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Promo Dashboard</h2>
+          <div class="inline-controls">
+            <label for="promo-window-hours">Window</label>
+            <input id="promo-window-hours" type="number" min="1" max="168" value="24" />
+            <button id="promo-refresh-dashboard" type="button">Refresh</button>
+          </div>
+        </div>
+        <div id="promo-dashboard-cards" class="cards"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Campaigns</h2>
+          <div class="inline-controls wrap">
+            <label for="promo-campaign-status">Status</label>
+            <select id="promo-campaign-status">
+              <option value="">ALL</option>
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="PAUSED">PAUSED</option>
+              <option value="EXPIRED">EXPIRED</option>
+              <option value="DEPLETED">DEPLETED</option>
+            </select>
+            <label for="promo-campaign-name">Campaign</label>
+            <input id="promo-campaign-name" type="text" maxlength="128" placeholder="campaign substring" />
+            <label for="promo-campaign-limit">Limit</label>
+            <input id="promo-campaign-limit" type="number" min="1" max="200" value="50" />
+            <button id="promo-refresh-campaigns" type="button">Load</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="promo-campaigns-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Campaign</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Scope</th>
+                <th>Uses</th>
+                <th>Valid Until</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Refund Rollback</h2>
+        <div class="inline-controls wrap">
+          <label for="promo-purchase-id">Purchase UUID</label>
+          <input id="promo-purchase-id" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+          <label for="promo-rollback-reason">Reason</label>
+          <input id="promo-rollback-reason" type="text" maxlength="256" placeholder="Optional reason" />
+          <button id="promo-run-rollback" type="button">Run Rollback</button>
+        </div>
+        <pre id="promo-rollback-result" class="json-view"></pre>
+      </section>
+    </main>
+
+    <div id="flash" class="flash" role="status" aria-live="polite"></div>
+    <script src="/ops/static/ops-ui.js"></script>
+  </body>
+</html>

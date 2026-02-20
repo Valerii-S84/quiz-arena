@@ -27,12 +27,17 @@ def test_run_referral_reward_distribution_task_wrapper(monkeypatch) -> None:
 
 def test_send_referral_reward_alerts_sends_milestone_and_reward_events(monkeypatch) -> None:
     events: list[str] = []
+    recorded: list[tuple[str, bool]] = []
 
     async def fake_send_ops_alert(*, event: str, payload: dict[str, object]) -> bool:
         events.append(event)
         return True
 
+    async def fake_record_event(*, event_type: str, payload: dict[str, int], sent: bool) -> None:
+        recorded.append((event_type, sent))
+
     monkeypatch.setattr(referrals, "send_ops_alert", fake_send_ops_alert)
+    monkeypatch.setattr(referrals, "_record_referral_reward_event", fake_record_event)
 
     result = asyncio.run(
         referrals._send_referral_reward_alerts(
@@ -48,6 +53,10 @@ def test_send_referral_reward_alerts_sends_milestone_and_reward_events(monkeypat
     assert events == [
         "referral_reward_milestone_available",
         "referral_reward_granted",
+    ]
+    assert recorded == [
+        ("referral_reward_milestone_available", True),
+        ("referral_reward_granted", True),
     ]
     assert result == {
         "milestone_alert_sent": 1,

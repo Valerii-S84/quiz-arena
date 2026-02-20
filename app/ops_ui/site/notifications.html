@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quiz Arena Ops - Notifications</title>
+    <link rel="stylesheet" href="/ops/static/ops-ui.css" />
+  </head>
+  <body data-page="notifications">
+    <div class="background-grid" aria-hidden="true"></div>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Quiz Arena</p>
+        <h1>Referral Notification Feed</h1>
+      </div>
+      <nav class="tabs" aria-label="Ops sections">
+        <a class="tab" href="/ops/promo">Promo</a>
+        <a class="tab" href="/ops/referrals">Referrals</a>
+        <a class="tab active" href="/ops/notifications">Notifications</a>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <section class="panel auth-panel">
+        <h2>Internal Auth</h2>
+        <div class="field-row">
+          <label for="internal-token">X-Internal-Token</label>
+          <input id="internal-token" type="password" autocomplete="off" placeholder="Paste token for internal API" />
+          <button id="save-token" type="button">Save Token</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Events Feed</h2>
+          <div class="inline-controls wrap">
+            <label for="notif-window-hours">Window</label>
+            <input id="notif-window-hours" type="number" min="1" max="720" value="168" />
+            <label for="notif-event-type">Type</label>
+            <select id="notif-event-type">
+              <option value="">ALL</option>
+              <option value="referral_reward_milestone_available">referral_reward_milestone_available</option>
+              <option value="referral_reward_granted">referral_reward_granted</option>
+            </select>
+            <label for="notif-limit">Limit</label>
+            <input id="notif-limit" type="number" min="1" max="500" value="200" />
+            <button id="notif-refresh" type="button">Refresh</button>
+          </div>
+        </div>
+        <div id="notif-summary" class="cards"></div>
+        <div id="notif-events" class="event-feed"></div>
+      </section>
+    </main>
+
+    <div id="flash" class="flash" role="status" aria-live="polite"></div>
+    <script src="/ops/static/ops-ui.js"></script>
+  </body>
+</html>
