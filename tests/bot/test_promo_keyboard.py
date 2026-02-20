@@ -14,10 +14,12 @@ def test_build_promo_discount_keyboard_for_specific_product_scope() -> None:
     )
 
     assert keyboard is not None
-    assert len(keyboard.inline_keyboard) == 1
+    assert len(keyboard.inline_keyboard) == 2
     button = keyboard.inline_keyboard[0][0]
-    assert button.callback_data == f"buy:PREMIUM_MONTH:promo:{redemption_id}"
+    assert button.callback_data == f"buy:PREMIUM_MONTH:promo:{redemption_id.hex}"
     assert button.text == "Premium Month (50⭐)"
+    back_button = keyboard.inline_keyboard[1][0]
+    assert back_button.callback_data == "home:open"
 
 
 def test_build_promo_discount_keyboard_for_unknown_scope_returns_none() -> None:

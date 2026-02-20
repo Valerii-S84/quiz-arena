@@ -20,8 +20,12 @@ def test_extract_promo_code_from_slash_command() -> None:
     assert _extract_promo_code(_message(text="/promo CHIK")) == "CHIK"
 
 
-def test_extract_promo_code_does_not_parse_plain_text_anymore() -> None:
-    assert _extract_promo_code(_message(text="CHIK")) is None
+def test_extract_promo_code_from_plain_text_code() -> None:
+    assert _extract_promo_code(_message(text="CHIK")) == "CHIK"
+
+
+def test_extract_promo_code_ignores_plain_text_non_code() -> None:
+    assert _extract_promo_code(_message(text="hello world")) is None
 
 
 def test_extract_promo_code_from_reply_prompt() -> None:

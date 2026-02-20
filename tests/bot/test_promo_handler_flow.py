@@ -87,7 +87,8 @@ async def test_redeem_promo_from_text_handles_premium_grant(monkeypatch) -> None
     message = _PromoMessage(text="/promo BONUS", from_user=SimpleNamespace(id=2))
     await promo._redeem_promo_from_text(message)
 
-    assert message.answers[-1].text == TEXTS_DE["msg.promo.success.grant"]
+    assert message.answers[0].text == TEXTS_DE["msg.promo.success.grant"]
+    assert "7 Tage Premium" in (message.answers[1].text or "")
 
 
 @pytest.mark.asyncio
@@ -113,4 +114,32 @@ async def test_redeem_promo_from_text_handles_discount_success(monkeypatch) -> N
     message = _PromoMessage(text="/promo SALE25", from_user=SimpleNamespace(id=3))
     await promo._redeem_promo_from_text(message)
 
-    assert message.answers[-1].text == TEXTS_DE["msg.promo.success.discount"]
+    assert message.answers[0].text == TEXTS_DE["msg.promo.success.discount"]
+    assert "25% Rabatt" in (message.answers[1].text or "")
+
+
+@pytest.mark.asyncio
+async def test_handle_promo_plain_text_redeems_code(monkeypatch) -> None:
+    monkeypatch.setattr(promo, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        return SimpleNamespace(user_id=101)
+
+    async def _fake_redeem(*args, **kwargs):
+        return PromoRedeemResult(
+            redemption_id=UUID("33333333-3333-3333-3333-333333333333"),
+            result_type="PERCENT_DISCOUNT",
+            idempotent_replay=False,
+            discount_percent=30,
+            target_scope="ANY",
+            reserved_until=datetime.now(timezone.utc),
+        )
+
+    monkeypatch.setattr(promo.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(promo.PromoService, "redeem", _fake_redeem)
+
+    message = _PromoMessage(text="CHIK3", from_user=SimpleNamespace(id=3))
+    await promo.handle_promo_plain_text(message)  # type: ignore[arg-type]
+
+    assert message.answers[0].text == TEXTS_DE["msg.promo.success.discount"]
+    assert "30% Rabatt" in (message.answers[1].text or "")

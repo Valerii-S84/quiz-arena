@@ -32,7 +32,7 @@ from app.economy.purchases.errors import (
 )
 from app.economy.purchases.types import PurchaseCreditResult, PurchaseInitResult
 
-PROMO_RESERVATION_TTL_MINUTES = 15
+PROMO_RESERVATION_TTL = timedelta(days=7)
 STREAK_SAVER_PURCHASE_LOCK_WINDOW = timedelta(days=7)
 PREMIUM_PLAN_RANKS: dict[str, int] = {
     "PREMIUM_STARTER": 1,
@@ -192,7 +192,7 @@ class PurchaseService:
             promo_code.discount_percent,
         )
         redemption.status = "RESERVED"
-        redemption.reserved_until = now_utc + timedelta(minutes=PROMO_RESERVATION_TTL_MINUTES)
+        redemption.reserved_until = now_utc + PROMO_RESERVATION_TTL
         redemption.updated_at = now_utc
         return discount_stars_amount, promo_code.id
 

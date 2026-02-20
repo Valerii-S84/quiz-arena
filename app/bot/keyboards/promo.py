@@ -38,6 +38,7 @@ def build_promo_discount_keyboard(
         return None
 
     rows: list[list[InlineKeyboardButton]] = []
+    redemption_token = redemption_id.hex
     for product_code in target_product_codes:
         product = get_product(product_code)
         if product is None:
@@ -54,11 +55,12 @@ def build_promo_discount_keyboard(
             [
                 InlineKeyboardButton(
                     text=f"{product.title} ({stars_amount}⭐)",
-                    callback_data=f"buy:{product_code}:promo:{redemption_id}",
+                    callback_data=f"buy:{product_code}:promo:{redemption_token}",
                 )
             ]
         )
 
     if not rows:
         return None
+    rows.append([InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

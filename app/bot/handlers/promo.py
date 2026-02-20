@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -11,6 +12,7 @@ from app.bot.keyboards.promo import build_promo_discount_keyboard
 from app.bot.keyboards.shop import build_shop_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
+from app.economy.energy.constants import BERLIN_TIMEZONE
 from app.economy.promo.errors import (
     PromoAlreadyUsedError,
     PromoExpiredError,
@@ -20,10 +22,33 @@ from app.economy.promo.errors import (
     PromoRateLimitedError,
 )
 from app.economy.promo.service import PromoService
+from app.economy.purchases.catalog import get_product
 from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="promo")
 PROMO_INPUT_RE = re.compile(r"^/?promo\s+(.+)$", re.IGNORECASE)
+PROMO_PLAIN_RE = re.compile(r"^[A-Z0-9][A-Z0-9_-]{1,63}$")
+
+
+def _format_berlin_time(at_utc: datetime | None) -> str:
+    if at_utc is None:
+        return "unbekannt"
+    return at_utc.astimezone(ZoneInfo(BERLIN_TIMEZONE)).strftime("%d.%m %H:%M")
+
+
+def _resolve_scope_label(target_scope: str | None) -> str:
+    if target_scope is None:
+        return "deine Auswahl"
+    if target_scope == "ANY":
+        return "alle Pakete"
+    if target_scope == "MICRO_ANY":
+        return "Mikro-Pakete"
+    if target_scope == "PREMIUM_ANY":
+        return "Premium-Plaene"
+    product = get_product(target_scope)
+    if product is not None:
+        return product.title
+    return target_scope
 
 
 def _is_reply_to_promo_prompt(message: Message) -> bool:
@@ -51,6 +76,10 @@ def _extract_promo_code(message: Message) -> str | None:
             return None
         return text
 
+    # Accept plain promo-like codes sent as standalone messages in private chat.
+    if not text.startswith("/") and PROMO_PLAIN_RE.fullmatch(text.upper()) is not None:
+        return text
+
     return None
 
 
@@ -70,6 +99,11 @@ async def handle_promo_open(callback: CallbackQuery) -> None:
 
 @router.message(Command("promo"))
 async def handle_promo_command(message: Message) -> None:
+    await _redeem_promo_from_text(message)
+
+
+@router.message(F.text.regexp(PROMO_PLAIN_RE))
+async def handle_promo_plain_text(message: Message) -> None:
     await _redeem_promo_from_text(message)
 
 
@@ -123,6 +157,12 @@ async def _redeem_promo_from_text(message: Message) -> None:
 
     if result.result_type == "PREMIUM_GRANT":
         await message.answer(TEXTS_DE["msg.promo.success.grant"], reply_markup=build_shop_keyboard())
+        await message.answer(
+            TEXTS_DE["msg.promo.success.grant.details"].format(
+                premium_days=result.premium_days or 0,
+                premium_ends_at=_format_berlin_time(result.premium_ends_at),
+            )
+        )
         return
 
     discount_keyboard = build_promo_discount_keyboard(
@@ -133,4 +173,11 @@ async def _redeem_promo_from_text(message: Message) -> None:
     await message.answer(
         TEXTS_DE["msg.promo.success.discount"],
         reply_markup=discount_keyboard or build_shop_keyboard(),
+    )
+    await message.answer(
+        TEXTS_DE["msg.promo.success.discount.details"].format(
+            discount_percent=result.discount_percent or 0,
+            scope_label=_resolve_scope_label(result.target_scope),
+            reserved_until=_format_berlin_time(result.reserved_until),
+        )
     )
