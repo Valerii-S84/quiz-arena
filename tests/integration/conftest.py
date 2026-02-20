@@ -21,6 +21,8 @@ TRUNCATE_TABLES = (
     "purchases",
     "processed_updates",
     "outbox_events",
+    "analytics_events",
+    "analytics_daily",
     "reconciliation_runs",
     "promo_codes",
     "promo_code_batches",

@@ -49,6 +49,20 @@
     - `referral_reward_milestone_available`,
     - `referral_reward_granted`;
   - events route through configured ops channels (Slack/generic/PagerDuty policy-aware router).
+- Ops visual UX delivered (standalone pages behind internal IP allowlist):
+  - promo operations UI: `/ops/promo` (dashboard + campaigns + manual rollback actions);
+  - referral triage UI: `/ops/referrals` (dashboard + review queue + decisions);
+  - referral notifications feed UI: `/ops/notifications` (event feed + status/type aggregates).
+- Referral notifications feed API delivered:
+  - `GET /internal/referrals/events` (window/type filtered feed from emitted referral reward events).
+- Referral reward emitted events are now persisted in `outbox_events` for feed/dashboarding:
+  - statuses: `SENT` / `FAILED`;
+  - event types: `referral_reward_milestone_available`, `referral_reward_granted`.
+- Analytics foundation (M11-A) delivered:
+  - new tables: `analytics_events`, `analytics_daily` (migration `f0e1d2c3b4a5`);
+  - event persistence path for emitted referral reward events now also writes into `analytics_events`;
+  - daily aggregation worker: `run_analytics_daily_aggregation` (hourly, queue `q_low`);
+  - internal KPI endpoint: `GET /internal/analytics/executive` (executive/gameplay daily metrics over `analytics_daily`).
 - M10 core promo module is now implemented:
   - `POST /internal/promo/redeem` (`PREMIUM_GRANT`, `PERCENT_DISCOUNT`);
   - promo anti-abuse throttling (per-user + global brute-force autopause);
@@ -116,16 +130,16 @@
 - Bot token is already configured locally; rotate token before production webhook go-live.
 - Local runtime services are expected to be started manually when needed (`postgres`, `redis`, API, bot, worker).
 - Latest full validation run in this branch: `148 passed` (2026-02-18).
-- Latest targeted validation run (2026-02-20): referral review + notification routing tests passed.
-- Current Alembic head: `d5e6f7a8b9c0`.
+- Latest targeted validation run (2026-02-20): analytics foundation + executive KPI endpoint tests passed.
+- Current Alembic head: `f0e1d2c3b4a5`.
 
 ## Immediate Next Steps (Priority)
-1. Promo ops UX:
-  - standalone visual admin UI over implemented internal promo admin endpoints.
-2. Referral ops UX:
-  - standalone visual review UI over implemented referral triage APIs.
-3. Notification UX:
-  - optional product-facing feed/dashboard over emitted referral reward events.
+1. Analytics enrichment (M11-B):
+  - add missing product event emitters (`gameplay_energy_zero`, `streak_lost`, key purchase funnel events) to improve KPI coverage.
+2. Dashboard expansion:
+  - expose executive/gameplay/infra slices in ops UI over `/internal/analytics/executive`.
+3. Ops maturity:
+  - restore-drill automation and recurring backup/restore validation workflow.
 
 ## Validation Commands
 - `TMPDIR=/tmp .venv/bin/python -m pytest -q`

@@ -48,7 +48,7 @@
   - marks `promo_redemptions.status='REVOKED'` idempotently.
 
 ## Not Implemented
-- Standalone visual admin UI for promo campaign operations (API workflow is implemented).
+- No unresolved functional gaps in M10 scope at this moment.
 
 ## Risks
 - Promo rate limiting behavior is transactional and tested in integration, but large-scale concurrent load behavior is still unprofiled.

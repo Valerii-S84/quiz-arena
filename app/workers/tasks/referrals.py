@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import structlog
 from celery.schedules import crontab
 
+from app.db.repo.analytics_repo import AnalyticsRepo
 from app.db.repo.outbox_events_repo import OutboxEventsRepo
 from app.db.session import SessionLocal
+from app.economy.energy.constants import BERLIN_TIMEZONE
 from app.economy.referrals.service import ReferralService
 from app.services.alerts import send_ops_alert
 from app.workers.celery_app import celery_app
@@ -91,6 +94,8 @@ async def _record_referral_reward_event(
     payload: dict[str, int],
     sent: bool,
 ) -> None:
+    now_utc = datetime.now(timezone.utc)
+    local_date_berlin = now_utc.astimezone(ZoneInfo(BERLIN_TIMEZONE)).date()
     try:
         async with SessionLocal.begin() as session:
             await OutboxEventsRepo.create(
@@ -98,6 +103,15 @@ async def _record_referral_reward_event(
                 event_type=event_type,
                 payload={**payload, "delivery_sent": sent},
                 status="SENT" if sent else "FAILED",
+            )
+            await AnalyticsRepo.create_event(
+                session,
+                event_type=event_type,
+                source="WORKER",
+                user_id=None,
+                local_date_berlin=local_date_berlin,
+                payload={**payload, "delivery_sent": sent},
+                happened_at=now_utc,
             )
     except Exception:
         logger.exception(

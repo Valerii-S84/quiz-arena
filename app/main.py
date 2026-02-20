@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes.health import router as health_router
+from app.api.routes.internal_analytics import router as internal_analytics_router
 from app.api.routes.internal_offers import router as internal_offers_router
 from app.api.routes.internal_promo import router as internal_promo_router
 from app.api.routes.internal_referrals import router as internal_referrals_router
@@ -28,6 +29,7 @@ def create_app() -> FastAPI:
     app.include_router(internal_promo_router)
     app.include_router(internal_offers_router)
     app.include_router(internal_referrals_router)
+    app.include_router(internal_analytics_router)
     app.include_router(ops_ui_router)
     app.mount("/ops/static", StaticFiles(directory=str(OPS_UI_STATIC_DIR)), name="ops-static")
     return app

@@ -1,5 +1,38 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-20, M11-A analytics foundation)
+- Added analytics data model and migration:
+  - `analytics_events` table for event ingestion;
+  - `analytics_daily` table for daily KPI aggregates;
+  - migration: `alembic/versions/f0e1d2c3b4a5_m15_add_analytics_tables.py`.
+- Added aggregation service + scheduled worker:
+  - `app/services/analytics_daily.py` builds Berlin-day snapshots;
+  - `app/workers/tasks/analytics_daily.py` runs hourly (`q_low`) and upserts daily rows.
+- Added internal analytics KPI endpoint:
+  - `GET /internal/analytics/executive` (token + IP allowlist protected).
+- Wired referral reward emitted events into analytics ingestion:
+  - `app/workers/tasks/referrals.py` now writes both to `outbox_events` and `analytics_events`.
+- Added tests:
+  - `tests/api/test_internal_analytics_auth.py`,
+  - `tests/integration/test_internal_analytics_dashboard_integration.py`,
+  - `tests/integration/test_analytics_daily_aggregation_integration.py`,
+  - `tests/workers/test_analytics_daily_task.py`.
+
+## Update (2026-02-20, standalone ops UI + referral notifications feed)
+- Delivered standalone ops web UI (internal IP allowlist protected):
+  - `GET /ops/promo`,
+  - `GET /ops/referrals`,
+  - `GET /ops/notifications`.
+- Added internal referral notifications feed API:
+  - `GET /internal/referrals/events` (filters: `window_hours`, `event_type`, `limit`).
+- Wired referral reward emitted events into persistence for feed visibility:
+  - worker now records `referral_reward_milestone_available` and `referral_reward_granted`
+    into `outbox_events` with delivery status `SENT`/`FAILED`.
+- Added tests:
+  - `tests/api/test_ops_ui.py`,
+  - `tests/integration/test_internal_referrals_events_integration.py`,
+  - updated `tests/workers/test_referrals_task.py` and `tests/api/test_internal_referrals_auth.py`.
+
 ## Update (2026-02-20, referral reward notifications channel)
 - Added external notification events for referral reward lifecycle:
   - `referral_reward_milestone_available`,
@@ -130,7 +163,9 @@
 ## New DB migration
 - Added migration:
   - `alembic/versions/d5e6f7a8b9c0_m14_add_mode_progress_table.py`
-- Current DB head verified: `d5e6f7a8b9c0`.
+- Added migration:
+  - `alembic/versions/f0e1d2c3b4a5_m15_add_analytics_tables.py`
+- Current DB head verified: `f0e1d2c3b4a5`.
 - Promo dashboard delivery in this update did not require DB migrations.
 
 ## Important operational notes

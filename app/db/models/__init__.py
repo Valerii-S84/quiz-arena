@@ -1,3 +1,5 @@
+from app.db.models.analytics_daily import AnalyticsDaily
+from app.db.models.analytics_events import AnalyticsEvent
 from app.db.models.friend_challenges import FriendChallenge
 from app.db.models.energy_state import EnergyState
 from app.db.models.entitlements import Entitlement
@@ -21,6 +23,8 @@ from app.db.models.streak_state import StreakState
 from app.db.models.users import User
 
 __all__ = [
+    "AnalyticsDaily",
+    "AnalyticsEvent",
     "EnergyState",
     "FriendChallenge",
     "Entitlement",

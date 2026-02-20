@@ -3,6 +3,8 @@ from __future__ import annotations
 from sqlalchemy import CheckConstraint, UniqueConstraint
 
 from app.db.models import (  # noqa: F401
+    AnalyticsDaily,
+    AnalyticsEvent,
     EnergyState,
     Entitlement,
     FriendChallenge,
@@ -49,6 +51,8 @@ def test_all_m2_tables_registered() -> None:
         "referrals",
         "processed_updates",
         "outbox_events",
+        "analytics_events",
+        "analytics_daily",
         "reconciliation_runs",
         "promo_code_batches",
     }

@@ -44,10 +44,9 @@
   - events are routed through existing provider-aware ops alert channels (`slack` + `generic` by default).
 
 ## Not Implemented
-- Standalone visual admin UI for fraud triage (API workflow is implemented).
+- No unresolved functional gaps in M9 scope at this moment.
 
 ## Risks
-- Referral reward choice is currently not interactive; business may require explicit user selection before production.
 - Qualification and reward jobs currently scan DB in periodic batches; high-scale optimization (partitioning/index tuning/aggregation cache) may be required.
 
 ## Decisions

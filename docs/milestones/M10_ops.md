@@ -36,3 +36,7 @@
 - New runbook:
   - `docs/runbooks/telegram_sandbox_stars_smoke.md` for external Telegram sandbox validation of promo/payment and referral duplicate-callback safety.
   - `docs/runbooks/promo_incident_response.md` for promo autopause triage and safe manual unpause procedure.
+- Standalone ops UI pages for internal operations:
+  - `/ops/promo` for promo campaign operations and manual rollback flow;
+  - `/ops/referrals` for referral review triage actions;
+  - `/ops/notifications` for referral reward events feed.

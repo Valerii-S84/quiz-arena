@@ -36,4 +36,4 @@
   - `REFERRALS_ALERT_MAX_REFERRER_REJECTED_FRAUD`.
 
 ## Missing for Next Milestones
-- Standalone visual manual-review UI for fraud investigation and threshold tuning actions (API workflow available).
+- Analytics foundation over emitted referral events (`events` + daily aggregates + KPI surfaces).
