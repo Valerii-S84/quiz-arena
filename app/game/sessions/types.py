@@ -12,6 +12,9 @@ class SessionQuestionView:
     options: tuple[str, str, str, str]
     mode_code: str
     source: str
+    category: str | None = None
+    question_number: int | None = None
+    total_questions: int | None = None
 
 
 @dataclass(slots=True)

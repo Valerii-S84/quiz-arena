@@ -206,6 +206,14 @@ class GameSessionService:
         idempotent_replay: bool,
     ) -> StartSessionResult:
         question = await GameSessionService._load_question_for_session(session, quiz_session=existing)
+        total_questions: int | None = None
+        question_number: int | None = None
+        if existing.source == "FRIEND_CHALLENGE":
+            question_number = existing.friend_challenge_round
+            if existing.friend_challenge_id is not None:
+                challenge = await FriendChallengesRepo.get_by_id(session, existing.friend_challenge_id)
+                if challenge is not None:
+                    total_questions = challenge.total_rounds
         return StartSessionResult(
             session=SessionQuestionView(
                 session_id=existing.id,
@@ -214,6 +222,9 @@ class GameSessionService:
                 options=question.options,
                 mode_code=existing.mode_code,
                 source=existing.source,
+                category=question.category,
+                question_number=question_number,
+                total_questions=total_questions,
             ),
             energy_free=0,
             energy_paid=0,
@@ -406,6 +417,7 @@ class GameSessionService:
             forced_question_id=forced_question_id,
             friend_challenge_id=challenge.id,
             friend_challenge_round=next_round,
+            friend_challenge_total_rounds=challenge.total_rounds,
         )
         return FriendChallengeRoundStartResult(
             snapshot=GameSessionService._build_friend_challenge_snapshot(challenge),
@@ -428,6 +440,7 @@ class GameSessionService:
         forced_question_id: str | None = None,
         friend_challenge_id: UUID | None = None,
         friend_challenge_round: int | None = None,
+        friend_challenge_total_rounds: int | None = None,
     ) -> StartSessionResult:
         if source == "FRIEND_CHALLENGE" and (friend_challenge_id is None or friend_challenge_round is None):
             raise FriendChallengeAccessError
@@ -577,6 +590,9 @@ class GameSessionService:
                 options=question.options,
                 mode_code=mode_code,
                 source=source,
+                category=question.category,
+                question_number=friend_challenge_round if source == "FRIEND_CHALLENGE" else 1,
+                total_questions=friend_challenge_total_rounds if source == "FRIEND_CHALLENGE" else 1,
             ),
             energy_free=energy_free,
             energy_paid=energy_paid,

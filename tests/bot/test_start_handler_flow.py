@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from uuid import UUID
 
 import pytest
 
 from app.bot.handlers import start
 from app.bot.texts.de import TEXTS_DE
 from app.economy.offers.types import OfferSelection
+from app.game.sessions.types import SessionQuestionView, StartSessionResult
 from app.game.sessions.errors import FriendChallengeNotFoundError
 from tests.bot.helpers import DummyMessage, DummySessionLocal
 
@@ -36,6 +38,35 @@ def test_extract_friend_challenge_token() -> None:
     assert start._extract_friend_challenge_token(token) == "0123456789abcdef0123456789abcdef"
     assert start._extract_friend_challenge_token("fc_invalid") is None
     assert start._extract_friend_challenge_token(None) is None
+
+
+def test_build_question_text_contains_theme_counter_and_energy() -> None:
+    start_result = StartSessionResult(
+        session=SessionQuestionView(
+            session_id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+            question_id="q-1",
+            text="Was passt?",
+            options=("A", "B", "C", "D"),
+            mode_code="QUICK_MIX_A1A2",
+            source="MENU",
+            category="Wortschatz - Alltag",
+            question_number=1,
+            total_questions=1,
+        ),
+        energy_free=10,
+        energy_paid=0,
+        idempotent_replay=False,
+    )
+    text = start._build_question_text(
+        source="MENU",
+        snapshot_free_energy=10,
+        snapshot_paid_energy=0,
+        start_result=start_result,
+    )
+    assert "⚡" in text
+    assert "🔋 Energie:" in text
+    assert "📚 Thema:" in text
+    assert "❓ Frage 1/1" in text
 
 
 @pytest.mark.asyncio

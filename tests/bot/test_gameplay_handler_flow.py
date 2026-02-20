@@ -43,6 +43,9 @@ def _start_result() -> StartSessionResult:
             options=("A", "B", "C", "D"),
             mode_code="QUICK_MIX_A1A2",
             source="MENU",
+            category="Artikel - Nominativ",
+            question_number=3,
+            total_questions=12,
         ),
         energy_free=18,
         energy_paid=2,
@@ -81,6 +84,19 @@ def test_build_friend_finish_text_handles_win_and_draw() -> None:
     )
     assert TEXTS_DE["msg.friend.challenge.finished.win"] in win_text
     assert TEXTS_DE["msg.friend.challenge.finished.draw"] in draw_text
+
+
+def test_build_question_text_contains_theme_counter_and_energy() -> None:
+    text = gameplay._build_question_text(
+        source="MENU",
+        snapshot_free_energy=18,
+        snapshot_paid_energy=2,
+        start_result=_start_result(),
+    )
+    assert "⚡" in text
+    assert "🔋 Energie:" in text
+    assert "📚 Thema:" in text
+    assert "❓ Frage 3/12" in text
 
 
 @pytest.mark.asyncio
