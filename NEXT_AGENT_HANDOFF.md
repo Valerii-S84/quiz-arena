@@ -1,5 +1,24 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-20, M11-B analytics event emitters for product flows)
+- Added centralized analytics event emitter utility:
+  - `app/core/analytics_events.py`.
+- Wired product event emission into core flows:
+  - energy depletion transition -> `gameplay_energy_zero`,
+  - streak rollover loss -> `streak_lost`,
+  - purchase funnel transitions ->
+    `purchase_init_created`,
+    `purchase_invoice_sent`,
+    `purchase_precheckout_ok`,
+    `purchase_paid_uncredited`,
+    `purchase_credited`.
+- Extended daily KPI schema with purchase-funnel event counters:
+  - migration: `alembic/versions/e1f2a3b4c5d6_m16_add_purchase_funnel_event_metrics.py`.
+- Updated analytics pipeline and endpoint mapping to expose those counters.
+- Added tests:
+  - `tests/integration/test_analytics_event_emitters_integration.py`,
+  - updated analytics integration tests for new funnel counters.
+
 ## Update (2026-02-20, M11-A analytics foundation)
 - Added analytics data model and migration:
   - `analytics_events` table for event ingestion;
@@ -165,7 +184,9 @@
   - `alembic/versions/d5e6f7a8b9c0_m14_add_mode_progress_table.py`
 - Added migration:
   - `alembic/versions/f0e1d2c3b4a5_m15_add_analytics_tables.py`
-- Current DB head verified: `f0e1d2c3b4a5`.
+- Added migration:
+  - `alembic/versions/e1f2a3b4c5d6_m16_add_purchase_funnel_event_metrics.py`
+- Current DB head verified: `e1f2a3b4c5d6`.
 - Promo dashboard delivery in this update did not require DB migrations.
 
 ## Important operational notes

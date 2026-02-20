@@ -63,6 +63,14 @@
   - event persistence path for emitted referral reward events now also writes into `analytics_events`;
   - daily aggregation worker: `run_analytics_daily_aggregation` (hourly, queue `q_low`);
   - internal KPI endpoint: `GET /internal/analytics/executive` (executive/gameplay daily metrics over `analytics_daily`).
+- Analytics enrichment (M11-B, partial) delivered:
+  - product event emitters added:
+    - `gameplay_energy_zero` (energy depletion transition),
+    - `streak_lost` (rollover loss transition),
+    - purchase funnel: `purchase_init_created`, `purchase_invoice_sent`, `purchase_precheckout_ok`,
+      `purchase_paid_uncredited`, `purchase_credited`;
+  - daily aggregate schema extended with purchase-funnel event totals
+    (migration `e1f2a3b4c5d6`).
 - M10 core promo module is now implemented:
   - `POST /internal/promo/redeem` (`PREMIUM_GRANT`, `PERCENT_DISCOUNT`);
   - promo anti-abuse throttling (per-user + global brute-force autopause);
@@ -130,14 +138,14 @@
 - Bot token is already configured locally; rotate token before production webhook go-live.
 - Local runtime services are expected to be started manually when needed (`postgres`, `redis`, API, bot, worker).
 - Latest full validation run in this branch: `148 passed` (2026-02-18).
-- Latest targeted validation run (2026-02-20): analytics foundation + executive KPI endpoint tests passed.
-- Current Alembic head: `f0e1d2c3b4a5`.
+- Latest targeted validation run (2026-02-20): analytics emitters + purchase funnel event metrics tests passed.
+- Current Alembic head: `e1f2a3b4c5d6`.
 
 ## Immediate Next Steps (Priority)
-1. Analytics enrichment (M11-B):
-  - add missing product event emitters (`gameplay_energy_zero`, `streak_lost`, key purchase funnel events) to improve KPI coverage.
-2. Dashboard expansion:
+1. Dashboard expansion:
   - expose executive/gameplay/infra slices in ops UI over `/internal/analytics/executive`.
+2. Analytics enrichment (remaining):
+  - add additional product events for retention/conversion cuts (premium expiry/reminders, offer push channel when implemented).
 3. Ops maturity:
   - restore-drill automation and recurring backup/restore validation workflow.
 

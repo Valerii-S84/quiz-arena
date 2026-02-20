@@ -39,6 +39,11 @@ async def test_internal_analytics_executive_returns_latest_rows_desc() -> None:
                     streak_lost_events_total=2,
                     referral_reward_milestone_events_total=1,
                     referral_reward_granted_events_total=1,
+                    purchase_init_events_total=5,
+                    purchase_invoice_sent_events_total=5,
+                    purchase_precheckout_ok_events_total=4,
+                    purchase_paid_uncredited_events_total=4,
+                    purchase_credited_events_total=4,
                     calculated_at=now_utc,
                 ),
                 AnalyticsDaily(
@@ -60,6 +65,11 @@ async def test_internal_analytics_executive_returns_latest_rows_desc() -> None:
                     streak_lost_events_total=1,
                     referral_reward_milestone_events_total=0,
                     referral_reward_granted_events_total=1,
+                    purchase_init_events_total=3,
+                    purchase_invoice_sent_events_total=3,
+                    purchase_precheckout_ok_events_total=2,
+                    purchase_paid_uncredited_events_total=2,
+                    purchase_credited_events_total=2,
                     calculated_at=now_utc,
                 ),
             ]
@@ -83,3 +93,5 @@ async def test_internal_analytics_executive_returns_latest_rows_desc() -> None:
     assert payload["rows"][0]["dau"] == 12
     assert payload["rows"][0]["purchase_rate"] == pytest.approx(0.333333, rel=1e-6)
     assert payload["rows"][0]["gameplay_completion_rate"] == pytest.approx(0.8)
+    assert payload["rows"][0]["purchase_init_events_total"] == 5
+    assert payload["rows"][0]["purchase_credited_events_total"] == 4

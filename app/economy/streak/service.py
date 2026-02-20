@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.analytics_events import EVENT_SOURCE_SYSTEM, emit_analytics_event
 from app.db.models.streak_state import StreakState
 from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.streak_repo import StreakRepo
@@ -59,12 +60,25 @@ class StreakService:
         state = await StreakService._get_or_create_state_for_update(session, user_id, now_utc)
         premium_scope = await EntitlementsRepo.get_active_premium_scope(session, user_id, now_utc)
 
-        snapshot = StreakService._snapshot_from_model(state)
+        snapshot_before_rollover = StreakService._snapshot_from_model(state)
         snapshot = rollover_to_local_date(
-            snapshot,
+            snapshot_before_rollover,
             target_local_date=berlin_local_date(now_utc),
             premium_scope=premium_scope,
         )
+
+        if snapshot_before_rollover.current_streak > 0 and snapshot.current_streak == 0:
+            await emit_analytics_event(
+                session,
+                event_type="streak_lost",
+                source=EVENT_SOURCE_SYSTEM,
+                user_id=user_id,
+                payload={
+                    "previous_streak": snapshot_before_rollover.current_streak,
+                    "rollover_local_date": berlin_local_date(now_utc).isoformat(),
+                },
+                happened_at=now_utc,
+            )
 
         StreakService._apply_snapshot_to_model(state, snapshot, now_utc)
         await session.flush()
@@ -81,13 +95,26 @@ class StreakService:
         premium_scope = await EntitlementsRepo.get_active_premium_scope(session, user_id, activity_at_utc)
 
         local_date = berlin_local_date(activity_at_utc)
-        snapshot = StreakService._snapshot_from_model(state)
-        snapshot = rollover_to_local_date(
-            snapshot,
+        snapshot_before_rollover = StreakService._snapshot_from_model(state)
+        snapshot_after_rollover = rollover_to_local_date(
+            snapshot_before_rollover,
             target_local_date=local_date,
             premium_scope=premium_scope,
         )
-        snapshot, counted = record_activity(snapshot, local_date=local_date)
+        if snapshot_before_rollover.current_streak > 0 and snapshot_after_rollover.current_streak == 0:
+            await emit_analytics_event(
+                session,
+                event_type="streak_lost",
+                source=EVENT_SOURCE_SYSTEM,
+                user_id=user_id,
+                payload={
+                    "previous_streak": snapshot_before_rollover.current_streak,
+                    "rollover_local_date": local_date.isoformat(),
+                },
+                happened_at=activity_at_utc,
+            )
+
+        snapshot, counted = record_activity(snapshot_after_rollover, local_date=local_date)
 
         StreakService._apply_snapshot_to_model(state, snapshot, activity_at_utc)
         await session.flush()

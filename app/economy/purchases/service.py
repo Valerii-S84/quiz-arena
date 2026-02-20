@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.analytics_events import EVENT_SOURCE_SYSTEM, emit_analytics_event
 from app.db.models.ledger_entries import LedgerEntry
 from app.db.models.mode_access import ModeAccess
 from app.db.models.entitlements import Entitlement
@@ -42,6 +43,34 @@ PREMIUM_PLAN_RANKS: dict[str, int] = {
 
 
 class PurchaseService:
+    @staticmethod
+    async def _emit_purchase_event(
+        session: AsyncSession,
+        *,
+        event_type: str,
+        purchase: Purchase,
+        happened_at: datetime,
+        extra_payload: dict[str, object] | None = None,
+    ) -> None:
+        payload: dict[str, object] = {
+            "purchase_id": str(purchase.id),
+            "product_code": purchase.product_code,
+            "product_type": purchase.product_type,
+            "status": purchase.status,
+            "stars_amount": purchase.stars_amount,
+            "discount_stars_amount": purchase.discount_stars_amount,
+        }
+        if extra_payload:
+            payload.update(extra_payload)
+        await emit_analytics_event(
+            session,
+            event_type=event_type,
+            source=EVENT_SOURCE_SYSTEM,
+            user_id=purchase.user_id,
+            payload=payload,
+            happened_at=happened_at,
+        )
+
     @staticmethod
     def _build_invoice_payload() -> str:
         return f"inv_{uuid4().hex}"
@@ -341,6 +370,13 @@ class PurchaseService:
             redemption.applied_purchase_id = purchase.id
             redemption.updated_at = now_utc
 
+        await PurchaseService._emit_purchase_event(
+            session,
+            event_type="purchase_init_created",
+            purchase=purchase,
+            happened_at=now_utc,
+        )
+
         return PurchaseService._as_init_result(purchase, idempotent_replay=False)
 
     @staticmethod
@@ -354,6 +390,12 @@ class PurchaseService:
             raise PurchaseNotFoundError
         if purchase.status == "CREATED":
             purchase.status = "INVOICE_SENT"
+            await PurchaseService._emit_purchase_event(
+                session,
+                event_type="purchase_invoice_sent",
+                purchase=purchase,
+                happened_at=datetime.now(timezone.utc),
+            )
 
     @staticmethod
     async def validate_precheckout(
@@ -382,7 +424,14 @@ class PurchaseService:
                 now_utc=check_time,
             )
 
-        purchase.status = "PRECHECKOUT_OK"
+        if purchase.status != "PRECHECKOUT_OK":
+            purchase.status = "PRECHECKOUT_OK"
+            await PurchaseService._emit_purchase_event(
+                session,
+                event_type="purchase_precheckout_ok",
+                purchase=purchase,
+                happened_at=check_time,
+            )
 
     @staticmethod
     async def apply_successful_payment(
@@ -415,6 +464,14 @@ class PurchaseService:
         purchase.status = "PAID_UNCREDITED"
         if purchase.paid_at is None or previous_status != "PAID_UNCREDITED":
             purchase.paid_at = now_utc
+        if previous_status != "PAID_UNCREDITED":
+            await PurchaseService._emit_purchase_event(
+                session,
+                event_type="purchase_paid_uncredited",
+                purchase=purchase,
+                happened_at=now_utc,
+                extra_payload={"previous_status": previous_status},
+            )
 
         product = get_product(purchase.product_code)
         if product is None:
@@ -523,6 +580,12 @@ class PurchaseService:
 
         purchase.status = "CREDITED"
         purchase.credited_at = now_utc
+        await PurchaseService._emit_purchase_event(
+            session,
+            event_type="purchase_credited",
+            purchase=purchase,
+            happened_at=now_utc,
+        )
 
         return PurchaseCreditResult(
             purchase_id=purchase.id,

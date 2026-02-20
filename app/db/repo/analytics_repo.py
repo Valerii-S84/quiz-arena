@@ -35,6 +35,11 @@ class AnalyticsDailyUpsert:
     streak_lost_events_total: int
     referral_reward_milestone_events_total: int
     referral_reward_granted_events_total: int
+    purchase_init_events_total: int
+    purchase_invoice_sent_events_total: int
+    purchase_precheckout_ok_events_total: int
+    purchase_paid_uncredited_events_total: int
+    purchase_credited_events_total: int
     calculated_at: datetime
 
 

@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.analytics_events import EVENT_SOURCE_SYSTEM, emit_analytics_event
 from app.db.models.energy_state import EnergyState
 from app.db.models.ledger_entries import LedgerEntry
 from app.db.repo.energy_repo import EnergyRepo
@@ -18,7 +19,7 @@ from app.economy.energy.rules import (
     credit_paid_energy,
 )
 from app.economy.energy.time import berlin_local_date
-from app.economy.energy.types import EnergyConsumeResult, EnergyCreditResult, EnergySnapshot
+from app.economy.energy.types import EnergyBucketState, EnergyConsumeResult, EnergyCreditResult, EnergySnapshot
 
 
 class EnergyService:
@@ -75,6 +76,7 @@ class EnergyService:
 
         snapshot, _ = apply_regen(snapshot, now_utc=now_utc, premium_active=premium_active)
         snapshot, _ = apply_daily_topup(snapshot, local_date_berlin=berlin_local_date(now_utc))
+        before_state = classify_energy_state(snapshot, premium_active=premium_active)
 
         if existing_entry is not None:
             EnergyService._apply_snapshot_to_model(state, snapshot, now_utc)
@@ -97,6 +99,7 @@ class EnergyService:
         if not allowed:
             EnergyService._apply_snapshot_to_model(state, snapshot_after_consume, now_utc)
             await session.flush()
+            after_state = classify_energy_state(snapshot_after_consume, premium_active=premium_active)
             return EnergyConsumeResult(
                 allowed=False,
                 idempotent_replay=False,
@@ -104,7 +107,7 @@ class EnergyService:
                 consumed_asset=None,
                 free_energy=snapshot_after_consume.free_energy,
                 paid_energy=snapshot_after_consume.paid_energy,
-                state=classify_energy_state(snapshot_after_consume, premium_active=premium_active),
+                state=after_state,
             )
 
         if consumed_asset in {"FREE_ENERGY", "PAID_ENERGY"}:
@@ -130,6 +133,26 @@ class EnergyService:
 
         EnergyService._apply_snapshot_to_model(state, snapshot_after_consume, now_utc)
         await session.flush()
+        after_state = classify_energy_state(snapshot_after_consume, premium_active=premium_active)
+
+        if (
+            consumed_asset in {"FREE_ENERGY", "PAID_ENERGY"}
+            and before_state != after_state
+            and after_state == EnergyBucketState.EMPTY
+        ):
+            await emit_analytics_event(
+                session,
+                event_type="gameplay_energy_zero",
+                source=EVENT_SOURCE_SYSTEM,
+                user_id=user_id,
+                payload={
+                    "consumed_asset": consumed_asset,
+                    "before_state": before_state.value,
+                    "after_state": after_state.value,
+                },
+                happened_at=now_utc,
+            )
+
         return EnergyConsumeResult(
             allowed=True,
             idempotent_replay=False,
@@ -137,7 +160,7 @@ class EnergyService:
             consumed_asset=consumed_asset,
             free_energy=snapshot_after_consume.free_energy,
             paid_energy=snapshot_after_consume.paid_energy,
-            state=classify_energy_state(snapshot_after_consume, premium_active=premium_active),
+            state=after_state,
         )
 
     @staticmethod

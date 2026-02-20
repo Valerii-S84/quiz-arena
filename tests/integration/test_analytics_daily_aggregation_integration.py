@@ -242,6 +242,46 @@ async def test_analytics_daily_aggregation_builds_expected_daily_kpis() -> None:
                     payload={},
                     happened_at=day_start_utc + timedelta(hours=7),
                 ),
+                AnalyticsEvent(
+                    event_type="purchase_init_created",
+                    source="BOT",
+                    user_id=user_1,
+                    local_date_berlin=local_day,
+                    payload={},
+                    happened_at=day_start_utc + timedelta(hours=7, minutes=10),
+                ),
+                AnalyticsEvent(
+                    event_type="purchase_invoice_sent",
+                    source="BOT",
+                    user_id=user_1,
+                    local_date_berlin=local_day,
+                    payload={},
+                    happened_at=day_start_utc + timedelta(hours=7, minutes=11),
+                ),
+                AnalyticsEvent(
+                    event_type="purchase_precheckout_ok",
+                    source="BOT",
+                    user_id=user_1,
+                    local_date_berlin=local_day,
+                    payload={},
+                    happened_at=day_start_utc + timedelta(hours=7, minutes=12),
+                ),
+                AnalyticsEvent(
+                    event_type="purchase_paid_uncredited",
+                    source="BOT",
+                    user_id=user_1,
+                    local_date_berlin=local_day,
+                    payload={},
+                    happened_at=day_start_utc + timedelta(hours=7, minutes=13),
+                ),
+                AnalyticsEvent(
+                    event_type="purchase_credited",
+                    source="BOT",
+                    user_id=user_1,
+                    local_date_berlin=local_day,
+                    payload={},
+                    happened_at=day_start_utc + timedelta(hours=7, minutes=14),
+                ),
             ]
         )
 
@@ -269,3 +309,8 @@ async def test_analytics_daily_aggregation_builds_expected_daily_kpis() -> None:
     assert row.streak_lost_events_total == 1
     assert row.referral_reward_milestone_events_total == 1
     assert row.referral_reward_granted_events_total == 0
+    assert row.purchase_init_events_total == 1
+    assert row.purchase_invoice_sent_events_total == 1
+    assert row.purchase_precheckout_ok_events_total == 1
+    assert row.purchase_paid_uncredited_events_total == 1
+    assert row.purchase_credited_events_total == 1

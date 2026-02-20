@@ -55,6 +55,26 @@ class AnalyticsDaily(Base):
             "referral_reward_granted_events_total >= 0",
             name="ck_analytics_daily_referral_granted_non_negative",
         ),
+        CheckConstraint(
+            "purchase_init_events_total >= 0",
+            name="ck_analytics_daily_purchase_init_events_non_negative",
+        ),
+        CheckConstraint(
+            "purchase_invoice_sent_events_total >= 0",
+            name="ck_analytics_daily_purchase_invoice_sent_events_non_negative",
+        ),
+        CheckConstraint(
+            "purchase_precheckout_ok_events_total >= 0",
+            name="ck_analytics_daily_purchase_precheckout_ok_events_non_negative",
+        ),
+        CheckConstraint(
+            "purchase_paid_uncredited_events_total >= 0",
+            name="ck_analytics_daily_purchase_paid_uncredited_events_non_negative",
+        ),
+        CheckConstraint(
+            "purchase_credited_events_total >= 0",
+            name="ck_analytics_daily_purchase_credited_events_non_negative",
+        ),
         CheckConstraint("purchase_rate >= 0 AND purchase_rate <= 1", name="ck_analytics_daily_purchase_rate"),
         CheckConstraint(
             "promo_redemption_rate >= 0 AND promo_redemption_rate <= 1",
@@ -105,6 +125,27 @@ class AnalyticsDaily(Base):
         server_default=text("0"),
     )
     referral_reward_granted_events_total: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
+    purchase_init_events_total: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    purchase_invoice_sent_events_total: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
+    purchase_precheckout_ok_events_total: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
+    purchase_paid_uncredited_events_total: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
+    purchase_credited_events_total: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         server_default=text("0"),

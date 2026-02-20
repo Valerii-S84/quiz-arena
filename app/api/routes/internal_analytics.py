@@ -41,6 +41,11 @@ class AnalyticsDailyKpiResponse(BaseModel):
     streak_lost_events_total: int = Field(ge=0)
     referral_reward_milestone_events_total: int = Field(ge=0)
     referral_reward_granted_events_total: int = Field(ge=0)
+    purchase_init_events_total: int = Field(ge=0)
+    purchase_invoice_sent_events_total: int = Field(ge=0)
+    purchase_precheckout_ok_events_total: int = Field(ge=0)
+    purchase_paid_uncredited_events_total: int = Field(ge=0)
+    purchase_credited_events_total: int = Field(ge=0)
     calculated_at: datetime
 
 
@@ -89,6 +94,11 @@ def _as_row(item: object) -> AnalyticsDailyKpiResponse:
             getattr(item, "referral_reward_milestone_events_total")
         ),
         referral_reward_granted_events_total=int(getattr(item, "referral_reward_granted_events_total")),
+        purchase_init_events_total=int(getattr(item, "purchase_init_events_total")),
+        purchase_invoice_sent_events_total=int(getattr(item, "purchase_invoice_sent_events_total")),
+        purchase_precheckout_ok_events_total=int(getattr(item, "purchase_precheckout_ok_events_total")),
+        purchase_paid_uncredited_events_total=int(getattr(item, "purchase_paid_uncredited_events_total")),
+        purchase_credited_events_total=int(getattr(item, "purchase_credited_events_total")),
         calculated_at=getattr(item, "calculated_at"),
     )
 

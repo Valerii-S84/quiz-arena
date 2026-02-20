@@ -13,6 +13,11 @@ ENERGY_ZERO_EVENT = "gameplay_energy_zero"
 STREAK_LOST_EVENT = "streak_lost"
 REFERRAL_REWARD_MILESTONE_EVENT = "referral_reward_milestone_available"
 REFERRAL_REWARD_GRANTED_EVENT = "referral_reward_granted"
+PURCHASE_INIT_EVENT = "purchase_init_created"
+PURCHASE_INVOICE_SENT_EVENT = "purchase_invoice_sent"
+PURCHASE_PRECHECKOUT_OK_EVENT = "purchase_precheckout_ok"
+PURCHASE_PAID_UNCREDITED_EVENT = "purchase_paid_uncredited"
+PURCHASE_CREDITED_EVENT = "purchase_credited"
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +116,11 @@ async def build_daily_snapshot(
             STREAK_LOST_EVENT,
             REFERRAL_REWARD_MILESTONE_EVENT,
             REFERRAL_REWARD_GRANTED_EVENT,
+            PURCHASE_INIT_EVENT,
+            PURCHASE_INVOICE_SENT_EVENT,
+            PURCHASE_PRECHECKOUT_OK_EVENT,
+            PURCHASE_PAID_UNCREDITED_EVENT,
+            PURCHASE_CREDITED_EVENT,
         ),
     )
 
@@ -140,6 +150,11 @@ async def build_daily_snapshot(
             streak_lost_events_total=event_counts.get(STREAK_LOST_EVENT, 0),
             referral_reward_milestone_events_total=event_counts.get(REFERRAL_REWARD_MILESTONE_EVENT, 0),
             referral_reward_granted_events_total=event_counts.get(REFERRAL_REWARD_GRANTED_EVENT, 0),
+            purchase_init_events_total=event_counts.get(PURCHASE_INIT_EVENT, 0),
+            purchase_invoice_sent_events_total=event_counts.get(PURCHASE_INVOICE_SENT_EVENT, 0),
+            purchase_precheckout_ok_events_total=event_counts.get(PURCHASE_PRECHECKOUT_OK_EVENT, 0),
+            purchase_paid_uncredited_events_total=event_counts.get(PURCHASE_PAID_UNCREDITED_EVENT, 0),
+            purchase_credited_events_total=event_counts.get(PURCHASE_CREDITED_EVENT, 0),
             calculated_at=now_utc,
         ),
         day_start_utc=day_start_utc,
