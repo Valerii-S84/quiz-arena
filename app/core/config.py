@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     )
 
     app_env: str = Field(default="dev", alias="APP_ENV")
+    enable_openapi_docs: bool = Field(default=True, alias="ENABLE_OPENAPI_DOCS")
     app_host: str = Field(default="0.0.0.0", alias="APP_HOST")
     app_port: int = Field(default=8000, alias="APP_PORT")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")

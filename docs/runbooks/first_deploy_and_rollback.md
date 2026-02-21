@@ -38,6 +38,11 @@ Re-apply:
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
+Note:
+- `scripts/deploy.sh` now runs both DB migrations and mandatory QuizBank import (`python -m scripts.quizbank_import_tool --replace-all`) before bringing up `api/worker/beat/caddy`.
+- Deploy now includes an automatic gate `python -m scripts.quizbank_assert_non_empty`; deploy fails immediately if `quiz_questions` is empty.
+- If you deploy manually (without `scripts/deploy.sh`), run this import step explicitly after migrations.
+
 ## 3) Webhook setup
 Run on server or local machine:
 
@@ -65,6 +70,25 @@ docker compose -f docker-compose.prod.yml ps
 - Logs:
 ```bash
 docker compose -f docker-compose.prod.yml logs --tail=100 api worker beat
+```
+- Verify quiz content loaded:
+```bash
+docker compose -f docker-compose.prod.yml run --rm api python - <<'PY'
+import asyncio
+from sqlalchemy import select, func
+from app.db.models.quiz_questions import QuizQuestion
+from app.db.session import SessionLocal
+
+
+async def main() -> None:
+    async with SessionLocal() as session:
+        total = (await session.execute(select(func.count()).select_from(QuizQuestion))).scalar_one()
+        print(f"quiz_questions_total={total}")
+        raise SystemExit(0 if total > 0 else 1)
+
+
+asyncio.run(main())
+PY
 ```
 
 ## 5) Backups (minimum)

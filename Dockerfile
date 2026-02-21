@@ -15,6 +15,7 @@ COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./
 COPY scripts ./scripts
+COPY QuizBank ./QuizBank
 
 RUN python -m pip install --upgrade pip \
     && pip install -e .

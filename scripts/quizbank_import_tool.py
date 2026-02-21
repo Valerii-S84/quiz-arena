@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import csv
+import os
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -11,8 +12,10 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import delete
+from sqlalchemy.engine import make_url
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from app.core.config import get_settings
 from app.db.models.quiz_questions import QuizQuestion
 from app.db.session import SessionLocal
 from app.game.questions.catalog import QUIZBANK_FILE_TO_MODE_CODE
@@ -32,6 +35,9 @@ REQUIRED_COLUMNS = {
     "category",
     "key",
 }
+PROD_REPLACE_CONFIRM_ENV = "QUIZBANK_REPLACE_ALL_CONFIRM"
+PROD_REPLACE_CONFIRM_VALUE = "PROD_REPLACE_ALL_OK"
+PROD_REPLACE_EXPECTED_DB_ENV = "QUIZBANK_REPLACE_ALL_CONFIRM_DB"
 
 
 @dataclass(slots=True)
@@ -183,6 +189,55 @@ def _chunks(rows: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]]
     return [rows[index : index + size] for index in range(0, len(rows), size)]
 
 
+def _validate_replace_all_safety(
+    *,
+    app_env: str,
+    database_url: str,
+    replace_all: bool,
+    confirmation_value: str,
+    expected_db_name: str,
+) -> None:
+    if not replace_all:
+        return
+
+    normalized_env = app_env.strip().lower()
+    if normalized_env not in {"production", "prod"}:
+        return
+
+    resolved_db_name = (make_url(database_url).database or "").strip()
+    if not resolved_db_name:
+        raise RuntimeError("Refusing --replace-all in production: DATABASE_URL has empty database name.")
+
+    if confirmation_value != PROD_REPLACE_CONFIRM_VALUE:
+        raise RuntimeError(
+            "Refusing --replace-all in production without explicit confirmation. "
+            f"Set {PROD_REPLACE_CONFIRM_ENV}={PROD_REPLACE_CONFIRM_VALUE}."
+        )
+
+    if not expected_db_name:
+        raise RuntimeError(
+            "Refusing --replace-all in production without expected database confirmation. "
+            f"Set {PROD_REPLACE_EXPECTED_DB_ENV} to the intended production DB name."
+        )
+
+    if expected_db_name != resolved_db_name:
+        raise RuntimeError(
+            "Refusing --replace-all in production: expected DB name mismatch. "
+            f"Expected '{expected_db_name}', resolved '{resolved_db_name}'."
+        )
+
+
+def _assert_replace_all_safety(*, replace_all: bool) -> None:
+    settings = get_settings()
+    _validate_replace_all_safety(
+        app_env=settings.app_env,
+        database_url=settings.database_url,
+        replace_all=replace_all,
+        confirmation_value=os.getenv(PROD_REPLACE_CONFIRM_ENV, "").strip(),
+        expected_db_name=os.getenv(PROD_REPLACE_EXPECTED_DB_ENV, "").strip(),
+    )
+
+
 async def _persist_records(records: list[dict[str, Any]], *, replace_all: bool) -> None:
     if not records:
         raise ValueError("no importable rows found")
@@ -218,6 +273,7 @@ async def _persist_records(records: list[dict[str, Any]], *, replace_all: bool) 
 
 async def _run() -> int:
     args = _parse_args()
+    _assert_replace_all_safety(replace_all=args.replace_all)
     records, summary, by_mode = _build_records(args)
 
     if not args.dry_run:

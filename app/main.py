@@ -17,12 +17,14 @@ from app.core.logging import configure_logging
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
+    docs_enabled = bool(getattr(settings, "enable_openapi_docs", True))
 
     app = FastAPI(
         title="Quiz Arena Bot API",
         version="0.1.0",
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
     )
     app.include_router(health_router)
     app.include_router(telegram_webhook_router)
