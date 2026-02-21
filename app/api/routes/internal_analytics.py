@@ -15,7 +15,7 @@ from app.services.analytics_daily import build_daily_snapshot
 from app.services.internal_auth import (
     extract_client_ip,
     is_client_ip_allowed,
-    is_valid_internal_token,
+    is_internal_request_authenticated,
 )
 
 router = APIRouter(tags=["internal", "analytics"])
@@ -61,17 +61,16 @@ def _assert_internal_access(request: Request) -> None:
         request,
         trusted_proxies=getattr(settings, "internal_api_trusted_proxies", ""),
     )
-    token = request.headers.get("X-Internal-Token")
-
-    if not is_valid_internal_token(
-        expected_token=settings.internal_api_token,
-        received_token=token,
-    ):
-        logger.warning("internal_analytics_auth_failed", reason="invalid_token", client_ip=client_ip)
-        raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
 
     if not is_client_ip_allowed(client_ip=client_ip, allowlist=settings.internal_api_allowlist):
         logger.warning("internal_analytics_auth_failed", reason="ip_not_allowed", client_ip=client_ip)
+        raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
+
+    if not is_internal_request_authenticated(
+        request,
+        expected_token=settings.internal_api_token,
+    ):
+        logger.warning("internal_analytics_auth_failed", reason="invalid_credentials", client_ip=client_ip)
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
 
 

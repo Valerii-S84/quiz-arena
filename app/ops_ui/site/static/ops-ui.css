@@ -74,6 +74,17 @@ h1 {
   flex-wrap: wrap;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.logout-form {
+  margin: 0;
+}
+
 .tab {
   text-decoration: none;
   color: var(--ink);
@@ -99,6 +110,25 @@ h1 {
   display: grid;
   gap: 16px;
   padding: 8px 28px 32px;
+}
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.login-panel {
+  width: min(460px, 100%);
+}
+
+.login-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .panel {

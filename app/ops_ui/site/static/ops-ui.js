@@ -1,6 +1,4 @@
 (function () {
-  const TOKEN_KEY = "quiz_arena_ops_internal_token";
-
   function $(id) {
     return document.getElementById(id);
   }
@@ -47,25 +45,6 @@
     }, 2600);
   }
 
-  function readToken() {
-    return (window.localStorage.getItem(TOKEN_KEY) || "").trim();
-  }
-
-  function wireTokenControls() {
-    const tokenInput = $("internal-token");
-    const saveButton = $("save-token");
-    if (!tokenInput || !saveButton) {
-      return;
-    }
-
-    tokenInput.value = readToken();
-    saveButton.addEventListener("click", () => {
-      const token = tokenInput.value.trim();
-      window.localStorage.setItem(TOKEN_KEY, token);
-      showFlash(token ? "Token saved" : "Token cleared", "ok");
-    });
-  }
-
   function buildQuery(params) {
     const search = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
@@ -79,16 +58,10 @@
   }
 
   async function api(path, options = {}) {
-    const token = readToken();
-    if (!token) {
-      throw new Error("Missing internal token");
-    }
-
     const init = {
       method: options.method || "GET",
-      headers: {
-        "X-Internal-Token": token,
-      },
+      headers: {},
+      credentials: "same-origin",
     };
 
     if (options.body !== undefined) {
@@ -106,6 +79,9 @@
 
     if (!response.ok) {
       const code = payload && payload.detail && payload.detail.code ? payload.detail.code : `HTTP_${response.status}`;
+      if (response.status === 403) {
+        window.location.assign("/ops/login");
+      }
       throw new Error(code);
     }
 
@@ -487,8 +463,6 @@
   }
 
   function bootstrap() {
-    wireTokenControls();
-
     const page = document.body.dataset.page;
     if (page === "promo") {
       initPromoPage();

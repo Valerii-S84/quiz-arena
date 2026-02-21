@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quiz Arena Ops - Login</title>
+    <link rel="stylesheet" href="/ops/static/ops-ui.css" />
+  </head>
+  <body>
+    <div class="background-grid" aria-hidden="true"></div>
+    <main class="login-shell">
+      <section class="panel login-panel">
+        <p class="eyebrow">Quiz Arena</p>
+        <h1>Ops UI Login</h1>
+        <p class="muted">Access requires an allowlisted IP and valid internal token.</p>
+        <form class="login-form" method="post" action="/ops/login">
+          <label for="token">X-Internal-Token</label>
+          <input
+            id="token"
+            name="token"
+            type="password"
+            autocomplete="off"
+            required
+            placeholder="Paste internal token"
+          />
+          <button type="submit">Sign In</button>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>

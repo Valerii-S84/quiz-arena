@@ -13,23 +13,19 @@
         <p class="eyebrow">Quiz Arena</p>
         <h1>Referral Ops Triage</h1>
       </div>
-      <nav class="tabs" aria-label="Ops sections">
-        <a class="tab" href="/ops/promo">Promo</a>
-        <a class="tab active" href="/ops/referrals">Referrals</a>
-        <a class="tab" href="/ops/notifications">Notifications</a>
-      </nav>
+      <div class="topbar-actions">
+        <nav class="tabs" aria-label="Ops sections">
+          <a class="tab" href="/ops/promo">Promo</a>
+          <a class="tab active" href="/ops/referrals">Referrals</a>
+          <a class="tab" href="/ops/notifications">Notifications</a>
+        </nav>
+        <form method="post" action="/ops/logout" class="logout-form">
+          <button class="ghost" type="submit">Sign Out</button>
+        </form>
+      </div>
     </header>
 
     <main class="layout">
-      <section class="panel auth-panel">
-        <h2>Internal Auth</h2>
-        <div class="field-row">
-          <label for="internal-token">X-Internal-Token</label>
-          <input id="internal-token" type="password" autocomplete="off" placeholder="Paste token for internal API" />
-          <button id="save-token" type="button">Save Token</button>
-        </div>
-      </section>
-
       <section class="panel">
         <div class="panel-head">
           <h2>Referral Dashboard</h2>

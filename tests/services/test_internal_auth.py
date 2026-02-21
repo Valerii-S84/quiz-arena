@@ -3,8 +3,12 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from app.services.internal_auth import (
+    OPS_UI_SESSION_COOKIE,
+    build_ops_ui_session_value,
     extract_client_ip,
     is_client_ip_allowed,
+    is_internal_request_authenticated,
+    is_valid_ops_ui_session,
     is_valid_internal_token,
 )
 
@@ -13,6 +17,27 @@ def test_is_valid_internal_token_requires_exact_match() -> None:
     assert is_valid_internal_token(expected_token="secret", received_token="secret") is True
     assert is_valid_internal_token(expected_token="secret", received_token="wrong") is False
     assert is_valid_internal_token(expected_token="secret", received_token=None) is False
+
+
+def test_is_valid_ops_ui_session_requires_matching_hashed_value() -> None:
+    session_value = build_ops_ui_session_value(token="secret")
+    assert is_valid_ops_ui_session(expected_token="secret", received_session=session_value) is True
+    assert is_valid_ops_ui_session(expected_token="secret", received_session="wrong") is False
+    assert is_valid_ops_ui_session(expected_token="secret", received_session=None) is False
+
+
+def test_is_internal_request_authenticated_accepts_token_or_ops_session() -> None:
+    request_with_token = SimpleNamespace(headers={"X-Internal-Token": "secret"}, cookies={})
+    assert is_internal_request_authenticated(request_with_token, expected_token="secret") is True
+
+    request_with_session = SimpleNamespace(
+        headers={},
+        cookies={OPS_UI_SESSION_COOKIE: build_ops_ui_session_value(token="secret")},
+    )
+    assert is_internal_request_authenticated(request_with_session, expected_token="secret") is True
+
+    request_without_credentials = SimpleNamespace(headers={}, cookies={})
+    assert is_internal_request_authenticated(request_without_credentials, expected_token="secret") is False
 
 
 def test_is_client_ip_allowed_supports_exact_ip_and_cidr() -> None:

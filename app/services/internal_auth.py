@@ -1,16 +1,45 @@
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import secrets
 from functools import lru_cache
 
 from fastapi import Request
 
+OPS_UI_SESSION_COOKIE = "quiz_arena_ops_session"
+
 
 def is_valid_internal_token(*, expected_token: str, received_token: str | None) -> bool:
     if not expected_token or not received_token:
         return False
     return secrets.compare_digest(expected_token, received_token)
+
+
+def build_ops_ui_session_value(*, token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def is_valid_ops_ui_session(*, expected_token: str, received_session: str | None) -> bool:
+    if not expected_token or not received_session:
+        return False
+    expected_session = build_ops_ui_session_value(token=expected_token)
+    return secrets.compare_digest(expected_session, received_session)
+
+
+def is_internal_request_authenticated(
+    request: Request,
+    *,
+    expected_token: str,
+) -> bool:
+    header_token = request.headers.get("X-Internal-Token")
+    if is_valid_internal_token(expected_token=expected_token, received_token=header_token):
+        return True
+
+    return is_valid_ops_ui_session(
+        expected_token=expected_token,
+        received_session=request.cookies.get(OPS_UI_SESSION_COOKIE),
+    )
 
 
 @lru_cache(maxsize=32)
