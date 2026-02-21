@@ -38,6 +38,11 @@ services:
       dockerfile: Dockerfile
     container_name: quiz_arena_api_prod
     restart: unless-stopped
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     env_file:
       - .env
     depends_on:
@@ -67,6 +72,11 @@ services:
       dockerfile: Dockerfile
     container_name: quiz_arena_worker_prod
     restart: unless-stopped
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     env_file:
       - .env
     depends_on:
@@ -91,6 +101,11 @@ services:
       dockerfile: Dockerfile
     container_name: quiz_arena_beat_prod
     restart: unless-stopped
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     env_file:
       - .env
     depends_on:

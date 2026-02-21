@@ -71,6 +71,20 @@ docker compose -f docker-compose.prod.yml ps
 ```bash
 docker compose -f docker-compose.prod.yml logs --tail=100 api worker beat
 ```
+- Verify Docker hardening (non-root + non-editable install + image size):
+```bash
+docker exec -it quiz_arena_api_prod id
+docker exec -it quiz_arena_api_prod python -c "import app; print(app.__file__)"
+docker image ls --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" | grep -E "quizarena-|REPOSITORY"
+```
+- Verify ops_ui static assets are present in runtime image:
+```bash
+docker exec -it quiz_arena_api_prod python -c "import app; from pathlib import Path; p = Path(app.__file__).parent / 'ops_ui' / 'site' / 'static'; print(p, 'exists=', p.exists())"
+```
+- Verify celery beat schedule is persisted in `/tmp`:
+```bash
+docker exec -it quiz_arena_beat_prod sh -lc "ls -l /app/celerybeat-schedule /tmp/celerybeat-schedule*"
+```
 - Verify quiz content loaded:
 ```bash
 docker compose -f docker-compose.prod.yml run --rm api python - <<'PY'
