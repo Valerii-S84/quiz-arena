@@ -1,6 +1,6 @@
 # QuizBank Inventory Audit
 
-Generated (UTC): `2026-02-16T22:21:16Z`
+Generated (UTC): `2026-02-22T21:01:59Z`
 
 ## Summary
 
@@ -8,7 +8,7 @@ Generated (UTC): `2026-02-16T22:21:16Z`
 - Files with `level` column: **19**
 - Files without `level` column: **0**
 - Total quiz rows: **5570**
-- Total by levels: `A1: 1077`, `A2: 2559`, `B1: 1614`, `B2: 320`
+- Total by levels: `A1: 1077, A2: 2559, B1: 1614, B2: 320`
 
 ## Per File
 

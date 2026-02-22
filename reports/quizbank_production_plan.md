@@ -2,20 +2,25 @@
 
 ## Current State
 
-- Audit date: `2026-02-15`
-- Scope: `21` files in `QuizBank` (`20` CSV + `1` XLSX)
-- Total rows audited: `4580`
+- Audit date: `2026-02-22`
+- Scope: `19` CSV files in `QuizBank`
+- Total rows audited: `5570`
 - Result: all files are marked `ready` by automated QA
 
 Primary source of truth for per-file metrics:
+- `reports/quizbank_inventory_audit.json`
+- `reports/quizbank_inventory_audit.md`
 - `reports/quizbank_audit_report.json`
 - `reports/quizbank_audit_report.md`
+- `reports/quizbank_ambiguity_scan.json`
+- `reports/quizbank_ambiguity_scan.md`
 
 ## Production Checklist
 
 Use this checklist before every release of quiz content.
 
-- [ ] Run `python tools/quizbank_audit.py`
+- [ ] Run `python scripts/quizbank_reports.py refresh`
+- [ ] Run `python scripts/quizbank_reports.py check`
 - [ ] Confirm summary has `needs_fix_count = 0`
 - [ ] Confirm `critical_total = 0`
 - [ ] Confirm `high_total = 0`
@@ -50,9 +55,9 @@ Phase 1 (completed)
 - Full audit across all files.
 - Resolve W-Fragen duplicate/ambiguity issues in both XLSX and CSV versions.
 
-Phase 2 (next)
-- Add a CI step to run `tools/quizbank_audit.py` on every PR.
-- Block merge when summary has any `needs_fix_count > 0`.
+Phase 2 (completed)
+- Added CI gate: `python scripts/quizbank_reports.py check`.
+- CI now fails on stale `quizbank_*` reports or drift against current `QuizBank/*.csv`.
 
 Phase 3 (next)
 - Add linguistic review workflow:
@@ -67,4 +72,3 @@ Phase 4 (next)
 ## Notes
 
 - `logik_luecke_sheet_template.csv` is a template file with zero content rows; keep it excluded from release import.
-- Keep CSV and XLSX variants synchronized when both formats exist for the same bank.

@@ -5,7 +5,15 @@
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
-.venv/bin/pip install -e ".[dev]"
+.venv/bin/pip install -r requirements-dev.lock
+.venv/bin/pip install --no-deps -e .
+```
+
+Lockfiles are source-of-truth for CI/prod reproducibility:
+
+```bash
+make lock
+make lock-check
 ```
 
 ## 2. Start infrastructure
@@ -96,3 +104,17 @@ make test-integration
 - Reverse proxy config: `deploy/Caddyfile`
 - Deploy helper: `scripts/deploy.sh`
 - Runbook: `docs/runbooks/first_deploy_and_rollback.md`
+
+## 8. QuizBank report refresh flow
+
+Refresh all factual QuizBank reports:
+
+```bash
+make refresh-quizbank-reports
+```
+
+Verify reports are fresh (used by CI):
+
+```bash
+make check-quizbank-reports
+```

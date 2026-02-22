@@ -1,5 +1,6 @@
 PYTHON=.venv/bin/python
 PIP=.venv/bin/pip
+PIP_COMPILE=.venv/bin/pip-compile
 TEST_DATABASE_URL?=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test
 
 venv:
@@ -7,7 +8,23 @@ venv:
 
 install: venv
 	$(PIP) install --upgrade pip
-	$(PIP) install -e ".[dev]"
+	$(PIP) install -r requirements-dev.lock
+	$(PIP) install --no-deps -e .
+
+lock:
+	$(PIP) install --upgrade pip pip-tools
+	$(PIP_COMPILE) --strip-extras pyproject.toml --output-file requirements.lock
+	$(PIP_COMPILE) --strip-extras --extra dev pyproject.toml --output-file requirements-dev.lock
+
+lock-check:
+	@TMP_REQ=$$(mktemp); TMP_DEV=$$(mktemp); \
+	cp requirements.lock $$TMP_REQ; \
+	cp requirements-dev.lock $$TMP_DEV; \
+	$(PIP_COMPILE) --strip-extras pyproject.toml --output-file requirements.lock; \
+	$(PIP_COMPILE) --strip-extras --extra dev pyproject.toml --output-file requirements-dev.lock; \
+	diff -u $$TMP_REQ requirements.lock; \
+	diff -u $$TMP_DEV requirements-dev.lock; \
+	rm -f $$TMP_REQ $$TMP_DEV
 
 up:
 	docker compose up -d
@@ -42,3 +59,9 @@ migrate:
 
 import-quizbank:
 	$(PYTHON) -m scripts.quizbank_import_tool --replace-all
+
+refresh-quizbank-reports:
+	$(PYTHON) scripts/quizbank_reports.py refresh
+
+check-quizbank-reports:
+	$(PYTHON) scripts/quizbank_reports.py check

@@ -52,6 +52,7 @@ docker compose -f docker-compose.prod.yml up -d --scale api=2 --scale worker=3
 Capacity guardrails before scaling:
 - DB connections scale with `API_WORKERS * api_replicas` (each API process has its own SQLAlchemy pool). Increase gradually and monitor Postgres `max_connections`.
 - Task pressure scales with `CELERY_WORKER_CONCURRENCY * worker_replicas`. For DB-heavy workloads, increase worker replicas/concurrency step-by-step and monitor DB saturation.
+- Runtime dependency graph is locked by `requirements.lock` during Docker build. If `pyproject.toml` changes, regenerate and commit lockfiles before deploy (`make lock`).
 
 Note:
 - `scripts/deploy.sh` now runs both DB migrations and mandatory QuizBank import (`python -m scripts.quizbank_import_tool --replace-all`) before bringing up `api/worker/beat/caddy`.

@@ -1,6 +1,6 @@
 # QuizBank Duplicate & Ambiguity Scan
 
-- Generated at: `2026-02-16T05:47:27.239692+00:00`
+- Generated at: `2026-02-22T21:02:08.258055+00:00`
 - Files scanned: `19`
 
 | File | Rows | Exact duplicate groups | Exact conflict groups | Signature conflict groups | Fuzzy conflicts | Same-row candidates | Template repeat groups |
@@ -8,20 +8,20 @@
 | Adjektivendungen_Beginner_Bank_A1_A2_210.csv | 210 | 0 | 0 | 0 | 2 | 0 | 0 |
 | Akkusativ_Dativ_Bank_A1_B1_210.csv | 210 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Antonym_Match_Bank_A1_B1_210.csv | 210 | 0 | 0 | 0 | 7 | 0 | 0 |
-| Artikel_Sprint_Bank_A2_B1_210.csv | 210 | 0 | 0 | 0 | 1 | 0 | 0 |
+| Artikel_Sprint_Bank_A1_B2_1000.csv | 1000 | 0 | 0 | 0 | 1 | 0 | 0 |
 | LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv | 500 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Lexical_Gap_Fill_Bank_A2_B1_210.csv | 210 | 0 | 0 | 0 | 9 | 0 | 0 |
 | Mini_Dialog_Bank_A2_B1_210.csv | 210 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Modalverben_Bank_210.csv | 210 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Negation_Quiz_Bank_A2_B1_210.csv | 210 | 0 | 0 | 0 | 0 | 0 | 0 |
-| Plural_Check_Bank_210.csv | 210 | 0 | 0 | 0 | 1 | 0 | 0 |
+| Plural_Check_Bank_500.csv | 500 | 0 | 0 | 0 | 3 | 0 | 0 |
 | Possessive_Adjectives_Bank_A2_B1_210.csv | 210 | 0 | 0 | 0 | 14 | 0 | 0 |
 | Preposition_Selection_Bank_A2_B1_210.csv | 210 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Satzbau_Bank_A2_B1_210.csv | 210 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Synonym_Match_Bank_A1_B1_210.csv | 210 | 0 | 0 | 0 | 1 | 0 | 0 |
 | Topic_Vocabulary_Themes_Bank_A2_B1_210.csv | 210 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Verb_Conjugation_Bank_A2_B1_210.csv | 210 | 0 | 0 | 0 | 100 | 0 | 0 |
-| W_Fragen_Bank_210.csv | 210 | 0 | 0 | 0 | 0 | 0 | 0 |
+| W_Fragen_Bank_630.csv | 630 | 0 | 0 | 0 | 0 | 0 | 0 |
 | logik_luecke_sheet_template.csv | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | trennbare_verben_210_korrigiert.csv | 210 | 0 | 0 | 0 | 0 | 0 | 0 |
 
@@ -42,7 +42,7 @@
 - Fuzzy conflict `4/60` score `96.2962962962963` | answers `jung/nein`
 - Fuzzy conflict `44/60` score `96.2962962962963` | answers `reich/nein`
 
-### Artikel_Sprint_Bank_A2_B1_210.csv
+### Artikel_Sprint_Bank_A1_B2_1000.csv
 
 - Fuzzy conflict `158/186` score `96.41025641025641` | answers `der/die`
 
@@ -58,9 +58,11 @@
 - Fuzzy conflict `124/160` score `96.113074204947` | answers `ressourcen einplanen/ziele definieren`
 - Fuzzy conflict `64/154` score `96.06299212598425` | answers `um hilfe bitten/einen vorschlag begründen`
 
-### Plural_Check_Bank_210.csv
+### Plural_Check_Bank_500.csv
 
+- Fuzzy conflict `361/389` score `96.7741935483871` | answers `die beiträge/die beträge`
 - Fuzzy conflict `83/163` score `96.2962962962963` | answers `die decken/die ecken`
+- Fuzzy conflict `207/329` score `96.2962962962963` | answers `die köpfe/die knöpfe`
 
 ### Possessive_Adjectives_Bank_A2_B1_210.csv
 

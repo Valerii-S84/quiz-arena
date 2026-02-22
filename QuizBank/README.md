@@ -10,9 +10,9 @@
 
 ## Поточний склад
 
-- Файлів у папці: `20`
-- Загальна кількість вікторин: `5150`
-- Продакшн вікторин: `5150`
+- CSV-файлів у папці: `19`
+- Загальна кількість вікторин: `5570`
+- Продакшн вікторин: `5570`
 - Службові шаблони: `1` файл (`0` рядків контенту)
 
 ## Продакшн банки
@@ -45,8 +45,11 @@
 Запускати з кореня репозиторію:
 
 ```bash
-python tools/quizbank_audit.py
-python tools/quizbank_ambiguity_scan.py
+python scripts/quizbank_reports.py refresh
+python scripts/quizbank_reports.py check
 ```
 
-Звіти генеруються в папку `reports/`.
+Це оновлює і перевіряє:
+- `reports/quizbank_inventory_audit.{json,md}`
+- `reports/quizbank_audit_report.{json,md}`
+- `reports/quizbank_ambiguity_scan.{json,md}`
