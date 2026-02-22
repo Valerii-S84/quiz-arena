@@ -112,3 +112,18 @@ class FriendChallengesRepo:
         )
         result = await session.execute(stmt)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def list_by_series_id_for_update(
+        session: AsyncSession,
+        *,
+        series_id: UUID,
+    ) -> list[FriendChallenge]:
+        stmt = (
+            select(FriendChallenge)
+            .where(FriendChallenge.series_id == series_id)
+            .order_by(FriendChallenge.series_game_number.asc(), FriendChallenge.created_at.asc())
+            .with_for_update()
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())

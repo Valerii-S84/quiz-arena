@@ -8,12 +8,14 @@ from uuid import UUID
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
+from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
     build_friend_challenge_create_keyboard,
     build_friend_challenge_finished_keyboard,
     build_friend_challenge_limit_keyboard,
     build_friend_challenge_next_keyboard,
+    build_friend_challenge_result_share_keyboard,
     build_friend_challenge_share_keyboard,
     build_friend_challenge_share_url,
 )
@@ -50,6 +52,9 @@ ANSWER_RE = re.compile(r"^answer:([0-9a-f\-]{36}):([0-3])$")
 FRIEND_NEXT_RE = re.compile(r"^friend:next:([0-9a-f\-]{36})$")
 FRIEND_CREATE_RE = re.compile(r"^friend:challenge:create:(3|5|12)$")
 FRIEND_REMATCH_RE = re.compile(r"^friend:rematch:([0-9a-f\-]{36})$")
+FRIEND_SHARE_RESULT_RE = re.compile(r"^friend:share:result:([0-9a-f\-]{36})$")
+FRIEND_SERIES_BEST3_RE = re.compile(r"^friend:series:best3:([0-9a-f\-]{36})$")
+FRIEND_SERIES_NEXT_RE = re.compile(r"^friend:series:next:([0-9a-f\-]{36})$")
 
 
 def _format_user_label(*, username: str | None, first_name: str | None, fallback: str = "Freund") -> str:
@@ -197,6 +202,35 @@ def _build_friend_signature(*, challenge: FriendChallengeSnapshot, user_id: int)
     if score_diff <= -3:
         return "Chaos im Satzbau"
     return "Revanche-Laeufer"
+
+
+def _build_public_badge_label(
+    *,
+    challenge: FriendChallengeSnapshot,
+    user_id: int,
+    series_my_wins: int = 0,
+    series_opponent_wins: int = 0,
+) -> str:
+    if challenge.series_best_of > 1 and series_my_wins > series_opponent_wins:
+        return "Series Closer"
+    return _build_friend_signature(challenge=challenge, user_id=user_id)
+
+
+def _build_series_progress_text(
+    *,
+    game_no: int,
+    best_of: int,
+    my_wins: int,
+    opponent_wins: int,
+    opponent_label: str,
+) -> str:
+    return TEXTS_DE["msg.friend.challenge.series.progress"].format(
+        game_no=game_no,
+        best_of=best_of,
+        my_wins=my_wins,
+        opponent_label=opponent_label,
+        opponent_wins=opponent_wins,
+    )
 
 
 def _build_friend_proof_card_text(
@@ -666,6 +700,268 @@ async def handle_friend_challenge_rematch(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
+@router.callback_query(F.data.regexp(FRIEND_SERIES_BEST3_RE))
+async def handle_friend_challenge_series_best3(callback: CallbackQuery) -> None:
+    if callback.from_user is None or callback.message is None or callback.data is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
+    matched = FRIEND_SERIES_BEST3_RE.match(callback.data)
+    if matched is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
+    challenge_id = UUID(matched.group(1))
+    now_utc = datetime.now(timezone.utc)
+    async with SessionLocal.begin() as session:
+        snapshot = await UserOnboardingService.ensure_home_snapshot(
+            session,
+            telegram_user=callback.from_user,
+        )
+        try:
+            series_duel = await GameSessionService.create_friend_challenge_best_of_three(
+                session,
+                initiator_user_id=snapshot.user_id,
+                challenge_id=challenge_id,
+                now_utc=now_utc,
+                best_of=3,
+            )
+        except FriendChallengePaymentRequiredError:
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.limit.reached"],
+                reply_markup=build_friend_challenge_limit_keyboard(),
+            )
+            await callback.answer()
+            return
+        except (
+            FriendChallengeNotFoundError,
+            FriendChallengeAccessError,
+        ):
+            await callback.message.answer(TEXTS_DE["msg.friend.challenge.invalid"], reply_markup=build_home_keyboard())
+            await callback.answer()
+            return
+
+    opponent_label = await _resolve_opponent_label(
+        challenge=series_duel,
+        user_id=snapshot.user_id,
+    )
+    await callback.message.answer(
+        "\n".join(
+            [
+                TEXTS_DE["msg.friend.challenge.series.started"].format(opponent_label=opponent_label),
+                _build_friend_plan_text(total_rounds=series_duel.total_rounds),
+                _build_series_progress_text(
+                    game_no=series_duel.series_game_number,
+                    best_of=series_duel.series_best_of,
+                    my_wins=0,
+                    opponent_wins=0,
+                    opponent_label=opponent_label,
+                ),
+            ]
+        ),
+        reply_markup=build_friend_challenge_next_keyboard(challenge_id=str(series_duel.challenge_id)),
+    )
+    opponent_user_id = _friend_opponent_user_id(challenge=series_duel, user_id=snapshot.user_id)
+    if opponent_user_id is not None:
+        opponent_label_for_opponent = await _resolve_opponent_label(
+            challenge=series_duel,
+            user_id=opponent_user_id,
+        )
+        await _notify_opponent(
+            callback,
+            opponent_user_id=opponent_user_id,
+            text="\n".join(
+                [
+                    TEXTS_DE["msg.friend.challenge.series.started"].format(
+                        opponent_label=opponent_label_for_opponent
+                    ),
+                    _build_friend_plan_text(total_rounds=series_duel.total_rounds),
+                    _build_series_progress_text(
+                        game_no=series_duel.series_game_number,
+                        best_of=series_duel.series_best_of,
+                        my_wins=0,
+                        opponent_wins=0,
+                        opponent_label=opponent_label_for_opponent,
+                    ),
+                ]
+            ),
+            reply_markup=build_friend_challenge_next_keyboard(challenge_id=str(series_duel.challenge_id)),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.regexp(FRIEND_SERIES_NEXT_RE))
+async def handle_friend_challenge_series_next(callback: CallbackQuery) -> None:
+    if callback.from_user is None or callback.message is None or callback.data is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
+    matched = FRIEND_SERIES_NEXT_RE.match(callback.data)
+    if matched is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
+    challenge_id = UUID(matched.group(1))
+    now_utc = datetime.now(timezone.utc)
+    async with SessionLocal.begin() as session:
+        snapshot = await UserOnboardingService.ensure_home_snapshot(
+            session,
+            telegram_user=callback.from_user,
+        )
+        try:
+            next_duel = await GameSessionService.create_friend_challenge_series_next_game(
+                session,
+                initiator_user_id=snapshot.user_id,
+                challenge_id=challenge_id,
+                now_utc=now_utc,
+            )
+            my_wins, opponent_wins, game_no, best_of = await GameSessionService.get_friend_series_score_for_user(
+                session,
+                user_id=snapshot.user_id,
+                challenge_id=next_duel.challenge_id,
+                now_utc=now_utc,
+            )
+        except FriendChallengePaymentRequiredError:
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.limit.reached"],
+                reply_markup=build_friend_challenge_limit_keyboard(),
+            )
+            await callback.answer()
+            return
+        except (
+            FriendChallengeNotFoundError,
+            FriendChallengeAccessError,
+        ):
+            await callback.message.answer(TEXTS_DE["msg.friend.challenge.invalid"], reply_markup=build_home_keyboard())
+            await callback.answer()
+            return
+
+    opponent_label = await _resolve_opponent_label(
+        challenge=next_duel,
+        user_id=snapshot.user_id,
+    )
+    await callback.message.answer(
+        "\n".join(
+            [
+                _build_series_progress_text(
+                    game_no=game_no,
+                    best_of=best_of,
+                    my_wins=my_wins,
+                    opponent_wins=opponent_wins,
+                    opponent_label=opponent_label,
+                ),
+                _build_friend_plan_text(total_rounds=next_duel.total_rounds),
+            ]
+        ),
+        reply_markup=build_friend_challenge_next_keyboard(challenge_id=str(next_duel.challenge_id)),
+    )
+    opponent_user_id = _friend_opponent_user_id(challenge=next_duel, user_id=snapshot.user_id)
+    if opponent_user_id is not None:
+        opponent_label_for_opponent = await _resolve_opponent_label(
+            challenge=next_duel,
+            user_id=opponent_user_id,
+        )
+        await _notify_opponent(
+            callback,
+            opponent_user_id=opponent_user_id,
+            text="\n".join(
+                [
+                    _build_series_progress_text(
+                        game_no=game_no,
+                        best_of=best_of,
+                        my_wins=opponent_wins,
+                        opponent_wins=my_wins,
+                        opponent_label=opponent_label_for_opponent,
+                    ),
+                    _build_friend_plan_text(total_rounds=next_duel.total_rounds),
+                ]
+            ),
+            reply_markup=build_friend_challenge_next_keyboard(challenge_id=str(next_duel.challenge_id)),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.regexp(FRIEND_SHARE_RESULT_RE))
+async def handle_friend_challenge_share_result(callback: CallbackQuery) -> None:
+    if callback.from_user is None or callback.message is None or callback.data is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
+    matched = FRIEND_SHARE_RESULT_RE.match(callback.data)
+    if matched is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
+    challenge_id = UUID(matched.group(1))
+    now_utc = datetime.now(timezone.utc)
+    async with SessionLocal.begin() as session:
+        snapshot = await UserOnboardingService.ensure_home_snapshot(
+            session,
+            telegram_user=callback.from_user,
+        )
+        try:
+            challenge = await GameSessionService.get_friend_challenge_snapshot_for_user(
+                session,
+                user_id=snapshot.user_id,
+                challenge_id=challenge_id,
+                now_utc=now_utc,
+            )
+        except (
+            FriendChallengeNotFoundError,
+            FriendChallengeAccessError,
+        ):
+            await callback.message.answer(TEXTS_DE["msg.friend.challenge.invalid"], reply_markup=build_home_keyboard())
+            await callback.answer()
+            return
+
+        if challenge.status not in {"COMPLETED", "EXPIRED"}:
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.proof.not_ready"],
+                reply_markup=build_friend_challenge_back_keyboard(),
+            )
+            await callback.answer()
+            return
+
+        opponent_label = await _resolve_opponent_label(
+            challenge=challenge,
+            user_id=snapshot.user_id,
+        )
+        proof_card_text = _build_friend_proof_card_text(
+            challenge=challenge,
+            user_id=snapshot.user_id,
+            opponent_label=opponent_label,
+        )
+        share_url = await _build_friend_result_share_url(
+            callback,
+            proof_card_text=proof_card_text,
+        )
+        if share_url is None:
+            await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+            return
+
+        await emit_analytics_event(
+            session,
+            event_type="friend_challenge_proof_card_share_clicked",
+            source=EVENT_SOURCE_BOT,
+            happened_at=now_utc,
+            user_id=snapshot.user_id,
+            payload={
+                "challenge_id": str(challenge.challenge_id),
+                "status": challenge.status,
+                "total_rounds": challenge.total_rounds,
+            },
+        )
+
+    await callback.message.answer(
+        "\n".join([TEXTS_DE["msg.friend.challenge.proof.share.ready"], proof_card_text]),
+        reply_markup=build_friend_challenge_result_share_keyboard(
+            share_url=share_url,
+            challenge_id=str(challenge.challenge_id),
+        ),
+    )
+    await callback.answer()
+
+
 @router.callback_query(F.data.regexp(FRIEND_NEXT_RE))
 async def handle_friend_challenge_next(callback: CallbackQuery) -> None:
     if callback.from_user is None or callback.message is None or callback.data is None:
@@ -866,26 +1162,94 @@ async def handle_answer(callback: CallbackQuery) -> None:
                 )
 
         if challenge.status in {"COMPLETED", "EXPIRED"}:
+            series_my_wins = 0
+            series_opponent_wins = 0
+            series_game_no = challenge.series_game_number
+            series_best_of = challenge.series_best_of
+            if challenge.series_id is not None and challenge.series_best_of > 1:
+                async with SessionLocal.begin() as session:
+                    try:
+                        (
+                            series_my_wins,
+                            series_opponent_wins,
+                            series_game_no,
+                            series_best_of,
+                        ) = await GameSessionService.get_friend_series_score_for_user(
+                            session,
+                            user_id=snapshot.user_id,
+                            challenge_id=challenge.challenge_id,
+                            now_utc=now_utc,
+                        )
+                    except (
+                        FriendChallengeNotFoundError,
+                        FriendChallengeAccessError,
+                    ):
+                        series_my_wins = 0
+                        series_opponent_wins = 0
+                        series_game_no = challenge.series_game_number
+                        series_best_of = challenge.series_best_of
+
+            wins_needed = max(1, (series_best_of // 2) + 1)
+            series_finished = (
+                series_best_of <= 1
+                or series_my_wins >= wins_needed
+                or series_opponent_wins >= wins_needed
+                or series_game_no >= series_best_of
+            )
+            show_next_series_game = (
+                challenge.series_id is not None and challenge.series_best_of > 1 and not series_finished
+            )
+            if series_my_wins > series_opponent_wins:
+                champion_label = "Du"
+            elif series_opponent_wins > series_my_wins:
+                champion_label = opponent_label
+            else:
+                champion_label = "Unentschieden"
+
             my_finish_text = _build_friend_finish_text(
                 challenge=challenge,
                 user_id=snapshot.user_id,
                 opponent_label=opponent_label,
+            )
+            my_badge_label = _build_public_badge_label(
+                challenge=challenge,
+                user_id=snapshot.user_id,
+                series_my_wins=series_my_wins,
+                series_opponent_wins=series_opponent_wins,
             )
             my_proof_card_text = _build_friend_proof_card_text(
                 challenge=challenge,
                 user_id=snapshot.user_id,
                 opponent_label=opponent_label,
             )
-            my_share_url = await _build_friend_result_share_url(
-                callback,
-                proof_card_text=my_proof_card_text,
-            )
             finish_keyboard = build_friend_challenge_finished_keyboard(
                 challenge_id=str(challenge.challenge_id),
-                share_url=my_share_url,
+                show_next_series_game=show_next_series_game,
             )
+            my_message_lines = [my_finish_text]
+            if challenge.series_best_of > 1:
+                my_message_lines.append(
+                    _build_series_progress_text(
+                        game_no=series_game_no,
+                        best_of=series_best_of,
+                        my_wins=series_my_wins,
+                        opponent_wins=series_opponent_wins,
+                        opponent_label=opponent_label,
+                    )
+                )
+                if series_finished:
+                    my_message_lines.append(
+                        TEXTS_DE["msg.friend.challenge.series.finished"].format(
+                            champion_label=champion_label
+                        )
+                    )
+            my_message_lines.append(
+                TEXTS_DE["msg.friend.challenge.badge.public"].format(badge_label=my_badge_label)
+            )
+            my_message_lines.append("")
+            my_message_lines.append(my_proof_card_text)
             await callback.message.answer(
-                "\n\n".join([my_finish_text, my_proof_card_text]),
+                "\n".join(my_message_lines),
                 reply_markup=finish_keyboard,
             )
             if not result.idempotent_replay and opponent_user_id is not None:
@@ -893,38 +1257,65 @@ async def handle_answer(callback: CallbackQuery) -> None:
                     challenge=challenge,
                     user_id=opponent_user_id,
                 )
+                opponent_badge_label = _build_public_badge_label(
+                    challenge=challenge,
+                    user_id=opponent_user_id,
+                    series_my_wins=series_opponent_wins,
+                    series_opponent_wins=series_my_wins,
+                )
                 opponent_proof_card_text = _build_friend_proof_card_text(
                     challenge=challenge,
                     user_id=opponent_user_id,
                     opponent_label=opponent_label_for_opponent,
                 )
-                opponent_share_url = await _build_friend_result_share_url(
-                    callback,
-                    proof_card_text=opponent_proof_card_text,
-                )
                 opponent_finish_keyboard = build_friend_challenge_finished_keyboard(
                     challenge_id=str(challenge.challenge_id),
-                    share_url=opponent_share_url,
+                    show_next_series_game=show_next_series_game,
                 )
+                opponent_message_lines = [
+                    _build_friend_score_text(
+                        challenge=challenge,
+                        user_id=opponent_user_id,
+                        opponent_label=opponent_label_for_opponent,
+                    ),
+                    _build_friend_finish_text(
+                        challenge=challenge,
+                        user_id=opponent_user_id,
+                        opponent_label=opponent_label_for_opponent,
+                    ),
+                ]
+                if challenge.series_best_of > 1:
+                    opponent_champion_label = champion_label
+                    if champion_label == "Du":
+                        opponent_champion_label = opponent_label_for_opponent
+                    elif champion_label == opponent_label:
+                        opponent_champion_label = "Du"
+                    opponent_message_lines.append(
+                        _build_series_progress_text(
+                            game_no=series_game_no,
+                            best_of=series_best_of,
+                            my_wins=series_opponent_wins,
+                            opponent_wins=series_my_wins,
+                            opponent_label=opponent_label_for_opponent,
+                        )
+                    )
+                    if series_finished:
+                        opponent_message_lines.append(
+                            TEXTS_DE["msg.friend.challenge.series.finished"].format(
+                                champion_label=opponent_champion_label
+                            )
+                        )
+                opponent_message_lines.append(
+                    TEXTS_DE["msg.friend.challenge.badge.public"].format(
+                        badge_label=opponent_badge_label
+                    )
+                )
+                opponent_message_lines.append("")
+                opponent_message_lines.append(opponent_proof_card_text)
                 await _notify_opponent(
                     callback,
                     opponent_user_id=opponent_user_id,
-                    text="\n".join(
-                        [
-                            _build_friend_score_text(
-                                challenge=challenge,
-                                user_id=opponent_user_id,
-                                opponent_label=opponent_label_for_opponent,
-                            ),
-                            _build_friend_finish_text(
-                                challenge=challenge,
-                                user_id=opponent_user_id,
-                                opponent_label=opponent_label_for_opponent,
-                            ),
-                            "",
-                            opponent_proof_card_text,
-                        ]
-                    ),
+                    text="\n".join(opponent_message_lines),
                     reply_markup=opponent_finish_keyboard,
                 )
             await callback.answer()

@@ -101,15 +101,41 @@ def build_friend_challenge_share_keyboard(
 def build_friend_challenge_finished_keyboard(
     *,
     challenge_id: str,
-    share_url: str | None = None,
+    include_share: bool = True,
+    show_best_of_three: bool = True,
+    show_next_series_game: bool = False,
 ) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = [
         [InlineKeyboardButton(text="🔁 REVANCHE", callback_data=f"friend:rematch:{challenge_id}")]
     ]
-    if share_url:
-        rows.append([InlineKeyboardButton(text="📤 TEILEN", url=share_url)])
+    if show_best_of_three:
+        rows.append(
+            [InlineKeyboardButton(text="🎯 BEST OF 3", callback_data=f"friend:series:best3:{challenge_id}")]
+        )
+    if show_next_series_game:
+        rows.append(
+            [InlineKeyboardButton(text="▶️ NAECHSTES SPIEL", callback_data=f"friend:series:next:{challenge_id}")]
+        )
+    if include_share:
+        rows.append(
+            [InlineKeyboardButton(text="📤 TEILEN", callback_data=f"friend:share:result:{challenge_id}")]
+        )
     rows.append([InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_friend_challenge_result_share_keyboard(
+    *,
+    share_url: str,
+    challenge_id: str,
+) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="📤 JETZT TEILEN", url=share_url)],
+            [InlineKeyboardButton(text="🔁 REVANCHE", callback_data=f"friend:rematch:{challenge_id}")],
+            [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")],
+        ]
+    )
 
 
 def build_friend_challenge_limit_keyboard() -> InlineKeyboardMarkup:

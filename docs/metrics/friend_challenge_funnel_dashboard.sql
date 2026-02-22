@@ -96,3 +96,29 @@ where event_type = 'friend_challenge_last_chance_sent'
   and happened_at >= (now() - interval '30 day')
 group by 1
 order by 1 desc;
+
+-- 5) Proof Card share intent rate (clicked "Teilen" / completed duels)
+with daily as (
+    select
+        local_date_berlin,
+        count(*) filter (where event_type = 'friend_challenge_completed') as completed_total,
+        count(*) filter (where event_type = 'friend_challenge_proof_card_share_clicked') as share_clicked_total
+    from analytics_events
+    where event_type in (
+        'friend_challenge_completed',
+        'friend_challenge_proof_card_share_clicked'
+    )
+      and local_date_berlin >= (current_date - interval '30 day')
+    group by local_date_berlin
+)
+select
+    local_date_berlin,
+    completed_total,
+    share_clicked_total,
+    case
+        when completed_total > 0
+        then round(share_clicked_total::numeric / completed_total, 4)
+        else 0
+    end as proof_card_share_click_rate
+from daily
+order by local_date_berlin desc;

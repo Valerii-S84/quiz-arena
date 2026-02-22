@@ -23,6 +23,8 @@ class FriendChallenge(Base):
         ),
         CheckConstraint("current_round >= 1", name="ck_friend_challenges_current_round_positive"),
         CheckConstraint("total_rounds >= 1", name="ck_friend_challenges_total_rounds_positive"),
+        CheckConstraint("series_game_number >= 1", name="ck_friend_challenges_series_game_positive"),
+        CheckConstraint("series_best_of >= 1", name="ck_friend_challenges_series_best_of_positive"),
         CheckConstraint("creator_score >= 0", name="ck_friend_challenges_creator_score_non_negative"),
         CheckConstraint("opponent_score >= 0", name="ck_friend_challenges_opponent_score_non_negative"),
         CheckConstraint("creator_answered_round >= 0", name="ck_friend_challenges_creator_answered_non_negative"),
@@ -31,6 +33,7 @@ class FriendChallenge(Base):
         Index("idx_friend_challenges_opponent_created", "opponent_user_id", "created_at"),
         Index("idx_friend_challenges_status_created", "status", "created_at"),
         Index("idx_friend_challenges_status_expires", "status", "expires_at"),
+        Index("idx_friend_challenges_series_game", "series_id", "series_game_number"),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
@@ -42,6 +45,9 @@ class FriendChallenge(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     current_round: Mapped[int] = mapped_column(Integer, nullable=False)
     total_rounds: Mapped[int] = mapped_column(Integer, nullable=False)
+    series_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    series_game_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    series_best_of: Mapped[int] = mapped_column(Integer, nullable=False)
     creator_score: Mapped[int] = mapped_column(Integer, nullable=False)
     opponent_score: Mapped[int] = mapped_column(Integer, nullable=False)
     creator_answered_round: Mapped[int] = mapped_column(Integer, nullable=False)

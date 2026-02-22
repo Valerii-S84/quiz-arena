@@ -4,6 +4,7 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_finished_keyboard,
     build_friend_challenge_limit_keyboard,
     build_friend_challenge_next_keyboard,
+    build_friend_challenge_result_share_keyboard,
     build_friend_challenge_share_keyboard,
     build_friend_challenge_share_url,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "build_friend_challenge_finished_keyboard",
     "build_friend_challenge_limit_keyboard",
     "build_friend_challenge_next_keyboard",
+    "build_friend_challenge_result_share_keyboard",
     "build_friend_challenge_share_keyboard",
     "build_friend_challenge_share_url",
     "build_offer_keyboard",

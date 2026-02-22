@@ -39,6 +39,9 @@ class FriendChallengeSnapshot:
     total_rounds: int
     creator_score: int
     opponent_score: int
+    series_id: UUID | None = None
+    series_game_number: int = 1
+    series_best_of: int = 1
     winner_user_id: int | None = None
     expires_at: datetime | None = None
 
