@@ -20,6 +20,10 @@ def _build_share_templates(*, total_rounds: int) -> tuple[str, str, str]:
     )
 
 
+def build_friend_challenge_share_url(*, base_link: str, share_text: str) -> str:
+    return _build_share_url(invite_link=base_link, share_text=share_text)
+
+
 def build_friend_challenge_create_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -61,10 +65,7 @@ def build_friend_challenge_share_keyboard(
             [
                 InlineKeyboardButton(
                     text="😏 PROVOKATION",
-                    url=_build_share_url(
-                        invite_link=invite_link,
-                        share_text=template_a,
-                    ),
+                    url=build_friend_challenge_share_url(base_link=invite_link, share_text=template_a),
                 )
             ]
         )
@@ -72,10 +73,7 @@ def build_friend_challenge_share_keyboard(
             [
                 InlineKeyboardButton(
                     text="🔥 GLEICHE FRAGEN",
-                    url=_build_share_url(
-                        invite_link=invite_link,
-                        share_text=template_b,
-                    ),
+                    url=build_friend_challenge_share_url(base_link=invite_link, share_text=template_b),
                 )
             ]
         )
@@ -83,10 +81,7 @@ def build_friend_challenge_share_keyboard(
             [
                 InlineKeyboardButton(
                     text="🏆 REVANCHE?",
-                    url=_build_share_url(
-                        invite_link=invite_link,
-                        share_text=template_c,
-                    ),
+                    url=build_friend_challenge_share_url(base_link=invite_link, share_text=template_c),
                 )
             ]
         )
@@ -106,13 +101,15 @@ def build_friend_challenge_share_keyboard(
 def build_friend_challenge_finished_keyboard(
     *,
     challenge_id: str,
+    share_url: str | None = None,
 ) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🔁 REVANCHE", callback_data=f"friend:rematch:{challenge_id}")],
-            [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")],
-        ]
-    )
+    rows: list[list[InlineKeyboardButton]] = [
+        [InlineKeyboardButton(text="🔁 REVANCHE", callback_data=f"friend:rematch:{challenge_id}")]
+    ]
+    if share_url:
+        rows.append([InlineKeyboardButton(text="📤 TEILEN", url=share_url)])
+    rows.append([InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def build_friend_challenge_limit_keyboard() -> InlineKeyboardMarkup:

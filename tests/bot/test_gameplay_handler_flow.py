@@ -14,7 +14,7 @@ from app.game.sessions.types import (
     SessionQuestionView,
     StartSessionResult,
 )
-from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
+from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessionLocal
 
 
 def _challenge_snapshot(*, status: str = "ACTIVE", winner_user_id: int | None = None) -> FriendChallengeSnapshot:
@@ -92,6 +92,18 @@ def test_build_friend_finish_text_handles_win_and_draw() -> None:
     assert TEXTS_DE["msg.friend.challenge.finished.expired"] in expired_text
 
 
+def test_build_friend_proof_card_text_includes_winner_score_and_signature() -> None:
+    proof_text = gameplay._build_friend_proof_card_text(
+        challenge=_challenge_snapshot(status="COMPLETED", winner_user_id=10),
+        user_id=10,
+        opponent_label="Bob",
+    )
+    assert TEXTS_DE["msg.friend.challenge.proof.title"] in proof_text
+    assert "Sieger: Du" in proof_text
+    assert "Score: Du 5 | Bob 4" in proof_text
+    assert "Titel:" in proof_text
+
+
 def test_build_question_text_contains_theme_counter_and_energy() -> None:
     text = gameplay._build_question_text(
         source="MENU",
@@ -115,6 +127,22 @@ async def test_build_friend_invite_link_returns_none_on_bot_error() -> None:
         message=message,
     )
     assert await gameplay._build_friend_invite_link(callback, invite_token="abc") is None
+
+
+@pytest.mark.asyncio
+async def test_build_friend_result_share_url_returns_none_on_bot_error() -> None:
+    message = DummyMessage()
+    message.bot.raise_on_get_me = True
+    callback = DummyCallback(
+        data="x",
+        from_user=SimpleNamespace(id=1),
+        message=message,
+    )
+    share_url = await gameplay._build_friend_result_share_url(
+        callback,
+        proof_card_text="proof card",
+    )
+    assert share_url is None
 
 
 @pytest.mark.asyncio
@@ -387,3 +415,76 @@ async def test_handle_answer_starts_next_round_for_regular_mode(monkeypatch) -> 
     await gameplay.handle_answer(callback)
 
     assert any(call.kwargs.get("parse_mode") == "HTML" for call in callback.message.answers)
+
+
+@pytest.mark.asyncio
+async def test_handle_answer_friend_challenge_completion_sends_proof_card_with_share_button(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        return SimpleNamespace(user_id=10, free_energy=20, paid_energy=0, current_streak=0)
+
+    async def _fake_submit_answer(*args, **kwargs):
+        return AnswerSessionResult(
+            session_id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+            question_id="q-friend",
+            is_correct=True,
+            current_streak=4,
+            best_streak=7,
+            idempotent_replay=False,
+            mode_code="QUICK_MIX_A1A2",
+            source="FRIEND_CHALLENGE",
+            selected_answer_text="der",
+            correct_answer_text="der",
+            friend_challenge=FriendChallengeSnapshot(
+                challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                invite_token="token",
+                mode_code="QUICK_MIX_A1A2",
+                access_type="FREE",
+                status="COMPLETED",
+                creator_user_id=10,
+                opponent_user_id=20,
+                current_round=5,
+                total_rounds=5,
+                creator_score=4,
+                opponent_score=2,
+                winner_user_id=10,
+            ),
+            friend_challenge_answered_round=5,
+            friend_challenge_round_completed=True,
+            friend_challenge_waiting_for_opponent=False,
+        )
+
+    async def _fake_resolve_label(*, challenge, user_id):
+        del challenge
+        return "Bob" if user_id == 10 else "Alice"
+
+    async def _fake_notify(callback, *, opponent_user_id, text, reply_markup=None):
+        del callback, opponent_user_id, text, reply_markup
+        return
+
+    monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(gameplay.GameSessionService, "submit_answer", _fake_submit_answer)
+    monkeypatch.setattr(gameplay, "_resolve_opponent_label", _fake_resolve_label)
+    monkeypatch.setattr(gameplay, "_notify_opponent", _fake_notify)
+
+    callback = DummyCallback(
+        data="answer:123e4567-e89b-12d3-a456-426614174000:0",
+        from_user=SimpleNamespace(id=10),
+        message=DummyMessage(bot=DummyBot(username="proofbot")),
+    )
+    await gameplay.handle_answer(callback)
+
+    finish_call = next(
+        call
+        for call in callback.message.answers
+        if call.text and TEXTS_DE["msg.friend.challenge.proof.title"] in call.text
+    )
+    assert TEXTS_DE["msg.friend.challenge.finished.win"] in (finish_call.text or "")
+    keyboard = finish_call.kwargs["reply_markup"]
+    share_urls = [button.url for row in keyboard.inline_keyboard for button in row if button.url]
+    assert len(share_urls) == 1
+    assert "https://t.me/share/url" in (share_urls[0] or "")
+    assert "https%3A%2F%2Ft.me%2Fproofbot" in (share_urls[0] or "")

@@ -15,6 +15,7 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_limit_keyboard,
     build_friend_challenge_next_keyboard,
     build_friend_challenge_share_keyboard,
+    build_friend_challenge_share_url,
 )
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.keyboards.offers import build_offer_keyboard
@@ -176,6 +177,66 @@ def _build_friend_finish_text(
     return "\n".join([outcome_text, summary_text])
 
 
+def _build_friend_signature(*, challenge: FriendChallengeSnapshot, user_id: int) -> str:
+    if challenge.creator_user_id == user_id:
+        my_score = challenge.creator_score
+        opponent_score = challenge.opponent_score
+    else:
+        my_score = challenge.opponent_score
+        opponent_score = challenge.creator_score
+
+    score_diff = my_score - opponent_score
+    if challenge.status == "EXPIRED":
+        return "Deadline Survivor"
+    if score_diff >= 3:
+        return "Artikel-Koenig"
+    if score_diff > 0:
+        return "Satzbau-Boss"
+    if score_diff == 0:
+        return "Rematch-Magnet"
+    if score_diff <= -3:
+        return "Chaos im Satzbau"
+    return "Revanche-Laeufer"
+
+
+def _build_friend_proof_card_text(
+    *,
+    challenge: FriendChallengeSnapshot,
+    user_id: int,
+    opponent_label: str,
+) -> str:
+    if challenge.creator_user_id == user_id:
+        my_score = challenge.creator_score
+        opponent_score = challenge.opponent_score
+    else:
+        my_score = challenge.opponent_score
+        opponent_score = challenge.creator_score
+
+    if challenge.status == "EXPIRED":
+        winner_label = "Zeit abgelaufen"
+    elif challenge.winner_user_id is None:
+        winner_label = "Unentschieden"
+    elif challenge.winner_user_id == user_id:
+        winner_label = "Du"
+    else:
+        winner_label = opponent_label
+
+    signature = _build_friend_signature(challenge=challenge, user_id=user_id)
+    return "\n".join(
+        [
+            TEXTS_DE["msg.friend.challenge.proof.title"],
+            TEXTS_DE["msg.friend.challenge.proof.winner"].format(winner_label=winner_label),
+            TEXTS_DE["msg.friend.challenge.proof.score"].format(
+                my_score=my_score,
+                opponent_label=opponent_label,
+                opponent_score=opponent_score,
+            ),
+            TEXTS_DE["msg.friend.challenge.proof.format"].format(total_rounds=challenge.total_rounds),
+            TEXTS_DE["msg.friend.challenge.proof.signature"].format(signature=signature),
+        ]
+    )
+
+
 def _build_friend_ttl_text(*, challenge: FriendChallengeSnapshot, now_utc: datetime) -> str | None:
     if challenge.status != "ACTIVE":
         return None
@@ -248,6 +309,25 @@ async def _build_friend_invite_link(callback: CallbackQuery, *, invite_token: st
     if not me.username:
         return None
     return f"https://t.me/{me.username}?start=fc_{invite_token}"
+
+
+async def _build_friend_result_share_url(
+    callback: CallbackQuery,
+    *,
+    proof_card_text: str,
+) -> str | None:
+    try:
+        me = await callback.bot.get_me()
+    except Exception:
+        return None
+    if not me.username:
+        return None
+
+    share_text = "\n".join([proof_card_text, "", TEXTS_DE["msg.friend.challenge.proof.share.cta"]])
+    return build_friend_challenge_share_url(
+        base_link=f"https://t.me/{me.username}",
+        share_text=share_text,
+    )
 
 
 async def _start_mode(
@@ -791,14 +871,40 @@ async def handle_answer(callback: CallbackQuery) -> None:
                 user_id=snapshot.user_id,
                 opponent_label=opponent_label,
             )
+            my_proof_card_text = _build_friend_proof_card_text(
+                challenge=challenge,
+                user_id=snapshot.user_id,
+                opponent_label=opponent_label,
+            )
+            my_share_url = await _build_friend_result_share_url(
+                callback,
+                proof_card_text=my_proof_card_text,
+            )
             finish_keyboard = build_friend_challenge_finished_keyboard(
                 challenge_id=str(challenge.challenge_id),
+                share_url=my_share_url,
             )
-            await callback.message.answer(my_finish_text, reply_markup=finish_keyboard)
+            await callback.message.answer(
+                "\n\n".join([my_finish_text, my_proof_card_text]),
+                reply_markup=finish_keyboard,
+            )
             if not result.idempotent_replay and opponent_user_id is not None:
                 opponent_label_for_opponent = await _resolve_opponent_label(
                     challenge=challenge,
                     user_id=opponent_user_id,
+                )
+                opponent_proof_card_text = _build_friend_proof_card_text(
+                    challenge=challenge,
+                    user_id=opponent_user_id,
+                    opponent_label=opponent_label_for_opponent,
+                )
+                opponent_share_url = await _build_friend_result_share_url(
+                    callback,
+                    proof_card_text=opponent_proof_card_text,
+                )
+                opponent_finish_keyboard = build_friend_challenge_finished_keyboard(
+                    challenge_id=str(challenge.challenge_id),
+                    share_url=opponent_share_url,
                 )
                 await _notify_opponent(
                     callback,
@@ -815,9 +921,11 @@ async def handle_answer(callback: CallbackQuery) -> None:
                                 user_id=opponent_user_id,
                                 opponent_label=opponent_label_for_opponent,
                             ),
+                            "",
+                            opponent_proof_card_text,
                         ]
                     ),
-                    reply_markup=finish_keyboard,
+                    reply_markup=opponent_finish_keyboard,
                 )
             await callback.answer()
             return
