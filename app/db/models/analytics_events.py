@@ -16,6 +16,7 @@ class AnalyticsEvent(Base):
             "source IN ('BOT','WORKER','API','SYSTEM')",
             name="ck_analytics_events_source",
         ),
+        Index("idx_analytics_events_created_at", "created_at"),
         Index("idx_analytics_events_type_time", "event_type", "happened_at"),
         Index("idx_analytics_events_user_time", "user_id", "happened_at"),
         Index("idx_analytics_events_local_date_type", "local_date_berlin", "event_type"),

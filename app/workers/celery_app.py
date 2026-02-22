@@ -14,6 +14,7 @@ celery_app = Celery(
         "app.workers.tasks.offers_observability",
         "app.workers.tasks.analytics_daily",
         "app.workers.tasks.promo_maintenance",
+        "app.workers.tasks.retention_cleanup",
         "app.workers.tasks.referrals",
         "app.workers.tasks.referrals_observability",
         "app.workers.tasks.telegram_updates_observability",

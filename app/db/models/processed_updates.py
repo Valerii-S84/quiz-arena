@@ -11,6 +11,7 @@ from app.db.models.base import Base
 class ProcessedUpdate(Base):
     __tablename__ = "processed_updates"
     __table_args__ = (
+        Index("idx_processed_updates_processed_at", "processed_at"),
         Index(
             "idx_processed_updates_processing_status_age",
             "processed_at",

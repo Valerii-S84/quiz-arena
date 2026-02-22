@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.outbox_events import OutboxEvent
@@ -81,3 +81,22 @@ class OutboxEventsRepo:
         )
         result = await session.execute(stmt)
         return {str(event_type): int(total) for event_type, total in result.all()}
+
+    @staticmethod
+    async def delete_created_before(
+        session: AsyncSession,
+        *,
+        cutoff_utc: datetime,
+        limit: int,
+    ) -> int:
+        resolved_limit = max(1, int(limit))
+        candidate_ids = (
+            select(OutboxEvent.id)
+            .where(OutboxEvent.created_at < cutoff_utc)
+            .order_by(OutboxEvent.created_at.asc(), OutboxEvent.id.asc())
+            .limit(resolved_limit)
+            .scalar_subquery()
+        )
+        stmt = delete(OutboxEvent).where(OutboxEvent.id.in_(candidate_ids)).returning(OutboxEvent.id)
+        result = await session.execute(stmt)
+        return len(list(result.scalars()))

@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     app_host: str = Field(default="0.0.0.0", alias="APP_HOST")
     app_port: int = Field(default=8000, alias="APP_PORT")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    quiz_question_pool_cache_ttl_seconds: int = Field(
+        default=300,
+        alias="QUIZ_QUESTION_POOL_CACHE_TTL_SECONDS",
+    )
 
     telegram_bot_token: str = Field(alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_secret: str = Field(alias="TELEGRAM_WEBHOOK_SECRET")
@@ -50,6 +54,50 @@ class Settings(BaseSettings):
     telegram_updates_observability_top_stuck_limit: int = Field(
         default=10,
         alias="TELEGRAM_UPDATES_OBSERVABILITY_TOP_STUCK_LIMIT",
+    )
+    retention_processed_updates_days: int = Field(
+        default=14,
+        alias="RETENTION_PROCESSED_UPDATES_DAYS",
+    )
+    retention_outbox_events_days: int = Field(
+        default=30,
+        alias="RETENTION_OUTBOX_EVENTS_DAYS",
+    )
+    retention_analytics_events_days: int = Field(
+        default=90,
+        alias="RETENTION_ANALYTICS_EVENTS_DAYS",
+    )
+    retention_cleanup_batch_size: int = Field(
+        default=5000,
+        alias="RETENTION_CLEANUP_BATCH_SIZE",
+    )
+    retention_cleanup_max_batches_per_table: int = Field(
+        default=20,
+        alias="RETENTION_CLEANUP_MAX_BATCHES_PER_TABLE",
+    )
+    retention_cleanup_max_runtime_seconds: int = Field(
+        default=45,
+        alias="RETENTION_CLEANUP_MAX_RUNTIME_SECONDS",
+    )
+    retention_cleanup_batch_sleep_min_ms: int = Field(
+        default=0,
+        alias="RETENTION_CLEANUP_BATCH_SLEEP_MIN_MS",
+    )
+    retention_cleanup_batch_sleep_max_ms: int = Field(
+        default=0,
+        alias="RETENTION_CLEANUP_BATCH_SLEEP_MAX_MS",
+    )
+    retention_cleanup_schedule_seconds: int = Field(
+        default=3600,
+        alias="RETENTION_CLEANUP_SCHEDULE_SECONDS",
+    )
+    retention_cleanup_schedule_hour_berlin: int = Field(
+        default=3,
+        alias="RETENTION_CLEANUP_SCHEDULE_HOUR_BERLIN",
+    )
+    retention_cleanup_schedule_minute_berlin: int = Field(
+        default=15,
+        alias="RETENTION_CLEANUP_SCHEDULE_MINUTE_BERLIN",
     )
     internal_api_token: str = Field(
         default="dev_internal_token_change_me",

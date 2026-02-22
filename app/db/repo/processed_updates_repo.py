@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Float, func, select, update
+from sqlalchemy import Float, delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -200,3 +200,22 @@ class ProcessedUpdatesRepo:
                 }
             )
         return oldest
+
+    @staticmethod
+    async def delete_processed_before(
+        session: AsyncSession,
+        *,
+        cutoff_utc: datetime,
+        limit: int,
+    ) -> int:
+        resolved_limit = max(1, int(limit))
+        candidate_ids = (
+            select(ProcessedUpdate.update_id)
+            .where(ProcessedUpdate.processed_at < cutoff_utc)
+            .order_by(ProcessedUpdate.processed_at.asc(), ProcessedUpdate.update_id.asc())
+            .limit(resolved_limit)
+            .scalar_subquery()
+        )
+        stmt = delete(ProcessedUpdate).where(ProcessedUpdate.update_id.in_(candidate_ids)).returning(ProcessedUpdate.update_id)
+        result = await session.execute(stmt)
+        return len(list(result.scalars()))

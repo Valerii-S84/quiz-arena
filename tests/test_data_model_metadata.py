@@ -103,6 +103,7 @@ def test_critical_constraints_present() -> None:
 
     outbox_events = Base.metadata.tables["outbox_events"]
     outbox_indexes = {index.name for index in outbox_events.indexes}
+    assert "idx_outbox_events_created_at" in outbox_indexes
     assert "idx_outbox_events_type_created_desc" in outbox_indexes
     assert "idx_outbox_events_status_created_desc" in outbox_indexes
 
@@ -110,3 +111,11 @@ def test_critical_constraints_present() -> None:
     offers_indexes = {index.name for index in offers_impressions.indexes}
     assert "idx_offers_shown_at" in offers_indexes
     assert "idx_offers_shown_at_code" in offers_indexes
+
+    processed_updates = Base.metadata.tables["processed_updates"]
+    processed_updates_indexes = {index.name for index in processed_updates.indexes}
+    assert "idx_processed_updates_processed_at" in processed_updates_indexes
+
+    analytics_events = Base.metadata.tables["analytics_events"]
+    analytics_events_indexes = {index.name for index in analytics_events.indexes}
+    assert "idx_analytics_events_created_at" in analytics_events_indexes

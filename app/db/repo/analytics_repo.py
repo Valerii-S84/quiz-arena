@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
 
-from sqlalchemy import distinct, func, select
+from sqlalchemy import delete, distinct, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -231,3 +231,22 @@ class AnalyticsRepo:
         stmt = select(AnalyticsDaily).order_by(AnalyticsDaily.local_date_berlin.desc()).limit(limit)
         result = await session.execute(stmt)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def delete_events_created_before(
+        session: AsyncSession,
+        *,
+        cutoff_utc: datetime,
+        limit: int,
+    ) -> int:
+        resolved_limit = max(1, int(limit))
+        candidate_ids = (
+            select(AnalyticsEvent.id)
+            .where(AnalyticsEvent.created_at < cutoff_utc)
+            .order_by(AnalyticsEvent.created_at.asc(), AnalyticsEvent.id.asc())
+            .limit(resolved_limit)
+            .scalar_subquery()
+        )
+        stmt = delete(AnalyticsEvent).where(AnalyticsEvent.id.in_(candidate_ids)).returning(AnalyticsEvent.id)
+        result = await session.execute(stmt)
+        return len(list(result.scalars()))

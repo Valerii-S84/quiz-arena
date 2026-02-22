@@ -12,6 +12,7 @@ from app.db.models.base import Base
 class OutboxEvent(Base):
     __tablename__ = "outbox_events"
     __table_args__ = (
+        Index("idx_outbox_events_created_at", "created_at"),
         Index(
             "idx_outbox_events_type_created_desc",
             "event_type",

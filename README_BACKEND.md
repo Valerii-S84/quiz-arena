@@ -14,6 +14,14 @@ python3 -m venv .venv
 docker compose up -d
 ```
 
+Local infra expected credentials (default `docker-compose.yml`):
+- Postgres user/password: `quiz` / `quiz`
+- Databases:
+  - app: `quiz_arena`
+  - tests: `quiz_arena_test` (create via `scripts.ensure_test_db`)
+
+If an old local Postgres volume has different credentials, recreate local containers/volumes instead of manual `ALTER USER`.
+
 ## 3. Run API
 
 ```bash
@@ -33,6 +41,26 @@ docker compose up -d
 ```bash
 .venv/bin/python -m celery -A app.workers.celery_app worker -Q q_high,q_normal,q_low --loglevel=INFO
 ```
+
+Retention cleanup defaults:
+- `processed_updates`: 14 days
+- `outbox_events`: 30 days
+- `analytics_events`: 90 days
+- Scheduled task: `app.workers.tasks.retention_cleanup.run_retention_cleanup` (hourly, queue `q_low`)
+
+Tuning env vars:
+- `QUIZ_QUESTION_POOL_CACHE_TTL_SECONDS`
+- `RETENTION_PROCESSED_UPDATES_DAYS`
+- `RETENTION_OUTBOX_EVENTS_DAYS`
+- `RETENTION_ANALYTICS_EVENTS_DAYS`
+- `RETENTION_CLEANUP_BATCH_SIZE`
+- `RETENTION_CLEANUP_MAX_BATCHES_PER_TABLE`
+- `RETENTION_CLEANUP_MAX_RUNTIME_SECONDS`
+- `RETENTION_CLEANUP_BATCH_SLEEP_MIN_MS`
+- `RETENTION_CLEANUP_BATCH_SLEEP_MAX_MS`
+- `RETENTION_CLEANUP_SCHEDULE_SECONDS`
+- `RETENTION_CLEANUP_SCHEDULE_HOUR_BERLIN`
+- `RETENTION_CLEANUP_SCHEDULE_MINUTE_BERLIN`
 
 ## 6. Run tests
 

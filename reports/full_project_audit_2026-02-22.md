@@ -295,16 +295,49 @@
 3. Закрити P1-2: виправити funnel-метрики (`dismiss != click`, conversion after successful payment).
 4. Закрити P1-4: зелений `mypy` + додати у CI.
 
-### Етап 1 (продуктивність і операційна готовність, 1-2 тижні)
+### Етап 1 (закриття P1, 1-2 тижні)
 1. Додати рекомендовані індекси і перевірити `EXPLAIN ANALYZE` для ключових запитів.
 2. Розвести readiness/liveness, прибрати raw exception leakage.
-3. Впровадити retention jobs для `processed_updates/outbox_events/analytics_events`.
-4. Вирівняти production runbook для internal allowlist/trusted proxies.
+3. Вирівняти production runbook для internal allowlist/trusted proxies.
+4. Закріпити `mypy` як обов'язковий CI gate.
 
-### Етап 2 (підтвердження масштабу, 1-2 тижні)
-1. Провести load/stress: API + Celery + Postgres (цільові профілі 10k concurrent, пікові burst).
-2. Визначити SLO/SLI і ввести release gates (p95/p99 latency, queue lag, error rate).
-3. Зафіксувати lockfile, оновити контент-репорти автоматично в pipeline.
+### Етап 2 (після P1: execution-slices, 1-3 тижні)
+
+#### SLICE P2-1: Retention jobs (табличний "мусор")
+Ціль: не допустити неконтрольованого росту `processed_updates`, `outbox_events`, `analytics_events` (або еквівалентних event-таблиць).
+
+DoD:
+1. Є retention policy з термінами зберігання (рекомендований baseline: `processed_updates` 14 днів, `outbox_events` 30 днів, `analytics_events` 90 днів; `analytics_daily` без агресивного purge).
+2. Є scheduled cleanup job (Celery beat/cron) з batched delete (наприклад, по 2k-10k рядків за ітерацію) і індексами під умови `WHERE created_at < cutoff`.
+3. Є хоча б 1 інтеграційний сценарій, який перевіряє коректне очищення без видалення "свіжих" записів.
+4. Є метрики/логи очистки: `rows_deleted`, `duration_ms`, `table`, `cutoff`, `error_count`.
+
+#### SLICE P2-2: Performance hot spot (O(N) selection)
+Ціль: прибрати O(N)-підбір питань у runtime-банку там, де це стане bottleneck на 25k-40k DAU.
+
+DoD:
+1. Є вимір "до/після" (мінімум benchmark-скрипт або тест з фіксованим seed/розміром вибірки).
+2. Підтверджено, що анти-повтори (already-seen question IDs) не зламані.
+3. Усі профільні тести зелені (`tests/game/test_question_selection.py` + інтеграційний happy-path).
+4. Є короткий технічний запис у report: який алгоритм замінено і який виграш отримано.
+
+#### SLICE P2-3: Load/stress + SLO gates
+Ціль: перейти від припущень до виміряної пропускної здатності та стабільності.
+
+DoD:
+1. Є `k6` сценарії для steady/peak/burst профілів (окремо webhook/start flows + worker-heavy flow).
+2. Зафіксовані критерії проходження: `p95` для webhook/start, `error_rate`, `db lock waits` (і їх цільові пороги в docs).
+3. Окремо перевірено "at-least-once updates" + idempotency під дублями/ретраями.
+4. Є короткий звіт з цифрами, обмеженнями тестового середовища і рішенням `PASS/FAIL` по gate.
+
+#### SLICE P2-4: Lockfile + актуалізація QuizBank docs/reports
+Ціль: відтворюваний dev/CI контур і документація без розсинхрону з фактом.
+
+DoD:
+1. Доданий lockfile (`uv`/`pip-tools`/`poetry` відповідно до обраного стандарту проєкту) і використовується в CI.
+2. Оновлено фактичні дані QuizBank (кількість CSV/питань/розподіл рівнів) у `QuizBank/README.md`.
+3. Або додано автооновлення audit-репортів у pipeline, або явно зафіксовано ручний flow з конкретними командами.
+4. У PR є перевірка, що `reports/quizbank_inventory_audit.md` не застарів відносно стану `QuizBank/*.csv`.
 
 ## 8. Підсумковий висновок
 
