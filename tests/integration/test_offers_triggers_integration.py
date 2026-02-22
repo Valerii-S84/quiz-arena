@@ -83,6 +83,7 @@ async def _insert_offer_impression(
     priority: int,
     dismiss_reason: str | None = None,
     clicked_at: datetime | None = None,
+    dismissed_at: datetime | None = None,
 ) -> None:
     async with SessionLocal.begin() as session:
         session.add(
@@ -95,6 +96,7 @@ async def _insert_offer_impression(
                 local_date_berlin=_berlin_date(now_utc),
                 clicked_at=clicked_at,
                 dismiss_reason=dismiss_reason,
+                dismissed_at=dismissed_at,
                 idempotency_key=f"seed:{uuid4().hex}",
             )
         )
@@ -261,7 +263,7 @@ async def test_offer_mute_window_blocks_offer_for_72h_after_not_show() -> None:
         trigger_code=TRG_ENERGY_ZERO,
         priority=100,
         dismiss_reason=OFFER_NOT_SHOW_DISMISS_REASON,
-        clicked_at=now_utc.replace(hour=11),
+        dismissed_at=now_utc.replace(hour=11),
     )
 
     async with SessionLocal.begin() as session:

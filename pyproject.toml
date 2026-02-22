@@ -47,3 +47,40 @@ target-version = "py312"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app", "tests"]
+explicit_package_bases = true
+warn_unused_configs = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = ["celery", "celery.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+  "app.api.routes.internal_referrals",
+  "app.bot.handlers.gameplay",
+  "app.bot.handlers.payments",
+  "app.bot.handlers.promo",
+  "app.bot.handlers.referral",
+  "app.bot.handlers.start",
+  "app.core.config",
+  "app.db.repo.offers_repo",
+  "app.db.repo.promo_repo",
+  "app.db.repo.purchases_repo",
+  "app.db.repo.users_repo",
+  "app.economy.purchases.recovery",
+  "app.game.sessions.service",
+  "app.services.referrals_observability",
+  "app.workers.tasks.payments_reliability",
+  "app.workers.tasks.promo_maintenance",
+  "app.workers.tasks.referrals",
+]
+ignore_errors = true

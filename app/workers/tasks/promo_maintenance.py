@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import asyncio
 from datetime import datetime, timedelta, timezone
 
 import structlog
@@ -8,6 +6,7 @@ import structlog
 from app.db.repo.promo_repo import PromoRepo
 from app.db.session import SessionLocal
 from app.services.alerts import send_ops_alert
+from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
@@ -75,17 +74,17 @@ async def run_promo_bruteforce_guard_async() -> dict[str, int]:
 
 @celery_app.task(name="app.workers.tasks.promo_maintenance.run_promo_reservation_expiry")
 def run_promo_reservation_expiry() -> dict[str, int]:
-    return asyncio.run(run_promo_reservation_expiry_async())
+    return run_async_job(run_promo_reservation_expiry_async())
 
 
 @celery_app.task(name="app.workers.tasks.promo_maintenance.run_promo_campaign_status_rollover")
 def run_promo_campaign_status_rollover() -> dict[str, int]:
-    return asyncio.run(run_promo_campaign_status_rollover_async())
+    return run_async_job(run_promo_campaign_status_rollover_async())
 
 
 @celery_app.task(name="app.workers.tasks.promo_maintenance.run_promo_bruteforce_guard")
 def run_promo_bruteforce_guard() -> dict[str, int]:
-    return asyncio.run(run_promo_bruteforce_guard_async())
+    return run_async_job(run_promo_bruteforce_guard_async())
 
 
 celery_app.conf.beat_schedule = celery_app.conf.beat_schedule or {}

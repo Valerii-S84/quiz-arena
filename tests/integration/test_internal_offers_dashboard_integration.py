@@ -103,9 +103,10 @@ async def _seed_offer_dashboard_dataset(now_utc: datetime) -> None:
                     priority=100,
                     shown_at=now_utc - timedelta(minutes=90),
                     local_date_berlin=date(2026, 2, 19),
-                    clicked_at=now_utc - timedelta(minutes=89),
+                    clicked_at=None,
                     converted_purchase_id=None,
                     dismiss_reason=OFFER_NOT_SHOW_DISMISS_REASON,
+                    dismissed_at=now_utc - timedelta(minutes=89),
                     idempotency_key=f"offer-dashboard:{uuid4().hex}",
                 ),
                 OfferImpression(
@@ -142,6 +143,7 @@ async def _seed_offer_dashboard_dataset(now_utc: datetime) -> None:
                     clicked_at=None,
                     converted_purchase_id=None,
                     dismiss_reason=OFFER_NOT_SHOW_DISMISS_REASON,
+                    dismissed_at=now_utc - timedelta(minutes=49),
                     idempotency_key=f"offer-dashboard:{uuid4().hex}",
                 ),
                 OfferImpression(
@@ -192,10 +194,10 @@ async def test_internal_offers_dashboard_returns_funnel_metrics_and_alert_flags(
     assert payload["window_hours"] == 24
     assert payload["impressions_total"] == 6
     assert payload["unique_users"] == 3
-    assert payload["clicks_total"] == 3
+    assert payload["clicks_total"] == 2
     assert payload["dismissals_total"] == 2
     assert payload["conversions_total"] == 2
-    assert payload["click_through_rate"] == pytest.approx(0.5)
+    assert payload["click_through_rate"] == pytest.approx(2 / 6)
     assert payload["conversion_rate"] == pytest.approx(2 / 6)
     assert payload["dismiss_rate"] == pytest.approx(2 / 6)
     assert payload["impressions_per_user"] == pytest.approx(2.0)

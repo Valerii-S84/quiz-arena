@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import asyncio
 from datetime import datetime, timezone
 
 import structlog
@@ -11,6 +9,7 @@ from app.db.repo.outbox_events_repo import OutboxEventsRepo
 from app.db.session import SessionLocal
 from app.economy.referrals.service import ReferralService
 from app.services.alerts import send_ops_alert
+from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
@@ -118,12 +117,12 @@ async def _record_referral_reward_event(
 
 @celery_app.task(name="app.workers.tasks.referrals.run_referral_qualification_checks")
 def run_referral_qualification_checks(batch_size: int = 200) -> dict[str, int]:
-    return asyncio.run(run_referral_qualification_checks_async(batch_size=batch_size))
+    return run_async_job(run_referral_qualification_checks_async(batch_size=batch_size))
 
 
 @celery_app.task(name="app.workers.tasks.referrals.run_referral_reward_distribution")
 def run_referral_reward_distribution(batch_size: int = 200) -> dict[str, int]:
-    return asyncio.run(run_referral_reward_distribution_async(batch_size=batch_size))
+    return run_async_job(run_referral_reward_distribution_async(batch_size=batch_size))
 
 
 celery_app.conf.beat_schedule = celery_app.conf.beat_schedule or {}

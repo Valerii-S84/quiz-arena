@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import asyncio
 from datetime import datetime, timedelta, timezone
 
 import structlog
@@ -10,6 +8,7 @@ from app.db.repo.outbox_events_repo import OutboxEventsRepo
 from app.db.repo.processed_updates_repo import ProcessedUpdatesRepo
 from app.db.session import SessionLocal
 from app.services.alerts import send_ops_alert
+from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.tasks.telegram_updates import (
     EVENT_TELEGRAM_UPDATE_FAILED_FINAL,
@@ -129,7 +128,7 @@ async def run_telegram_updates_reliability_alerts_async() -> dict[str, object]:
 
 @celery_app.task(name="app.workers.tasks.telegram_updates_observability.run_telegram_updates_reliability_alerts")
 def run_telegram_updates_reliability_alerts() -> dict[str, object]:
-    return asyncio.run(run_telegram_updates_reliability_alerts_async())
+    return run_async_job(run_telegram_updates_reliability_alerts_async())
 
 
 celery_app.conf.beat_schedule = celery_app.conf.beat_schedule or {}

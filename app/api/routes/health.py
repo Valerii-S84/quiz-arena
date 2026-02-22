@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
@@ -13,6 +14,7 @@ from app.db.session import SessionLocal
 from app.workers.celery_app import celery_app
 
 router = APIRouter(tags=["health"])
+logger = structlog.get_logger(__name__)
 
 
 def _ok_check(extra: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -22,8 +24,8 @@ def _ok_check(extra: dict[str, Any] | None = None) -> dict[str, Any]:
     return payload
 
 
-def _failed_check(error: str) -> dict[str, str]:
-    return {"status": "failed", "error": error}
+def _failed_check(error_code: str) -> dict[str, str]:
+    return {"status": "failed", "error": error_code}
 
 
 async def _check_database() -> dict[str, Any]:
@@ -32,7 +34,8 @@ async def _check_database() -> dict[str, Any]:
             await session.execute(text("SELECT 1"))
         return _ok_check()
     except Exception as exc:
-        return _failed_check(str(exc))
+        logger.warning("health_database_check_failed", error_type=type(exc).__name__)
+        return _failed_check("database_unavailable")
 
 
 async def _check_redis() -> dict[str, Any]:
@@ -41,10 +44,15 @@ async def _check_redis() -> dict[str, Any]:
         redis_client = Redis.from_url(get_settings().redis_url)
         pong = await redis_client.ping()
         if pong is not True:
-            return _failed_check(f"unexpected redis ping response: {pong!r}")
+            logger.warning(
+                "health_redis_check_unexpected_ping",
+                ping_value=repr(pong),
+            )
+            return _failed_check("redis_unavailable")
         return _ok_check()
     except Exception as exc:
-        return _failed_check(str(exc))
+        logger.warning("health_redis_check_failed", error_type=type(exc).__name__)
+        return _failed_check("redis_unavailable")
     finally:
         if redis_client is not None:
             await redis_client.aclose()
@@ -54,15 +62,16 @@ def _check_celery_worker_sync() -> dict[str, Any]:
     try:
         inspector = celery_app.control.inspect(timeout=1.0)
         if inspector is None:
-            return _failed_check("celery inspector is unavailable")
+            return _failed_check("celery_unavailable")
 
         replies = inspector.ping() or {}
         if not replies:
-            return _failed_check("no celery workers responded to ping")
+            return _failed_check("celery_unavailable")
 
         return _ok_check({"workers": len(replies)})
     except Exception as exc:
-        return _failed_check(str(exc))
+        logger.warning("health_celery_check_failed", error_type=type(exc).__name__)
+        return _failed_check("celery_unavailable")
 
 
 async def _check_celery_worker() -> dict[str, Any]:
@@ -95,6 +104,14 @@ async def _collect_health_checks() -> dict[str, dict[str, Any]]:
 
 def _all_checks_ok(checks: dict[str, dict[str, Any]]) -> bool:
     return all(check.get("status") == "ok" for check in checks.values())
+
+
+@router.get("/live")
+async def live() -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"status": "live"},
+    )
 
 
 @router.get("/health")

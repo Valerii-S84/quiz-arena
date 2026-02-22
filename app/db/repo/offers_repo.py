@@ -89,7 +89,7 @@ class OffersRepo:
             )
             .values(
                 dismiss_reason=dismiss_reason,
-                clicked_at=dismissed_at,
+                dismissed_at=dismissed_at,
             )
         )
         result = await session.execute(stmt)
@@ -109,6 +109,7 @@ class OffersRepo:
                 OfferImpression.id == impression_id,
                 OfferImpression.user_id == user_id,
                 OfferImpression.clicked_at.is_(None),
+                OfferImpression.dismiss_reason.is_(None),
             )
             .values(clicked_at=clicked_at)
         )
@@ -154,6 +155,7 @@ class OffersRepo:
         stmt = select(func.count(OfferImpression.id)).where(
             OfferImpression.shown_at >= shown_since_utc,
             OfferImpression.clicked_at.is_not(None),
+            OfferImpression.dismiss_reason.is_(None),
         )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)

@@ -105,9 +105,10 @@ class OfferService:
                 continue
             if impression.dismiss_reason != OFFER_NOT_SHOW_DISMISS_REASON:
                 continue
-            if impression.clicked_at is None:
+            dismissed_at = impression.dismissed_at or impression.clicked_at
+            if dismissed_at is None:
                 continue
-            if impression.clicked_at >= mute_threshold:
+            if dismissed_at >= mute_threshold:
                 return True
         return False
 

@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import asyncio
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -10,6 +8,7 @@ from app.db.repo.analytics_repo import AnalyticsRepo
 from app.db.session import SessionLocal
 from app.economy.energy.constants import BERLIN_TIMEZONE
 from app.services.analytics_daily import build_daily_snapshot
+from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
@@ -47,7 +46,7 @@ async def run_analytics_daily_aggregation_async(*, days_back: int = 2) -> dict[s
 
 @celery_app.task(name="app.workers.tasks.analytics_daily.run_analytics_daily_aggregation")
 def run_analytics_daily_aggregation(days_back: int = 2) -> dict[str, object]:
-    return asyncio.run(run_analytics_daily_aggregation_async(days_back=days_back))
+    return run_async_job(run_analytics_daily_aggregation_async(days_back=days_back))
 
 
 celery_app.conf.beat_schedule = celery_app.conf.beat_schedule or {}

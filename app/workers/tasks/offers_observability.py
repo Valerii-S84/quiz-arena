@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import asyncio
 from datetime import datetime, timezone
 
 import structlog
@@ -13,6 +11,7 @@ from app.services.offers_observability import (
     evaluate_offer_alert_state,
     get_offer_alert_thresholds,
 )
+from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
@@ -91,7 +90,7 @@ async def run_offers_funnel_alerts_async() -> dict[str, object]:
 
 @celery_app.task(name="app.workers.tasks.offers_observability.run_offers_funnel_alerts")
 def run_offers_funnel_alerts() -> dict[str, object]:
-    return asyncio.run(run_offers_funnel_alerts_async())
+    return run_async_job(run_offers_funnel_alerts_async())
 
 
 celery_app.conf.beat_schedule = celery_app.conf.beat_schedule or {}

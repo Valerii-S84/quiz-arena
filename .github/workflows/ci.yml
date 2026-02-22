@@ -57,6 +57,9 @@ jobs:
       - name: Ruff
         run: ruff check app tests
 
+      - name: Mypy
+        run: mypy app tests
+
       - name: Pytest (unit and bot)
         env:
           DATABASE_URL: ${{ env.TEST_DATABASE_URL }}

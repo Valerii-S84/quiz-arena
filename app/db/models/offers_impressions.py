@@ -34,4 +34,5 @@ class OfferImpression(Base):
         nullable=True,
     )
     dismiss_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(96), unique=True, nullable=False)

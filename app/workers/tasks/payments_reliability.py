@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import asyncio
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -25,6 +23,7 @@ from app.services.payments_reliability import (
     compute_reconciliation_diff,
     reconciliation_status,
 )
+from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
@@ -228,7 +227,7 @@ async def run_payments_reconciliation_async(*, stale_minutes: int = 30) -> dict[
 
 @celery_app.task(name="app.workers.tasks.payments_reliability.recover_paid_uncredited")
 def recover_paid_uncredited(batch_size: int = 100, stale_minutes: int = 2) -> dict[str, int]:
-    return asyncio.run(
+    return run_async_job(
         recover_paid_uncredited_async(
             batch_size=batch_size,
             stale_minutes=stale_minutes,
@@ -238,17 +237,17 @@ def recover_paid_uncredited(batch_size: int = 100, stale_minutes: int = 2) -> di
 
 @celery_app.task(name="app.workers.tasks.payments_reliability.expire_stale_unpaid_invoices")
 def expire_stale_unpaid_invoices(stale_minutes: int = 30) -> dict[str, int]:
-    return asyncio.run(expire_stale_unpaid_invoices_async(stale_minutes=stale_minutes))
+    return run_async_job(expire_stale_unpaid_invoices_async(stale_minutes=stale_minutes))
 
 
 @celery_app.task(name="app.workers.tasks.payments_reliability.run_refund_promo_rollback")
 def run_refund_promo_rollback(batch_size: int = 100) -> dict[str, int]:
-    return asyncio.run(run_refund_promo_rollback_async(batch_size=batch_size))
+    return run_async_job(run_refund_promo_rollback_async(batch_size=batch_size))
 
 
 @celery_app.task(name="app.workers.tasks.payments_reliability.run_payments_reconciliation")
 def run_payments_reconciliation(stale_minutes: int = 30) -> dict[str, int | str]:
-    return asyncio.run(run_payments_reconciliation_async(stale_minutes=stale_minutes))
+    return run_async_job(run_payments_reconciliation_async(stale_minutes=stale_minutes))
 
 
 celery_app.conf.beat_schedule = celery_app.conf.beat_schedule or {}

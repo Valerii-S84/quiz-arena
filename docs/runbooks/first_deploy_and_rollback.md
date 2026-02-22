@@ -27,10 +27,16 @@ Mandatory to change:
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_WEBHOOK_SECRET`
 - `INTERNAL_API_TOKEN`
+- `INTERNAL_API_ALLOWLIST` (CIDR list for ops/internal access, not localhost in production)
+- `INTERNAL_API_TRUSTED_PROXIES` (reverse-proxy CIDRs that are allowed to set forwarded client IP)
 - `PROMO_SECRET_PEPPER`
 - `POSTGRES_PASSWORD`
 - `DATABASE_URL` password segment
 - `CADDY_EMAIL`
+
+If API is behind reverse proxy/load balancer:
+- set `INTERNAL_API_TRUSTED_PROXIES` to proxy network(s), for example `10.0.0.0/8,172.16.0.0/12`;
+- set `INTERNAL_API_ALLOWLIST` to real operator/source network(s), for example VPN egress CIDRs.
 
 Re-apply:
 

@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import asyncio
 import random
 
 import structlog
@@ -13,6 +11,7 @@ from app.db.repo.outbox_events_repo import OutboxEventsRepo
 from app.db.repo.processed_updates_repo import ProcessedUpdatesRepo
 from app.db.session import SessionLocal
 from app.services.telegram_updates import extract_update_id
+from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
@@ -187,7 +186,7 @@ def process_telegram_update(
 
     task_id = str(self.request.id) if self.request.id is not None else None
     try:
-        return asyncio.run(
+        return run_async_job(
             process_update_async(
                 update_payload,
                 update_id=resolved_update_id,
@@ -204,7 +203,7 @@ def process_telegram_update(
                 retries=current_retries,
                 max_retries=TASK_MAX_RETRIES,
             )
-            asyncio.run(
+            run_async_job(
                 _emit_reliability_event(
                     event_type=EVENT_TELEGRAM_UPDATE_FAILED_FINAL,
                     payload={
@@ -230,7 +229,7 @@ def process_telegram_update(
             retry_in_seconds=retry_in_seconds,
             max_retries=TASK_MAX_RETRIES,
         )
-        asyncio.run(
+        run_async_job(
             _emit_reliability_event(
                 event_type=EVENT_TELEGRAM_UPDATE_RETRY_SCHEDULED,
                 payload={

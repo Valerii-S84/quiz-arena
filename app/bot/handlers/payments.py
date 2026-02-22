@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -9,6 +10,7 @@ from aiogram.types import CallbackQuery, LabeledPrice, Message, PreCheckoutQuery
 
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.session import SessionLocal
 from app.economy.offers.service import OfferService
 from app.economy.purchases.catalog import get_product
@@ -25,6 +27,35 @@ from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="payments")
 logger = structlog.get_logger(__name__)
+
+
+def _token_hash(value: str, *, length: int) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:length]
+
+
+def _build_purchase_idempotency_key(
+    *,
+    product_code: str,
+    callback_id: str,
+    offer_impression_id: int | None,
+) -> str:
+    product_token = _token_hash(product_code, length=8)
+    callback_token = _token_hash(callback_id, length=10)
+    if offer_impression_id is not None:
+        return f"buy:{product_token}:offer:{offer_impression_id}:{callback_token}"
+    return f"buy:{product_token}:{callback_token}"
+
+
+def _extract_offer_impression_id_from_purchase_idempotency_key(idempotency_key: str) -> int | None:
+    parts = idempotency_key.split(":")
+    if len(parts) != 5:
+        return None
+    if parts[0] != "buy" or parts[2] != "offer":
+        return None
+    try:
+        return int(parts[3])
+    except ValueError:
+        return None
 
 
 def _parse_buy_callback_data(callback_data: str) -> tuple[str, UUID | None, int | None]:
@@ -73,17 +104,14 @@ async def handle_buy(callback: CallbackQuery) -> None:
                 session,
                 user_id=snapshot.user_id,
                 product_code=product_code,
-                idempotency_key=f"buy:{product_code}:{callback.id}",
+                idempotency_key=_build_purchase_idempotency_key(
+                    product_code=product_code,
+                    callback_id=callback.id,
+                    offer_impression_id=offer_impression_id,
+                ),
                 now_utc=now_utc,
                 promo_redemption_id=promo_redemption_id,
             )
-            if offer_impression_id is not None:
-                await OfferService.mark_offer_converted_purchase(
-                    session,
-                    user_id=snapshot.user_id,
-                    impression_id=offer_impression_id,
-                    purchase_id=init_result.purchase_id,
-                )
     except PremiumDowngradeNotAllowedError:
         await callback.answer(TEXTS_DE["msg.premium.downgrade.blocked"], show_alert=True)
         return
@@ -171,6 +199,18 @@ async def handle_successful_payment(message: Message) -> None:
                 raw_successful_payment=payment.model_dump(exclude_none=True),
                 now_utc=now_utc,
             )
+            purchase = await PurchasesRepo.get_by_id(session, credit_result.purchase_id)
+            if purchase is not None:
+                offer_impression_id = _extract_offer_impression_id_from_purchase_idempotency_key(
+                    purchase.idempotency_key
+                )
+                if offer_impression_id is not None:
+                    await OfferService.mark_offer_converted_purchase(
+                        session,
+                        user_id=snapshot.user_id,
+                        impression_id=offer_impression_id,
+                        purchase_id=credit_result.purchase_id,
+                    )
     except (PurchaseNotFoundError, ProductNotFoundError, PurchasePrecheckoutValidationError):
         await message.answer(TEXTS_DE["msg.purchase.error.failed"], reply_markup=build_home_keyboard())
         return
