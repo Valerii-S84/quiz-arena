@@ -1,5 +1,78 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-22, P2 execution handoff: P2-1 + P2-2 done, P2-3 artifacts done)
+
+### What was completed today
+1. `SLICE P2-1` implemented (retention jobs):
+   - Added retention cleanup task + scheduler:
+     - `app/workers/tasks/retention_cleanup.py`
+   - Added retention config/env knobs:
+     - `app/core/config.py`
+     - `.env.example`
+     - `.env.production.example`
+   - Added batched delete methods:
+     - `app/db/repo/processed_updates_repo.py`
+     - `app/db/repo/outbox_events_repo.py`
+     - `app/db/repo/analytics_repo.py`
+   - Added retention indexes + migration:
+     - `alembic/versions/de56fa78bc90_m21_add_retention_cleanup_indexes.py`
+   - Added tests:
+     - `tests/workers/test_retention_cleanup_task.py`
+     - `tests/integration/test_retention_cleanup_integration.py`
+   - Added hardening requested by user:
+     - max runtime guard,
+     - batch sleep/jitter,
+     - optional Berlin-night cron scheduling (`RETENTION_CLEANUP_SCHEDULE_SECONDS=0` + hour/minute knobs).
+
+2. `SLICE P2-2` implemented (question-selection hot path):
+   - Reworked runtime selection path with cached ordered pool + deterministic circular anti-repeat pick:
+     - `app/game/questions/runtime_bank.py`
+   - Added stale-cache self-heal retry.
+   - Added cache TTL knob:
+     - `QUIZ_QUESTION_POOL_CACHE_TTL_SECONDS`.
+   - Added benchmark script + report:
+     - `scripts/benchmark_question_selection_hotpath.py`
+     - `reports/p2_2_question_selection_hotpath_report_2026-02-22.md`
+   - Synthetic benchmark result:
+     - `old: 63085.87 ms`
+     - `new: 13.91 ms`
+     - `speedup_x: 4536.46`
+
+3. `SLICE P2-3` artifacts implemented:
+   - k6 scenarios:
+     - `load/k6/webhook_start_profiles.js` (`steady/peak/burst`)
+     - `load/k6/webhook_duplicate_updates.js` (duplicate-delivery pressure)
+   - SLO gate tooling:
+     - `scripts/pg_lock_waits_snapshot.py`
+     - `scripts/evaluate_slo_gate.py`
+   - SLO docs + runbook:
+     - `docs/performance/p2_3_load_slo_gates.md`
+   - P2-3 report scaffold:
+     - `reports/p2_3_load_slo_report_2026-02-22.md`
+   - Added integration test for at-least-once/idempotency under duplicate updates:
+     - `tests/integration/test_telegram_updates_idempotency_integration.py`
+
+### Commits
+- `f196036` - Implement P2 retention cleanup and question-selection hot path hardening
+- `9d22fd2` - Add P2-3 load profiles, SLO gates, and duplicate-update integration check
+
+### What is still pending
+1. Finish `SLICE P2-3` execution on environment with `k6` installed:
+   - run `steady`, `peak`, `burst`,
+   - run duplicate profile,
+   - capture `reports/k6_*_summary.json`,
+   - capture DB snapshots before/after runs,
+   - evaluate gates via `scripts/evaluate_slo_gate.py`,
+   - fill `reports/p2_3_load_slo_report_2026-02-22.md` with actual PASS/FAIL metrics.
+2. Start `SLICE P2-4`:
+   - add lockfile strategy for CI/prod reproducibility,
+   - update QuizBank factual docs/reports,
+   - add/define automation or strict manual flow for report refresh.
+
+### Environment note
+- `k6` is missing in current workspace (`k6: command not found`), so load profiles were prepared but not executed here.
+- Working tree is clean after the two commits above.
+
 ## Update (2026-02-22, Critical Patch Mission: P0-2 + P1-1 Scale & DB Index Hardening)
 
 ### Why this is now top priority
