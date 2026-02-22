@@ -1,5 +1,127 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-22, Critical Patch Mission: P0-2 + P1-1 Scale & DB Index Hardening)
+
+### Why this is now top priority
+- Current audit verdict: project is functionally strong but not scale-ready for 100k users.
+- Two blocking areas must be closed first:
+  - `P0-2`: production scaling baseline.
+  - `P1-1`: missing DB indexes for hot operational/analytics queries.
+
+### Mission objective for next agent
+- Deliver a production-ready patch set that removes immediate scale blockers and hardens DB query paths.
+- Keep behavior backward-compatible (no product logic rewrites in this mission).
+- Final state must be deployable with zero ambiguity from runbook.
+
+### Scope (strict)
+1. Scale baseline in production compose/runtime.
+2. DB index hardening via Alembic migration(s) + SQLAlchemy model parity.
+3. Ops docs update for new scaling controls and rollout sequence.
+4. Test coverage updates for new schema/index expectations.
+
+### Out of scope (do not mix in this patch)
+- Telegram reliability redesign (`P0-1`).
+- Funnel semantics fix (`P1-2`) and health/readiness redesign (`P1-3`).
+- New features, UX changes, or refactor-only changes.
+
+### Required deliverables
+1. `docker-compose.prod.yml` updated for practical scaling.
+2. `.env.production.example` extended with scaling knobs.
+3. `alembic/versions/<new_revision>_m17_scale_index_hardening.py` (exact name can vary, but keep milestone semantics).
+4. Updated model index definitions:
+   - `app/db/models/purchases.py`
+   - `app/db/models/referrals.py`
+   - `app/db/models/outbox_events.py`
+   - `app/db/models/offers_impressions.py`
+5. Runbook update:
+   - `docs/runbooks/first_deploy_and_rollback.md`
+6. Short execution report:
+   - `reports/p0_2_p1_1_patch_report_2026-02-22.md`
+
+### Implementation plan (must follow)
+
+#### Phase A: Compose scale baseline (P0-2)
+1. Remove hard scaling blockers in `docker-compose.prod.yml`:
+   - remove `container_name` from services that must be scalable (`api`, `worker`);
+   - keep static names only where scaling is not intended (`postgres`, `redis`, `caddy`, `beat`).
+2. API process scaling:
+   - add workers parameter to uvicorn command:
+     - `--workers ${API_WORKERS:-4}`
+   - keep host/port unchanged.
+3. Worker throughput controls:
+   - parameterize Celery worker concurrency:
+     - `--concurrency=${CELERY_WORKER_CONCURRENCY:-4}`
+   - keep queue list `q_high,q_normal,q_low`.
+4. Add new env knobs to `.env.production.example`:
+   - `API_WORKERS=4`
+   - `CELERY_WORKER_CONCURRENCY=4`
+5. Update runbook to reflect new scaling operations:
+   - explicit `docker compose -f docker-compose.prod.yml up -d --scale api=<N> --scale worker=<M>`;
+   - remove docs that depend on fixed container names for scalable services.
+
+#### Phase B: DB index hardening (P1-1)
+Create Alembic migration from current head `e1f2a3b4c5d6`.
+
+Minimum indexes to add:
+1. `purchases`:
+   - partial index for recovery scans:
+     - `(paid_at)` where `status='PAID_UNCREDITED' AND paid_at IS NOT NULL`
+   - partial index for stale unpaid expiry:
+     - `(created_at)` where `status IN ('CREATED','INVOICE_SENT') AND paid_at IS NULL`
+2. `referrals`:
+   - `(status, created_at)` for started/review windows.
+   - `(status, qualified_at, referrer_user_id)` for reward candidate scans.
+   - `(referrer_user_id, rewarded_at)` where `status='REWARDED'` for monthly cap queries.
+3. `outbox_events`:
+   - `(event_type, created_at DESC, id DESC)` for event feed queries.
+   - `(status, created_at DESC)` for status aggregation windows.
+4. `offers_impressions`:
+   - `(shown_at)` for global window counters.
+   - `(shown_at, offer_code)` for grouped top-offer aggregation.
+
+Important:
+- Ensure model metadata mirrors migration indexes (tests rely on schema/model consistency).
+- Keep naming convention explicit and deterministic (`idx_<table>_<purpose>`).
+
+#### Phase C: Verification and safety
+Run and capture outputs in patch report:
+1. `ruff check app tests`
+2. `mypy app tests` (if still failing from unrelated baseline, document exact residual issue)
+3. `pytest -q --ignore=tests/integration`
+4. Integration DB flow:
+   - ensure isolated test DB (`...quiz_arena_test`)
+   - `alembic upgrade head`
+   - `pytest -q -s tests/integration`
+5. Migration reversibility:
+   - verify `alembic downgrade -1` and `alembic upgrade head` on isolated DB.
+6. Query-plan sanity for hot paths:
+   - run `EXPLAIN` for representative queries from:
+     - `app/db/repo/purchases_repo.py`
+     - `app/db/repo/referrals_repo.py`
+     - `app/db/repo/outbox_events_repo.py`
+     - `app/db/repo/offers_repo.py`
+   - include before/after plan summary in report.
+
+### Acceptance criteria (Definition of Done)
+- Production compose can scale `api` and `worker` without editing file each time.
+- New env knobs are documented and applied in production template.
+- All listed indexes exist in migration and model metadata.
+- Migration is forward/backward safe on isolated test DB.
+- Tests remain green (or residual failures are clearly proven unrelated).
+- `reports/p0_2_p1_1_patch_report_2026-02-22.md` contains:
+  - changed files list,
+  - migration/index list,
+  - command results,
+  - risk notes and rollback instructions.
+
+### Rollout notes for next agent
+- Deploy order:
+  1. ship code + migration,
+  2. run migration,
+  3. scale API/worker,
+  4. monitor DB CPU/locks/latency.
+- If migration lock risk is high on prod-sized tables, execute during low-traffic window and document fallback plan.
+
 ## Update (2026-02-20, M11-B analytics event emitters for product flows)
 - Added centralized analytics event emitter utility:
   - `app/core/analytics_events.py`.
