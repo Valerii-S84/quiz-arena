@@ -36,7 +36,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: quiz_arena_api_prod
     restart: unless-stopped
     init: true
     cap_drop:
@@ -50,7 +49,17 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--workers",
+        "${API_WORKERS:-4}",
+      ]
     healthcheck:
       test:
         [
@@ -70,7 +79,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: quiz_arena_worker_prod
     restart: unless-stopped
     init: true
     cap_drop:
@@ -92,6 +100,7 @@ services:
         "worker",
         "-Q",
         "q_high,q_normal,q_low",
+        "--concurrency=${CELERY_WORKER_CONCURRENCY:-4}",
         "--loglevel=INFO",
       ]
 

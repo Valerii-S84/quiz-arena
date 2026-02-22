@@ -20,6 +20,14 @@ class Referral(Base):
         UniqueConstraint("referrer_user_id", "referred_user_id", name="uq_referrals_referrer_referred"),
         Index("idx_referrals_referrer", "referrer_user_id"),
         Index("idx_referrals_code", "referral_code"),
+        Index("idx_referrals_status_created", "status", "created_at"),
+        Index("idx_referrals_status_qualified_referrer", "status", "qualified_at", "referrer_user_id"),
+        Index(
+            "idx_referrals_referrer_rewarded_at",
+            "referrer_user_id",
+            "rewarded_at",
+            postgresql_where=text("status = 'REWARDED' AND rewarded_at IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)

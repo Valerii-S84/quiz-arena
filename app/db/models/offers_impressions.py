@@ -16,6 +16,8 @@ class OfferImpression(Base):
         Index("idx_offers_user_time", "user_id", "shown_at"),
         Index("idx_offers_code", "offer_code"),
         Index("idx_offers_local_date", "local_date_berlin"),
+        Index("idx_offers_shown_at", "shown_at"),
+        Index("idx_offers_shown_at_code", "shown_at", "offer_code"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)

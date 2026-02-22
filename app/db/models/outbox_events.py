@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, String, text
+from sqlalchemy import BigInteger, DateTime, Index, String, desc, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,6 +11,19 @@ from app.db.models.base import Base
 
 class OutboxEvent(Base):
     __tablename__ = "outbox_events"
+    __table_args__ = (
+        Index(
+            "idx_outbox_events_type_created_desc",
+            "event_type",
+            desc("created_at"),
+            desc("id"),
+        ),
+        Index(
+            "idx_outbox_events_status_created_desc",
+            "status",
+            desc("created_at"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     event_type: Mapped[str] = mapped_column(String(64), nullable=False)

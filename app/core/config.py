@@ -19,6 +19,38 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = Field(alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_secret: str = Field(alias="TELEGRAM_WEBHOOK_SECRET")
+    telegram_update_processing_ttl_seconds: int = Field(
+        default=300,
+        alias="TELEGRAM_UPDATE_PROCESSING_TTL_SECONDS",
+    )
+    telegram_update_task_max_retries: int = Field(
+        default=7,
+        alias="TELEGRAM_UPDATE_TASK_MAX_RETRIES",
+    )
+    telegram_update_task_retry_backoff_max_seconds: int = Field(
+        default=300,
+        alias="TELEGRAM_UPDATE_TASK_RETRY_BACKOFF_MAX_SECONDS",
+    )
+    telegram_updates_alert_window_minutes: int = Field(
+        default=15,
+        alias="TELEGRAM_UPDATES_ALERT_WINDOW_MINUTES",
+    )
+    telegram_updates_stuck_alert_min_minutes: int = Field(
+        default=10,
+        alias="TELEGRAM_UPDATES_STUCK_ALERT_MIN_MINUTES",
+    )
+    telegram_updates_retry_spike_threshold: int = Field(
+        default=25,
+        alias="TELEGRAM_UPDATES_RETRY_SPIKE_THRESHOLD",
+    )
+    telegram_updates_failed_final_spike_threshold: int = Field(
+        default=3,
+        alias="TELEGRAM_UPDATES_FAILED_FINAL_SPIKE_THRESHOLD",
+    )
+    telegram_updates_observability_top_stuck_limit: int = Field(
+        default=10,
+        alias="TELEGRAM_UPDATES_OBSERVABILITY_TOP_STUCK_LIMIT",
+    )
     internal_api_token: str = Field(
         default="dev_internal_token_change_me",
         alias="INTERNAL_API_TOKEN",

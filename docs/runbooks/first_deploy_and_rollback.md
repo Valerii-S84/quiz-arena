@@ -38,6 +38,15 @@ Re-apply:
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
+Scale runtime services (example):
+```bash
+docker compose -f docker-compose.prod.yml up -d --scale api=2 --scale worker=3
+```
+
+Capacity guardrails before scaling:
+- DB connections scale with `API_WORKERS * api_replicas` (each API process has its own SQLAlchemy pool). Increase gradually and monitor Postgres `max_connections`.
+- Task pressure scales with `CELERY_WORKER_CONCURRENCY * worker_replicas`. For DB-heavy workloads, increase worker replicas/concurrency step-by-step and monitor DB saturation.
+
 Note:
 - `scripts/deploy.sh` now runs both DB migrations and mandatory QuizBank import (`python -m scripts.quizbank_import_tool --replace-all`) before bringing up `api/worker/beat/caddy`.
 - Deploy now includes an automatic gate `python -m scripts.quizbank_assert_non_empty`; deploy fails immediately if `quiz_questions` is empty.
@@ -73,17 +82,17 @@ docker compose -f docker-compose.prod.yml logs --tail=100 api worker beat
 ```
 - Verify Docker hardening (non-root + non-editable install + image size):
 ```bash
-docker exec -it quiz_arena_api_prod id
-docker exec -it quiz_arena_api_prod python -c "import app; print(app.__file__)"
+docker compose -f docker-compose.prod.yml exec -T api id
+docker compose -f docker-compose.prod.yml exec -T api python -c "import app; print(app.__file__)"
 docker image ls --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" | grep -E "quizarena-|REPOSITORY"
 ```
 - Verify ops_ui static assets are present in runtime image:
 ```bash
-docker exec -it quiz_arena_api_prod python -c "import app; from pathlib import Path; p = Path(app.__file__).parent / 'ops_ui' / 'site' / 'static'; print(p, 'exists=', p.exists())"
+docker compose -f docker-compose.prod.yml exec -T api python -c "import app; from pathlib import Path; p = Path(app.__file__).parent / 'ops_ui' / 'site' / 'static'; print(p, 'exists=', p.exists())"
 ```
 - Verify celery beat schedule is persisted in `/tmp`:
 ```bash
-docker exec -it quiz_arena_beat_prod sh -lc "ls -l /app/celerybeat-schedule /tmp/celerybeat-schedule*"
+docker compose -f docker-compose.prod.yml exec -T beat sh -lc "ls -l /app/celerybeat-schedule /tmp/celerybeat-schedule*"
 ```
 - Verify quiz content loaded:
 ```bash
@@ -105,14 +114,80 @@ asyncio.run(main())
 PY
 ```
 
-## 5) Backups (minimum)
+## 5) Telegram update reliability (P0-1)
+Default knobs in `.env` (tune only if needed):
+- `TELEGRAM_UPDATE_PROCESSING_TTL_SECONDS=300`
+- `TELEGRAM_UPDATE_TASK_MAX_RETRIES=7`
+- `TELEGRAM_UPDATE_TASK_RETRY_BACKOFF_MAX_SECONDS=300`
+- `TELEGRAM_UPDATES_ALERT_WINDOW_MINUTES=15`
+- `TELEGRAM_UPDATES_STUCK_ALERT_MIN_MINUTES=10`
+- `TELEGRAM_UPDATES_RETRY_SPIKE_THRESHOLD=25`
+- `TELEGRAM_UPDATES_FAILED_FINAL_SPIKE_THRESHOLD=3`
+- `TELEGRAM_UPDATES_OBSERVABILITY_TOP_STUCK_LIMIT=10`
+
+What is monitored every 5 minutes (beat task):
+- `processed_updates_processing_stuck_count`
+- `processed_updates_processing_age_max_seconds`
+- `telegram_updates_reclaimed_total`
+- `telegram_updates_retries_total`
+- `telegram_updates_failed_final_total`
+
+Alert event:
+- `telegram_updates_reliability_degraded`
+
+Quick DB verification on server:
+```bash
+docker compose -f docker-compose.prod.yml run --rm api python - <<'PY'
+import asyncio
+from datetime import datetime, timedelta, timezone
+from sqlalchemy import func, select
+from app.db.models.processed_updates import ProcessedUpdate
+from app.db.models.outbox_events import OutboxEvent
+from app.db.session import SessionLocal
+
+EVENTS = (
+    "telegram_update_reclaimed",
+    "telegram_update_retry_scheduled",
+    "telegram_update_failed_final",
+)
+
+async def main() -> None:
+    now_utc = datetime.now(timezone.utc)
+    since_utc = now_utc - timedelta(minutes=15)
+    async with SessionLocal() as session:
+        stuck_count = (
+            await session.execute(
+                select(func.count(ProcessedUpdate.update_id)).where(
+                    ProcessedUpdate.status == "PROCESSING",
+                    ProcessedUpdate.processed_at <= now_utc - timedelta(minutes=10),
+                )
+            )
+        ).scalar_one()
+        by_type_rows = (
+            await session.execute(
+                select(OutboxEvent.event_type, func.count(OutboxEvent.id))
+                .where(
+                    OutboxEvent.created_at >= since_utc,
+                    OutboxEvent.event_type.in_(EVENTS),
+                )
+                .group_by(OutboxEvent.event_type)
+            )
+        ).all()
+    print("processed_updates_processing_stuck_count=", int(stuck_count))
+    print("outbox_events_15m_by_type=", {str(k): int(v) for k, v in by_type_rows})
+
+asyncio.run(main())
+PY
+```
+
+## 6) Backups (minimum)
 Daily Postgres dump (cron example):
 
 ```bash
 docker exec -t quiz_arena_postgres_prod pg_dump -U quiz -d quiz_arena -Fc > /var/backups/quiz_arena_$(date +%F).dump
 ```
 
-## 6) Rollback
+## 7) Rollback
 If deploy is broken after new commit:
 
 1. On server, switch to previous git commit/tag.
@@ -125,7 +200,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 pg_restore -U quiz -d quiz_arena --clean --if-exists /var/backups/<last_good_dump>.dump
 ```
 
-## 7) Notes
+## 8) Notes
 - Keep `.env` only on server, never commit.
 - Apply migrations before exposing webhook after schema changes.
 - For first production launch, prefer clean DB init instead of local dump import (current local data is dev/smoke level).

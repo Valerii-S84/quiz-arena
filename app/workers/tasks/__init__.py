@@ -13,6 +13,7 @@ from app.workers.tasks.promo_maintenance import (
 from app.workers.tasks.referrals import run_referral_qualification_checks, run_referral_reward_distribution
 from app.workers.tasks.referrals_observability import run_referrals_fraud_alerts
 from app.workers.tasks.telegram_updates import process_telegram_update
+from app.workers.tasks.telegram_updates_observability import run_telegram_updates_reliability_alerts
 
 __all__ = [
     "process_telegram_update",
@@ -27,4 +28,5 @@ __all__ = [
     "run_referral_qualification_checks",
     "run_referral_reward_distribution",
     "run_referrals_fraud_alerts",
+    "run_telegram_updates_reliability_alerts",
 ]

@@ -33,6 +33,16 @@ class Purchase(Base):
         Index("idx_purchases_product", "product_code"),
         Index("idx_purchases_promo_code", "applied_promo_code_id"),
         Index(
+            "idx_purchases_paid_uncredited_paid_at",
+            "paid_at",
+            postgresql_where=text("status = 'PAID_UNCREDITED' AND paid_at IS NOT NULL"),
+        ),
+        Index(
+            "idx_purchases_unpaid_created_at",
+            "created_at",
+            postgresql_where=text("status IN ('CREATED','INVOICE_SENT') AND paid_at IS NULL"),
+        ),
+        Index(
             "uq_purchases_active_invoice_user_product",
             "user_id",
             "product_code",

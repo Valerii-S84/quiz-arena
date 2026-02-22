@@ -69,7 +69,18 @@ async def _check_celery_worker() -> dict[str, Any]:
     return await asyncio.to_thread(_check_celery_worker_sync)
 
 
-async def _collect_checks() -> dict[str, dict[str, Any]]:
+async def _collect_readiness_checks() -> dict[str, dict[str, Any]]:
+    checks = await asyncio.gather(
+        _check_database(),
+        _check_redis(),
+    )
+    return {
+        "database": checks[0],
+        "redis": checks[1],
+    }
+
+
+async def _collect_health_checks() -> dict[str, dict[str, Any]]:
     checks = await asyncio.gather(
         _check_database(),
         _check_redis(),
@@ -88,7 +99,7 @@ def _all_checks_ok(checks: dict[str, dict[str, Any]]) -> bool:
 
 @router.get("/health")
 async def health() -> JSONResponse:
-    checks = await _collect_checks()
+    checks = await _collect_health_checks()
     is_healthy = _all_checks_ok(checks)
     return JSONResponse(
         status_code=status.HTTP_200_OK if is_healthy else status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -101,7 +112,7 @@ async def health() -> JSONResponse:
 
 @router.get("/ready")
 async def ready() -> JSONResponse:
-    checks = await _collect_checks()
+    checks = await _collect_readiness_checks()
     is_ready = _all_checks_ok(checks)
     return JSONResponse(
         status_code=status.HTTP_200_OK if is_ready else status.HTTP_503_SERVICE_UNAVAILABLE,
