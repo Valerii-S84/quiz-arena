@@ -8,12 +8,15 @@ from sqlalchemy import select
 
 from app.db.models.analytics_events import AnalyticsEvent
 from app.db.repo.energy_repo import EnergyRepo
+from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.energy.service import EnergyService
 from app.economy.energy.time import berlin_local_date
 from app.economy.purchases.service import PurchaseService
 from app.economy.streak.service import StreakService
+from app.game.questions.runtime_bank import get_question_by_id
+from app.game.sessions.service import GameSessionService
 
 UTC = timezone.utc
 
@@ -148,3 +151,84 @@ async def test_streak_rollover_emits_streak_lost_event() -> None:
     events = await _list_user_events(user_id, event_type="streak_lost")
     assert len(events) == 1
     assert int(events[0].payload.get("previous_streak", 0)) >= 1
+
+
+@pytest.mark.asyncio
+async def test_friend_challenge_flow_emits_created_joined_completed_and_rematch_events() -> None:
+    creator_user_id = await _create_user("fc-events-creator")
+    opponent_user_id = await _create_user("fc-events-opponent")
+    now_utc = datetime.now(UTC)
+
+    async with SessionLocal.begin() as session:
+        challenge = await GameSessionService.create_friend_challenge(
+            session,
+            creator_user_id=creator_user_id,
+            mode_code="QUICK_MIX_A1A2",
+            now_utc=now_utc,
+            total_rounds=1,
+        )
+        await GameSessionService.join_friend_challenge_by_token(
+            session,
+            user_id=opponent_user_id,
+            invite_token=challenge.invite_token,
+            now_utc=now_utc + timedelta(seconds=1),
+        )
+        creator_round = await GameSessionService.start_friend_challenge_round(
+            session,
+            user_id=creator_user_id,
+            challenge_id=challenge.challenge_id,
+            idempotency_key="fc-events:creator:start",
+            now_utc=now_utc + timedelta(seconds=2),
+        )
+        opponent_round = await GameSessionService.start_friend_challenge_round(
+            session,
+            user_id=opponent_user_id,
+            challenge_id=challenge.challenge_id,
+            idempotency_key="fc-events:opponent:start",
+            now_utc=now_utc + timedelta(seconds=3),
+        )
+        assert creator_round.start_result is not None
+        assert opponent_round.start_result is not None
+
+        creator_session = await QuizSessionsRepo.get_by_id(session, creator_round.start_result.session.session_id)
+        assert creator_session is not None
+        question = await get_question_by_id(
+            session,
+            creator_session.mode_code,
+            question_id=creator_session.question_id or "",
+            local_date_berlin=creator_session.local_date_berlin,
+        )
+        assert question is not None
+
+        await GameSessionService.submit_answer(
+            session,
+            user_id=creator_user_id,
+            session_id=creator_round.start_result.session.session_id,
+            selected_option=question.correct_option,
+            idempotency_key="fc-events:creator:answer",
+            now_utc=now_utc + timedelta(seconds=4),
+        )
+        await GameSessionService.submit_answer(
+            session,
+            user_id=opponent_user_id,
+            session_id=opponent_round.start_result.session.session_id,
+            selected_option=(question.correct_option + 1) % 4,
+            idempotency_key="fc-events:opponent:answer",
+            now_utc=now_utc + timedelta(seconds=5),
+        )
+        await GameSessionService.create_friend_challenge_rematch(
+            session,
+            initiator_user_id=creator_user_id,
+            challenge_id=challenge.challenge_id,
+            now_utc=now_utc + timedelta(seconds=6),
+        )
+
+    creator_created = await _list_user_events(creator_user_id, event_type="friend_challenge_created")
+    opponent_joined = await _list_user_events(opponent_user_id, event_type="friend_challenge_joined")
+    opponent_completed = await _list_user_events(opponent_user_id, event_type="friend_challenge_completed")
+    creator_rematch = await _list_user_events(creator_user_id, event_type="friend_challenge_rematch_created")
+
+    assert len(creator_created) >= 2
+    assert len(opponent_joined) == 1
+    assert len(opponent_completed) == 1
+    assert len(creator_rematch) == 1

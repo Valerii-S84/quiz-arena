@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 
@@ -39,6 +40,7 @@ class FriendChallengeSnapshot:
     creator_score: int
     opponent_score: int
     winner_user_id: int | None = None
+    expires_at: datetime | None = None
 
 
 @dataclass(slots=True)

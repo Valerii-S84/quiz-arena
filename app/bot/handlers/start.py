@@ -22,10 +22,11 @@ from app.game.modes.rules import is_zero_cost_source
 from app.game.sessions.errors import (
     FriendChallengeAccessError,
     FriendChallengeCompletedError,
+    FriendChallengeExpiredError,
     FriendChallengeFullError,
     FriendChallengeNotFoundError,
 )
-from app.game.sessions.service import GameSessionService
+from app.game.sessions.service import FRIEND_CHALLENGE_LEVEL_SEQUENCE, GameSessionService
 from app.game.sessions.types import FriendChallengeSnapshot, StartSessionResult
 from app.services.user_onboarding import UserOnboardingService
 
@@ -63,6 +64,35 @@ def _extract_friend_challenge_token(start_payload: str | None) -> str | None:
     if matched is None:
         return None
     return matched.group(1).lower()
+
+
+def _build_friend_plan_text(*, total_rounds: int) -> str:
+    rounds = max(1, int(total_rounds))
+    sequence = list(FRIEND_CHALLENGE_LEVEL_SEQUENCE[:rounds])
+    if rounds > len(FRIEND_CHALLENGE_LEVEL_SEQUENCE):
+        sequence.extend([FRIEND_CHALLENGE_LEVEL_SEQUENCE[-1]] * (rounds - len(FRIEND_CHALLENGE_LEVEL_SEQUENCE)))
+
+    counts: dict[str, int] = {}
+    for level in sequence:
+        counts[level] = counts.get(level, 0) + 1
+    mix_parts = [f"{level} x{counts[level]}" for level in ("A1", "A2", "B1", "B2", "C1", "C2") if level in counts]
+    mix = ", ".join(mix_parts) if mix_parts else "A1 x1"
+    mode_label = "Sprint" if rounds <= 5 else "Mix"
+    return f"{rounds} Fragen {mode_label}: {mix}. Keine Energie-Kosten."
+
+
+def _build_friend_ttl_text(*, challenge: FriendChallengeSnapshot, now_utc: datetime) -> str | None:
+    if challenge.status != "ACTIVE":
+        return None
+    if challenge.expires_at is None:
+        return None
+    remaining = challenge.expires_at - now_utc
+    total_seconds = int(remaining.total_seconds())
+    if total_seconds <= 0:
+        return TEXTS_DE["msg.friend.challenge.expired"]
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    return TEXTS_DE["msg.friend.challenge.ttl"].format(hours=hours, minutes=minutes)
 
 
 def _build_home_text(*, free_energy: int, paid_energy: int, current_streak: int) -> str:
@@ -241,6 +271,8 @@ async def handle_start(message: Message) -> None:
                 FriendChallengeAccessError,
             ):
                 challenge_error_key = "msg.friend.challenge.invalid"
+            except FriendChallengeExpiredError:
+                challenge_error_key = "msg.friend.challenge.expired"
             except FriendChallengeFullError:
                 challenge_error_key = "msg.friend.challenge.full"
         else:
@@ -273,14 +305,19 @@ async def handle_start(message: Message) -> None:
         summary_lines = [
             TEXTS_DE["msg.friend.challenge.joined"],
             TEXTS_DE["msg.friend.challenge.with"].format(opponent_label=opponent_label),
-            TEXTS_DE["msg.friend.challenge.plan"],
-            TEXTS_DE["msg.friend.challenge.play.instant"],
+            _build_friend_plan_text(total_rounds=challenge_start.snapshot.total_rounds),
+            TEXTS_DE["msg.friend.challenge.play.instant"].format(
+                total_rounds=challenge_start.snapshot.total_rounds
+            ),
             _build_friend_score_text(
                 challenge=challenge_start.snapshot,
                 user_id=snapshot.user_id,
                 opponent_label=opponent_label,
             ),
         ]
+        ttl_text = _build_friend_ttl_text(challenge=challenge_start.snapshot, now_utc=now_utc)
+        if ttl_text is not None:
+            summary_lines.append(ttl_text)
         if challenge_start.waiting_for_opponent:
             summary_lines.append(TEXTS_DE["msg.friend.challenge.waiting"])
         if challenge_start.already_answered_current_round:

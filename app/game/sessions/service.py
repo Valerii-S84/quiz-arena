@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.db.models.friend_challenges import FriendChallenge
 from app.db.models.quiz_attempts import QuizAttempt
 from app.db.models.quiz_sessions import QuizSession
@@ -18,6 +19,7 @@ from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
 from app.db.repo.quiz_questions_repo import QuizQuestionsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.db.repo.users_repo import UsersRepo
+from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.economy.energy.service import EnergyService
 from app.economy.streak.service import StreakService
 from app.economy.streak.time import berlin_local_date
@@ -34,6 +36,7 @@ from app.game.sessions.errors import (
     EnergyInsufficientError,
     FriendChallengeAccessError,
     FriendChallengeCompletedError,
+    FriendChallengeExpiredError,
     FriendChallengeFullError,
     FriendChallengeNotFoundError,
     FriendChallengePaymentRequiredError,
@@ -53,6 +56,7 @@ from app.game.sessions.types import (
 FRIEND_CHALLENGE_TOTAL_ROUNDS = 12
 FRIEND_CHALLENGE_FREE_CREATES = 2
 FRIEND_CHALLENGE_TICKET_PRODUCT_CODE = "FRIEND_CHALLENGE_5"
+FRIEND_CHALLENGE_TTL_SECONDS = max(60, int(get_settings().friend_challenge_ttl_seconds))
 FRIEND_CHALLENGE_LEVEL_SEQUENCE: tuple[str, ...] = (
     "A1",
     "A1",
@@ -75,6 +79,121 @@ PERSISTENT_ADAPTIVE_MODE_BOUNDS: dict[str, tuple[str, str]] = {
 
 class GameSessionService:
     @staticmethod
+    def _friend_challenge_expires_at(*, now_utc: datetime) -> datetime:
+        return now_utc + timedelta(seconds=FRIEND_CHALLENGE_TTL_SECONDS)
+
+    @staticmethod
+    def _expire_friend_challenge_if_due(*, challenge: FriendChallenge, now_utc: datetime) -> bool:
+        if challenge.status != "ACTIVE":
+            return False
+        if challenge.expires_at > now_utc:
+            return False
+        challenge.status = "EXPIRED"
+        challenge.winner_user_id = None
+        challenge.completed_at = now_utc
+        challenge.updated_at = now_utc
+        return True
+
+    @staticmethod
+    async def _emit_friend_challenge_expired_event(
+        session: AsyncSession,
+        *,
+        challenge: FriendChallenge,
+        happened_at: datetime,
+        source: str,
+    ) -> None:
+        await emit_analytics_event(
+            session,
+            event_type="friend_challenge_expired",
+            source=source,
+            happened_at=happened_at,
+            user_id=None,
+            payload={
+                "challenge_id": str(challenge.id),
+                "creator_user_id": challenge.creator_user_id,
+                "opponent_user_id": challenge.opponent_user_id,
+                "creator_score": challenge.creator_score,
+                "opponent_score": challenge.opponent_score,
+                "total_rounds": challenge.total_rounds,
+                "expires_at": challenge.expires_at.isoformat(),
+            },
+        )
+
+    @staticmethod
+    async def _resolve_friend_challenge_access_type(
+        session: AsyncSession,
+        *,
+        creator_user_id: int,
+        now_utc: datetime,
+    ) -> str:
+        creator = await UsersRepo.get_by_id_for_update(session, creator_user_id)
+        if creator is None:
+            raise FriendChallengeAccessError
+
+        premium_active = await EntitlementsRepo.has_active_premium(session, creator_user_id, now_utc)
+        access_type = "PREMIUM"
+        if not premium_active:
+            free_count = await FriendChallengesRepo.count_by_creator_access_type(
+                session,
+                creator_user_id=creator_user_id,
+                access_type="FREE",
+            )
+            if free_count < FRIEND_CHALLENGE_FREE_CREATES:
+                access_type = "FREE"
+            else:
+                paid_count = await FriendChallengesRepo.count_by_creator_access_type(
+                    session,
+                    creator_user_id=creator_user_id,
+                    access_type="PAID_TICKET",
+                )
+                paid_tickets = await PurchasesRepo.count_credited_product(
+                    session,
+                    user_id=creator_user_id,
+                    product_code=FRIEND_CHALLENGE_TICKET_PRODUCT_CODE,
+                )
+                if paid_count >= paid_tickets:
+                    raise FriendChallengePaymentRequiredError
+                access_type = "PAID_TICKET"
+        return access_type
+
+    @staticmethod
+    async def _create_friend_challenge_row(
+        session: AsyncSession,
+        *,
+        creator_user_id: int,
+        opponent_user_id: int | None,
+        mode_code: str,
+        access_type: str,
+        total_rounds: int,
+        now_utc: datetime,
+    ) -> FriendChallenge:
+        challenge = await FriendChallengesRepo.create(
+            session,
+            challenge=FriendChallenge(
+                id=uuid4(),
+                invite_token=uuid4().hex,
+                creator_user_id=creator_user_id,
+                opponent_user_id=opponent_user_id,
+                mode_code=mode_code,
+                access_type=access_type,
+                status="ACTIVE",
+                current_round=1,
+                total_rounds=max(1, total_rounds),
+                creator_score=0,
+                opponent_score=0,
+                creator_answered_round=0,
+                opponent_answered_round=0,
+                winner_user_id=None,
+                expires_at=GameSessionService._friend_challenge_expires_at(now_utc=now_utc),
+                expires_last_chance_notified_at=None,
+                created_at=now_utc,
+                updated_at=now_utc,
+                completed_at=None,
+            ),
+        )
+        return challenge
+
+    @staticmethod
     def _build_friend_challenge_snapshot(challenge: FriendChallenge) -> FriendChallengeSnapshot:
         return FriendChallengeSnapshot(
             challenge_id=challenge.id,
@@ -89,6 +208,7 @@ class GameSessionService:
             creator_score=challenge.creator_score,
             opponent_score=challenge.opponent_score,
             winner_user_id=challenge.winner_user_id,
+            expires_at=challenge.expires_at,
         )
 
     @staticmethod
@@ -240,58 +360,113 @@ class GameSessionService:
         now_utc: datetime,
         total_rounds: int = FRIEND_CHALLENGE_TOTAL_ROUNDS,
     ) -> FriendChallengeSnapshot:
-        creator = await UsersRepo.get_by_id_for_update(session, creator_user_id)
-        if creator is None:
-            raise FriendChallengeAccessError
-
-        premium_active = await EntitlementsRepo.has_active_premium(session, creator_user_id, now_utc)
-        access_type = "PREMIUM"
-        if not premium_active:
-            free_count = await FriendChallengesRepo.count_by_creator_access_type(
-                session,
-                creator_user_id=creator_user_id,
-                access_type="FREE",
-            )
-            if free_count < FRIEND_CHALLENGE_FREE_CREATES:
-                access_type = "FREE"
-            else:
-                paid_count = await FriendChallengesRepo.count_by_creator_access_type(
-                    session,
-                    creator_user_id=creator_user_id,
-                    access_type="PAID_TICKET",
-                )
-                paid_tickets = await PurchasesRepo.count_credited_product(
-                    session,
-                    user_id=creator_user_id,
-                    product_code=FRIEND_CHALLENGE_TICKET_PRODUCT_CODE,
-                )
-                if paid_count >= paid_tickets:
-                    raise FriendChallengePaymentRequiredError
-                access_type = "PAID_TICKET"
-
-        challenge = await FriendChallengesRepo.create(
+        access_type = await GameSessionService._resolve_friend_challenge_access_type(
             session,
-            challenge=FriendChallenge(
-                id=uuid4(),
-                invite_token=uuid4().hex,
-                creator_user_id=creator_user_id,
-                opponent_user_id=None,
-                mode_code=mode_code,
-                access_type=access_type,
-                status="ACTIVE",
-                current_round=1,
-                total_rounds=max(1, total_rounds),
-                creator_score=0,
-                opponent_score=0,
-                creator_answered_round=0,
-                opponent_answered_round=0,
-                winner_user_id=None,
-                created_at=now_utc,
-                updated_at=now_utc,
-                completed_at=None,
-            ),
+            creator_user_id=creator_user_id,
+            now_utc=now_utc,
+        )
+        challenge = await GameSessionService._create_friend_challenge_row(
+            session,
+            creator_user_id=creator_user_id,
+            opponent_user_id=None,
+            mode_code=mode_code,
+            access_type=access_type,
+            total_rounds=total_rounds,
+            now_utc=now_utc,
+        )
+        await emit_analytics_event(
+            session,
+            event_type="friend_challenge_created",
+            source=EVENT_SOURCE_BOT,
+            happened_at=now_utc,
+            user_id=creator_user_id,
+            payload={
+                "challenge_id": str(challenge.id),
+                "mode_code": challenge.mode_code,
+                "access_type": challenge.access_type,
+                "total_rounds": challenge.total_rounds,
+                "entrypoint": "standard",
+                "expires_at": challenge.expires_at.isoformat(),
+            },
         )
         return GameSessionService._build_friend_challenge_snapshot(challenge)
+
+    @staticmethod
+    async def create_friend_challenge_rematch(
+        session: AsyncSession,
+        *,
+        initiator_user_id: int,
+        challenge_id: UUID,
+        now_utc: datetime,
+    ) -> FriendChallengeSnapshot:
+        challenge = await FriendChallengesRepo.get_by_id_for_update(session, challenge_id)
+        if challenge is None:
+            raise FriendChallengeNotFoundError
+        if GameSessionService._expire_friend_challenge_if_due(challenge=challenge, now_utc=now_utc):
+            await GameSessionService._emit_friend_challenge_expired_event(
+                session,
+                challenge=challenge,
+                happened_at=now_utc,
+                source=EVENT_SOURCE_BOT,
+            )
+        if challenge.status not in {"COMPLETED", "EXPIRED"}:
+            raise FriendChallengeAccessError
+        if initiator_user_id not in {challenge.creator_user_id, challenge.opponent_user_id}:
+            raise FriendChallengeAccessError
+
+        opponent_user_id: int | None
+        if challenge.creator_user_id == initiator_user_id:
+            opponent_user_id = challenge.opponent_user_id
+        else:
+            opponent_user_id = challenge.creator_user_id
+        if opponent_user_id is None:
+            raise FriendChallengeAccessError
+
+        access_type = await GameSessionService._resolve_friend_challenge_access_type(
+            session,
+            creator_user_id=initiator_user_id,
+            now_utc=now_utc,
+        )
+        rematch = await GameSessionService._create_friend_challenge_row(
+            session,
+            creator_user_id=initiator_user_id,
+            opponent_user_id=opponent_user_id,
+            mode_code=challenge.mode_code,
+            access_type=access_type,
+            total_rounds=challenge.total_rounds,
+            now_utc=now_utc,
+        )
+        await emit_analytics_event(
+            session,
+            event_type="friend_challenge_created",
+            source=EVENT_SOURCE_BOT,
+            happened_at=now_utc,
+            user_id=initiator_user_id,
+            payload={
+                "challenge_id": str(rematch.id),
+                "mode_code": rematch.mode_code,
+                "access_type": rematch.access_type,
+                "total_rounds": rematch.total_rounds,
+                "entrypoint": "rematch",
+                "source_challenge_id": str(challenge_id),
+                "expires_at": rematch.expires_at.isoformat(),
+            },
+        )
+        await emit_analytics_event(
+            session,
+            event_type="friend_challenge_rematch_created",
+            source=EVENT_SOURCE_BOT,
+            happened_at=now_utc,
+            user_id=initiator_user_id,
+            payload={
+                "challenge_id": str(rematch.id),
+                "source_challenge_id": str(challenge_id),
+                "opponent_user_id": opponent_user_id,
+                "total_rounds": rematch.total_rounds,
+                "expires_at": rematch.expires_at.isoformat(),
+            },
+        )
+        return GameSessionService._build_friend_challenge_snapshot(rematch)
 
     @staticmethod
     async def join_friend_challenge_by_token(
@@ -304,6 +479,15 @@ class GameSessionService:
         challenge = await FriendChallengesRepo.get_by_invite_token_for_update(session, invite_token)
         if challenge is None:
             raise FriendChallengeNotFoundError
+        if GameSessionService._expire_friend_challenge_if_due(challenge=challenge, now_utc=now_utc):
+            await GameSessionService._emit_friend_challenge_expired_event(
+                session,
+                challenge=challenge,
+                happened_at=now_utc,
+                source=EVENT_SOURCE_BOT,
+            )
+        if challenge.status == "EXPIRED":
+            raise FriendChallengeExpiredError
         if challenge.status != "ACTIVE":
             raise FriendChallengeCompletedError
 
@@ -316,6 +500,20 @@ class GameSessionService:
         if challenge.opponent_user_id is None:
             challenge.opponent_user_id = user_id
             challenge.updated_at = now_utc
+            await emit_analytics_event(
+                session,
+                event_type="friend_challenge_joined",
+                source=EVENT_SOURCE_BOT,
+                happened_at=now_utc,
+                user_id=user_id,
+                payload={
+                    "challenge_id": str(challenge.id),
+                    "creator_user_id": challenge.creator_user_id,
+                    "mode_code": challenge.mode_code,
+                    "total_rounds": challenge.total_rounds,
+                    "expires_at": challenge.expires_at.isoformat(),
+                },
+            )
             return FriendChallengeJoinResult(
                 snapshot=GameSessionService._build_friend_challenge_snapshot(challenge),
                 joined_now=True,
@@ -341,6 +539,15 @@ class GameSessionService:
         challenge = await FriendChallengesRepo.get_by_id_for_update(session, challenge_id)
         if challenge is None:
             raise FriendChallengeNotFoundError
+        if GameSessionService._expire_friend_challenge_if_due(challenge=challenge, now_utc=now_utc):
+            await GameSessionService._emit_friend_challenge_expired_event(
+                session,
+                challenge=challenge,
+                happened_at=now_utc,
+                source=EVENT_SOURCE_BOT,
+            )
+        if challenge.status == "EXPIRED":
+            raise FriendChallengeExpiredError
         if challenge.status != "ACTIVE":
             raise FriendChallengeCompletedError
         if user_id not in {challenge.creator_user_id, challenge.opponent_user_id}:
@@ -682,58 +889,71 @@ class GameSessionService:
                 raise FriendChallengeAccessError
 
             answered_round = quiz_session.friend_challenge_round or 1
-            if is_creator:
-                if challenge.creator_answered_round < answered_round:
-                    if is_correct:
-                        challenge.creator_score += 1
-                    challenge.creator_answered_round = answered_round
-            else:
-                if challenge.opponent_answered_round < answered_round:
-                    if is_correct:
-                        challenge.opponent_score += 1
-                    challenge.opponent_answered_round = answered_round
-
-            both_answered_round = (
-                challenge.opponent_user_id is not None
-                and challenge.creator_answered_round >= answered_round
-                and challenge.opponent_answered_round >= answered_round
+            expired_now = GameSessionService._expire_friend_challenge_if_due(
+                challenge=challenge,
+                now_utc=now_utc,
             )
-            if both_answered_round and challenge.status == "ACTIVE":
-                friend_round_completed = True
+            if expired_now:
+                await GameSessionService._emit_friend_challenge_expired_event(
+                    session,
+                    challenge=challenge,
+                    happened_at=now_utc,
+                    source=EVENT_SOURCE_BOT,
+                )
 
-            max_answered_round = max(
-                challenge.creator_answered_round,
-                challenge.opponent_answered_round,
-            )
-            challenge.current_round = min(challenge.total_rounds, max_answered_round + 1)
-
-            if (
-                challenge.status == "ACTIVE"
-                and challenge.opponent_user_id is not None
-                and challenge.creator_answered_round >= challenge.total_rounds
-                and challenge.opponent_answered_round >= challenge.total_rounds
-            ):
-                friend_round_completed = True
-                challenge.current_round = challenge.total_rounds
-                challenge.status = "COMPLETED"
-                challenge.completed_at = now_utc
-                if challenge.creator_score > challenge.opponent_score:
-                    challenge.winner_user_id = challenge.creator_user_id
-                elif challenge.opponent_score > challenge.creator_score:
-                    challenge.winner_user_id = challenge.opponent_user_id
+            if challenge.status == "ACTIVE":
+                if is_creator:
+                    if challenge.creator_answered_round < answered_round:
+                        if is_correct:
+                            challenge.creator_score += 1
+                        challenge.creator_answered_round = answered_round
                 else:
-                    challenge.winner_user_id = None
+                    if challenge.opponent_answered_round < answered_round:
+                        if is_correct:
+                            challenge.opponent_score += 1
+                        challenge.opponent_answered_round = answered_round
 
-            if challenge.status == "COMPLETED" and challenge.current_round >= challenge.total_rounds:
-                if challenge.creator_score > challenge.opponent_score:
-                    challenge.winner_user_id = challenge.creator_user_id
-                elif (
-                    challenge.opponent_score > challenge.creator_score
+                both_answered_round = (
+                    challenge.opponent_user_id is not None
+                    and challenge.creator_answered_round >= answered_round
+                    and challenge.opponent_answered_round >= answered_round
+                )
+                if both_answered_round and challenge.status == "ACTIVE":
+                    friend_round_completed = True
+
+                max_answered_round = max(
+                    challenge.creator_answered_round,
+                    challenge.opponent_answered_round,
+                )
+                challenge.current_round = min(challenge.total_rounds, max_answered_round + 1)
+
+                if (
+                    challenge.status == "ACTIVE"
                     and challenge.opponent_user_id is not None
+                    and challenge.creator_answered_round >= challenge.total_rounds
+                    and challenge.opponent_answered_round >= challenge.total_rounds
                 ):
-                    challenge.winner_user_id = challenge.opponent_user_id
-                else:
-                    challenge.winner_user_id = None
+                    friend_round_completed = True
+                    challenge.current_round = challenge.total_rounds
+                    challenge.status = "COMPLETED"
+                    challenge.completed_at = now_utc
+                    if challenge.creator_score > challenge.opponent_score:
+                        challenge.winner_user_id = challenge.creator_user_id
+                    elif challenge.opponent_score > challenge.creator_score:
+                        challenge.winner_user_id = challenge.opponent_user_id
+                    else:
+                        challenge.winner_user_id = None
+
+                if challenge.status == "COMPLETED" and challenge.current_round >= challenge.total_rounds:
+                    if challenge.creator_score > challenge.opponent_score:
+                        challenge.winner_user_id = challenge.creator_user_id
+                    elif (
+                        challenge.opponent_score > challenge.creator_score
+                        and challenge.opponent_user_id is not None
+                    ):
+                        challenge.winner_user_id = challenge.opponent_user_id
+                    else:
+                        challenge.winner_user_id = None
 
             challenge.updated_at = now_utc
             friend_snapshot = GameSessionService._build_friend_challenge_snapshot(challenge)
@@ -745,6 +965,24 @@ class GameSessionService:
                     else challenge.creator_answered_round < answered_round
                 )
             )
+            if challenge.status == "COMPLETED" and challenge.completed_at == now_utc:
+                await emit_analytics_event(
+                    session,
+                    event_type="friend_challenge_completed",
+                    source=EVENT_SOURCE_BOT,
+                    happened_at=now_utc,
+                    user_id=user_id,
+                    payload={
+                        "challenge_id": str(challenge.id),
+                        "creator_user_id": challenge.creator_user_id,
+                        "opponent_user_id": challenge.opponent_user_id,
+                        "creator_score": challenge.creator_score,
+                        "opponent_score": challenge.opponent_score,
+                        "winner_user_id": challenge.winner_user_id,
+                        "total_rounds": challenge.total_rounds,
+                        "expires_at": challenge.expires_at.isoformat(),
+                    },
+                )
 
         streak_result = await StreakService.record_activity(
             session,

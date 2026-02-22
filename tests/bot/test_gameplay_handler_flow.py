@@ -7,7 +7,7 @@ import pytest
 
 from app.bot.handlers import gameplay
 from app.bot.texts.de import TEXTS_DE
-from app.game.sessions.errors import SessionNotFoundError
+from app.game.sessions.errors import FriendChallengeExpiredError, SessionNotFoundError
 from app.game.sessions.types import (
     AnswerSessionResult,
     FriendChallengeSnapshot,
@@ -82,8 +82,14 @@ def test_build_friend_finish_text_handles_win_and_draw() -> None:
         user_id=10,
         opponent_label="Bob",
     )
+    expired_text = gameplay._build_friend_finish_text(
+        challenge=_challenge_snapshot(status="EXPIRED", winner_user_id=None),
+        user_id=10,
+        opponent_label="Bob",
+    )
     assert TEXTS_DE["msg.friend.challenge.finished.win"] in win_text
     assert TEXTS_DE["msg.friend.challenge.finished.draw"] in draw_text
+    assert TEXTS_DE["msg.friend.challenge.finished.expired"] in expired_text
 
 
 def test_build_question_text_contains_theme_counter_and_energy() -> None:
@@ -112,7 +118,31 @@ async def test_build_friend_invite_link_returns_none_on_bot_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_create_hides_raw_url_and_keeps_share_link(monkeypatch) -> None:
+async def test_handle_friend_challenge_create_opens_format_picker(monkeypatch) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+
+    callback = DummyCallback(
+        data="friend:challenge:create",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+    await gameplay.handle_friend_challenge_create(callback)
+
+    response = callback.message.answers[0]
+    assert response.text == TEXTS_DE["msg.friend.challenge.create.choose"]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "friend:challenge:create:3" in callbacks
+    assert "friend:challenge:create:5" in callbacks
+    assert "friend:challenge:create:12" in callbacks
+
+
+@pytest.mark.asyncio
+async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_share_link(monkeypatch) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
@@ -128,7 +158,7 @@ async def test_handle_friend_challenge_create_hides_raw_url_and_keeps_share_link
             creator_user_id=17,
             opponent_user_id=None,
             current_round=1,
-            total_rounds=12,
+            total_rounds=5,
             creator_score=0,
             opponent_score=0,
             winner_user_id=None,
@@ -143,17 +173,99 @@ async def test_handle_friend_challenge_create_hides_raw_url_and_keeps_share_link
     monkeypatch.setattr(gameplay, "_build_friend_invite_link", _fake_friend_invite_link)
 
     callback = DummyCallback(
-        data="friend:challenge:create",
+        data="friend:challenge:create:5",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(),
     )
-    await gameplay.handle_friend_challenge_create(callback)
+    await gameplay.handle_friend_challenge_create_selected(callback)
 
     response = callback.message.answers[0]
     assert "https://t.me/" not in (response.text or "")
     keyboard = response.kwargs["reply_markup"]
     share_urls = [button.url for row in keyboard.inline_keyboard for button in row if button.url]
     assert any("start%3Dfc_0123456789abcdef0123456789abcdef" in url for url in share_urls)
+    assert len(share_urls) == 3
+
+
+@pytest.mark.asyncio
+async def test_handle_friend_challenge_rematch_creates_duel_and_notifies_opponent(monkeypatch) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        return SimpleNamespace(user_id=10)
+
+    async def _fake_rematch(*args, **kwargs):
+        return FriendChallengeSnapshot(
+            challenge_id=UUID("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+            invite_token="token-rematch",
+            mode_code="QUICK_MIX_A1A2",
+            access_type="FREE",
+            status="ACTIVE",
+            creator_user_id=10,
+            opponent_user_id=20,
+            current_round=1,
+            total_rounds=5,
+            creator_score=0,
+            opponent_score=0,
+            winner_user_id=None,
+        )
+
+    notified: list[int] = []
+
+    async def _fake_notify(callback, *, opponent_user_id, text, reply_markup=None):
+        del callback, text, reply_markup
+        notified.append(opponent_user_id)
+
+    async def _fake_resolve_label(*, challenge, user_id):
+        del challenge
+        return "Bob" if user_id == 10 else "Alice"
+
+    monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(gameplay.GameSessionService, "create_friend_challenge_rematch", _fake_rematch)
+    monkeypatch.setattr(gameplay, "_notify_opponent", _fake_notify)
+    monkeypatch.setattr(gameplay, "_resolve_opponent_label", _fake_resolve_label)
+
+    callback = DummyCallback(
+        data="friend:rematch:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        from_user=SimpleNamespace(id=10),
+        message=DummyMessage(),
+    )
+    await gameplay.handle_friend_challenge_rematch(callback)
+
+    response = callback.message.answers[0]
+    assert TEXTS_DE["msg.friend.challenge.rematch.created"].format(opponent_label="Bob") in (response.text or "")
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "friend:next:cccccccc-cccc-cccc-cccc-cccccccccccc" in callbacks
+    assert notified == [20]
+
+
+@pytest.mark.asyncio
+async def test_handle_friend_challenge_next_expired_shows_expired_message(monkeypatch) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        return SimpleNamespace(user_id=17, free_energy=20, paid_energy=0, current_streak=0)
+
+    async def _fake_start_round(*args, **kwargs):
+        raise FriendChallengeExpiredError()
+
+    monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(gameplay.GameSessionService, "start_friend_challenge_round", _fake_start_round)
+
+    callback = DummyCallback(
+        data="friend:next:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+    await gameplay.handle_friend_challenge_next(callback)
+
+    response = callback.message.answers[0]
+    assert response.text == TEXTS_DE["msg.friend.challenge.expired"]
 
 
 @pytest.mark.asyncio

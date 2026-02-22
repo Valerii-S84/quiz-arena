@@ -14,7 +14,7 @@ class FriendChallenge(Base):
     __tablename__ = "friend_challenges"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('ACTIVE','COMPLETED','CANCELED')",
+            "status IN ('ACTIVE','COMPLETED','CANCELED','EXPIRED')",
             name="ck_friend_challenges_status",
         ),
         CheckConstraint(
@@ -30,6 +30,7 @@ class FriendChallenge(Base):
         Index("idx_friend_challenges_creator_created", "creator_user_id", "created_at"),
         Index("idx_friend_challenges_opponent_created", "opponent_user_id", "created_at"),
         Index("idx_friend_challenges_status_created", "status", "created_at"),
+        Index("idx_friend_challenges_status_expires", "status", "expires_at"),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
@@ -46,6 +47,8 @@ class FriendChallenge(Base):
     creator_answered_round: Mapped[int] = mapped_column(Integer, nullable=False)
     opponent_answered_round: Mapped[int] = mapped_column(Integer, nullable=False)
     winner_user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_last_chance_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

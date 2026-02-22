@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -66,3 +67,48 @@ class FriendChallengesRepo:
         )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def list_active_due_for_last_chance_for_update(
+        session: AsyncSession,
+        *,
+        now_utc: datetime,
+        expires_before_utc: datetime,
+        limit: int,
+    ) -> list[FriendChallenge]:
+        resolved_limit = max(1, int(limit))
+        stmt = (
+            select(FriendChallenge)
+            .where(
+                FriendChallenge.status == "ACTIVE",
+                FriendChallenge.expires_at > now_utc,
+                FriendChallenge.expires_at <= expires_before_utc,
+                FriendChallenge.expires_last_chance_notified_at.is_(None),
+            )
+            .order_by(FriendChallenge.expires_at.asc())
+            .limit(resolved_limit)
+            .with_for_update(skip_locked=True)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def list_active_due_for_expire_for_update(
+        session: AsyncSession,
+        *,
+        now_utc: datetime,
+        limit: int,
+    ) -> list[FriendChallenge]:
+        resolved_limit = max(1, int(limit))
+        stmt = (
+            select(FriendChallenge)
+            .where(
+                FriendChallenge.status == "ACTIVE",
+                FriendChallenge.expires_at <= now_utc,
+            )
+            .order_by(FriendChallenge.expires_at.asc())
+            .limit(resolved_limit)
+            .with_for_update(skip_locked=True)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())

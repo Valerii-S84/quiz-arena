@@ -10,7 +10,10 @@ from aiogram.types import CallbackQuery
 
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
+    build_friend_challenge_create_keyboard,
+    build_friend_challenge_finished_keyboard,
     build_friend_challenge_limit_keyboard,
+    build_friend_challenge_next_keyboard,
     build_friend_challenge_share_keyboard,
 )
 from app.bot.keyboards.home import build_home_keyboard
@@ -28,6 +31,7 @@ from app.game.sessions.errors import (
     EnergyInsufficientError,
     FriendChallengeAccessError,
     FriendChallengeCompletedError,
+    FriendChallengeExpiredError,
     FriendChallengeFullError,
     FriendChallengeNotFoundError,
     FriendChallengePaymentRequiredError,
@@ -35,7 +39,7 @@ from app.game.sessions.errors import (
     ModeLockedError,
     SessionNotFoundError,
 )
-from app.game.sessions.service import GameSessionService
+from app.game.sessions.service import FRIEND_CHALLENGE_LEVEL_SEQUENCE, GameSessionService
 from app.game.sessions.types import FriendChallengeRoundStartResult, FriendChallengeSnapshot, StartSessionResult
 from app.services.user_onboarding import UserOnboardingService
 
@@ -43,6 +47,8 @@ router = Router(name="gameplay")
 
 ANSWER_RE = re.compile(r"^answer:([0-9a-f\-]{36}):([0-3])$")
 FRIEND_NEXT_RE = re.compile(r"^friend:next:([0-9a-f\-]{36})$")
+FRIEND_CREATE_RE = re.compile(r"^friend:challenge:create:(3|5|12)$")
+FRIEND_REMATCH_RE = re.compile(r"^friend:rematch:([0-9a-f\-]{36})$")
 
 
 def _format_user_label(*, username: str | None, first_name: str | None, fallback: str = "Freund") -> str:
@@ -55,6 +61,21 @@ def _format_user_label(*, username: str | None, first_name: str | None, fallback
         if normalized_name:
             return normalized_name
     return fallback
+
+
+def _build_friend_plan_text(*, total_rounds: int) -> str:
+    rounds = max(1, int(total_rounds))
+    sequence = list(FRIEND_CHALLENGE_LEVEL_SEQUENCE[:rounds])
+    if rounds > len(FRIEND_CHALLENGE_LEVEL_SEQUENCE):
+        sequence.extend([FRIEND_CHALLENGE_LEVEL_SEQUENCE[-1]] * (rounds - len(FRIEND_CHALLENGE_LEVEL_SEQUENCE)))
+
+    counts: dict[str, int] = {}
+    for level in sequence:
+        counts[level] = counts.get(level, 0) + 1
+    mix_parts = [f"{level} x{counts[level]}" for level in ("A1", "A2", "B1", "B2", "C1", "C2") if level in counts]
+    mix = ", ".join(mix_parts) if mix_parts else "A1 x1"
+    mode_label = "Sprint" if rounds <= 5 else "Mix"
+    return f"{rounds} Fragen {mode_label}: {mix}. Keine Energie-Kosten."
 
 
 def _build_question_text(
@@ -136,7 +157,9 @@ def _build_friend_finish_text(
         my_score = challenge.opponent_score
         opponent_score = challenge.creator_score
 
-    if challenge.winner_user_id is None:
+    if challenge.status == "EXPIRED":
+        outcome_text = TEXTS_DE["msg.friend.challenge.finished.expired"]
+    elif challenge.winner_user_id is None:
         outcome_text = TEXTS_DE["msg.friend.challenge.finished.draw"]
     elif challenge.winner_user_id == user_id:
         outcome_text = TEXTS_DE["msg.friend.challenge.finished.win"]
@@ -151,6 +174,20 @@ def _build_friend_finish_text(
         opponent_label=opponent_label,
     )
     return "\n".join([outcome_text, summary_text])
+
+
+def _build_friend_ttl_text(*, challenge: FriendChallengeSnapshot, now_utc: datetime) -> str | None:
+    if challenge.status != "ACTIVE":
+        return None
+    if challenge.expires_at is None:
+        return None
+    remaining = challenge.expires_at - now_utc
+    total_seconds = int(remaining.total_seconds())
+    if total_seconds <= 0:
+        return TEXTS_DE["msg.friend.challenge.expired"]
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    return TEXTS_DE["msg.friend.challenge.ttl"].format(hours=hours, minutes=minutes)
 
 
 def _friend_opponent_user_id(*, challenge: FriendChallengeSnapshot, user_id: int) -> int | None:
@@ -387,9 +424,30 @@ async def handle_mode(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data == "friend:challenge:create")
 async def handle_friend_challenge_create(callback: CallbackQuery) -> None:
+    if callback.message is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    await callback.message.answer(
+        TEXTS_DE["msg.friend.challenge.create.choose"],
+        reply_markup=build_friend_challenge_create_keyboard(),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.regexp(FRIEND_CREATE_RE))
+async def handle_friend_challenge_create_selected(callback: CallbackQuery) -> None:
     if callback.from_user is None or callback.message is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
+    if callback.data is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
+    matched = FRIEND_CREATE_RE.match(callback.data)
+    if matched is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    selected_rounds = int(matched.group(1))
 
     now_utc = datetime.now(timezone.utc)
     async with SessionLocal.begin() as session:
@@ -403,6 +461,7 @@ async def handle_friend_challenge_create(callback: CallbackQuery) -> None:
                 creator_user_id=onboarding.user_id,
                 mode_code="QUICK_MIX_A1A2",
                 now_utc=now_utc,
+                total_rounds=selected_rounds,
             )
         except FriendChallengePaymentRequiredError:
             await callback.message.answer(
@@ -414,9 +473,12 @@ async def handle_friend_challenge_create(callback: CallbackQuery) -> None:
 
     invite_link = await _build_friend_invite_link(callback, invite_token=challenge.invite_token)
     body_lines = [
-        TEXTS_DE["msg.friend.challenge.plan"],
+        _build_friend_plan_text(total_rounds=challenge.total_rounds),
         TEXTS_DE["msg.friend.challenge.created.short"],
     ]
+    ttl_text = _build_friend_ttl_text(challenge=challenge, now_utc=now_utc)
+    if ttl_text is not None:
+        body_lines.append(ttl_text)
     if invite_link is None:
         body_lines.insert(
             0,
@@ -427,6 +489,7 @@ async def handle_friend_challenge_create(callback: CallbackQuery) -> None:
             reply_markup=build_friend_challenge_share_keyboard(
                 invite_link=None,
                 challenge_id=str(challenge.challenge_id),
+                total_rounds=challenge.total_rounds,
             ),
         )
     else:
@@ -439,7 +502,86 @@ async def handle_friend_challenge_create(callback: CallbackQuery) -> None:
             reply_markup=build_friend_challenge_share_keyboard(
                 invite_link=invite_link,
                 challenge_id=str(challenge.challenge_id),
+                total_rounds=challenge.total_rounds,
             ),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.regexp(FRIEND_REMATCH_RE))
+async def handle_friend_challenge_rematch(callback: CallbackQuery) -> None:
+    if callback.from_user is None or callback.message is None or callback.data is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
+    matched = FRIEND_REMATCH_RE.match(callback.data)
+    if matched is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
+    challenge_id = UUID(matched.group(1))
+    now_utc = datetime.now(timezone.utc)
+    async with SessionLocal.begin() as session:
+        snapshot = await UserOnboardingService.ensure_home_snapshot(
+            session,
+            telegram_user=callback.from_user,
+        )
+        try:
+            rematch = await GameSessionService.create_friend_challenge_rematch(
+                session,
+                initiator_user_id=snapshot.user_id,
+                challenge_id=challenge_id,
+                now_utc=now_utc,
+            )
+        except FriendChallengePaymentRequiredError:
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.limit.reached"],
+                reply_markup=build_friend_challenge_limit_keyboard(),
+            )
+            await callback.answer()
+            return
+        except (
+            FriendChallengeNotFoundError,
+            FriendChallengeAccessError,
+        ):
+            await callback.message.answer(TEXTS_DE["msg.friend.challenge.invalid"], reply_markup=build_home_keyboard())
+            await callback.answer()
+            return
+
+    opponent_label = await _resolve_opponent_label(
+        challenge=rematch,
+        user_id=snapshot.user_id,
+    )
+    rematch_lines = [
+        TEXTS_DE["msg.friend.challenge.rematch.created"].format(opponent_label=opponent_label),
+        _build_friend_plan_text(total_rounds=rematch.total_rounds),
+    ]
+    rematch_ttl_text = _build_friend_ttl_text(challenge=rematch, now_utc=now_utc)
+    if rematch_ttl_text is not None:
+        rematch_lines.append(rematch_ttl_text)
+    await callback.message.answer(
+        "\n".join(rematch_lines),
+        reply_markup=build_friend_challenge_next_keyboard(challenge_id=str(rematch.challenge_id)),
+    )
+
+    opponent_user_id = _friend_opponent_user_id(challenge=rematch, user_id=snapshot.user_id)
+    if opponent_user_id is not None:
+        opponent_label_for_opponent = await _resolve_opponent_label(
+            challenge=rematch,
+            user_id=opponent_user_id,
+        )
+        await _notify_opponent(
+            callback,
+            opponent_user_id=opponent_user_id,
+            text="\n".join(
+                [
+                    TEXTS_DE["msg.friend.challenge.rematch.invite"].format(
+                        opponent_label=opponent_label_for_opponent
+                    ),
+                    _build_friend_plan_text(total_rounds=rematch.total_rounds),
+                ]
+            ),
+            reply_markup=build_friend_challenge_next_keyboard(challenge_id=str(rematch.challenge_id)),
         )
     await callback.answer()
 
@@ -470,6 +612,13 @@ async def handle_friend_challenge_next(callback: CallbackQuery) -> None:
                 idempotency_key=f"start:friend:next:{challenge_id}:{callback.id}",
                 now_utc=now_utc,
             )
+        except FriendChallengeExpiredError:
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.expired"],
+                reply_markup=build_friend_challenge_finished_keyboard(challenge_id=str(challenge_id)),
+            )
+            await callback.answer()
+            return
         except (
             FriendChallengeNotFoundError,
             FriendChallengeAccessError,
@@ -490,6 +639,9 @@ async def handle_friend_challenge_next(callback: CallbackQuery) -> None:
             ),
         ),
     ]
+    ttl_text = _build_friend_ttl_text(challenge=round_start.snapshot, now_utc=now_utc)
+    if ttl_text is not None:
+        summary_lines.append(ttl_text)
     if round_start.already_answered_current_round:
         summary_lines.append(
             TEXTS_DE["msg.friend.challenge.all_answered.waiting"].format(
@@ -601,6 +753,9 @@ async def handle_answer(callback: CallbackQuery) -> None:
                 opponent_label=opponent_label,
             )
         )
+        ttl_text = _build_friend_ttl_text(challenge=challenge, now_utc=now_utc)
+        if ttl_text is not None:
+            await callback.message.answer(ttl_text)
 
         opponent_user_id = _friend_opponent_user_id(challenge=challenge, user_id=snapshot.user_id)
         if result.friend_challenge_round_completed:
@@ -630,13 +785,16 @@ async def handle_answer(callback: CallbackQuery) -> None:
                     ),
                 )
 
-        if challenge.status == "COMPLETED":
+        if challenge.status in {"COMPLETED", "EXPIRED"}:
             my_finish_text = _build_friend_finish_text(
                 challenge=challenge,
                 user_id=snapshot.user_id,
                 opponent_label=opponent_label,
             )
-            await callback.message.answer(my_finish_text, reply_markup=build_home_keyboard())
+            finish_keyboard = build_friend_challenge_finished_keyboard(
+                challenge_id=str(challenge.challenge_id),
+            )
+            await callback.message.answer(my_finish_text, reply_markup=finish_keyboard)
             if not result.idempotent_replay and opponent_user_id is not None:
                 opponent_label_for_opponent = await _resolve_opponent_label(
                     challenge=challenge,
@@ -659,7 +817,7 @@ async def handle_answer(callback: CallbackQuery) -> None:
                             ),
                         ]
                     ),
-                    reply_markup=build_home_keyboard(),
+                    reply_markup=finish_keyboard,
                 )
             await callback.answer()
             return
@@ -677,6 +835,15 @@ async def handle_answer(callback: CallbackQuery) -> None:
                     idempotency_key=f"start:friend:auto:{challenge.challenge_id}:{callback.id}",
                     now_utc=now_utc,
                 )
+            except FriendChallengeExpiredError:
+                await callback.message.answer(
+                    TEXTS_DE["msg.friend.challenge.expired"],
+                    reply_markup=build_friend_challenge_finished_keyboard(
+                        challenge_id=str(challenge.challenge_id)
+                    ),
+                )
+                await callback.answer()
+                return
             except (
                 FriendChallengeNotFoundError,
                 FriendChallengeAccessError,

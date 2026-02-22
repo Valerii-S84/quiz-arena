@@ -39,6 +39,22 @@ class Settings(BaseSettings):
         default=300,
         alias="TELEGRAM_UPDATE_TASK_RETRY_BACKOFF_MAX_SECONDS",
     )
+    friend_challenge_ttl_seconds: int = Field(
+        default=86_400,
+        alias="FRIEND_CHALLENGE_TTL_SECONDS",
+    )
+    friend_challenge_last_chance_seconds: int = Field(
+        default=7_200,
+        alias="FRIEND_CHALLENGE_LAST_CHANCE_SECONDS",
+    )
+    friend_challenge_deadline_batch_size: int = Field(
+        default=100,
+        alias="FRIEND_CHALLENGE_DEADLINE_BATCH_SIZE",
+    )
+    friend_challenge_deadline_scan_interval_seconds: int = Field(
+        default=300,
+        alias="FRIEND_CHALLENGE_DEADLINE_SCAN_INTERVAL_SECONDS",
+    )
     telegram_updates_alert_window_minutes: int = Field(
         default=15,
         alias="TELEGRAM_UPDATES_ALERT_WINDOW_MINUTES",

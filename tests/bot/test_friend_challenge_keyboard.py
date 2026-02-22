@@ -1,5 +1,7 @@
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
+    build_friend_challenge_create_keyboard,
+    build_friend_challenge_finished_keyboard,
     build_friend_challenge_limit_keyboard,
     build_friend_challenge_next_keyboard,
     build_friend_challenge_share_keyboard,
@@ -21,6 +23,24 @@ def test_friend_challenge_back_keyboard_contains_home_only() -> None:
     assert callbacks == ["home:open"]
 
 
+def test_friend_challenge_create_keyboard_contains_sprint_and_classic_options() -> None:
+    keyboard = build_friend_challenge_create_keyboard()
+    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert "friend:challenge:create:3" in callbacks
+    assert "friend:challenge:create:5" in callbacks
+    assert "friend:challenge:create:12" in callbacks
+    assert "home:open" in callbacks
+
+
+def test_friend_challenge_finished_keyboard_contains_rematch_and_back() -> None:
+    keyboard = build_friend_challenge_finished_keyboard(
+        challenge_id="00000000-0000-0000-0000-000000000001"
+    )
+    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert "friend:rematch:00000000-0000-0000-0000-000000000001" in callbacks
+    assert "home:open" in callbacks
+
+
 def test_friend_challenge_limit_keyboard_contains_buy_options_and_back() -> None:
     keyboard = build_friend_challenge_limit_keyboard()
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
@@ -33,13 +53,17 @@ def test_friend_challenge_share_keyboard_contains_share_url_and_back() -> None:
     keyboard = build_friend_challenge_share_keyboard(
         invite_link="https://t.me/quizarena_bot?start=fc_token",
         challenge_id="00000000-0000-0000-0000-000000000001",
+        total_rounds=5,
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
-    assert any(button.url and "https://t.me/share/url" in button.url for button in buttons)
-    assert any(
-        button.url and "https%3A%2F%2Ft.me%2Fquizarena_bot%3Fstart%3Dfc_token" in button.url
-        for button in buttons
+    share_buttons = [button for button in buttons if button.url]
+    assert len(share_buttons) == 3
+    assert all("https://t.me/share/url" in (button.url or "") for button in share_buttons)
+    assert all(
+        "https%3A%2F%2Ft.me%2Fquizarena_bot%3Fstart%3Dfc_token" in (button.url or "")
+        for button in share_buttons
     )
+    assert any("5+Fragen" in (button.url or "") for button in share_buttons)
     assert any(
         button.callback_data == "friend:next:00000000-0000-0000-0000-000000000001"
         for button in buttons

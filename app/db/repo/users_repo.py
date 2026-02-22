@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import select, update
@@ -30,6 +31,18 @@ class UsersRepo:
         stmt = select(User).where(User.referral_code == referral_code)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
+
+    @staticmethod
+    async def list_by_ids(
+        session: AsyncSession,
+        user_ids: Sequence[int],
+    ) -> list[User]:
+        ids = tuple({int(user_id) for user_id in user_ids})
+        if not ids:
+            return []
+        stmt = select(User).where(User.id.in_(ids))
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
 
     @staticmethod
     async def create(

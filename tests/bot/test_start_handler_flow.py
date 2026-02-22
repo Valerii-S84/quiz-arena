@@ -8,8 +8,8 @@ import pytest
 from app.bot.handlers import start
 from app.bot.texts.de import TEXTS_DE
 from app.economy.offers.types import OfferSelection
+from app.game.sessions.errors import FriendChallengeExpiredError, FriendChallengeNotFoundError
 from app.game.sessions.types import SessionQuestionView, StartSessionResult
-from app.game.sessions.errors import FriendChallengeNotFoundError
 from tests.bot.helpers import DummyMessage, DummySessionLocal
 
 
@@ -98,6 +98,28 @@ async def test_handle_start_friend_token_invalid(monkeypatch) -> None:
     await start.handle_start(message)
 
     assert message.answers[0].text == TEXTS_DE["msg.friend.challenge.invalid"]
+
+
+@pytest.mark.asyncio
+async def test_handle_start_friend_token_expired(monkeypatch) -> None:
+    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
+        return SimpleNamespace(user_id=9, free_energy=20, paid_energy=0, current_streak=1)
+
+    async def _fake_join_friend_challenge(*args, **kwargs):
+        raise FriendChallengeExpiredError()
+
+    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(start.GameSessionService, "join_friend_challenge_by_token", _fake_join_friend_challenge)
+
+    message = _StartMessage(
+        text="/start fc_0123456789abcdef0123456789abcdef",
+        from_user=SimpleNamespace(id=1, username="alice", first_name="Alice", language_code="de"),
+    )
+    await start.handle_start(message)
+
+    assert message.answers[0].text == TEXTS_DE["msg.friend.challenge.expired"]
 
 
 @pytest.mark.asyncio
