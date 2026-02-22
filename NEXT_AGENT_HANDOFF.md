@@ -1,5 +1,55 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-22, P2-4 lockfile + QuizBank docs/reports completed)
+
+### What was changed
+1. Lockfile strategy and reproducibility:
+   - Added pinned lockfiles:
+     - `requirements.lock`
+     - `requirements-dev.lock`
+   - Updated dependency workflow:
+     - `Dockerfile` now installs runtime deps from `requirements.lock` (wheel-based, pinned).
+     - `.github/workflows/ci.yml` now:
+       - verifies lockfiles are in sync with `pyproject.toml`,
+       - installs from `requirements-dev.lock` + editable package (`--no-deps`).
+   - Updated developer tooling/docs:
+     - `Makefile` (`lock`, `lock-check` targets),
+     - `README_BACKEND.md`,
+     - `docs/runbooks/first_deploy_and_rollback.md`.
+
+2. QuizBank report refresh automation and CI gate:
+   - Added inventory generator:
+     - `tools/quizbank_inventory_audit.py`
+   - Added unified refresh/check script:
+     - `scripts/quizbank_reports.py`
+       - `refresh`: regenerates inventory + audit + ambiguity reports,
+       - `check`: validates report freshness against `QuizBank/*.csv` and drift vs freshly generated outputs.
+   - CI now enforces freshness:
+     - `.github/workflows/ci.yml` step `Verify QuizBank reports freshness`.
+
+3. Factual QuizBank docs/reports refreshed:
+   - Updated docs:
+     - `QuizBank/README.md` (current counts and commands),
+     - `reports/quizbank_production_plan.md`.
+   - Regenerated artifacts:
+     - `reports/quizbank_inventory_audit.json`
+     - `reports/quizbank_inventory_audit.md`
+     - `reports/quizbank_audit_report.json`
+     - `reports/quizbank_audit_report.md`
+     - `reports/quizbank_ambiguity_scan.json`
+     - `reports/quizbank_ambiguity_scan.md`
+   - Old file-name drift in ambiguity report is fixed (report now reflects current bank file set).
+
+4. Added execution report:
+   - `reports/p2_4_lockfile_quizbank_docs_report_2026-02-22.md`
+
+### Validation snapshot
+1. `ruff check app tests` -> pass
+2. `ruff check scripts/quizbank_reports.py tools/quizbank_inventory_audit.py` -> pass
+3. `mypy app tests` -> pass
+4. `TMPDIR=/tmp pytest -q --ignore=tests/integration` -> `242 passed`
+5. `python scripts/quizbank_reports.py check` -> pass
+
 ## Update (2026-02-22, P2-3b edge-condition fix completed)
 
 ### Why this slice was done
