@@ -1,5 +1,68 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-22, P2-3b edge-condition fix completed)
+
+### Why this slice was done
+- User priority changed: close `burst` + `duplicate` FAIL conditions before moving to `P2-4`.
+
+### What was changed
+1. Webhook enqueue hardening:
+   - `app/api/routes/telegram_webhook.py`
+   - Celery enqueue path is now timeout-bounded and offloaded from request event loop:
+     - new fail-fast behavior on enqueue timeout/failure -> webhook responds `503 {"status":"retry"}` (non-2xx, so upstream retries).
+   - Non-Celery test doubles are enqueued directly in-loop (prevents coroutine leak warnings in integration tests).
+2. Config/env knobs:
+   - `app/core/config.py`: added `TELEGRAM_WEBHOOK_ENQUEUE_TIMEOUT_MS` (default `250`).
+   - `.env.example`: added `TELEGRAM_WEBHOOK_ENQUEUE_TIMEOUT_MS=250`.
+   - `.env.production.example`: added `TELEGRAM_WEBHOOK_ENQUEUE_TIMEOUT_MS=250`.
+3. Tests:
+   - `tests/api/test_telegram_webhook.py`: added enqueue-failure and loop-bound fallback cases.
+   - Revalidated smoke webhook integration path:
+     - `tests/integration/test_telegram_sandbox_smoke_integration.py::test_telegram_webhook_smoke_referral_reward_choice_duplicate_replay`.
+
+### P2-3b execution results (post-fix re-run)
+Artifacts:
+- `reports/k6_peak_summary_p2_3b.json`
+- `reports/k6_burst_summary_p2_3b.json`
+- `reports/k6_duplicate_summary_p2_3b.json`
+- `reports/p2_3b_peak_gate.json`
+- `reports/p2_3b_burst_gate.json`
+- `reports/p2_3b_duplicate_gate_observation.json`
+
+Outcome:
+1. `peak`: PASS (`p95=5.637ms`, `error_rate=0`)
+2. `burst`: PASS (`p95=5.618ms`, `error_rate=0.000195`)
+3. `duplicate`: PASS (`webhook_duplicate_fail_rate=0`)
+
+### Updated report
+- `reports/p2_3_load_slo_report_2026-02-22.md` now includes a dedicated `P2-3b Re-Run After Webhook Enqueue Edge Fix` section with before/after delta.
+
+## Update (2026-02-22, P2-3 execution completed on local dockerized k6)
+
+### What was completed
+1. Executed load profiles locally via Dockerized `grafana/k6` against local API (`127.0.0.1:8000`):
+   - `steady` (`reports/k6_steady_summary.json`)
+   - `peak` (`reports/k6_peak_summary.json`)
+   - `burst` (`reports/k6_burst_summary.json`)
+   - duplicate delivery (`reports/k6_duplicate_summary.json`)
+2. Captured DB snapshots and gate artifacts:
+   - `reports/p2_3_*_db_before.json`
+   - `reports/p2_3_*_db_after.json`
+   - `reports/p2_3_*_gate.json`
+3. Updated P2-3 report with factual PASS/FAIL results:
+   - `reports/p2_3_load_slo_report_2026-02-22.md`
+4. Fixed SLO gate parser compatibility issue with current k6 summary format:
+   - updated `scripts/evaluate_slo_gate.py` to support both legacy `values` payload and direct metric fields (`value`, `p(95)`, etc.).
+
+### Result snapshot
+1. `steady`: PASS
+2. `peak`: PASS (but with generator saturation warning and dropped iterations)
+3. `burst`: FAIL (high timeout/error-rate and extreme p95)
+4. `duplicate`: FAIL on custom `webhook_duplicate_fail_rate` threshold (`http_req_failed` still below 1%)
+
+### Operational note
+- API process was started locally for load run (`python/uvicorn` on port `8000`); if still present in your environment, stop it before next test cycle.
+
 ## Update (2026-02-22, P2 execution handoff: P2-1 + P2-2 done, P2-3 artifacts done)
 
 ### What was completed today

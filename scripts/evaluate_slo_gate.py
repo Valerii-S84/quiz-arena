@@ -16,11 +16,25 @@ def _metric_values(
     metric_name: str,
     flow_tag: str,
 ) -> dict[str, float] | None:
+    def _extract_values(payload: object) -> dict[str, float] | None:
+        if not isinstance(payload, dict):
+            return None
+
+        nested_values = payload.get("values")
+        if isinstance(nested_values, dict):
+            return {str(k): float(v) for k, v in nested_values.items()}
+
+        # k6 summary-export may store trend/rate values directly under the metric key.
+        extracted: dict[str, float] = {}
+        for key, value in payload.items():
+            if key in {"thresholds", "type", "contains", "values"}:
+                continue
+            if isinstance(value, (int, float)):
+                extracted[str(key)] = float(value)
+        return extracted if extracted else None
+
     exact = metrics.get(metric_name)
-    if isinstance(exact, dict):
-        values = exact.get("values")
-        if isinstance(values, dict):
-            return {str(k): float(v) for k, v in values.items()}
+    exact_values = _extract_values(exact)
 
     tagged_prefix = f"{metric_name}{{"
     for key, payload in metrics.items():
@@ -28,11 +42,10 @@ def _metric_values(
             continue
         if f"flow:{flow_tag}" not in key:
             continue
-        if isinstance(payload, dict):
-            values = payload.get("values")
-            if isinstance(values, dict):
-                return {str(k): float(v) for k, v in values.items()}
-    return None
+        tagged_values = _extract_values(payload)
+        if tagged_values is not None:
+            return tagged_values
+    return exact_values
 
 
 def main() -> int:
@@ -58,7 +71,7 @@ def main() -> int:
         raise SystemExit("SLO_FAIL: required metrics not found in k6 summary")
 
     p95_ms = float(duration_values.get("p(95)", duration_values.get("p95", 0.0)))
-    error_rate = float(failed_values.get("rate", 1.0))
+    error_rate = float(failed_values.get("rate", failed_values.get("value", 1.0)))
 
     failures: list[str] = []
     if p95_ms > args.max_p95_ms:

@@ -23,6 +23,10 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = Field(alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_secret: str = Field(alias="TELEGRAM_WEBHOOK_SECRET")
+    telegram_webhook_enqueue_timeout_ms: int = Field(
+        default=250,
+        alias="TELEGRAM_WEBHOOK_ENQUEUE_TIMEOUT_MS",
+    )
     telegram_update_processing_ttl_seconds: int = Field(
         default=300,
         alias="TELEGRAM_UPDATE_PROCESSING_TTL_SECONDS",

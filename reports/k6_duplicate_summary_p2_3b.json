@@ -1,0 +1,166 @@
+{
+    "metrics": {
+        "vus_max": {
+            "min": 40,
+            "max": 40,
+            "value": 40
+        },
+        "http_req_receiving": {
+            "avg": 0.09926136646571847,
+            "min": 0.017248,
+            "med": 0.0925125,
+            "max": 14.228676,
+            "p(90)": 0.14601880000000006,
+            "p(95)": 0.16876509999999975
+        },
+        "http_req_waiting": {
+            "p(95)": 15.571898049999968,
+            "avg": 7.335119264846198,
+            "min": 0,
+            "med": 5.650663,
+            "max": 333.502825,
+            "p(90)": 12.1612139
+        },
+        "data_received": {
+            "count": 16004221,
+            "rate": 56844.05048461435
+        },
+        "http_req_blocked": {
+            "avg": 0.01390064366564698,
+            "min": 0.001642,
+            "med": 0.0054605,
+            "max": 34.005263,
+            "p(90)": 0.00797,
+            "p(95)": 0.008938
+        },
+        "vus": {
+            "value": 40,
+            "min": 40,
+            "max": 40
+        },
+        "http_req_tls_handshaking": {
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0
+        },
+        "http_req_duration": {
+            "med": 5.783423,
+            "max": 333.678295,
+            "p(90)": 12.289843600000005,
+            "p(95)": 15.70295684999999,
+            "avg": 7.465909252501453,
+            "min": 0.054632
+        },
+        "webhook_duplicate_fail_rate{flow:webhook_duplicates}": {
+            "fails": 55570,
+            "passes": 0,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "checks": {
+            "passes": 111140,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_duration{flow:webhook_duplicates}": {
+            "avg": 7.465909252501453,
+            "min": 0.054632,
+            "med": 5.783423,
+            "max": 333.678295,
+            "p(90)": 12.289843600000005,
+            "p(95)": 15.70295684999999,
+            "thresholds": {
+                "p(95)<500": false
+            }
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 111140,
+            "value": 0
+        },
+        "http_req_sending": {
+            "p(95)": 0.067696,
+            "avg": 0.031528621189490735,
+            "min": 0.007714,
+            "med": 0.02353,
+            "max": 11.267534,
+            "p(90)": 0.058218300000000014
+        },
+        "http_req_connecting": {
+            "min": 0,
+            "med": 0,
+            "max": 29.534112,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0.006481361418031312
+        },
+        "http_req_failed{flow:webhook_duplicates}": {
+            "passes": 0,
+            "fails": 111140,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(90)": 12.289843600000005,
+            "p(95)": 15.70295684999999,
+            "avg": 7.465909252501453,
+            "min": 0.054632,
+            "med": 5.783423,
+            "max": 333.678295
+        },
+        "webhook_duplicate_fail_rate": {
+            "fails": 55570,
+            "passes": 0,
+            "value": 0
+        },
+        "http_reqs": {
+            "count": 111140,
+            "rate": 394.7488459988174
+        },
+        "data_sent": {
+            "rate": 193732.95191456508,
+            "count": 54544758
+        },
+        "iteration_duration": {
+            "avg": 215.98057162542787,
+            "min": 207.115871,
+            "med": 212.8680965,
+            "max": 789.605333,
+            "p(90)": 224.9878343,
+            "p(95)": 231.4571215
+        },
+        "iterations": {
+            "count": 55570,
+            "rate": 197.3744229994087
+        }
+    },
+    "root_group": {
+        "groups": {},
+        "checks": {
+                "first duplicate request is 200": {
+                    "path": "::first duplicate request is 200",
+                    "id": "9277a8cd1fe283aaf0eeb8ecb0fcb15d",
+                    "passes": 55570,
+                    "fails": 0,
+                    "name": "first duplicate request is 200"
+                },
+                "second duplicate request is 200": {
+                    "name": "second duplicate request is 200",
+                    "path": "::second duplicate request is 200",
+                    "id": "3cb380cf660307e8b1b7744554082164",
+                    "passes": 55570,
+                    "fails": 0
+                }
+            },
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e"
+    }
+}

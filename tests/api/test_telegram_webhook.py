@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
@@ -14,6 +15,20 @@ class StubTask:
 
     def delay(self, **kwargs: object) -> None:
         self.calls.append(kwargs)
+
+
+class LoopBoundStubTask:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def delay(self, **kwargs: object) -> None:
+        asyncio.get_running_loop()
+        self.calls.append(kwargs)
+
+
+class FailingStubTask:
+    def delay(self, **kwargs: object) -> None:
+        raise RuntimeError("broker_unavailable")
 
 
 def test_webhook_enqueues_update_when_secret_is_valid(monkeypatch) -> None:
@@ -36,6 +51,53 @@ def test_webhook_enqueues_update_when_secret_is_valid(monkeypatch) -> None:
     assert response.json() == {"status": "queued"}
     assert len(stub_task.calls) == 1
     assert stub_task.calls[0]["update_id"] == 12345
+
+
+def test_webhook_enqueues_with_loop_bound_task_fallback(monkeypatch) -> None:
+    stub_task = LoopBoundStubTask()
+    monkeypatch.setattr(
+        telegram_webhook,
+        "get_settings",
+        lambda: SimpleNamespace(
+            telegram_webhook_secret="secret-token",
+            telegram_webhook_enqueue_timeout_ms=250,
+        ),
+    )
+    monkeypatch.setattr(telegram_webhook, "process_telegram_update", stub_task)
+
+    client = TestClient(app)
+    response = client.post(
+        "/webhook/telegram",
+        json={"update_id": 12345, "message": {"message_id": 1}},
+        headers={"X-Telegram-Bot-Api-Secret-Token": "secret-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "queued"}
+    assert len(stub_task.calls) == 1
+
+
+def test_webhook_returns_ignored_when_enqueue_fails(monkeypatch) -> None:
+    stub_task = FailingStubTask()
+    monkeypatch.setattr(
+        telegram_webhook,
+        "get_settings",
+        lambda: SimpleNamespace(
+            telegram_webhook_secret="secret-token",
+            telegram_webhook_enqueue_timeout_ms=250,
+        ),
+    )
+    monkeypatch.setattr(telegram_webhook, "process_telegram_update", stub_task)
+
+    client = TestClient(app)
+    response = client.post(
+        "/webhook/telegram",
+        json={"update_id": 12345, "message": {"message_id": 1}},
+        headers={"X-Telegram-Bot-Api-Secret-Token": "secret-token"},
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"status": "retry"}
 
 
 def test_webhook_ignores_invalid_secret(monkeypatch) -> None:
