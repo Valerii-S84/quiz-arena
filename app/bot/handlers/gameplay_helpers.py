@@ -61,13 +61,16 @@ async def _notify_opponent(
     if opponent_user_id is None or callback.from_user is None:
         return
 
+    bot = callback.bot
+    assert bot is not None
+
     async with session_local.begin() as session:
         opponent = await users_repo.get_by_id(session, opponent_user_id)
     if opponent is None:
         return
 
     try:
-        await callback.bot.send_message(
+        await bot.send_message(
             chat_id=opponent.telegram_user_id,
             text=text,
             reply_markup=reply_markup,
@@ -77,8 +80,10 @@ async def _notify_opponent(
 
 
 async def _build_friend_invite_link(callback: CallbackQuery, *, invite_token: str) -> str | None:
+    bot = callback.bot
+    assert bot is not None
     try:
-        me = await callback.bot.get_me()
+        me = await bot.get_me()
     except Exception:
         return None
     if not me.username:
@@ -93,8 +98,10 @@ async def _build_friend_result_share_url(
     share_cta_text: str,
     build_share_url,
 ) -> str | None:
+    bot = callback.bot
+    assert bot is not None
     try:
-        me = await callback.bot.get_me()
+        me = await bot.get_me()
     except Exception:
         return None
     if not me.username:

@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+
 ROOT = Path(__file__).resolve().parent.parent
 QUIZBANK_DIR = ROOT / "QuizBank"
 REPORTS_DIR = ROOT / "reports"
@@ -140,17 +141,9 @@ def check_reports() -> int:
         _run_refresh(temp_path)
 
         json_pairs = [
-            (
-                "reports/quizbank_inventory_audit.json",
-                INVENTORY_JSON,
-                temp_path / INVENTORY_JSON.name,
-            ),
+            ("reports/quizbank_inventory_audit.json", INVENTORY_JSON, temp_path / INVENTORY_JSON.name),
             ("reports/quizbank_audit_report.json", AUDIT_JSON, temp_path / AUDIT_JSON.name),
-            (
-                "reports/quizbank_ambiguity_scan.json",
-                AMBIGUITY_JSON,
-                temp_path / AMBIGUITY_JSON.name,
-            ),
+            ("reports/quizbank_ambiguity_scan.json", AMBIGUITY_JSON, temp_path / AMBIGUITY_JSON.name),
         ]
         for rel_name, actual_path, expected_path in json_pairs:
             actual = _normalize_json(_load_json(actual_path))
@@ -166,11 +159,11 @@ def check_reports() -> int:
             ("reports/quizbank_ambiguity_scan.md", AMBIGUITY_MD, temp_path / AMBIGUITY_MD.name),
         ]
         for rel_name, actual_path, expected_path in md_pairs:
-            actual = _normalize_md(actual_path.read_text(encoding="utf-8"))
-            expected = _normalize_md(expected_path.read_text(encoding="utf-8"))
-            if actual != expected:
+            actual_md = _normalize_md(actual_path.read_text(encoding="utf-8"))
+            expected_md = _normalize_md(expected_path.read_text(encoding="utf-8"))
+            if actual_md != expected_md:
                 print(f"QuizBank report mismatch: {rel_name}")
-                print(_diff_preview(expected, actual, rel_name))
+                print(_diff_preview(expected_md, actual_md, rel_name))
                 print("Run: python scripts/quizbank_reports.py refresh")
                 return 1
 

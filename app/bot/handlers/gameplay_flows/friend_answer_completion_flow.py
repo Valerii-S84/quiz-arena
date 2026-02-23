@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Protocol, cast
 
 from aiogram.types import CallbackQuery
 
 from app.bot.keyboards.friend_challenge import build_friend_challenge_finished_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
+
+
+class _Answerable(Protocol):
+    async def answer(self, *args, **kwargs) -> object: ...
 
 
 async def handle_completed_friend_challenge(
@@ -114,7 +119,11 @@ async def handle_completed_friend_challenge(
     )
     my_message_lines.append("")
     my_message_lines.append(my_proof_card_text)
-    await callback.message.answer(
+    message = callback.message
+    assert message is not None
+    assert hasattr(message, "answer")
+    answerable = cast(_Answerable, message)
+    await answerable.answer(
         "\n".join(my_message_lines),
         reply_markup=finish_keyboard,
     )

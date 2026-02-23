@@ -145,13 +145,13 @@ def audit_table(path: Path, data: TableData) -> dict[str, Any]:
     rows = data.rows
     missing_columns = [col for col in REQUIRED_COLUMNS if col not in columns]
 
-    missing_required_counts = Counter()
+    missing_required_counts: Counter[str] = Counter()
     trailing_space_samples: list[dict[str, Any]] = []
     double_space_samples: list[dict[str, Any]] = []
     question_punct_issues: list[int] = []
     explanation_punct_issues: list[int] = []
     date_parse_issues: list[dict[str, Any]] = []
-    status_distribution = Counter()
+    status_distribution: Counter[str] = Counter()
 
     bad_correct_option_id: list[dict[str, Any]] = []
     mismatch_correct_answer: list[dict[str, Any]] = []
@@ -177,7 +177,9 @@ def audit_table(path: Path, data: TableData) -> dict[str, Any]:
             if not isinstance(value, str):
                 continue
             if value != value.strip() and len(trailing_space_samples) < 50:
-                trailing_space_samples.append({"row": row_id, "column": col, "value": value})
+                trailing_space_samples.append(
+                    {"row": row_id, "column": col, "value": value}
+                )
             if "  " in value and len(double_space_samples) < 50:
                 double_space_samples.append({"row": row_id, "column": col})
 
@@ -238,7 +240,9 @@ def audit_table(path: Path, data: TableData) -> dict[str, Any]:
                     )
             if normalize(correct_answer) not in [normalize(option) for option in options]:
                 if len(answer_not_in_options) < 50:
-                    answer_not_in_options.append({"row": row_id, "correct_answer": correct_answer})
+                    answer_not_in_options.append(
+                        {"row": row_id, "correct_answer": correct_answer}
+                    )
 
     duplicate_question_groups: list[dict[str, Any]] = []
     ambiguous_question_groups: list[dict[str, Any]] = []
@@ -270,7 +274,9 @@ def audit_table(path: Path, data: TableData) -> dict[str, Any]:
     ]
 
     non_ready_count = sum(
-        count for status, count in status_distribution.items() if status not in {"ready", "(empty)"}
+        count
+        for status, count in status_distribution.items()
+        if status not in {"ready", "(empty)"}
     )
 
     critical_count = (

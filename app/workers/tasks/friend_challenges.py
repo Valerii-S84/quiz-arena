@@ -119,12 +119,16 @@ async def run_friend_challenge_deadlines_async(
 
     user_ids: set[int] = set()
     for item in reminder_items:
-        user_ids.add(int(item["creator_user_id"]))
+        creator_user_id = item["creator_user_id"]
+        assert isinstance(creator_user_id, int)
+        user_ids.add(creator_user_id)
         opponent_user_id = item["opponent_user_id"]
         if isinstance(opponent_user_id, int):
             user_ids.add(opponent_user_id)
     for item in expired_items:
-        user_ids.add(int(item["creator_user_id"]))
+        creator_user_id = item["creator_user_id"]
+        assert isinstance(creator_user_id, int)
+        user_ids.add(creator_user_id)
         opponent_user_id = item["opponent_user_id"]
         if isinstance(opponent_user_id, int):
             user_ids.add(opponent_user_id)
@@ -148,7 +152,9 @@ async def run_friend_challenge_deadlines_async(
                 f"⏳ Dein Duell läuft bald ab ({hours:02d}:{minutes:02d}h). " "Jetzt weiterspielen!"
             )
             challenge_id = str(item["challenge_id"])
-            target_user_ids = [int(item["creator_user_id"])]
+            creator_user_id = item["creator_user_id"]
+            assert isinstance(creator_user_id, int)
+            target_user_ids = [creator_user_id]
             opponent_user_id = item["opponent_user_id"]
             if isinstance(opponent_user_id, int):
                 target_user_ids.append(opponent_user_id)
@@ -185,10 +191,13 @@ async def run_friend_challenge_deadlines_async(
 
         for item in expired_items:
             challenge_id = str(item["challenge_id"])
-            creator_user_id = int(item["creator_user_id"])
+            creator_user_id = item["creator_user_id"]
+            assert isinstance(creator_user_id, int)
             opponent_user_id = item["opponent_user_id"]
-            creator_score = int(item["creator_score"])
-            opponent_score = int(item["opponent_score"])
+            creator_score = item["creator_score"]
+            opponent_score = item["opponent_score"]
+            assert isinstance(creator_score, int)
+            assert isinstance(opponent_score, int)
 
             sent_to = 0
             failed_to = 0
@@ -281,7 +290,9 @@ async def run_friend_challenge_deadlines_async(
 
 
 @celery_app.task(name="app.workers.tasks.friend_challenges.run_friend_challenge_deadlines")
-def run_friend_challenge_deadlines(batch_size: int = DEADLINE_BATCH_SIZE) -> dict[str, int]:
+def run_friend_challenge_deadlines(
+    batch_size: int = DEADLINE_BATCH_SIZE,
+) -> dict[str, int]:
     return run_async_job(run_friend_challenge_deadlines_async(batch_size=batch_size))
 
 
