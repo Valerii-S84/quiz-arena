@@ -66,6 +66,7 @@ testpaths = ["tests"]
 python_version = "3.12"
 files = ["app", "tests"]
 explicit_package_bases = true
+mypy_path = ["tools"]
 warn_unused_configs = true
 show_error_codes = true
 
