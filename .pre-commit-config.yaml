@@ -4,6 +4,26 @@ default_language_version:
 repos:
   - repo: local
     hooks:
+      - id: architecture-line-limits
+        name: architecture-line-limits
+        entry: bash scripts/check_line_limits.sh
+        language: system
+        pass_filenames: false
+      - id: no-print-app
+        name: no-print-app
+        entry: bash scripts/check_no_print_app.sh
+        language: system
+        pass_filenames: false
+      - id: no-except-exception-pass
+        name: no-except-exception-pass
+        entry: bash scripts/check_no_except_exception_pass.sh
+        language: system
+        pass_filenames: false
+      - id: architecture-imports
+        name: architecture-imports
+        entry: bash scripts/check_architecture_imports.sh
+        language: system
+        pass_filenames: false
       - id: ruff
         name: ruff
         entry: .venv/bin/ruff check

@@ -97,7 +97,26 @@ make test
 make test-integration
 ```
 
-## 7. Production skeleton
+## 7. Architecture guard (pre-commit)
+
+Install and enable pre-commit hooks:
+
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run -a
+```
+
+Limits enforced (CI + pre-commit):
+- `app/**/*.py` max 250 lines
+- `tests/**/*.py` max 400 lines
+- `tools/**/*.py` max 300 lines
+
+Soft thresholds:
+- `app/**/*.py` >200 lines → warning
+- `app/**/*.py` >220 lines → CI fail unless PR contains `[APPROVED_SIZE_EXCEPTION]`
+
+## 8. Production skeleton
 
 - Compose stack: `docker-compose.prod.yml`
 - Production env template: `.env.production.example`
@@ -105,7 +124,7 @@ make test-integration
 - Deploy helper: `scripts/deploy.sh`
 - Runbook: `docs/runbooks/first_deploy_and_rollback.md`
 
-## 8. QuizBank report refresh flow
+## 9. QuizBank report refresh flow
 
 Refresh all factual QuizBank reports:
 
