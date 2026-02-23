@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import datetime, timedelta
 from uuid import uuid4
-from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -12,39 +11,20 @@ from app.db.models.promo_codes import PromoCode
 from app.db.models.promo_redemptions import PromoRedemption
 from app.db.models.purchases import Purchase
 from app.db.models.quiz_sessions import QuizSession
-from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
-from app.economy.energy.constants import BERLIN_TIMEZONE
 from app.workers.tasks.analytics_daily import run_analytics_daily_aggregation_async
-
-UTC = timezone.utc
-
-
-def _day_bounds_utc(local_date_berlin: date) -> tuple[datetime, datetime]:
-    tz = ZoneInfo(BERLIN_TIMEZONE)
-    start_local = datetime.combine(local_date_berlin, time.min, tzinfo=tz)
-    end_local = start_local + timedelta(days=1)
-    return start_local.astimezone(UTC), end_local.astimezone(UTC)
-
-
-async def _create_user(seed: str, seen_at: datetime) -> int:
-    async with SessionLocal.begin() as session:
-        user = await UsersRepo.create(
-            session,
-            telegram_user_id=80_000_000_000 + (abs(hash(seed)) % 1_000_000),
-            referral_code=f"A{uuid4().hex[:10].upper()}",
-            username=None,
-            first_name="Analytics",
-            referred_by_user_id=None,
-        )
-        user.last_seen_at = seen_at
-        return int(user.id)
+from tests.integration.analytics_daily_fixtures import (
+    UTC,
+    _berlin_date,
+    _create_user,
+    _day_bounds_utc,
+)
 
 
 @pytest.mark.asyncio
 async def test_analytics_daily_aggregation_builds_expected_daily_kpis() -> None:
     now_utc = datetime.now(UTC)
-    local_day = now_utc.astimezone(ZoneInfo(BERLIN_TIMEZONE)).date()
+    local_day = _berlin_date(now_utc)
     day_start_utc, day_end_utc = _day_bounds_utc(local_day)
 
     user_1 = await _create_user("analytics-u1", day_start_utc + timedelta(hours=1))
