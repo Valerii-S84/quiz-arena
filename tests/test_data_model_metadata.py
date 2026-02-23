@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import CheckConstraint, UniqueConstraint
 
 from app.db.models import AnalyticsEvent  # noqa: F401
-from app.db.models import (
+from app.db.models import (  # noqa: F401
     AnalyticsDaily,
     EnergyState,
     Entitlement,
