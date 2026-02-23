@@ -3,20 +3,27 @@ from __future__ import annotations
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
-from app.bot.handlers import gameplay_callbacks, gameplay_helpers, gameplay_views
+from app.bot.handlers import (
+    gameplay_callbacks,
+    gameplay_friend_challenge,
+    gameplay_helpers,
+    gameplay_views,
+)
+from app.bot.handlers.gameplay_friend_challenge import (  # noqa: F401
+    handle_friend_challenge_create,
+    handle_friend_challenge_create_selected,
+    handle_friend_challenge_next,
+    handle_friend_challenge_rematch,
+    handle_friend_challenge_series_best3,
+    handle_friend_challenge_series_next,
+    handle_friend_challenge_share_result,
+)
 from app.bot.handlers.gameplay_flows import (
     answer_flow,
     friend_answer_flow,
-    friend_challenge_flow,
-    friend_next_flow,
-    friend_series_flow,
     play_flow,
-    proof_card_flow,
 )
-from app.bot.keyboards.friend_challenge import (
-    build_friend_challenge_create_keyboard,
-    build_friend_challenge_share_url,
-)
+from app.bot.keyboards.friend_challenge import build_friend_challenge_share_url
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.repo.users_repo import UsersRepo
@@ -30,12 +37,8 @@ router = Router(name="gameplay")
 EVENT_SOURCE_BOT = "BOT"
 
 ANSWER_RE = gameplay_callbacks.ANSWER_RE
-FRIEND_NEXT_RE = gameplay_callbacks.FRIEND_NEXT_RE
-FRIEND_CREATE_RE = gameplay_callbacks.FRIEND_CREATE_RE
-FRIEND_REMATCH_RE = gameplay_callbacks.FRIEND_REMATCH_RE
-FRIEND_SHARE_RESULT_RE = gameplay_callbacks.FRIEND_SHARE_RESULT_RE
-FRIEND_SERIES_BEST3_RE = gameplay_callbacks.FRIEND_SERIES_BEST3_RE
-FRIEND_SERIES_NEXT_RE = gameplay_callbacks.FRIEND_SERIES_NEXT_RE
+
+gameplay_friend_challenge.register(router)
 
 _format_user_label = gameplay_views._format_user_label
 _build_friend_plan_text = gameplay_views._build_friend_plan_text
@@ -174,104 +177,6 @@ async def handle_mode(callback: CallbackQuery) -> None:
         mode_code=mode_code,
         source="MENU",
         idempotency_key=f"start:mode:{mode_code}:{callback.id}",
-    )
-
-
-@router.callback_query(F.data == "friend:challenge:create")
-async def handle_friend_challenge_create(callback: CallbackQuery) -> None:
-    if callback.message is None:
-        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
-        return
-    await callback.message.answer(
-        TEXTS_DE["msg.friend.challenge.create.choose"],
-        reply_markup=build_friend_challenge_create_keyboard(),
-    )
-    await callback.answer()
-
-
-@router.callback_query(F.data.regexp(FRIEND_CREATE_RE))
-async def handle_friend_challenge_create_selected(callback: CallbackQuery) -> None:
-    await friend_challenge_flow.handle_friend_challenge_create_selected(
-        callback,
-        **_session_deps(),
-        parse_challenge_rounds=gameplay_callbacks.parse_challenge_rounds,
-        build_friend_invite_link=_build_friend_invite_link,
-        build_friend_plan_text=_build_friend_plan_text,
-        build_friend_ttl_text=_build_friend_ttl_text,
-    )
-
-
-@router.callback_query(F.data.regexp(FRIEND_REMATCH_RE))
-async def handle_friend_challenge_rematch(callback: CallbackQuery) -> None:
-    await friend_challenge_flow.handle_friend_challenge_rematch(
-        callback,
-        friend_rematch_re=FRIEND_REMATCH_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        **_session_deps(),
-        resolve_opponent_label=_resolve_opponent_label,
-        friend_opponent_user_id=_friend_opponent_user_id,
-        notify_opponent=_notify_opponent,
-        build_friend_plan_text=_build_friend_plan_text,
-        build_friend_ttl_text=_build_friend_ttl_text,
-    )
-
-
-@router.callback_query(F.data.regexp(FRIEND_SERIES_BEST3_RE))
-async def handle_friend_challenge_series_best3(callback: CallbackQuery) -> None:
-    await friend_series_flow.handle_friend_challenge_series_best3(
-        callback,
-        friend_series_best3_re=FRIEND_SERIES_BEST3_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        **_session_deps(),
-        resolve_opponent_label=_resolve_opponent_label,
-        friend_opponent_user_id=_friend_opponent_user_id,
-        notify_opponent=_notify_opponent,
-        build_friend_plan_text=_build_friend_plan_text,
-        build_series_progress_text=_build_series_progress_text,
-    )
-
-
-@router.callback_query(F.data.regexp(FRIEND_SERIES_NEXT_RE))
-async def handle_friend_challenge_series_next(callback: CallbackQuery) -> None:
-    await friend_series_flow.handle_friend_challenge_series_next(
-        callback,
-        friend_series_next_re=FRIEND_SERIES_NEXT_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        **_session_deps(),
-        resolve_opponent_label=_resolve_opponent_label,
-        friend_opponent_user_id=_friend_opponent_user_id,
-        notify_opponent=_notify_opponent,
-        build_friend_plan_text=_build_friend_plan_text,
-        build_series_progress_text=_build_series_progress_text,
-    )
-
-
-@router.callback_query(F.data.regexp(FRIEND_SHARE_RESULT_RE))
-async def handle_friend_challenge_share_result(callback: CallbackQuery) -> None:
-    await proof_card_flow.handle_friend_challenge_share_result(
-        callback,
-        friend_share_result_re=FRIEND_SHARE_RESULT_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        **_session_deps(),
-        resolve_opponent_label=_resolve_opponent_label,
-        build_friend_proof_card_text=_build_friend_proof_card_text,
-        build_friend_result_share_url=_build_friend_result_share_url,
-        emit_analytics_event=emit_analytics_event,
-        event_source_bot=EVENT_SOURCE_BOT,
-    )
-
-
-@router.callback_query(F.data.regexp(FRIEND_NEXT_RE))
-async def handle_friend_challenge_next(callback: CallbackQuery) -> None:
-    await friend_next_flow.handle_friend_challenge_next(
-        callback,
-        friend_next_re=FRIEND_NEXT_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        **_session_deps(),
-        resolve_opponent_label=_resolve_opponent_label,
-        build_friend_score_text=_build_friend_score_text,
-        build_friend_ttl_text=_build_friend_ttl_text,
-        send_friend_round_question=_send_friend_round_question,
     )
 
 
