@@ -12,11 +12,10 @@ from app.db.models.purchases import Purchase
 from app.db.models.users import User
 from app.db.session import SessionLocal
 from app.main import app
+from tests.integration.telegram_sandbox_smoke_bot import _BotApiStub, _configure_webhook_processing
 from tests.integration.telegram_sandbox_smoke_fixtures import (
     UTC,
-    _BotApiStub,
     _callback_update,
-    _configure_webhook_processing,
     _create_discount_promo_code,
     _message_update,
     _post_webhook_update,

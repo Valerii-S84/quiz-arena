@@ -12,11 +12,10 @@ from app.db.models.referrals import Referral
 from app.db.session import SessionLocal
 from app.economy.referrals.service import ReferralService
 from app.main import app
+from tests.integration.telegram_sandbox_smoke_bot import _BotApiStub, _configure_webhook_processing
 from tests.integration.telegram_sandbox_smoke_fixtures import (
     UTC,
-    _BotApiStub,
     _callback_update,
-    _configure_webhook_processing,
     _create_user,
     _post_webhook_update,
 )
