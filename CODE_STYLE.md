@@ -9,7 +9,15 @@
 
 ## Dateigröße
 
-* **Max. 250 Zeilen pro Datei (Hard Limit).**
+* **Hard Limits (CI):**
+  * `app/**/*.py` max **250** Zeilen
+  * `tests/**/*.py` max **400** Zeilen
+  * `tools/**/*.py` max **300** Zeilen
+  * `scripts/**` → kein Limit
+  * `static/**/*.js|css` → kein Limit
+* **Soft-Grenzen (CI):**
+  * `app/**/*.py` > **200** Zeilen → Warning
+  * `app/**/*.py` > **220** Zeilen → **Fail** ohne Marker `[APPROVED_SIZE_EXCEPTION]` im PR
 * Ausnahmen **nur** mit expliziter Begründung im PR/DEVLOG und Link auf die Entscheidung.
 
 ## Modularität

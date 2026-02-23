@@ -8,32 +8,33 @@ Diese Struktur verhindert Chaos, trennt UI von Domänenlogik und hält Module kl
 
 ```
 /app
+  /api
+    /routes
   /bot
     /handlers
     /keyboards
     /texts
-  /game
-    /modes
-    /selection
-    /scoring
-    /anti_abuse
-  /tournaments
-    /lifecycle
-    /ranking
-    /rewards
-  /economy
-    /packages
-    /entitlements
-    /referrals
+  /core
   /db
     /models
-    /migrations
     /repo
+  /economy
+    /energy
+    /offers
+    /promo
+    /purchases
+    /referrals
+    /streak
+  /game
+    /friend_challenges
+    /modes
+    /questions
+    /sessions
+  /ops_ui
+    /site
   /services
-    /scheduler
-    /payments
-    /analytics
-  /config
+  /workers
+    /tasks
 /tests
 /docs
 ```
@@ -45,7 +46,6 @@ Diese Struktur verhindert Chaos, trennt UI von Domänenlogik und hält Module kl
 * Business-Logik liegt in:
 
   * `app/game/`
-  * `app/tournaments/`
   * `app/economy/`
 * DB-Zugriff:
 
@@ -53,7 +53,7 @@ Diese Struktur verhindert Chaos, trennt UI von Domänenlogik und hält Module kl
   * Repositories/Queries in `app/db/repo/`
   * Migrationen in `app/db/migrations/`
 * Services (Integration/Infra) nur in `app/services/`.
-* Konfiguration zentral in `app/config/`.
+* Konfiguration zentral in `app/core/`.
 
 ## Import-Guidelines
 

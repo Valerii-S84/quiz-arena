@@ -116,6 +116,14 @@ Soft thresholds:
 - `app/**/*.py` >200 lines → warning
 - `app/**/*.py` >220 lines → CI fail unless PR contains `[APPROVED_SIZE_EXCEPTION]`
 
+Additional guards (CI + pre-commit unless noted):
+- `print(` is forbidden in `app/`
+- `except Exception: pass` is forbidden anywhere in the repo
+- `domains -> app.bot` imports are forbidden
+- New files in `app/bot/handlers/` >180 lines → fail
+- Growth delta guard (CI only): if a PR adds >50 lines to a file in `app/` and the file ends up >180 lines → fail
+- Monolith warning (CI): file >=180 lines, >5 top-level `def`, >5 top-level `if` → warning
+
 ## 8. Production skeleton
 
 - Compose stack: `docker-compose.prod.yml`
