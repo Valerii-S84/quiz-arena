@@ -247,6 +247,10 @@ class AnalyticsRepo:
             .limit(resolved_limit)
             .scalar_subquery()
         )
-        stmt = delete(AnalyticsEvent).where(AnalyticsEvent.id.in_(candidate_ids)).returning(AnalyticsEvent.id)
+        stmt = (
+            delete(AnalyticsEvent)
+            .where(AnalyticsEvent.id.in_(candidate_ids))
+            .returning(AnalyticsEvent.id)
+        )
         result = await session.execute(stmt)
         return len(list(result.scalars()))

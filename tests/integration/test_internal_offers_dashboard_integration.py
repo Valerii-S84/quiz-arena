@@ -163,7 +163,9 @@ async def _seed_offer_dashboard_dataset(now_utc: datetime) -> None:
 
 
 @pytest.mark.asyncio
-async def test_internal_offers_dashboard_returns_funnel_metrics_and_alert_flags(monkeypatch) -> None:
+async def test_internal_offers_dashboard_returns_funnel_metrics_and_alert_flags(
+    monkeypatch,
+) -> None:
     now_utc = datetime.now(UTC)
     await _seed_offer_dashboard_dataset(now_utc)
 

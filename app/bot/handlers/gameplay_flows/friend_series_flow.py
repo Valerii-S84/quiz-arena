@@ -65,7 +65,10 @@ async def handle_friend_challenge_series_best3(
             FriendChallengeNotFoundError,
             FriendChallengeAccessError,
         ):
-            await callback.message.answer(TEXTS_DE["msg.friend.challenge.invalid"], reply_markup=build_home_keyboard())
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.invalid"],
+                reply_markup=build_home_keyboard(),
+            )
             await callback.answer()
             return
 
@@ -76,7 +79,9 @@ async def handle_friend_challenge_series_best3(
     await callback.message.answer(
         "\n".join(
             [
-                TEXTS_DE["msg.friend.challenge.series.started"].format(opponent_label=opponent_label),
+                TEXTS_DE["msg.friend.challenge.series.started"].format(
+                    opponent_label=opponent_label
+                ),
                 build_friend_plan_text(total_rounds=series_duel.total_rounds),
                 build_series_progress_text(
                     game_no=series_duel.series_game_number,
@@ -87,7 +92,9 @@ async def handle_friend_challenge_series_best3(
                 ),
             ]
         ),
-        reply_markup=build_friend_challenge_next_keyboard(challenge_id=str(series_duel.challenge_id)),
+        reply_markup=build_friend_challenge_next_keyboard(
+            challenge_id=str(series_duel.challenge_id)
+        ),
     )
     opponent_user_id = friend_opponent_user_id(challenge=series_duel, user_id=snapshot.user_id)
     if opponent_user_id is not None:
@@ -113,7 +120,9 @@ async def handle_friend_challenge_series_best3(
                     ),
                 ]
             ),
-            reply_markup=build_friend_challenge_next_keyboard(challenge_id=str(series_duel.challenge_id)),
+            reply_markup=build_friend_challenge_next_keyboard(
+                challenge_id=str(series_duel.challenge_id)
+            ),
         )
     await callback.answer()
 
@@ -154,11 +163,13 @@ async def handle_friend_challenge_series_next(
                 challenge_id=challenge_id,
                 now_utc=now_utc,
             )
-            my_wins, opponent_wins, game_no, best_of = await game_session_service.get_friend_series_score_for_user(
-                session,
-                user_id=snapshot.user_id,
-                challenge_id=next_duel.challenge_id,
-                now_utc=now_utc,
+            my_wins, opponent_wins, game_no, best_of = (
+                await game_session_service.get_friend_series_score_for_user(
+                    session,
+                    user_id=snapshot.user_id,
+                    challenge_id=next_duel.challenge_id,
+                    now_utc=now_utc,
+                )
             )
         except FriendChallengePaymentRequiredError:
             await callback.message.answer(
@@ -171,7 +182,10 @@ async def handle_friend_challenge_series_next(
             FriendChallengeNotFoundError,
             FriendChallengeAccessError,
         ):
-            await callback.message.answer(TEXTS_DE["msg.friend.challenge.invalid"], reply_markup=build_home_keyboard())
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.invalid"],
+                reply_markup=build_home_keyboard(),
+            )
             await callback.answer()
             return
 
@@ -215,6 +229,8 @@ async def handle_friend_challenge_series_next(
                     build_friend_plan_text(total_rounds=next_duel.total_rounds),
                 ]
             ),
-            reply_markup=build_friend_challenge_next_keyboard(challenge_id=str(next_duel.challenge_id)),
+            reply_markup=build_friend_challenge_next_keyboard(
+                challenge_id=str(next_duel.challenge_id)
+            ),
         )
     await callback.answer()

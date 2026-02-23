@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.core.config import get_settings
 from app.db.models.friend_challenges import FriendChallenge
 from app.db.models.quiz_attempts import QuizAttempt
@@ -19,7 +20,6 @@ from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
 from app.db.repo.quiz_questions_repo import QuizQuestionsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.db.repo.users_repo import UsersRepo
-from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.economy.energy.service import EnergyService
 from app.economy.streak.service import StreakService
 from app.economy.streak.time import berlin_local_date
@@ -130,7 +130,9 @@ class GameSessionService:
         if creator is None:
             raise FriendChallengeAccessError
 
-        premium_active = await EntitlementsRepo.has_active_premium(session, creator_user_id, now_utc)
+        premium_active = await EntitlementsRepo.has_active_premium(
+            session, creator_user_id, now_utc
+        )
         access_type = "PREMIUM"
         if not premium_active:
             free_count = await FriendChallengesRepo.count_by_creator_access_type(
@@ -200,7 +202,9 @@ class GameSessionService:
         return challenge
 
     @staticmethod
-    def _build_friend_challenge_snapshot(challenge: FriendChallenge) -> FriendChallengeSnapshot:
+    def _build_friend_challenge_snapshot(
+        challenge: FriendChallenge,
+    ) -> FriendChallengeSnapshot:
         return FriendChallengeSnapshot(
             challenge_id=challenge.id,
             invite_token=challenge.invite_token,
@@ -357,13 +361,17 @@ class GameSessionService:
         existing: QuizSession,
         idempotent_replay: bool,
     ) -> StartSessionResult:
-        question = await GameSessionService._load_question_for_session(session, quiz_session=existing)
+        question = await GameSessionService._load_question_for_session(
+            session, quiz_session=existing
+        )
         total_questions: int | None = None
         question_number: int | None = None
         if existing.source == "FRIEND_CHALLENGE":
             question_number = existing.friend_challenge_round
             if existing.friend_challenge_id is not None:
-                challenge = await FriendChallengesRepo.get_by_id(session, existing.friend_challenge_id)
+                challenge = await FriendChallengesRepo.get_by_id(
+                    session, existing.friend_challenge_id
+                )
                 if challenge is not None:
                     total_questions = challenge.total_rounds
         return StartSessionResult(
@@ -460,7 +468,10 @@ class GameSessionService:
             )
         if challenge.status not in {"COMPLETED", "EXPIRED"}:
             raise FriendChallengeAccessError
-        if initiator_user_id not in {challenge.creator_user_id, challenge.opponent_user_id}:
+        if initiator_user_id not in {
+            challenge.creator_user_id,
+            challenge.opponent_user_id,
+        }:
             raise FriendChallengeAccessError
 
         opponent_user_id = GameSessionService._resolve_challenge_opponent_user_id(
@@ -524,7 +535,7 @@ class GameSessionService:
                 "entrypoint": "rematch",
                 "source_challenge_id": str(challenge_id),
                 "expires_at": rematch.expires_at.isoformat(),
-                "series_id": str(rematch.series_id) if rematch.series_id is not None else None,
+                "series_id": (str(rematch.series_id) if rematch.series_id is not None else None),
                 "series_game_number": rematch.series_game_number,
                 "series_best_of": rematch.series_best_of,
             },
@@ -541,7 +552,7 @@ class GameSessionService:
                 "opponent_user_id": opponent_user_id,
                 "total_rounds": rematch.total_rounds,
                 "expires_at": rematch.expires_at.isoformat(),
-                "series_id": str(rematch.series_id) if rematch.series_id is not None else None,
+                "series_id": (str(rematch.series_id) if rematch.series_id is not None else None),
                 "series_game_number": rematch.series_game_number,
                 "series_best_of": rematch.series_best_of,
             },
@@ -569,7 +580,10 @@ class GameSessionService:
             )
         if challenge.status not in {"COMPLETED", "EXPIRED"}:
             raise FriendChallengeAccessError
-        if initiator_user_id not in {challenge.creator_user_id, challenge.opponent_user_id}:
+        if initiator_user_id not in {
+            challenge.creator_user_id,
+            challenge.opponent_user_id,
+        }:
             raise FriendChallengeAccessError
 
         opponent_user_id = GameSessionService._resolve_challenge_opponent_user_id(
@@ -652,7 +666,10 @@ class GameSessionService:
             )
         if challenge.status not in {"COMPLETED", "EXPIRED"}:
             raise FriendChallengeAccessError
-        if initiator_user_id not in {challenge.creator_user_id, challenge.opponent_user_id}:
+        if initiator_user_id not in {
+            challenge.creator_user_id,
+            challenge.opponent_user_id,
+        }:
             raise FriendChallengeAccessError
         if challenge.series_id is None or challenge.series_best_of <= 1:
             raise FriendChallengeAccessError
@@ -776,7 +793,9 @@ class GameSessionService:
                     "mode_code": challenge.mode_code,
                     "total_rounds": challenge.total_rounds,
                     "expires_at": challenge.expires_at.isoformat(),
-                    "series_id": str(challenge.series_id) if challenge.series_id is not None else None,
+                    "series_id": (
+                        str(challenge.series_id) if challenge.series_id is not None else None
+                    ),
                     "series_game_number": challenge.series_game_number,
                     "series_best_of": challenge.series_best_of,
                 },
@@ -859,15 +878,19 @@ class GameSessionService:
             friend_challenge_round=next_round,
         )
         selection_seed = f"friend:{challenge.id}:{next_round}:{challenge.mode_code}"
-        preferred_level = GameSessionService._friend_challenge_level_for_round(round_number=next_round)
+        preferred_level = GameSessionService._friend_challenge_level_for_round(
+            round_number=next_round
+        )
         forced_question_id: str | None = (
             shared_round_session.question_id if shared_round_session is not None else None
         )
         if forced_question_id is None:
-            previous_round_question_ids = await QuizSessionsRepo.list_friend_challenge_question_ids_before_round(
-                session,
-                friend_challenge_id=challenge.id,
-                before_round=next_round,
+            previous_round_question_ids = (
+                await QuizSessionsRepo.list_friend_challenge_question_ids_before_round(
+                    session,
+                    friend_challenge_id=challenge.id,
+                    before_round=next_round,
+                )
             )
             selected_question = await select_friend_challenge_question(
                 session,
@@ -984,7 +1007,9 @@ class GameSessionService:
         friend_challenge_round: int | None = None,
         friend_challenge_total_rounds: int | None = None,
     ) -> StartSessionResult:
-        if source == "FRIEND_CHALLENGE" and (friend_challenge_id is None or friend_challenge_round is None):
+        if source == "FRIEND_CHALLENGE" and (
+            friend_challenge_id is None or friend_challenge_round is None
+        ):
             raise FriendChallengeAccessError
 
         existing = await QuizSessionsRepo.get_by_idempotency_key(session, idempotency_key)
@@ -1058,10 +1083,12 @@ class GameSessionService:
                         effective_preferred_level = mode_progress.preferred_level
                     else:
                         # Backfill for existing users: infer last reached level from history.
-                        effective_preferred_level = await GameSessionService._infer_preferred_level_from_recent_attempt(
-                            session,
-                            user_id=user_id,
-                            mode_code=mode_code,
+                        effective_preferred_level = (
+                            await GameSessionService._infer_preferred_level_from_recent_attempt(
+                                session,
+                                user_id=user_id,
+                                mode_code=mode_code,
+                            )
                         )
 
                 if mode_progress is None and effective_preferred_level is not None:
@@ -1133,8 +1160,10 @@ class GameSessionService:
                 mode_code=mode_code,
                 source=source,
                 category=question.category,
-                question_number=friend_challenge_round if source == "FRIEND_CHALLENGE" else 1,
-                total_questions=friend_challenge_total_rounds if source == "FRIEND_CHALLENGE" else 1,
+                question_number=(friend_challenge_round if source == "FRIEND_CHALLENGE" else 1),
+                total_questions=(
+                    friend_challenge_total_rounds if source == "FRIEND_CHALLENGE" else 1
+                ),
             ),
             energy_free=energy_free,
             energy_paid=energy_paid,
@@ -1156,12 +1185,16 @@ class GameSessionService:
 
         existing_attempt = await QuizAttemptsRepo.get_by_idempotency_key(session, idempotency_key)
         if existing_attempt is not None:
-            streak_snapshot = await StreakService.sync_rollover(session, user_id=user_id, now_utc=now_utc)
+            streak_snapshot = await StreakService.sync_rollover(
+                session, user_id=user_id, now_utc=now_utc
+            )
             replay_session = await QuizSessionsRepo.get_by_id(session, existing_attempt.session_id)
             friend_snapshot = None
             waiting_for_opponent = False
             if replay_session is not None and replay_session.friend_challenge_id is not None:
-                challenge = await FriendChallengesRepo.get_by_id(session, replay_session.friend_challenge_id)
+                challenge = await FriendChallengesRepo.get_by_id(
+                    session, replay_session.friend_challenge_id
+                )
                 if challenge is not None:
                     friend_snapshot = GameSessionService._build_friend_challenge_snapshot(challenge)
                     waiting_for_opponent = challenge.status == "ACTIVE"
@@ -1172,7 +1205,7 @@ class GameSessionService:
                 current_streak=streak_snapshot.current_streak,
                 best_streak=streak_snapshot.best_streak,
                 idempotent_replay=True,
-                mode_code=replay_session.mode_code if replay_session is not None else None,
+                mode_code=(replay_session.mode_code if replay_session is not None else None),
                 source=replay_session.source if replay_session is not None else None,
                 selected_answer_text=None,
                 correct_answer_text=None,
@@ -1180,9 +1213,7 @@ class GameSessionService:
                 next_preferred_level=None,
                 friend_challenge=friend_snapshot,
                 friend_challenge_answered_round=(
-                    replay_session.friend_challenge_round
-                    if replay_session is not None
-                    else None
+                    replay_session.friend_challenge_round if replay_session is not None else None
                 ),
                 friend_challenge_round_completed=False,
                 friend_challenge_waiting_for_opponent=waiting_for_opponent,
@@ -1192,7 +1223,9 @@ class GameSessionService:
         if quiz_session is None or quiz_session.user_id != user_id:
             raise SessionNotFoundError
 
-        question = await GameSessionService._load_question_for_session(session, quiz_session=quiz_session)
+        question = await GameSessionService._load_question_for_session(
+            session, quiz_session=quiz_session
+        )
         is_correct = selected_option == question.correct_option
 
         await QuizAttemptsRepo.create(
@@ -1214,8 +1247,13 @@ class GameSessionService:
         friend_snapshot = None
         friend_round_completed = False
         friend_waiting_for_opponent = False
-        if quiz_session.source == "FRIEND_CHALLENGE" and quiz_session.friend_challenge_id is not None:
-            challenge = await FriendChallengesRepo.get_by_id_for_update(session, quiz_session.friend_challenge_id)
+        if (
+            quiz_session.source == "FRIEND_CHALLENGE"
+            and quiz_session.friend_challenge_id is not None
+        ):
+            challenge = await FriendChallengesRepo.get_by_id_for_update(
+                session, quiz_session.friend_challenge_id
+            )
             if challenge is None:
                 raise FriendChallengeNotFoundError
 
@@ -1279,7 +1317,10 @@ class GameSessionService:
                     else:
                         challenge.winner_user_id = None
 
-                if challenge.status == "COMPLETED" and challenge.current_round >= challenge.total_rounds:
+                if (
+                    challenge.status == "COMPLETED"
+                    and challenge.current_round >= challenge.total_rounds
+                ):
                     if challenge.creator_score > challenge.opponent_score:
                         challenge.winner_user_id = challenge.creator_user_id
                     elif (
@@ -1316,7 +1357,9 @@ class GameSessionService:
                         "winner_user_id": challenge.winner_user_id,
                         "total_rounds": challenge.total_rounds,
                         "expires_at": challenge.expires_at.isoformat(),
-                        "series_id": str(challenge.series_id) if challenge.series_id is not None else None,
+                        "series_id": (
+                            str(challenge.series_id) if challenge.series_id is not None else None
+                        ),
                         "series_game_number": challenge.series_game_number,
                         "series_best_of": challenge.series_best_of,
                     },

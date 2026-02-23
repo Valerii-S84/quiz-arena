@@ -97,7 +97,9 @@ def evaluate_referrals_alert_state(
         )
 
     fraud_rate_above_threshold = snapshot.fraud_rejected_rate > thresholds.max_fraud_rejected_rate
-    rejected_fraud_total_above_threshold = snapshot.rejected_fraud_total > thresholds.max_rejected_fraud_total
+    rejected_fraud_total_above_threshold = (
+        snapshot.rejected_fraud_total > thresholds.max_rejected_fraud_total
+    )
     referrer_spike_detected = any(
         int(row.get("rejected_fraud_total", 0)) >= thresholds.max_referrer_rejected_fraud
         for row in snapshot.top_referrers

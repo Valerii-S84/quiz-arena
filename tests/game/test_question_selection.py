@@ -23,10 +23,20 @@ def test_select_question_for_mode_falls_back_to_full_pool_when_all_recent() -> N
     selected = select_question_for_mode(
         "ARTIKEL_SPRINT",
         local_date_berlin=date(2026, 2, 18),
-        recent_question_ids=["artikel_001", "artikel_002", "artikel_003", "artikel_004"],
+        recent_question_ids=[
+            "artikel_001",
+            "artikel_002",
+            "artikel_003",
+            "artikel_004",
+        ],
         selection_seed="seed-2",
     )
-    assert selected.question_id in {"artikel_001", "artikel_002", "artikel_003", "artikel_004"}
+    assert selected.question_id in {
+        "artikel_001",
+        "artikel_002",
+        "artikel_003",
+        "artikel_004",
+    }
 
 
 def test_select_question_for_mode_is_seed_deterministic() -> None:

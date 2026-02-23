@@ -6,7 +6,9 @@ from app.core.integration_db_safety import assert_safe_integration_db, assess_in
 
 
 def test_assess_integration_db_safety_accepts_local_test_database() -> None:
-    result = assess_integration_db_safety("postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test")
+    result = assess_integration_db_safety(
+        "postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test"
+    )
 
     assert result.is_safe is True
     assert result.database_name == "quiz_arena_test"
@@ -27,5 +29,8 @@ def test_assess_integration_db_safety_rejects_unsafe_targets(database_url: str) 
 
 
 def test_assert_safe_integration_db_raises_with_clear_message() -> None:
-    with pytest.raises(RuntimeError, match="Refusing to run integration tests with destructive TRUNCATE"):
+    with pytest.raises(
+        RuntimeError,
+        match="Refusing to run integration tests with destructive TRUNCATE",
+    ):
         assert_safe_integration_db("postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena")

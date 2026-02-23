@@ -17,7 +17,9 @@ from app.game.sessions.types import (
 from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessionLocal
 
 
-def _challenge_snapshot(*, status: str = "ACTIVE", winner_user_id: int | None = None) -> FriendChallengeSnapshot:
+def _challenge_snapshot(
+    *, status: str = "ACTIVE", winner_user_id: int | None = None
+) -> FriendChallengeSnapshot:
     return FriendChallengeSnapshot(
         challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
         invite_token="token",
@@ -170,7 +172,9 @@ async def test_handle_friend_challenge_create_opens_format_picker(monkeypatch) -
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_share_link(monkeypatch) -> None:
+async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_share_link(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
@@ -197,7 +201,11 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
         return "https://t.me/testbot?start=fc_0123456789abcdef0123456789abcdef"
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(gameplay.GameSessionService, "create_friend_challenge", _fake_create_friend_challenge)
+    monkeypatch.setattr(
+        gameplay.GameSessionService,
+        "create_friend_challenge",
+        _fake_create_friend_challenge,
+    )
     monkeypatch.setattr(gameplay, "_build_friend_invite_link", _fake_friend_invite_link)
 
     callback = DummyCallback(
@@ -216,7 +224,9 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_rematch_creates_duel_and_notifies_opponent(monkeypatch) -> None:
+async def test_handle_friend_challenge_rematch_creates_duel_and_notifies_opponent(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
@@ -249,7 +259,9 @@ async def test_handle_friend_challenge_rematch_creates_duel_and_notifies_opponen
         return "Bob" if user_id == 10 else "Alice"
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(gameplay.GameSessionService, "create_friend_challenge_rematch", _fake_rematch)
+    monkeypatch.setattr(
+        gameplay.GameSessionService, "create_friend_challenge_rematch", _fake_rematch
+    )
     monkeypatch.setattr(gameplay, "_notify_opponent", _fake_notify)
     monkeypatch.setattr(gameplay, "_resolve_opponent_label", _fake_resolve_label)
 
@@ -261,7 +273,9 @@ async def test_handle_friend_challenge_rematch_creates_duel_and_notifies_opponen
     await gameplay.handle_friend_challenge_rematch(callback)
 
     response = callback.message.answers[0]
-    assert TEXTS_DE["msg.friend.challenge.rematch.created"].format(opponent_label="Bob") in (response.text or "")
+    assert TEXTS_DE["msg.friend.challenge.rematch.created"].format(opponent_label="Bob") in (
+        response.text or ""
+    )
     callbacks = [
         button.callback_data
         for row in response.kwargs["reply_markup"].inline_keyboard
@@ -273,7 +287,9 @@ async def test_handle_friend_challenge_rematch_creates_duel_and_notifies_opponen
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_series_best3_creates_duel_and_notifies_opponent(monkeypatch) -> None:
+async def test_handle_friend_challenge_series_best3_creates_duel_and_notifies_opponent(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
@@ -309,7 +325,11 @@ async def test_handle_friend_challenge_series_best3_creates_duel_and_notifies_op
         return "Bob" if user_id == 10 else "Alice"
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(gameplay.GameSessionService, "create_friend_challenge_best_of_three", _fake_series_start)
+    monkeypatch.setattr(
+        gameplay.GameSessionService,
+        "create_friend_challenge_best_of_three",
+        _fake_series_start,
+    )
     monkeypatch.setattr(gameplay, "_notify_opponent", _fake_notify)
     monkeypatch.setattr(gameplay, "_resolve_opponent_label", _fake_resolve_label)
 
@@ -321,7 +341,9 @@ async def test_handle_friend_challenge_series_best3_creates_duel_and_notifies_op
     await gameplay.handle_friend_challenge_series_best3(callback)
 
     response = callback.message.answers[0]
-    assert TEXTS_DE["msg.friend.challenge.series.started"].format(opponent_label="Bob") in (response.text or "")
+    assert TEXTS_DE["msg.friend.challenge.series.started"].format(opponent_label="Bob") in (
+        response.text or ""
+    )
     callbacks = [
         button.callback_data
         for row in response.kwargs["reply_markup"].inline_keyboard
@@ -333,7 +355,9 @@ async def test_handle_friend_challenge_series_best3_creates_duel_and_notifies_op
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_series_next_creates_game_and_notifies_opponent(monkeypatch) -> None:
+async def test_handle_friend_challenge_series_next_creates_game_and_notifies_opponent(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
@@ -372,8 +396,16 @@ async def test_handle_friend_challenge_series_next_creates_game_and_notifies_opp
         return "Bob" if user_id == 10 else "Alice"
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(gameplay.GameSessionService, "create_friend_challenge_series_next_game", _fake_series_next)
-    monkeypatch.setattr(gameplay.GameSessionService, "get_friend_series_score_for_user", _fake_series_score)
+    monkeypatch.setattr(
+        gameplay.GameSessionService,
+        "create_friend_challenge_series_next_game",
+        _fake_series_next,
+    )
+    monkeypatch.setattr(
+        gameplay.GameSessionService,
+        "get_friend_series_score_for_user",
+        _fake_series_score,
+    )
     monkeypatch.setattr(gameplay, "_notify_opponent", _fake_notify)
     monkeypatch.setattr(gameplay, "_resolve_opponent_label", _fake_resolve_label)
 
@@ -397,7 +429,9 @@ async def test_handle_friend_challenge_series_next_creates_game_and_notifies_opp
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_next_expired_shows_expired_message(monkeypatch) -> None:
+async def test_handle_friend_challenge_next_expired_shows_expired_message(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
@@ -407,7 +441,9 @@ async def test_handle_friend_challenge_next_expired_shows_expired_message(monkey
         raise FriendChallengeExpiredError()
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(gameplay.GameSessionService, "start_friend_challenge_round", _fake_start_round)
+    monkeypatch.setattr(
+        gameplay.GameSessionService, "start_friend_challenge_round", _fake_start_round
+    )
 
     callback = DummyCallback(
         data="friend:next:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
@@ -500,7 +536,9 @@ async def test_handle_answer_finishes_daily_challenge(monkeypatch) -> None:
     )
     await gameplay.handle_answer(callback)
 
-    assert any(call.text == TEXTS_DE["msg.game.daily.finished"] for call in callback.message.answers)
+    assert any(
+        call.text == TEXTS_DE["msg.game.daily.finished"] for call in callback.message.answers
+    )
 
 
 @pytest.mark.asyncio
@@ -618,7 +656,9 @@ async def test_handle_answer_friend_challenge_completion_sends_proof_card_with_s
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_share_result_sends_share_url_and_emits_event(monkeypatch) -> None:
+async def test_handle_friend_challenge_share_result_sends_share_url_and_emits_event(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
@@ -650,7 +690,11 @@ async def test_handle_friend_challenge_share_result_sends_share_url_and_emits_ev
         emitted.append(kwargs["event_type"])
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(gameplay.GameSessionService, "get_friend_challenge_snapshot_for_user", _fake_get_snapshot)
+    monkeypatch.setattr(
+        gameplay.GameSessionService,
+        "get_friend_challenge_snapshot_for_user",
+        _fake_get_snapshot,
+    )
     monkeypatch.setattr(gameplay, "_resolve_opponent_label", _fake_resolve_label)
     monkeypatch.setattr(gameplay, "emit_analytics_event", _fake_emit)
 
@@ -663,7 +707,12 @@ async def test_handle_friend_challenge_share_result_sends_share_url_and_emits_ev
 
     response = callback.message.answers[0]
     assert TEXTS_DE["msg.friend.challenge.proof.share.ready"] in (response.text or "")
-    urls = [button.url for row in response.kwargs["reply_markup"].inline_keyboard for button in row if button.url]
+    urls = [
+        button.url
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.url
+    ]
     assert len(urls) == 1
     assert "https://t.me/share/url" in (urls[0] or "")
     assert "https%3A%2F%2Ft.me%2Fproofbot" in (urls[0] or "")

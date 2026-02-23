@@ -3,8 +3,18 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint, text
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.models.base import Base
@@ -24,7 +34,9 @@ class PromoRedemption(Base):
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
-    promo_code_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("promo_codes.id"), nullable=False)
+    promo_code_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("promo_codes.id"), nullable=False
+    )
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     reject_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)

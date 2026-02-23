@@ -33,8 +33,12 @@ def _overview(*, claimable: int = 0) -> ReferralOverview:
 
 
 def test_build_claim_status_text_variants() -> None:
-    claim = ReferralClaimResult(status="CLAIMED", reward_code=REWARD_CODE_MEGA_PACK, overview=_overview())
-    assert referral._build_claim_status_text(claim) == TEXTS_DE["msg.referral.reward.claimed.megapack"]
+    claim = ReferralClaimResult(
+        status="CLAIMED", reward_code=REWARD_CODE_MEGA_PACK, overview=_overview()
+    )
+    assert (
+        referral._build_claim_status_text(claim) == TEXTS_DE["msg.referral.reward.claimed.megapack"]
+    )
 
     claim = ReferralClaimResult(status="TOO_EARLY", reward_code=None, overview=_overview())
     assert referral._build_claim_status_text(claim) == TEXTS_DE["msg.referral.reward.too_early"]

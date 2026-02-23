@@ -48,7 +48,9 @@ def _consume_premium_freeze(snapshot: StreakSnapshot, day: date) -> StreakSnapsh
     )
 
 
-def apply_day_end(snapshot: StreakSnapshot, *, day: date, premium_scope: str | None) -> StreakSnapshot:
+def apply_day_end(
+    snapshot: StreakSnapshot, *, day: date, premium_scope: str | None
+) -> StreakSnapshot:
     if snapshot.today_status != StreakTodayStatus.NO_ACTIVITY:
         return snapshot
 
@@ -93,7 +95,10 @@ def rollover_to_local_date(
 
 
 def record_activity(snapshot: StreakSnapshot, *, local_date: date) -> tuple[StreakSnapshot, bool]:
-    if snapshot.last_activity_local_date == local_date and snapshot.today_status == StreakTodayStatus.PLAYED:
+    if (
+        snapshot.last_activity_local_date == local_date
+        and snapshot.today_status == StreakTodayStatus.PLAYED
+    ):
         return snapshot, False
 
     if snapshot.current_streak <= 0:

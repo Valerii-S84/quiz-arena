@@ -4,8 +4,8 @@ from datetime import date, datetime, timezone
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.users_repo import UsersRepo

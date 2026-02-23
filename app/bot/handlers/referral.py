@@ -6,7 +6,8 @@ from zoneinfo import ZoneInfo
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message, User as TelegramUser
+from aiogram.types import CallbackQuery, Message
+from aiogram.types import User as TelegramUser
 
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.keyboards.referral import build_referral_keyboard
@@ -45,7 +46,9 @@ def _build_overview_text(*, overview: ReferralOverview, invite_link: str | None)
     if invite_link:
         lines.append(TEXTS_DE["msg.referral.link"])
     else:
-        lines.append(TEXTS_DE["msg.referral.link.fallback"].format(referral_code=overview.referral_code))
+        lines.append(
+            TEXTS_DE["msg.referral.link.fallback"].format(referral_code=overview.referral_code)
+        )
 
     if overview.pending_rewards_total > 0:
         lines.append(

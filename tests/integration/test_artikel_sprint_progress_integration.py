@@ -5,8 +5,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.db.models.quiz_attempts import QuizAttempt
 from app.db.models.mode_progress import ModeProgress
+from app.db.models.quiz_attempts import QuizAttempt
 from app.db.models.quiz_questions import QuizQuestion as QuizQuestionModel
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.users_repo import UsersRepo

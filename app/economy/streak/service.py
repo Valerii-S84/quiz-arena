@@ -28,7 +28,9 @@ class StreakService:
         )
 
     @staticmethod
-    def _apply_snapshot_to_model(state: StreakState, snapshot: StreakSnapshot, now_utc: datetime) -> None:
+    def _apply_snapshot_to_model(
+        state: StreakState, snapshot: StreakSnapshot, now_utc: datetime
+    ) -> None:
         state.current_streak = snapshot.current_streak
         state.best_streak = snapshot.best_streak
         state.last_activity_local_date = snapshot.last_activity_local_date
@@ -91,8 +93,12 @@ class StreakService:
         user_id: int,
         activity_at_utc: datetime,
     ) -> StreakActivityResult:
-        state = await StreakService._get_or_create_state_for_update(session, user_id, activity_at_utc)
-        premium_scope = await EntitlementsRepo.get_active_premium_scope(session, user_id, activity_at_utc)
+        state = await StreakService._get_or_create_state_for_update(
+            session, user_id, activity_at_utc
+        )
+        premium_scope = await EntitlementsRepo.get_active_premium_scope(
+            session, user_id, activity_at_utc
+        )
 
         local_date = berlin_local_date(activity_at_utc)
         snapshot_before_rollover = StreakService._snapshot_from_model(state)
@@ -101,7 +107,10 @@ class StreakService:
             target_local_date=local_date,
             premium_scope=premium_scope,
         )
-        if snapshot_before_rollover.current_streak > 0 and snapshot_after_rollover.current_streak == 0:
+        if (
+            snapshot_before_rollover.current_streak > 0
+            and snapshot_after_rollover.current_streak == 0
+        ):
             await emit_analytics_event(
                 session,
                 event_type="streak_lost",

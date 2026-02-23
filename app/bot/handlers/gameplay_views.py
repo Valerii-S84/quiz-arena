@@ -13,7 +13,9 @@ if TYPE_CHECKING:
     from app.game.sessions.types import FriendChallengeSnapshot, StartSessionResult
 
 
-def _format_user_label(*, username: str | None, first_name: str | None, fallback: str = "Freund") -> str:
+def _format_user_label(
+    *, username: str | None, first_name: str | None, fallback: str = "Freund"
+) -> str:
     if username:
         normalized = username.strip()
         if normalized:
@@ -29,12 +31,18 @@ def _build_friend_plan_text(*, total_rounds: int) -> str:
     rounds = max(1, int(total_rounds))
     sequence = list(FRIEND_CHALLENGE_LEVEL_SEQUENCE[:rounds])
     if rounds > len(FRIEND_CHALLENGE_LEVEL_SEQUENCE):
-        sequence.extend([FRIEND_CHALLENGE_LEVEL_SEQUENCE[-1]] * (rounds - len(FRIEND_CHALLENGE_LEVEL_SEQUENCE)))
+        sequence.extend(
+            [FRIEND_CHALLENGE_LEVEL_SEQUENCE[-1]] * (rounds - len(FRIEND_CHALLENGE_LEVEL_SEQUENCE))
+        )
 
     counts: dict[str, int] = {}
     for level in sequence:
         counts[level] = counts.get(level, 0) + 1
-    mix_parts = [f"{level} x{counts[level]}" for level in ("A1", "A2", "B1", "B2", "C1", "C2") if level in counts]
+    mix_parts = [
+        f"{level} x{counts[level]}"
+        for level in ("A1", "A2", "B1", "B2", "C1", "C2")
+        if level in counts
+    ]
     mix = ", ".join(mix_parts) if mix_parts else "A1 x1"
     mode_label = "Sprint" if rounds <= 5 else "Mix"
     return f"{rounds} Fragen {mode_label}: {mix}. Keine Energie-Kosten."
@@ -221,7 +229,9 @@ def _build_friend_proof_card_text(
                 opponent_label=opponent_label,
                 opponent_score=opponent_score,
             ),
-            TEXTS_DE["msg.friend.challenge.proof.format"].format(total_rounds=challenge.total_rounds),
+            TEXTS_DE["msg.friend.challenge.proof.format"].format(
+                total_rounds=challenge.total_rounds
+            ),
             TEXTS_DE["msg.friend.challenge.proof.signature"].format(signature=signature),
         ]
     )

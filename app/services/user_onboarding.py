@@ -56,7 +56,9 @@ class UserOnboardingService:
 
             await EnergyService.initialize_user_state(session, user_id=user.id, now_utc=now_utc)
             await StreakService.sync_rollover(session, user_id=user.id, now_utc=now_utc)
-            referral_code_from_payload = ReferralService.extract_referral_code_from_start_payload(start_payload)
+            referral_code_from_payload = ReferralService.extract_referral_code_from_start_payload(
+                start_payload
+            )
             if referral_code_from_payload is not None:
                 await ReferralService.register_start_for_new_user(
                     session,
@@ -66,8 +68,12 @@ class UserOnboardingService:
                 )
 
         await UsersRepo.touch_last_seen(session, user.id, now_utc)
-        energy_snapshot = await EnergyService.sync_energy_clock(session, user_id=user.id, now_utc=now_utc)
-        streak_snapshot = await StreakService.sync_rollover(session, user_id=user.id, now_utc=now_utc)
+        energy_snapshot = await EnergyService.sync_energy_clock(
+            session, user_id=user.id, now_utc=now_utc
+        )
+        streak_snapshot = await StreakService.sync_rollover(
+            session, user_id=user.id, now_utc=now_utc
+        )
 
         return HomeSnapshot(
             user_id=user.id,

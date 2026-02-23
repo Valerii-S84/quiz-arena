@@ -3,8 +3,18 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, text
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    text,
+)
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.models.base import Base
@@ -56,7 +66,9 @@ class Purchase(Base):
     product_code: Mapped[str] = mapped_column(String(32), nullable=False)
     product_type: Mapped[str] = mapped_column(String(16), nullable=False)
     base_stars_amount: Mapped[int] = mapped_column(Integer, nullable=False)
-    discount_stars_amount: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    discount_stars_amount: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
     stars_amount: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default=text("'XTR'"))
     status: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -67,7 +79,9 @@ class Purchase(Base):
     )
     idempotency_key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     invoice_payload: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
-    telegram_payment_charge_id: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
+    telegram_payment_charge_id: Mapped[str | None] = mapped_column(
+        String(128), unique=True, nullable=True
+    )
     telegram_pre_checkout_query_id: Mapped[str | None] = mapped_column(
         String(128),
         unique=True,

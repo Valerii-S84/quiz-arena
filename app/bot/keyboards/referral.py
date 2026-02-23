@@ -7,9 +7,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 def _build_share_url(*, invite_link: str, share_text: str) -> str:
     return (
-        "https://t.me/share/url"
-        f"?url={quote_plus(invite_link)}"
-        f"&text={quote_plus(share_text)}"
+        "https://t.me/share/url" f"?url={quote_plus(invite_link)}" f"&text={quote_plus(share_text)}"
     )
 
 

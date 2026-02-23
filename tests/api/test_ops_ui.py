@@ -53,7 +53,9 @@ def test_ops_page_redirects_to_login_when_token_missing(monkeypatch) -> None:
     )
 
     client = TestClient(app, client=("127.0.0.1", 5103))
-    response = client.get("/ops/promo", headers={"X-Forwarded-For": "127.0.0.1"}, follow_redirects=False)
+    response = client.get(
+        "/ops/promo", headers={"X-Forwarded-For": "127.0.0.1"}, follow_redirects=False
+    )
 
     assert response.status_code == 303
     assert response.headers["location"] == "/ops/login"
@@ -132,9 +134,18 @@ def test_ops_login_rate_limits_failed_attempts(monkeypatch) -> None:
         "Origin": "http://testserver",
     }
 
-    first = client.post("/ops/login", data={"token": "wrong-1"}, headers=headers, follow_redirects=False)
-    second = client.post("/ops/login", data={"token": "wrong-2"}, headers=headers, follow_redirects=False)
-    third = client.post("/ops/login", data={"token": "internal-secret"}, headers=headers, follow_redirects=False)
+    first = client.post(
+        "/ops/login", data={"token": "wrong-1"}, headers=headers, follow_redirects=False
+    )
+    second = client.post(
+        "/ops/login", data={"token": "wrong-2"}, headers=headers, follow_redirects=False
+    )
+    third = client.post(
+        "/ops/login",
+        data={"token": "internal-secret"},
+        headers=headers,
+        follow_redirects=False,
+    )
     ops_ui._LOGIN_FAILED_ATTEMPTS.clear()
 
     assert first.status_code == 403
@@ -174,7 +185,9 @@ def test_ops_logout_rejects_cross_origin_post(monkeypatch) -> None:
 def test_ops_logout_get_is_not_allowed(monkeypatch) -> None:
     monkeypatch.setattr(ops_ui, "get_settings", lambda: _settings())
     client = TestClient(app, client=("127.0.0.1", 5109))
-    response = client.get("/ops/logout", headers={"X-Forwarded-For": "127.0.0.1"}, follow_redirects=False)
+    response = client.get(
+        "/ops/logout", headers={"X-Forwarded-For": "127.0.0.1"}, follow_redirects=False
+    )
 
     assert response.status_code == 405
 
@@ -193,7 +206,9 @@ def test_ops_page_rejects_disallowed_ip(monkeypatch) -> None:
     assert response.json() == {"detail": {"code": "E_FORBIDDEN"}}
 
 
-def test_ops_page_rejects_spoofed_forwarded_for_from_untrusted_proxy(monkeypatch) -> None:
+def test_ops_page_rejects_spoofed_forwarded_for_from_untrusted_proxy(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(
         ops_ui,
         "get_settings",

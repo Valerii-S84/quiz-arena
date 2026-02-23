@@ -13,7 +13,10 @@ from app.bot.handlers.gameplay_flows import (
     play_flow,
     proof_card_flow,
 )
-from app.bot.keyboards.friend_challenge import build_friend_challenge_create_keyboard, build_friend_challenge_share_url
+from app.bot.keyboards.friend_challenge import (
+    build_friend_challenge_create_keyboard,
+    build_friend_challenge_share_url,
+)
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.repo.users_repo import UsersRepo
@@ -46,6 +49,7 @@ _build_friend_ttl_text = gameplay_views._build_friend_ttl_text
 _friend_opponent_user_id = gameplay_helpers._friend_opponent_user_id
 _build_friend_invite_link = gameplay_helpers._build_friend_invite_link
 
+
 def _session_deps() -> dict[str, object]:
     return {
         "session_local": SessionLocal,
@@ -53,10 +57,13 @@ def _session_deps() -> dict[str, object]:
         "game_session_service": GameSessionService,
     }
 
+
 async def emit_analytics_event(*args, **kwargs):
     from app.core.analytics_events import emit_analytics_event as _emit_analytics_event
 
     await _emit_analytics_event(*args, **kwargs)
+
+
 async def _resolve_opponent_label(*, challenge, user_id: int) -> str:
     return await gameplay_helpers._resolve_opponent_label(
         challenge=challenge,
@@ -65,7 +72,15 @@ async def _resolve_opponent_label(*, challenge, user_id: int) -> str:
         users_repo=UsersRepo,
         format_user_label=_format_user_label,
     )
-async def _notify_opponent(callback: CallbackQuery, *, opponent_user_id: int | None, text: str, reply_markup=None) -> None:
+
+
+async def _notify_opponent(
+    callback: CallbackQuery,
+    *,
+    opponent_user_id: int | None,
+    text: str,
+    reply_markup=None,
+) -> None:
     await gameplay_helpers._notify_opponent(
         callback,
         opponent_user_id=opponent_user_id,
@@ -74,14 +89,22 @@ async def _notify_opponent(callback: CallbackQuery, *, opponent_user_id: int | N
         users_repo=UsersRepo,
         reply_markup=reply_markup,
     )
-async def _build_friend_result_share_url(callback: CallbackQuery, *, proof_card_text: str) -> str | None:
+
+
+async def _build_friend_result_share_url(
+    callback: CallbackQuery, *, proof_card_text: str
+) -> str | None:
     return await gameplay_helpers._build_friend_result_share_url(
         callback,
         proof_card_text=proof_card_text,
         share_cta_text=TEXTS_DE["msg.friend.challenge.proof.share.cta"],
         build_share_url=build_friend_challenge_share_url,
     )
-async def _start_mode(callback: CallbackQuery, *, mode_code: str, source: str, idempotency_key: str) -> None:
+
+
+async def _start_mode(
+    callback: CallbackQuery, *, mode_code: str, source: str, idempotency_key: str
+) -> None:
     await play_flow.start_mode(
         callback,
         mode_code=mode_code,
@@ -93,7 +116,15 @@ async def _start_mode(callback: CallbackQuery, *, mode_code: str, source: str, i
         trg_locked_mode_click=TRG_LOCKED_MODE_CLICK,
         build_question_text=_build_question_text,
     )
-async def _send_friend_round_question(callback: CallbackQuery, *, snapshot_free_energy: int, snapshot_paid_energy: int, round_start) -> None:
+
+
+async def _send_friend_round_question(
+    callback: CallbackQuery,
+    *,
+    snapshot_free_energy: int,
+    snapshot_paid_energy: int,
+    round_start,
+) -> None:
     await play_flow.send_friend_round_question(
         callback,
         snapshot_free_energy=snapshot_free_energy,
@@ -101,6 +132,8 @@ async def _send_friend_round_question(callback: CallbackQuery, *, snapshot_free_
         round_start=round_start,
         build_question_text=_build_question_text,
     )
+
+
 @router.callback_query(F.data == "game:stop")
 async def handle_game_stop(callback: CallbackQuery) -> None:
     if callback.message is None:
@@ -108,19 +141,40 @@ async def handle_game_stop(callback: CallbackQuery) -> None:
         return
     await callback.message.answer(TEXTS_DE["msg.game.stopped"], reply_markup=build_home_keyboard())
     await callback.answer()
+
+
 @router.callback_query(F.data == "play")
 async def handle_play(callback: CallbackQuery) -> None:
-    await _start_mode(callback, mode_code="QUICK_MIX_A1A2", source="MENU", idempotency_key=f"start:play:{callback.id}")
+    await _start_mode(
+        callback,
+        mode_code="QUICK_MIX_A1A2",
+        source="MENU",
+        idempotency_key=f"start:play:{callback.id}",
+    )
+
+
 @router.callback_query(F.data == "daily_challenge")
 async def handle_daily_challenge(callback: CallbackQuery) -> None:
-    await _start_mode(callback, mode_code="DAILY_CHALLENGE", source="DAILY_CHALLENGE", idempotency_key=f"start:daily:{callback.id}")
+    await _start_mode(
+        callback,
+        mode_code="DAILY_CHALLENGE",
+        source="DAILY_CHALLENGE",
+        idempotency_key=f"start:daily:{callback.id}",
+    )
+
+
 @router.callback_query(F.data.startswith("mode:"))
 async def handle_mode(callback: CallbackQuery) -> None:
     if callback.data is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
     mode_code = gameplay_callbacks.parse_mode_code(callback.data)
-    await _start_mode(callback, mode_code=mode_code, source="MENU", idempotency_key=f"start:mode:{mode_code}:{callback.id}")
+    await _start_mode(
+        callback,
+        mode_code=mode_code,
+        source="MENU",
+        idempotency_key=f"start:mode:{mode_code}:{callback.id}",
+    )
 
 
 @router.callback_query(F.data == "friend:challenge:create")
@@ -128,7 +182,10 @@ async def handle_friend_challenge_create(callback: CallbackQuery) -> None:
     if callback.message is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
-    await callback.message.answer(TEXTS_DE["msg.friend.challenge.create.choose"], reply_markup=build_friend_challenge_create_keyboard())
+    await callback.message.answer(
+        TEXTS_DE["msg.friend.challenge.create.choose"],
+        reply_markup=build_friend_challenge_create_keyboard(),
+    )
     await callback.answer()
 
 

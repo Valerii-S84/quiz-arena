@@ -105,7 +105,9 @@ def evaluate_offer_alert_state(
 
     conversion_rate_below_threshold = snapshot.conversion_rate < thresholds.min_conversion_rate
     dismiss_rate_above_threshold = snapshot.dismiss_rate > thresholds.max_dismiss_rate
-    impressions_per_user_above_threshold = snapshot.impressions_per_user > thresholds.max_impressions_per_user
+    impressions_per_user_above_threshold = (
+        snapshot.impressions_per_user > thresholds.max_impressions_per_user
+    )
 
     return OfferAlertState(
         conversion_drop_detected=conversion_rate_below_threshold,
@@ -147,6 +149,8 @@ async def build_offer_funnel_snapshot(
         click_through_rate=_safe_rate(numerator=clicks_total, denominator=impressions_total),
         conversion_rate=_safe_rate(numerator=conversions_total, denominator=impressions_total),
         dismiss_rate=_safe_rate(numerator=dismissals_total, denominator=impressions_total),
-        impressions_per_user=_safe_rate(numerator=impressions_total, denominator=max(1, unique_users)),
+        impressions_per_user=_safe_rate(
+            numerator=impressions_total, denominator=max(1, unique_users)
+        ),
         top_offer_codes=top_offer_codes,
     )

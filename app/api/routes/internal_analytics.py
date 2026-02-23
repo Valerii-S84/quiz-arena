@@ -63,14 +63,22 @@ def _assert_internal_access(request: Request) -> None:
     )
 
     if not is_client_ip_allowed(client_ip=client_ip, allowlist=settings.internal_api_allowlist):
-        logger.warning("internal_analytics_auth_failed", reason="ip_not_allowed", client_ip=client_ip)
+        logger.warning(
+            "internal_analytics_auth_failed",
+            reason="ip_not_allowed",
+            client_ip=client_ip,
+        )
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
 
     if not is_internal_request_authenticated(
         request,
         expected_token=settings.internal_api_token,
     ):
-        logger.warning("internal_analytics_auth_failed", reason="invalid_credentials", client_ip=client_ip)
+        logger.warning(
+            "internal_analytics_auth_failed",
+            reason="invalid_credentials",
+            client_ip=client_ip,
+        )
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
 
 
@@ -95,11 +103,17 @@ def _as_row(item: object) -> AnalyticsDailyKpiResponse:
         referral_reward_milestone_events_total=int(
             getattr(item, "referral_reward_milestone_events_total")
         ),
-        referral_reward_granted_events_total=int(getattr(item, "referral_reward_granted_events_total")),
+        referral_reward_granted_events_total=int(
+            getattr(item, "referral_reward_granted_events_total")
+        ),
         purchase_init_events_total=int(getattr(item, "purchase_init_events_total")),
         purchase_invoice_sent_events_total=int(getattr(item, "purchase_invoice_sent_events_total")),
-        purchase_precheckout_ok_events_total=int(getattr(item, "purchase_precheckout_ok_events_total")),
-        purchase_paid_uncredited_events_total=int(getattr(item, "purchase_paid_uncredited_events_total")),
+        purchase_precheckout_ok_events_total=int(
+            getattr(item, "purchase_precheckout_ok_events_total")
+        ),
+        purchase_paid_uncredited_events_total=int(
+            getattr(item, "purchase_paid_uncredited_events_total")
+        ),
         purchase_credited_events_total=int(getattr(item, "purchase_credited_events_total")),
         calculated_at=getattr(item, "calculated_at"),
     )

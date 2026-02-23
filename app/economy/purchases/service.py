@@ -8,9 +8,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.analytics_events import EVENT_SOURCE_SYSTEM, emit_analytics_event
+from app.db.models.entitlements import Entitlement
 from app.db.models.ledger_entries import LedgerEntry
 from app.db.models.mode_access import ModeAccess
-from app.db.models.entitlements import Entitlement
 from app.db.models.promo_codes import PromoCode
 from app.db.models.promo_redemptions import PromoRedemption
 from app.db.models.purchases import Purchase
@@ -184,7 +184,10 @@ class PurchaseService:
             raise PurchaseInitValidationError
         if not PurchaseService._is_promo_scope_applicable(promo_code.target_scope, product=product):
             raise PurchaseInitValidationError
-        if promo_code.max_total_uses is not None and promo_code.used_total >= promo_code.max_total_uses:
+        if (
+            promo_code.max_total_uses is not None
+            and promo_code.used_total >= promo_code.max_total_uses
+        ):
             raise PurchaseInitValidationError
 
         discount_stars_amount = PurchaseService._calculate_discount_amount(
@@ -206,7 +209,9 @@ class PurchaseService:
         if purchase.applied_promo_code_id is None:
             raise PurchasePrecheckoutValidationError
 
-        redemption = await PromoRepo.get_redemption_by_applied_purchase_id_for_update(session, purchase.id)
+        redemption = await PromoRepo.get_redemption_by_applied_purchase_id_for_update(
+            session, purchase.id
+        )
         if redemption is None:
             raise PurchasePrecheckoutValidationError
         if redemption.status != "RESERVED":
@@ -214,7 +219,9 @@ class PurchaseService:
         if redemption.reserved_until is None or redemption.reserved_until <= now_utc:
             raise PurchasePrecheckoutValidationError
 
-        promo_code = await PromoRepo.get_code_by_id_for_update(session, purchase.applied_promo_code_id)
+        promo_code = await PromoRepo.get_code_by_id_for_update(
+            session, purchase.applied_promo_code_id
+        )
         if promo_code is None:
             raise PurchasePrecheckoutValidationError
         if promo_code.promo_type != "PERCENT_DISCOUNT":
@@ -238,7 +245,9 @@ class PurchaseService:
         if product.premium_days <= 0:
             raise PurchasePrecheckoutValidationError
 
-        active_entitlement = await EntitlementsRepo.get_active_premium_for_update(session, user_id, now_utc)
+        active_entitlement = await EntitlementsRepo.get_active_premium_for_update(
+            session, user_id, now_utc
+        )
         starts_at = now_utc
         ends_at = now_utc + timedelta(days=product.premium_days)
 
@@ -248,7 +257,9 @@ class PurchaseService:
             if next_rank <= active_rank:
                 raise PurchasePrecheckoutValidationError
 
-            active_end = active_entitlement.ends_at if active_entitlement.ends_at is not None else now_utc
+            active_end = (
+                active_entitlement.ends_at if active_entitlement.ends_at is not None else now_utc
+            )
             if active_end > now_utc:
                 ends_at = active_end + timedelta(days=product.premium_days)
             active_entitlement.status = "REVOKED"
@@ -316,16 +327,20 @@ class PurchaseService:
         discount_stars_amount = 0
         applied_promo_code_id: int | None = None
         if promo_redemption_id is not None:
-            discount_stars_amount, applied_promo_code_id = await PurchaseService._validate_and_reserve_discount_redemption(
-                session,
-                redemption_id=promo_redemption_id,
-                user_id=user_id,
-                product=product,
-                now_utc=now_utc,
+            discount_stars_amount, applied_promo_code_id = (
+                await PurchaseService._validate_and_reserve_discount_redemption(
+                    session,
+                    redemption_id=promo_redemption_id,
+                    user_id=user_id,
+                    product=product,
+                    now_utc=now_utc,
+                )
             )
 
         if product.product_type == "PREMIUM":
-            active_premium = await EntitlementsRepo.get_active_premium_for_update(session, user_id, now_utc)
+            active_premium = await EntitlementsRepo.get_active_premium_for_update(
+                session, user_id, now_utc
+            )
             if active_premium is not None:
                 active_rank = PurchaseService._premium_plan_rank(active_premium.scope)
                 next_rank = PurchaseService._premium_plan_rank(product.product_code)
@@ -364,7 +379,9 @@ class PurchaseService:
             return PurchaseService._as_init_result(active_invoice, idempotent_replay=True)
 
         if promo_redemption_id is not None:
-            redemption = await PromoRepo.get_redemption_by_id_for_update(session, promo_redemption_id)
+            redemption = await PromoRepo.get_redemption_by_id_for_update(
+                session, promo_redemption_id
+            )
             if redemption is None:
                 raise PurchaseInitValidationError
             redemption.applied_purchase_id = purchase.id
@@ -455,7 +472,12 @@ class PurchaseService:
                 idempotent_replay=True,
             )
 
-        if purchase.status not in {"PRECHECKOUT_OK", "INVOICE_SENT", "CREATED", "PAID_UNCREDITED"}:
+        if purchase.status not in {
+            "PRECHECKOUT_OK",
+            "INVOICE_SENT",
+            "CREATED",
+            "PAID_UNCREDITED",
+        }:
             raise PurchasePrecheckoutValidationError
 
         previous_status = purchase.status
@@ -545,7 +567,9 @@ class PurchaseService:
                     source="MEGA_PACK",
                     now_utc=now_utc,
                 )
-                starts_at = latest_end if latest_end is not None and latest_end > now_utc else now_utc
+                starts_at = (
+                    latest_end if latest_end is not None and latest_end > now_utc else now_utc
+                )
                 ends_at = starts_at + timedelta(hours=24)
 
                 await ModeAccessRepo.create(
@@ -564,13 +588,18 @@ class PurchaseService:
                 )
 
         if purchase.applied_promo_code_id is not None:
-            promo_redemption, promo_code = await PurchaseService._validate_reserved_discount_for_purchase(
-                session,
-                purchase=purchase,
-                now_utc=now_utc,
+            promo_redemption, promo_code = (
+                await PurchaseService._validate_reserved_discount_for_purchase(
+                    session,
+                    purchase=purchase,
+                    now_utc=now_utc,
+                )
             )
             if promo_redemption.status != "APPLIED":
-                if promo_code.max_total_uses is not None and promo_code.used_total >= promo_code.max_total_uses:
+                if (
+                    promo_code.max_total_uses is not None
+                    and promo_code.used_total >= promo_code.max_total_uses
+                ):
                     raise PurchasePrecheckoutValidationError
                 promo_redemption.status = "APPLIED"
                 promo_redemption.applied_at = now_utc

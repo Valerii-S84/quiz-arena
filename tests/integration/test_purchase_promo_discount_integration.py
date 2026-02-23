@@ -11,7 +11,10 @@ from app.db.repo.promo_repo import PromoRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
-from app.economy.purchases.errors import PurchaseInitValidationError, PurchasePrecheckoutValidationError
+from app.economy.purchases.errors import (
+    PurchaseInitValidationError,
+    PurchasePrecheckoutValidationError,
+)
 from app.economy.purchases.service import PurchaseService
 
 UTC = timezone.utc

@@ -23,12 +23,25 @@ class FriendChallenge(Base):
         ),
         CheckConstraint("current_round >= 1", name="ck_friend_challenges_current_round_positive"),
         CheckConstraint("total_rounds >= 1", name="ck_friend_challenges_total_rounds_positive"),
-        CheckConstraint("series_game_number >= 1", name="ck_friend_challenges_series_game_positive"),
+        CheckConstraint(
+            "series_game_number >= 1", name="ck_friend_challenges_series_game_positive"
+        ),
         CheckConstraint("series_best_of >= 1", name="ck_friend_challenges_series_best_of_positive"),
-        CheckConstraint("creator_score >= 0", name="ck_friend_challenges_creator_score_non_negative"),
-        CheckConstraint("opponent_score >= 0", name="ck_friend_challenges_opponent_score_non_negative"),
-        CheckConstraint("creator_answered_round >= 0", name="ck_friend_challenges_creator_answered_non_negative"),
-        CheckConstraint("opponent_answered_round >= 0", name="ck_friend_challenges_opponent_answered_non_negative"),
+        CheckConstraint(
+            "creator_score >= 0", name="ck_friend_challenges_creator_score_non_negative"
+        ),
+        CheckConstraint(
+            "opponent_score >= 0",
+            name="ck_friend_challenges_opponent_score_non_negative",
+        ),
+        CheckConstraint(
+            "creator_answered_round >= 0",
+            name="ck_friend_challenges_creator_answered_non_negative",
+        ),
+        CheckConstraint(
+            "opponent_answered_round >= 0",
+            name="ck_friend_challenges_opponent_answered_non_negative",
+        ),
         Index("idx_friend_challenges_creator_created", "creator_user_id", "created_at"),
         Index("idx_friend_challenges_opponent_created", "opponent_user_id", "created_at"),
         Index("idx_friend_challenges_status_created", "status", "created_at"),
@@ -39,7 +52,9 @@ class FriendChallenge(Base):
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
     invite_token: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
     creator_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
-    opponent_user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
+    opponent_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id"), nullable=True
+    )
     mode_code: Mapped[str] = mapped_column(String(32), nullable=False)
     access_type: Mapped[str] = mapped_column(String(16), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -52,9 +67,13 @@ class FriendChallenge(Base):
     opponent_score: Mapped[int] = mapped_column(Integer, nullable=False)
     creator_answered_round: Mapped[int] = mapped_column(Integer, nullable=False)
     opponent_answered_round: Mapped[int] = mapped_column(Integer, nullable=False)
-    winner_user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
+    winner_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id"), nullable=True
+    )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    expires_last_chance_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_last_chance_notified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

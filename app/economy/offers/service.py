@@ -159,7 +159,9 @@ class OfferService:
         streak_state = await StreakRepo.get_by_user_id(session, user_id)
         current_streak = 0 if streak_state is None else int(streak_state.current_streak)
         today_status = "NO_ACTIVITY" if streak_state is None else streak_state.today_status
-        last_activity_local_date: date | None = None if streak_state is None else streak_state.last_activity_local_date
+        last_activity_local_date: date | None = (
+            None if streak_state is None else streak_state.last_activity_local_date
+        )
 
         premium_active = await EntitlementsRepo.has_active_premium(session, user_id, now_utc)
 

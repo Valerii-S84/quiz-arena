@@ -63,7 +63,9 @@ class ReferralClaimResult:
 
 class ReferralService:
     @staticmethod
-    def extract_referral_code_from_start_payload(start_payload: str | None) -> str | None:
+    def extract_referral_code_from_start_payload(
+        start_payload: str | None,
+    ) -> str | None:
         if not start_payload:
             return None
         matched = START_PAYLOAD_REFERRAL_RE.match(start_payload.strip())
@@ -122,7 +124,9 @@ class ReferralService:
     ) -> ReferralOverview:
         anchors = ReferralService._build_reward_anchors(referrals)
         qualified_total = sum(
-            1 for referral in referrals if referral.status in {"QUALIFIED", "DEFERRED_LIMIT", "REWARDED"}
+            1
+            for referral in referrals
+            if referral.status in {"QUALIFIED", "DEFERRED_LIMIT", "REWARDED"}
         )
         rewarded_total = sum(1 for referral in referrals if referral.status == "REWARDED")
         pending_rewards_total = max(0, len(anchors) - rewarded_total)
@@ -408,7 +412,9 @@ class ReferralService:
         referral_id: int,
         now_utc: datetime,
     ) -> None:
-        active_entitlement = await EntitlementsRepo.get_active_premium_for_update(session, user_id, now_utc)
+        active_entitlement = await EntitlementsRepo.get_active_premium_for_update(
+            session, user_id, now_utc
+        )
         if active_entitlement is not None:
             base_end = (
                 active_entitlement.ends_at
@@ -485,7 +491,10 @@ class ReferralService:
         now_utc: datetime,
     ) -> ReferralClaimResult | None:
         normalized_reward_code = reward_code.strip().upper()
-        if normalized_reward_code not in {REWARD_CODE_MEGA_PACK, REWARD_CODE_PREMIUM_STARTER}:
+        if normalized_reward_code not in {
+            REWARD_CODE_MEGA_PACK,
+            REWARD_CODE_PREMIUM_STARTER,
+        }:
             raise ValueError(f"unsupported reward code: {reward_code}")
 
         user = await UsersRepo.get_by_id(session, user_id)

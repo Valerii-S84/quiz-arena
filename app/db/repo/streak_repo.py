@@ -20,7 +20,9 @@ class StreakRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def create_default_state(session: AsyncSession, *, user_id: int, now_utc: datetime) -> StreakState:
+    async def create_default_state(
+        session: AsyncSession, *, user_id: int, now_utc: datetime
+    ) -> StreakState:
         state = StreakState(
             user_id=user_id,
             current_streak=0,

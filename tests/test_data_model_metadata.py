@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from sqlalchemy import CheckConstraint, UniqueConstraint
 
-from app.db.models import (  # noqa: F401
+from app.db.models import AnalyticsEvent  # noqa: F401
+from app.db.models import (
     AnalyticsDaily,
-    AnalyticsEvent,
     EnergyState,
     Entitlement,
     FriendChallenge,
@@ -62,7 +62,9 @@ def test_all_m2_tables_registered() -> None:
 def test_critical_constraints_present() -> None:
     purchases = Base.metadata.tables["purchases"]
     purchase_check_names = {
-        constraint.name for constraint in purchases.constraints if isinstance(constraint, CheckConstraint)
+        constraint.name
+        for constraint in purchases.constraints
+        if isinstance(constraint, CheckConstraint)
     }
     assert "ck_purchases_final_amount" in purchase_check_names
     purchase_index_names = {index.name for index in purchases.indexes}

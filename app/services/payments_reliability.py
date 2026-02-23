@@ -27,7 +27,8 @@ def compute_product_stars_mismatch_count(
     return sum(
         1
         for product_code in product_codes
-        if paid_stars_by_product.get(product_code, 0) != credited_stars_by_product.get(product_code, 0)
+        if paid_stars_by_product.get(product_code, 0)
+        != credited_stars_by_product.get(product_code, 0)
     )
 
 

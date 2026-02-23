@@ -108,7 +108,9 @@ async def start_mode(
             await callback.answer()
             return
         except DailyChallengeAlreadyPlayedError:
-            await callback.message.answer(TEXTS_DE["msg.daily.challenge.used"], reply_markup=build_home_keyboard())
+            await callback.message.answer(
+                TEXTS_DE["msg.daily.challenge.used"], reply_markup=build_home_keyboard()
+            )
             await callback.answer()
             return
 
@@ -190,7 +192,9 @@ async def continue_regular_mode_after_answer(
                 preferred_question_level=result.next_preferred_level,
             )
         except ModeLockedError:
-            await callback.message.answer(TEXTS_DE["msg.locked.mode"], reply_markup=build_home_keyboard())
+            await callback.message.answer(
+                TEXTS_DE["msg.locked.mode"], reply_markup=build_home_keyboard()
+            )
             await callback.answer()
             return
         except EnergyInsufficientError:

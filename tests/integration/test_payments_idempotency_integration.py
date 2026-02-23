@@ -22,8 +22,8 @@ from app.economy.purchases.service import PurchaseService
 from app.workers.tasks.payments_reliability import (
     expire_stale_unpaid_invoices_async,
     recover_paid_uncredited_async,
-    run_refund_promo_rollback_async,
     run_payments_reconciliation_async,
+    run_refund_promo_rollback_async,
 )
 
 UTC = timezone.utc
@@ -411,7 +411,9 @@ async def test_expire_stale_unpaid_invoices_marks_created_and_invoice_sent_as_fa
 
 
 @pytest.mark.asyncio
-async def test_refund_promo_rollback_job_revokes_discount_redemption_without_decrementing_usage() -> None:
+async def test_refund_promo_rollback_job_revokes_discount_redemption_without_decrementing_usage() -> (
+    None
+):
     now_utc = datetime.now(UTC)
     user_id = await _create_user("refund-promo-rollback")
     purchase_id = uuid4()

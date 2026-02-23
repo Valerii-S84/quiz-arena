@@ -5,10 +5,10 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.game.sessions.service import GameSessionService
 from app.game.friend_challenges.ui_contract import (
     FRIEND_CHALLENGE_LEVEL_SEQUENCE as _FRIEND_CHALLENGE_LEVEL_SEQUENCE,
 )
+from app.game.sessions.service import GameSessionService
 from app.game.sessions.types import FriendChallengeRoundStartResult, FriendChallengeSnapshot
 
 FRIEND_CHALLENGE_LEVEL_SEQUENCE = _FRIEND_CHALLENGE_LEVEL_SEQUENCE

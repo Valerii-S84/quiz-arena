@@ -65,7 +65,9 @@ async def test_handle_offer_dismiss_replies_with_success(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_handle_offer_dismiss_replies_error_when_not_dismissed(monkeypatch) -> None:
+async def test_handle_offer_dismiss_replies_error_when_not_dismissed(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(offers, "SessionLocal", DummySessionLocal())
 
     async def _fake_get_user(session, telegram_user_id: int):

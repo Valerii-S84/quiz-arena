@@ -2,7 +2,18 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BOOLEAN, BigInteger, CHAR, CheckConstraint, DateTime, Index, Integer, SmallInteger, String, text
+from sqlalchemy import (
+    BOOLEAN,
+    CHAR,
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    Index,
+    Integer,
+    SmallInteger,
+    String,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.models.base import Base
@@ -61,9 +72,15 @@ class PromoCode(Base):
     valid_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     max_total_uses: Mapped[int | None] = mapped_column(Integer, nullable=True)
     used_total: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
-    max_uses_per_user: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("1"))
-    new_users_only: Mapped[bool] = mapped_column(BOOLEAN, nullable=False, server_default=text("false"))
-    first_purchase_only: Mapped[bool] = mapped_column(BOOLEAN, nullable=False, server_default=text("false"))
+    max_uses_per_user: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, server_default=text("1")
+    )
+    new_users_only: Mapped[bool] = mapped_column(
+        BOOLEAN, nullable=False, server_default=text("false")
+    )
+    first_purchase_only: Mapped[bool] = mapped_column(
+        BOOLEAN, nullable=False, server_default=text("false")
+    )
     created_by: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

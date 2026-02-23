@@ -14,9 +14,15 @@ def _resolve_target_product_codes(target_scope: str | None) -> list[str]:
     if target_scope == "ANY":
         return list(PRODUCTS.keys())
     if target_scope == "MICRO_ANY":
-        return [product_code for product_code, spec in PRODUCTS.items() if spec.product_type == "MICRO"]
+        return [
+            product_code for product_code, spec in PRODUCTS.items() if spec.product_type == "MICRO"
+        ]
     if target_scope == "PREMIUM_ANY":
-        return [product_code for product_code, spec in PRODUCTS.items() if spec.product_type == "PREMIUM"]
+        return [
+            product_code
+            for product_code, spec in PRODUCTS.items()
+            if spec.product_type == "PREMIUM"
+        ]
     if target_scope in PRODUCTS:
         return [target_scope]
     return []

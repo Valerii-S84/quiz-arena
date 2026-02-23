@@ -226,7 +226,11 @@ def _build_slack_payload(
                     {"title": "Environment", "value": app_env, "short": True},
                     {"title": "Sent At", "value": sent_at.isoformat(), "short": True},
                     {"title": "Event", "value": event, "short": False},
-                    {"title": "Payload", "value": _payload_text(payload), "short": False},
+                    {
+                        "title": "Payload",
+                        "value": _payload_text(payload),
+                        "short": False,
+                    },
                 ],
             }
         ],

@@ -44,7 +44,9 @@ def clear_runtime_pool_cache() -> None:
 
 
 @pytest.mark.asyncio
-async def test_select_question_for_mode_uses_db_pool_before_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_select_question_for_mode_uses_db_pool_before_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async def fake_list_question_ids_all_active(  # noqa: ANN001
         session,
         *,

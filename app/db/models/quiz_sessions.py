@@ -3,7 +3,17 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, String, text
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -34,7 +44,11 @@ class QuizSession(Base):
         Index("idx_sessions_user_started", "user_id", "started_at"),
         Index("idx_sessions_mode", "mode_code"),
         Index("idx_sessions_local_date", "local_date_berlin"),
-        Index("idx_sessions_friend_challenge", "friend_challenge_id", "friend_challenge_round"),
+        Index(
+            "idx_sessions_friend_challenge",
+            "friend_challenge_id",
+            "friend_challenge_round",
+        ),
         Index(
             "uq_daily_challenge_user_date",
             "user_id",

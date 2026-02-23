@@ -14,7 +14,10 @@ from app.db.session import SessionLocal
 from app.economy.purchases.service import PurchaseService
 from app.game.questions.runtime_bank import get_question_by_id
 from app.game.questions.types import QuizQuestion
-from app.game.sessions.errors import FriendChallengeExpiredError, FriendChallengePaymentRequiredError
+from app.game.sessions.errors import (
+    FriendChallengeExpiredError,
+    FriendChallengePaymentRequiredError,
+)
 from app.game.sessions.service import GameSessionService
 
 UTC = timezone.utc
@@ -297,7 +300,9 @@ async def test_friend_challenge_rematch_creates_bound_opponent_duel() -> None:
         assert creator_round.start_result is not None
         assert opponent_round.start_result is not None
 
-        creator_session = await QuizSessionsRepo.get_by_id(session, creator_round.start_result.session.session_id)
+        creator_session = await QuizSessionsRepo.get_by_id(
+            session, creator_round.start_result.session.session_id
+        )
         assert creator_session is not None
         question = await get_question_by_id(
             session,
@@ -506,7 +511,10 @@ async def test_friend_challenge_second_player_reuses_round_question_from_first(
 
     assert creator_round.start_result is not None
     assert opponent_round.start_result is not None
-    assert creator_round.start_result.session.question_id == opponent_round.start_result.session.question_id
+    assert (
+        creator_round.start_result.session.question_id
+        == opponent_round.start_result.session.question_id
+    )
     assert selection_calls == 1
 
 

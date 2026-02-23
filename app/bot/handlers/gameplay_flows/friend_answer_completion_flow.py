@@ -172,9 +172,7 @@ async def handle_completed_friend_challenge(
                     )
                 )
         opponent_message_lines.append(
-            TEXTS_DE["msg.friend.challenge.badge.public"].format(
-                badge_label=opponent_badge_label
-            )
+            TEXTS_DE["msg.friend.challenge.badge.public"].format(badge_label=opponent_badge_label)
         )
         opponent_message_lines.append("")
         opponent_message_lines.append(opponent_proof_card_text)

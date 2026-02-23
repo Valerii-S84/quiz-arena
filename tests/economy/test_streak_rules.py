@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-from app.economy.streak.constants import PREMIUM_SCOPE_MONTH, PREMIUM_SCOPE_SEASON, PREMIUM_SCOPE_STARTER
+from app.economy.streak.constants import (
+    PREMIUM_SCOPE_MONTH,
+    PREMIUM_SCOPE_SEASON,
+    PREMIUM_SCOPE_STARTER,
+)
 from app.economy.streak.rules import (
     apply_day_end,
     classify_streak_state,
@@ -11,7 +15,6 @@ from app.economy.streak.rules import (
 )
 from app.economy.streak.time import berlin_local_date, berlin_week_start
 from app.economy.streak.types import StreakSnapshot, StreakStateLabel, StreakTodayStatus
-
 
 UTC = timezone.utc
 
@@ -140,7 +143,9 @@ def test_transition_at_risk_to_no_streak_without_freeze() -> None:
         updated_at=datetime(2026, 2, 18, 20, 0, tzinfo=UTC),
     )
 
-    state_after = apply_day_end(state_before, day=date(2026, 2, 18), premium_scope=PREMIUM_SCOPE_STARTER)
+    state_after = apply_day_end(
+        state_before, day=date(2026, 2, 18), premium_scope=PREMIUM_SCOPE_STARTER
+    )
 
     assert state_after.current_streak == 0
     assert state_after.today_status == StreakTodayStatus.NO_ACTIVITY

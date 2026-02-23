@@ -7,13 +7,18 @@ import pytest
 
 from app.bot.handlers import payments
 from app.bot.texts.de import TEXTS_DE
-from app.economy.purchases.errors import PurchaseInitValidationError, PurchasePrecheckoutValidationError
+from app.economy.purchases.errors import (
+    PurchaseInitValidationError,
+    PurchasePrecheckoutValidationError,
+)
 from app.economy.purchases.types import PurchaseCreditResult, PurchaseInitResult
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
 
 class _PreCheckoutQuery:
-    def __init__(self, *, from_user: SimpleNamespace, invoice_payload: str, total_amount: int) -> None:
+    def __init__(
+        self, *, from_user: SimpleNamespace, invoice_payload: str, total_amount: int
+    ) -> None:
         self.from_user = from_user
         self.invoice_payload = invoice_payload
         self.total_amount = total_amount
@@ -36,7 +41,12 @@ class _SuccessfulPayment:
 
 
 class _PaymentMessage(DummyMessage):
-    def __init__(self, *, from_user: SimpleNamespace | None, successful_payment: _SuccessfulPayment | None) -> None:
+    def __init__(
+        self,
+        *,
+        from_user: SimpleNamespace | None,
+        successful_payment: _SuccessfulPayment | None,
+    ) -> None:
         super().__init__()
         self.from_user = from_user
         self.successful_payment = successful_payment
@@ -109,7 +119,9 @@ async def test_handle_precheckout_rejects_invalid_payload(monkeypatch) -> None:
     monkeypatch.setattr(payments.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(payments.PurchaseService, "validate_precheckout", _fake_validate)
 
-    query = _PreCheckoutQuery(from_user=SimpleNamespace(id=3), invoice_payload="inv-1", total_amount=10)
+    query = _PreCheckoutQuery(
+        from_user=SimpleNamespace(id=3), invoice_payload="inv-1", total_amount=10
+    )
     await payments.handle_precheckout(query)  # type: ignore[arg-type]
 
     assert query.calls == [{"ok": False, "error_message": TEXTS_DE["msg.purchase.error.failed"]}]
@@ -137,14 +149,18 @@ async def test_handle_successful_payment_sends_success_text(monkeypatch) -> None
     monkeypatch.setattr(payments.PurchaseService, "apply_successful_payment", _fake_apply_payment)
     monkeypatch.setattr(payments.PurchasesRepo, "get_by_id", _fake_get_by_id)
 
-    message = _PaymentMessage(from_user=SimpleNamespace(id=1), successful_payment=_SuccessfulPayment())
+    message = _PaymentMessage(
+        from_user=SimpleNamespace(id=1), successful_payment=_SuccessfulPayment()
+    )
     await payments.handle_successful_payment(message)  # type: ignore[arg-type]
 
     assert message.answers[0].text == TEXTS_DE["msg.purchase.success.premium"]
 
 
 @pytest.mark.asyncio
-async def test_handle_buy_with_offer_marks_click_without_conversion(monkeypatch) -> None:
+async def test_handle_buy_with_offer_marks_click_without_conversion(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(payments, "SessionLocal", DummySessionLocal())
     clicked_calls: list[dict[str, object]] = []
     init_keys: list[str] = []
@@ -174,7 +190,9 @@ async def test_handle_buy_with_offer_marks_click_without_conversion(monkeypatch)
 
     monkeypatch.setattr(payments.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(payments.OfferService, "mark_offer_clicked", _fake_mark_clicked)
-    monkeypatch.setattr(payments.OfferService, "mark_offer_converted_purchase", _fake_mark_converted)
+    monkeypatch.setattr(
+        payments.OfferService, "mark_offer_converted_purchase", _fake_mark_converted
+    )
     monkeypatch.setattr(payments.PurchaseService, "init_purchase", _fake_init_purchase)
     monkeypatch.setattr(payments.PurchaseService, "mark_invoice_sent", _fake_mark_invoice_sent)
 
@@ -218,9 +236,13 @@ async def test_handle_successful_payment_marks_offer_conversion(monkeypatch) -> 
     monkeypatch.setattr(payments.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(payments.PurchaseService, "apply_successful_payment", _fake_apply_payment)
     monkeypatch.setattr(payments.PurchasesRepo, "get_by_id", _fake_get_by_id)
-    monkeypatch.setattr(payments.OfferService, "mark_offer_converted_purchase", _fake_mark_converted)
+    monkeypatch.setattr(
+        payments.OfferService, "mark_offer_converted_purchase", _fake_mark_converted
+    )
 
-    message = _PaymentMessage(from_user=SimpleNamespace(id=1), successful_payment=_SuccessfulPayment())
+    message = _PaymentMessage(
+        from_user=SimpleNamespace(id=1), successful_payment=_SuccessfulPayment()
+    )
     await payments.handle_successful_payment(message)  # type: ignore[arg-type]
 
     assert converted_calls == [

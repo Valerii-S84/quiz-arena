@@ -66,9 +66,15 @@ def _normalized_origin(value: str | None) -> str | None:
 
 
 def _assert_same_origin_form_post(request: Request, *, client_ip: str | None) -> None:
-    content_type = (request.headers.get("content-type") or "").split(";", maxsplit=1)[0].strip().lower()
+    content_type = (
+        (request.headers.get("content-type") or "").split(";", maxsplit=1)[0].strip().lower()
+    )
     if content_type != OPS_UI_FORM_CONTENT_TYPE:
-        logger.warning("ops_ui_auth_failed", reason="invalid_form_content_type", client_ip=client_ip)
+        logger.warning(
+            "ops_ui_auth_failed",
+            reason="invalid_form_content_type",
+            client_ip=client_ip,
+        )
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
 
     host = (request.headers.get("host") or "").strip().lower()
@@ -81,12 +87,22 @@ def _assert_same_origin_form_post(request: Request, *, client_ip: str | None) ->
     if origin is not None:
         if origin in allowed_origins:
             return
-        logger.warning("ops_ui_auth_failed", reason="origin_mismatch", client_ip=client_ip, origin=origin)
+        logger.warning(
+            "ops_ui_auth_failed",
+            reason="origin_mismatch",
+            client_ip=client_ip,
+            origin=origin,
+        )
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
 
     referer = _normalized_origin(request.headers.get("referer"))
     if referer not in allowed_origins:
-        logger.warning("ops_ui_auth_failed", reason="referer_mismatch", client_ip=client_ip, referer=referer)
+        logger.warning(
+            "ops_ui_auth_failed",
+            reason="referer_mismatch",
+            client_ip=client_ip,
+            referer=referer,
+        )
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
 
 
@@ -176,7 +192,9 @@ async def login_ops_ui(request: Request) -> Response:
     raw_body = await request.body()
     payload = parse_qs(raw_body.decode("utf-8", errors="ignore"), keep_blank_values=True)
     token = (payload.get("token", [""])[0] or "").strip()
-    if not is_valid_internal_token(expected_token=settings.internal_api_token, received_token=token):
+    if not is_valid_internal_token(
+        expected_token=settings.internal_api_token, received_token=token
+    ):
         _record_login_failure(client_ip)
         await asyncio.sleep(OPS_UI_LOGIN_FAILURE_DELAY_SECONDS)
         logger.warning("ops_ui_auth_failed", reason="invalid_token", client_ip=client_ip)

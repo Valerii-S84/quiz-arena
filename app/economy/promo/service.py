@@ -138,7 +138,7 @@ class PromoService:
                 result_type="PREMIUM_GRANT",
                 idempotent_replay=True,
                 premium_days=promo_code.grant_premium_days,
-                premium_ends_at=entitlement.ends_at if entitlement is not None else None,
+                premium_ends_at=(entitlement.ends_at if entitlement is not None else None),
             )
 
         if promo_code.promo_type == "PERCENT_DISCOUNT":
@@ -166,9 +166,15 @@ class PromoService:
             raise PromoNotApplicableError
 
         grant_days = promo_code.grant_premium_days
-        active_entitlement = await EntitlementsRepo.get_active_premium_for_update(session, user_id, now_utc)
+        active_entitlement = await EntitlementsRepo.get_active_premium_for_update(
+            session, user_id, now_utc
+        )
         if active_entitlement is not None:
-            base_end = active_entitlement.ends_at if active_entitlement.ends_at and active_entitlement.ends_at > now_utc else now_utc
+            base_end = (
+                active_entitlement.ends_at
+                if active_entitlement.ends_at and active_entitlement.ends_at > now_utc
+                else now_utc
+            )
             active_entitlement.ends_at = base_end + timedelta(days=grant_days)
             active_entitlement.updated_at = now_utc
             entitlement = active_entitlement
@@ -184,7 +190,10 @@ class PromoService:
                     ends_at=now_utc + timedelta(days=grant_days),
                     source_purchase_id=None,
                     idempotency_key=f"entitlement:promo:{redemption.id}",
-                    metadata_={"promo_redemption_id": str(redemption.id), "promo_code_id": promo_code.id},
+                    metadata_={
+                        "promo_redemption_id": str(redemption.id),
+                        "promo_code_id": promo_code.id,
+                    },
                     created_at=now_utc,
                     updated_at=now_utc,
                 ),
@@ -223,7 +232,9 @@ class PromoService:
     ) -> PromoRedeemResult:
         now_utc = now_utc or datetime.now(timezone.utc)
 
-        existing = await PromoRepo.get_redemption_by_idempotency_key_for_update(session, idempotency_key)
+        existing = await PromoRepo.get_redemption_by_idempotency_key_for_update(
+            session, idempotency_key
+        )
         if existing is not None:
             if existing.user_id != user_id:
                 raise PromoIdempotencyConflictError
@@ -282,11 +293,16 @@ class PromoService:
                 normalized_code_hash=code_hash,
                 result="NOT_APPLICABLE",
                 now_utc=now_utc,
-                metadata={"reason": "ALREADY_USED", "redemption_id": str(existing_redemption.id)},
+                metadata={
+                    "reason": "ALREADY_USED",
+                    "redemption_id": str(existing_redemption.id),
+                },
             )
             raise PromoAlreadyUsedError
 
-        if matched_code.status != "ACTIVE" or not (matched_code.valid_from <= now_utc < matched_code.valid_until):
+        if matched_code.status != "ACTIVE" or not (
+            matched_code.valid_from <= now_utc < matched_code.valid_until
+        ):
             await PromoService._record_failed_attempt(
                 user_id=user_id,
                 normalized_code_hash=code_hash,
@@ -294,7 +310,10 @@ class PromoService:
                 now_utc=now_utc,
             )
             raise PromoExpiredError
-        if matched_code.max_total_uses is not None and matched_code.used_total >= matched_code.max_total_uses:
+        if (
+            matched_code.max_total_uses is not None
+            and matched_code.used_total >= matched_code.max_total_uses
+        ):
             await PromoService._record_failed_attempt(
                 user_id=user_id,
                 normalized_code_hash=code_hash,

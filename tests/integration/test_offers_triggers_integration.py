@@ -13,7 +13,11 @@ from app.db.models.streak_state import StreakState
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.energy.constants import BERLIN_TIMEZONE
-from app.economy.offers.constants import OFFER_NOT_SHOW_DISMISS_REASON, TRG_ENERGY_ZERO, TRG_LOCKED_MODE_CLICK
+from app.economy.offers.constants import (
+    OFFER_NOT_SHOW_DISMISS_REASON,
+    TRG_ENERGY_ZERO,
+    TRG_LOCKED_MODE_CLICK,
+)
 from app.economy.offers.service import OfferService
 
 UTC = timezone.utc

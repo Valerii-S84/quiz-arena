@@ -16,7 +16,9 @@ class ProcessedUpdatesRepo:
         *,
         update_id: int,
     ) -> ProcessedUpdate | None:
-        stmt = select(ProcessedUpdate).where(ProcessedUpdate.update_id == update_id).with_for_update()
+        stmt = (
+            select(ProcessedUpdate).where(ProcessedUpdate.update_id == update_id).with_for_update()
+        )
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -194,7 +196,9 @@ class ProcessedUpdatesRepo:
             oldest.append(
                 {
                     "update_id": int(update_id),
-                    "processing_task_id": str(processing_task_id) if processing_task_id is not None else None,
+                    "processing_task_id": (
+                        str(processing_task_id) if processing_task_id is not None else None
+                    ),
                     "processed_at": processed_at.isoformat(),
                     "age_seconds": max(0, int(age_seconds or 0)),
                 }
@@ -216,6 +220,10 @@ class ProcessedUpdatesRepo:
             .limit(resolved_limit)
             .scalar_subquery()
         )
-        stmt = delete(ProcessedUpdate).where(ProcessedUpdate.update_id.in_(candidate_ids)).returning(ProcessedUpdate.update_id)
+        stmt = (
+            delete(ProcessedUpdate)
+            .where(ProcessedUpdate.update_id.in_(candidate_ids))
+            .returning(ProcessedUpdate.update_id)
+        )
         result = await session.execute(stmt)
         return len(list(result.scalars()))

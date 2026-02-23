@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -113,7 +114,11 @@ async def _recover_single_purchase(purchase_id: UUID, *, now_utc: datetime) -> s
                 raw_successful_payment=purchase.raw_successful_payment,
                 now_utc=now_utc,
             )
-        except (ProductNotFoundError, PurchaseNotFoundError, PurchasePrecheckoutValidationError):
+        except (
+            ProductNotFoundError,
+            PurchaseNotFoundError,
+            PurchasePrecheckoutValidationError,
+        ):
             payload, failures = increment_recovery_failures(purchase.raw_successful_payment)
             purchase.raw_successful_payment = payload
 
@@ -126,7 +131,9 @@ async def _recover_single_purchase(purchase_id: UUID, *, now_utc: datetime) -> s
     return "credited"
 
 
-async def recover_paid_uncredited_async(*, batch_size: int = 100, stale_minutes: int = 2) -> dict[str, int]:
+async def recover_paid_uncredited_async(
+    *, batch_size: int = 100, stale_minutes: int = 2
+) -> dict[str, int]:
     now_utc = datetime.now(timezone.utc)
     stale_cutoff = now_utc - timedelta(minutes=stale_minutes)
 
@@ -177,7 +184,9 @@ async def run_payments_reconciliation_async(*, stale_minutes: int = 30) -> dict[
         paid_stars_total = await PurchasesRepo.sum_paid_stars_amount(session)
         credited_stars_total = await LedgerRepo.sum_distinct_purchase_stars_for_credits(session)
         paid_stars_by_product = await PurchasesRepo.sum_paid_stars_amount_by_product(session)
-        credited_stars_by_product = await LedgerRepo.sum_distinct_purchase_stars_for_credits_by_product(session)
+        credited_stars_by_product = (
+            await LedgerRepo.sum_distinct_purchase_stars_for_credits_by_product(session)
+        )
         product_stars_mismatch_count = compute_product_stars_mismatch_count(
             paid_stars_by_product=paid_stars_by_product,
             credited_stars_by_product=credited_stars_by_product,

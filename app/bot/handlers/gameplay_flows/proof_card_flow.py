@@ -53,7 +53,10 @@ async def handle_friend_challenge_share_result(
             FriendChallengeNotFoundError,
             FriendChallengeAccessError,
         ):
-            await callback.message.answer(TEXTS_DE["msg.friend.challenge.invalid"], reply_markup=build_home_keyboard())
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.invalid"],
+                reply_markup=build_home_keyboard(),
+            )
             await callback.answer()
             return
 

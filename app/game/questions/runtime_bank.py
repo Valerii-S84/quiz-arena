@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections import Counter
 import hashlib
+from collections import Counter
 from datetime import date
 from time import monotonic
 from typing import Sequence
@@ -13,12 +13,8 @@ from app.core.config import get_settings
 from app.db.models.quiz_questions import QuizQuestion as QuizQuestionRecord
 from app.db.repo.quiz_questions_repo import QuizQuestionsRepo
 from app.game.questions.catalog import DAILY_CHALLENGE_SOURCE_MODE
-from app.game.questions.static_bank import (
-    get_question_by_id as get_question_by_id_fallback,
-)
-from app.game.questions.static_bank import (
-    get_question_for_mode as get_question_for_mode_fallback,
-)
+from app.game.questions.static_bank import get_question_by_id as get_question_by_id_fallback
+from app.game.questions.static_bank import get_question_for_mode as get_question_for_mode_fallback
 from app.game.questions.static_bank import (
     select_question_for_mode as select_question_for_mode_fallback,
 )

@@ -76,4 +76,3 @@ class DummyCallback:
 
     async def answer(self, text: str | None = None, show_alert: bool = False) -> None:
         self.answer_calls.append({"text": text, "show_alert": show_alert})
-

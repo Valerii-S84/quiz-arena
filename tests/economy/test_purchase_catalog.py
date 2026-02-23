@@ -13,7 +13,12 @@ def test_purchase_catalog_contains_core_micro_products() -> None:
 
 
 def test_purchase_catalog_contains_core_premium_products() -> None:
-    assert {"PREMIUM_STARTER", "PREMIUM_MONTH", "PREMIUM_SEASON", "PREMIUM_YEAR"}.issubset(PRODUCTS)
+    assert {
+        "PREMIUM_STARTER",
+        "PREMIUM_MONTH",
+        "PREMIUM_SEASON",
+        "PREMIUM_YEAR",
+    }.issubset(PRODUCTS)
 
 
 def test_get_product_returns_none_for_unknown_code() -> None:

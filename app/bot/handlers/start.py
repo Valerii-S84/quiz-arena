@@ -35,7 +35,9 @@ START_PAYLOAD_RE = re.compile(r"^/start(?:@\w+)?(?:\s+(.+))?$")
 START_FRIEND_PAYLOAD_RE = re.compile(r"^fc_([a-f0-9]{32})$", re.IGNORECASE)
 
 
-def _format_user_label(*, username: str | None, first_name: str | None, fallback: str = "Freund") -> str:
+def _format_user_label(
+    *, username: str | None, first_name: str | None, fallback: str = "Freund"
+) -> str:
     if username:
         normalized = username.strip()
         if normalized:
@@ -70,12 +72,18 @@ def _build_friend_plan_text(*, total_rounds: int) -> str:
     rounds = max(1, int(total_rounds))
     sequence = list(FRIEND_CHALLENGE_LEVEL_SEQUENCE[:rounds])
     if rounds > len(FRIEND_CHALLENGE_LEVEL_SEQUENCE):
-        sequence.extend([FRIEND_CHALLENGE_LEVEL_SEQUENCE[-1]] * (rounds - len(FRIEND_CHALLENGE_LEVEL_SEQUENCE)))
+        sequence.extend(
+            [FRIEND_CHALLENGE_LEVEL_SEQUENCE[-1]] * (rounds - len(FRIEND_CHALLENGE_LEVEL_SEQUENCE))
+        )
 
     counts: dict[str, int] = {}
     for level in sequence:
         counts[level] = counts.get(level, 0) + 1
-    mix_parts = [f"{level} x{counts[level]}" for level in ("A1", "A2", "B1", "B2", "C1", "C2") if level in counts]
+    mix_parts = [
+        f"{level} x{counts[level]}"
+        for level in ("A1", "A2", "B1", "B2", "C1", "C2")
+        if level in counts
+    ]
     mix = ", ".join(mix_parts) if mix_parts else "A1 x1"
     mode_label = "Sprint" if rounds <= 5 else "Mix"
     return f"{rounds} Fragen {mode_label}: {mix}. Keine Energie-Kosten."
@@ -288,7 +296,10 @@ async def handle_start(message: Message) -> None:
 
     if friend_invite_token is not None:
         if challenge_error_key is not None or challenge_start is None:
-            await message.answer(TEXTS_DE[challenge_error_key or "msg.friend.challenge.invalid"], reply_markup=build_home_keyboard())
+            await message.answer(
+                TEXTS_DE[challenge_error_key or "msg.friend.challenge.invalid"],
+                reply_markup=build_home_keyboard(),
+            )
             return
 
         if challenge_joined_now:
@@ -359,7 +370,9 @@ async def handle_start(message: Message) -> None:
 @router.callback_query(F.data == "shop:open")
 async def handle_shop_open(callback: CallbackQuery) -> None:
     if callback.message is not None:
-        await callback.message.answer(TEXTS_DE["msg.shop.title"], reply_markup=build_shop_keyboard())
+        await callback.message.answer(
+            TEXTS_DE["msg.shop.title"], reply_markup=build_shop_keyboard()
+        )
     await callback.answer()
 
 

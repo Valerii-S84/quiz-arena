@@ -9,7 +9,9 @@ from app.db.models.purchases import Purchase
 
 class LedgerRepo:
     @staticmethod
-    async def get_by_idempotency_key(session: AsyncSession, idempotency_key: str) -> LedgerEntry | None:
+    async def get_by_idempotency_key(
+        session: AsyncSession, idempotency_key: str
+    ) -> LedgerEntry | None:
         stmt = select(LedgerEntry).where(LedgerEntry.idempotency_key == idempotency_key)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
@@ -45,13 +47,18 @@ class LedgerRepo:
         stmt = (
             select(func.coalesce(func.sum(Purchase.stars_amount), 0))
             .select_from(Purchase)
-            .join(credited_purchase_ids, Purchase.id == credited_purchase_ids.c.purchase_id)
+            .join(
+                credited_purchase_ids,
+                Purchase.id == credited_purchase_ids.c.purchase_id,
+            )
         )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
 
     @staticmethod
-    async def sum_distinct_purchase_stars_for_credits_by_product(session: AsyncSession) -> dict[str, int]:
+    async def sum_distinct_purchase_stars_for_credits_by_product(
+        session: AsyncSession,
+    ) -> dict[str, int]:
         credited_purchase_ids = (
             select(distinct(LedgerEntry.purchase_id).label("purchase_id"))
             .where(
@@ -68,7 +75,10 @@ class LedgerRepo:
                 func.coalesce(func.sum(Purchase.stars_amount), 0),
             )
             .select_from(Purchase)
-            .join(credited_purchase_ids, Purchase.id == credited_purchase_ids.c.purchase_id)
+            .join(
+                credited_purchase_ids,
+                Purchase.id == credited_purchase_ids.c.purchase_id,
+            )
             .group_by(Purchase.product_code)
         )
         result = await session.execute(stmt)

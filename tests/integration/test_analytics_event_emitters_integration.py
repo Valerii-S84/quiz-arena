@@ -190,7 +190,9 @@ async def test_friend_challenge_flow_emits_created_joined_completed_and_rematch_
         assert creator_round.start_result is not None
         assert opponent_round.start_result is not None
 
-        creator_session = await QuizSessionsRepo.get_by_id(session, creator_round.start_result.session.session_id)
+        creator_session = await QuizSessionsRepo.get_by_id(
+            session, creator_round.start_result.session.session_id
+        )
         assert creator_session is not None
         question = await get_question_by_id(
             session,
@@ -223,10 +225,18 @@ async def test_friend_challenge_flow_emits_created_joined_completed_and_rematch_
             now_utc=now_utc + timedelta(seconds=6),
         )
 
-    creator_created = await _list_user_events(creator_user_id, event_type="friend_challenge_created")
-    opponent_joined = await _list_user_events(opponent_user_id, event_type="friend_challenge_joined")
-    opponent_completed = await _list_user_events(opponent_user_id, event_type="friend_challenge_completed")
-    creator_rematch = await _list_user_events(creator_user_id, event_type="friend_challenge_rematch_created")
+    creator_created = await _list_user_events(
+        creator_user_id, event_type="friend_challenge_created"
+    )
+    opponent_joined = await _list_user_events(
+        opponent_user_id, event_type="friend_challenge_joined"
+    )
+    opponent_completed = await _list_user_events(
+        opponent_user_id, event_type="friend_challenge_completed"
+    )
+    creator_rematch = await _list_user_events(
+        creator_user_id, event_type="friend_challenge_rematch_created"
+    )
 
     assert len(creator_created) >= 2
     assert len(opponent_joined) == 1

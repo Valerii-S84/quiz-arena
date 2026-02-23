@@ -25,7 +25,9 @@ class User(Base):
     telegram_user_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     username: Mapped[str | None] = mapped_column(Text, nullable=True)
     first_name: Mapped[str | None] = mapped_column(Text, nullable=True)
-    language_code: Mapped[str] = mapped_column(String(8), nullable=False, server_default=text("'de'"))
+    language_code: Mapped[str] = mapped_column(
+        String(8), nullable=False, server_default=text("'de'")
+    )
     timezone: Mapped[str] = mapped_column(
         String(64),
         nullable=False,

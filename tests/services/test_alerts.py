@@ -57,7 +57,9 @@ def _patch_http_client(
 
 
 @pytest.mark.asyncio
-async def test_send_ops_alert_returns_false_when_no_targets_configured(monkeypatch) -> None:
+async def test_send_ops_alert_returns_false_when_no_targets_configured(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(alerts, "get_settings", lambda: _settings())
     sent = await alerts.send_ops_alert(event="test_event", payload={"k": "v"})
     assert sent is False
@@ -72,7 +74,9 @@ async def test_send_ops_alert_posts_to_generic_webhook(monkeypatch) -> None:
         lambda: _settings(ops_alert_webhook_url="https://ops.example.local/hook"),
     )
     _patch_http_client(monkeypatch, calls)
-    sent = await alerts.send_ops_alert(event="promo_campaign_auto_paused", payload={"paused_campaigns": 2})
+    sent = await alerts.send_ops_alert(
+        event="promo_campaign_auto_paused", payload={"paused_campaigns": 2}
+    )
 
     assert sent is True
     assert len(calls) == 1
@@ -84,7 +88,9 @@ async def test_send_ops_alert_posts_to_generic_webhook(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_send_ops_alert_routes_critical_event_to_pagerduty_and_slack(monkeypatch) -> None:
+async def test_send_ops_alert_routes_critical_event_to_pagerduty_and_slack(
+    monkeypatch,
+) -> None:
     calls: list[dict[str, Any]] = []
     monkeypatch.setattr(
         alerts,
@@ -129,7 +135,9 @@ async def test_send_ops_alert_applies_policy_override(monkeypatch) -> None:
     )
     _patch_http_client(monkeypatch, calls)
 
-    sent = await alerts.send_ops_alert(event="promo_campaign_auto_paused", payload={"paused_campaigns": 1})
+    sent = await alerts.send_ops_alert(
+        event="promo_campaign_auto_paused", payload={"paused_campaigns": 1}
+    )
 
     assert sent is True
     assert len(calls) == 1
@@ -151,14 +159,18 @@ async def test_send_ops_alert_returns_true_when_one_provider_fails(monkeypatch) 
     )
     _patch_http_client(monkeypatch, calls, fail_urls={"https://slack.example.local/hook"})
 
-    sent = await alerts.send_ops_alert(event="promo_campaign_auto_paused", payload={"paused_campaigns": 5})
+    sent = await alerts.send_ops_alert(
+        event="promo_campaign_auto_paused", payload={"paused_campaigns": 5}
+    )
 
     assert sent is True
     assert len(calls) == 2
 
 
 @pytest.mark.asyncio
-async def test_send_ops_alert_routes_referral_reward_milestone_as_info(monkeypatch) -> None:
+async def test_send_ops_alert_routes_referral_reward_milestone_as_info(
+    monkeypatch,
+) -> None:
     calls: list[dict[str, Any]] = []
     monkeypatch.setattr(
         alerts,

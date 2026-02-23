@@ -74,7 +74,9 @@ async def handle_friend_challenge_create_selected(
     if invite_link is None:
         body_lines.insert(
             0,
-            TEXTS_DE["msg.friend.challenge.created.fallback"].format(invite_token=challenge.invite_token),
+            TEXTS_DE["msg.friend.challenge.created.fallback"].format(
+                invite_token=challenge.invite_token
+            ),
         )
         await callback.message.answer(
             "\n".join(body_lines),
@@ -147,7 +149,10 @@ async def handle_friend_challenge_rematch(
             FriendChallengeNotFoundError,
             FriendChallengeAccessError,
         ):
-            await callback.message.answer(TEXTS_DE["msg.friend.challenge.invalid"], reply_markup=build_home_keyboard())
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.invalid"],
+                reply_markup=build_home_keyboard(),
+            )
             await callback.answer()
             return
 
@@ -184,6 +189,8 @@ async def handle_friend_challenge_rematch(
                     build_friend_plan_text(total_rounds=rematch.total_rounds),
                 ]
             ),
-            reply_markup=build_friend_challenge_next_keyboard(challenge_id=str(rematch.challenge_id)),
+            reply_markup=build_friend_challenge_next_keyboard(
+                challenge_id=str(rematch.challenge_id)
+            ),
         )
     await callback.answer()

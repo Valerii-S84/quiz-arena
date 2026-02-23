@@ -4,6 +4,9 @@ from datetime import datetime
 
 from aiogram.types import CallbackQuery
 
+from app.bot.handlers.gameplay_flows.friend_answer_completion_flow import (
+    handle_completed_friend_challenge,
+)
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
     build_friend_challenge_finished_keyboard,
@@ -18,10 +21,6 @@ from app.game.sessions.errors import (
     FriendChallengeNotFoundError,
 )
 from app.game.sessions.types import AnswerSessionResult
-
-from app.bot.handlers.gameplay_flows.friend_answer_completion_flow import (
-    handle_completed_friend_challenge,
-)
 
 
 async def handle_friend_answer_branch(
@@ -54,7 +53,9 @@ async def handle_friend_answer_branch(
         )
 
     if result.friend_challenge is None:
-        await callback.message.answer(TEXTS_DE["msg.friend.challenge.invalid"], reply_markup=build_home_keyboard())
+        await callback.message.answer(
+            TEXTS_DE["msg.friend.challenge.invalid"], reply_markup=build_home_keyboard()
+        )
         await callback.answer()
         return
 
@@ -152,7 +153,10 @@ async def handle_friend_answer_branch(
             FriendChallengeCompletedError,
             FriendChallengeFullError,
         ):
-            await callback.message.answer(TEXTS_DE["msg.friend.challenge.invalid"], reply_markup=build_home_keyboard())
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.invalid"],
+                reply_markup=build_home_keyboard(),
+            )
             await callback.answer()
             return
 

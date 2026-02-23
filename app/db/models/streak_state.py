@@ -2,7 +2,17 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, SmallInteger, String
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    SmallInteger,
+    String,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.models.base import Base
@@ -28,7 +38,9 @@ class StreakState(Base):
     last_activity_local_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     today_status: Mapped[str] = mapped_column(String(16), nullable=False)
     streak_saver_tokens: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    streak_saver_last_purchase_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    streak_saver_last_purchase_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     premium_freezes_used_week: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
     premium_freeze_week_start_local_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

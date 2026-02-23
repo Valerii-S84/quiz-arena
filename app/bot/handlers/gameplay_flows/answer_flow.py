@@ -60,7 +60,10 @@ async def handle_answer(
                 now_utc=now_utc,
             )
         except SessionNotFoundError:
-            await callback.message.answer(TEXTS_DE["msg.game.session.not_found"], reply_markup=build_home_keyboard())
+            await callback.message.answer(
+                TEXTS_DE["msg.game.session.not_found"],
+                reply_markup=build_home_keyboard(),
+            )
             await callback.answer()
             return
         except InvalidAnswerOptionError:
@@ -87,12 +90,16 @@ async def handle_answer(
     await callback.message.answer("\n".join(response_lines))
 
     if result.mode_code is None or result.source is None:
-        await callback.message.answer(TEXTS_DE["msg.game.stopped"], reply_markup=build_home_keyboard())
+        await callback.message.answer(
+            TEXTS_DE["msg.game.stopped"], reply_markup=build_home_keyboard()
+        )
         await callback.answer()
         return
 
     if result.source == "DAILY_CHALLENGE":
-        await callback.message.answer(TEXTS_DE["msg.game.daily.finished"], reply_markup=build_home_keyboard())
+        await callback.message.answer(
+            TEXTS_DE["msg.game.daily.finished"], reply_markup=build_home_keyboard()
+        )
         await callback.answer()
         return
 

@@ -5,9 +5,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 def _build_share_url(*, invite_link: str, share_text: str) -> str:
     return (
-        "https://t.me/share/url"
-        f"?url={quote_plus(invite_link)}"
-        f"&text={quote_plus(share_text)}"
+        "https://t.me/share/url" f"?url={quote_plus(invite_link)}" f"&text={quote_plus(share_text)}"
     )
 
 
@@ -38,7 +36,11 @@ def build_friend_challenge_create_keyboard() -> InlineKeyboardMarkup:
 def build_friend_challenge_next_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="▶️ NAECHSTE RUNDE", callback_data=f"friend:next:{challenge_id}")],
+            [
+                InlineKeyboardButton(
+                    text="▶️ NAECHSTE RUNDE", callback_data=f"friend:next:{challenge_id}"
+                )
+            ],
             [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")],
         ]
     )
@@ -65,7 +67,9 @@ def build_friend_challenge_share_keyboard(
             [
                 InlineKeyboardButton(
                     text="😏 PROVOKATION",
-                    url=build_friend_challenge_share_url(base_link=invite_link, share_text=template_a),
+                    url=build_friend_challenge_share_url(
+                        base_link=invite_link, share_text=template_a
+                    ),
                 )
             ]
         )
@@ -73,7 +77,9 @@ def build_friend_challenge_share_keyboard(
             [
                 InlineKeyboardButton(
                     text="🔥 GLEICHE FRAGEN",
-                    url=build_friend_challenge_share_url(base_link=invite_link, share_text=template_b),
+                    url=build_friend_challenge_share_url(
+                        base_link=invite_link, share_text=template_b
+                    ),
                 )
             ]
         )
@@ -81,7 +87,9 @@ def build_friend_challenge_share_keyboard(
             [
                 InlineKeyboardButton(
                     text="🏆 REVANCHE?",
-                    url=build_friend_challenge_share_url(base_link=invite_link, share_text=template_c),
+                    url=build_friend_challenge_share_url(
+                        base_link=invite_link, share_text=template_c
+                    ),
                 )
             ]
         )
@@ -110,15 +118,30 @@ def build_friend_challenge_finished_keyboard(
     ]
     if show_best_of_three:
         rows.append(
-            [InlineKeyboardButton(text="🎯 BEST OF 3", callback_data=f"friend:series:best3:{challenge_id}")]
+            [
+                InlineKeyboardButton(
+                    text="🎯 BEST OF 3",
+                    callback_data=f"friend:series:best3:{challenge_id}",
+                )
+            ]
         )
     if show_next_series_game:
         rows.append(
-            [InlineKeyboardButton(text="▶️ NAECHSTES SPIEL", callback_data=f"friend:series:next:{challenge_id}")]
+            [
+                InlineKeyboardButton(
+                    text="▶️ NAECHSTES SPIEL",
+                    callback_data=f"friend:series:next:{challenge_id}",
+                )
+            ]
         )
     if include_share:
         rows.append(
-            [InlineKeyboardButton(text="📤 TEILEN", callback_data=f"friend:share:result:{challenge_id}")]
+            [
+                InlineKeyboardButton(
+                    text="📤 TEILEN",
+                    callback_data=f"friend:share:result:{challenge_id}",
+                )
+            ]
         )
     rows.append([InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -132,7 +155,11 @@ def build_friend_challenge_result_share_keyboard(
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="📤 JETZT TEILEN", url=share_url)],
-            [InlineKeyboardButton(text="🔁 REVANCHE", callback_data=f"friend:rematch:{challenge_id}")],
+            [
+                InlineKeyboardButton(
+                    text="🔁 REVANCHE", callback_data=f"friend:rematch:{challenge_id}"
+                )
+            ],
             [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")],
         ]
     )
@@ -141,7 +168,11 @@ def build_friend_challenge_result_share_keyboard(
 def build_friend_challenge_limit_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🎟 1 DUELL  |  5⭐", callback_data="buy:FRIEND_CHALLENGE_5")],
+            [
+                InlineKeyboardButton(
+                    text="🎟 1 DUELL  |  5⭐", callback_data="buy:FRIEND_CHALLENGE_5"
+                )
+            ],
             [InlineKeyboardButton(text="💎 PREMIUM STARTER", callback_data="buy:PREMIUM_STARTER")],
             [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")],
         ]

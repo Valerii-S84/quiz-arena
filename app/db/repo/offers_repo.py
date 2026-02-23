@@ -138,12 +138,16 @@ class OffersRepo:
 
     @staticmethod
     async def count_impressions_since(session: AsyncSession, *, shown_since_utc: datetime) -> int:
-        stmt = select(func.count(OfferImpression.id)).where(OfferImpression.shown_at >= shown_since_utc)
+        stmt = select(func.count(OfferImpression.id)).where(
+            OfferImpression.shown_at >= shown_since_utc
+        )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
 
     @staticmethod
-    async def count_distinct_users_since(session: AsyncSession, *, shown_since_utc: datetime) -> int:
+    async def count_distinct_users_since(
+        session: AsyncSession, *, shown_since_utc: datetime
+    ) -> int:
         stmt = select(func.count(func.distinct(OfferImpression.user_id))).where(
             OfferImpression.shown_at >= shown_since_utc
         )

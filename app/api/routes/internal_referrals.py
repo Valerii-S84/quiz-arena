@@ -146,14 +146,22 @@ def _assert_internal_access(request: Request) -> None:
     )
 
     if not is_client_ip_allowed(client_ip=client_ip, allowlist=settings.internal_api_allowlist):
-        logger.warning("internal_referrals_auth_failed", reason="ip_not_allowed", client_ip=client_ip)
+        logger.warning(
+            "internal_referrals_auth_failed",
+            reason="ip_not_allowed",
+            client_ip=client_ip,
+        )
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
 
     if not is_internal_request_authenticated(
         request,
         expected_token=settings.internal_api_token,
     ):
-        logger.warning("internal_referrals_auth_failed", reason="invalid_credentials", client_ip=client_ip)
+        logger.warning(
+            "internal_referrals_auth_failed",
+            reason="invalid_credentials",
+            client_ip=client_ip,
+        )
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
 
 
@@ -216,9 +224,7 @@ async def get_referrals_dashboard(
         reward_rate=snapshot.reward_rate,
         fraud_rejected_rate=snapshot.fraud_rejected_rate,
         status_counts=snapshot.status_counts,
-        top_referrers=[
-            ReferralTopReferrerStatsResponse(**row) for row in snapshot.top_referrers
-        ],
+        top_referrers=[ReferralTopReferrerStatsResponse(**row) for row in snapshot.top_referrers],
         recent_fraud_cases=[
             ReferralFraudCaseResponse(**row) for row in snapshot.recent_fraud_cases
         ],
@@ -271,7 +277,10 @@ async def get_referrals_review_queue(
     )
 
 
-@router.post("/internal/referrals/{referral_id}/review", response_model=ReferralReviewActionResponse)
+@router.post(
+    "/internal/referrals/{referral_id}/review",
+    response_model=ReferralReviewActionResponse,
+)
 async def apply_referral_review_decision(
     referral_id: int,
     payload: ReferralReviewActionRequest,
@@ -298,7 +307,9 @@ async def apply_referral_review_decision(
 
         next_status = _resolve_next_status(current_status=referral.status, decision=decision)
         if next_status is None:
-            raise HTTPException(status_code=409, detail={"code": "E_REFERRAL_REVIEW_DECISION_CONFLICT"})
+            raise HTTPException(
+                status_code=409, detail={"code": "E_REFERRAL_REVIEW_DECISION_CONFLICT"}
+            )
 
         previous_status = referral.status
         if referral.status != next_status:

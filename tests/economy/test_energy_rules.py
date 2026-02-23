@@ -14,7 +14,6 @@ from app.economy.energy.rules import (
 from app.economy.energy.time import berlin_local_date, regen_ticks
 from app.economy.energy.types import EnergyBucketState, EnergySnapshot
 
-
 UTC = timezone.utc
 
 
@@ -75,7 +74,9 @@ def test_transition_low_to_empty_on_consume() -> None:
 
 def test_transition_empty_to_low_on_regen_tick() -> None:
     now_utc = datetime(2026, 2, 17, 13, 0, tzinfo=UTC)
-    state_before = snapshot(free_energy=0, paid_energy=0, last_regen_at=now_utc - timedelta(minutes=30))
+    state_before = snapshot(
+        free_energy=0, paid_energy=0, last_regen_at=now_utc - timedelta(minutes=30)
+    )
 
     state_after, ticks = apply_regen(state_before, now_utc=now_utc, premium_active=False)
 
@@ -94,7 +95,9 @@ def test_transition_empty_to_available_on_paid_credit() -> None:
 
 def test_transition_low_to_available_on_regen_tick() -> None:
     now_utc = datetime(2026, 2, 17, 13, 0, tzinfo=UTC)
-    state_before = snapshot(free_energy=3, paid_energy=0, last_regen_at=now_utc - timedelta(minutes=30))
+    state_before = snapshot(
+        free_energy=3, paid_energy=0, last_regen_at=now_utc - timedelta(minutes=30)
+    )
 
     state_after, ticks = apply_regen(state_before, now_utc=now_utc, premium_active=False)
 
@@ -153,7 +156,9 @@ def test_regen_uses_elapsed_full_ticks_only() -> None:
 
 def test_regen_does_not_increase_free_energy_when_premium_active() -> None:
     now_utc = datetime(2026, 2, 17, 13, 0, tzinfo=UTC)
-    state_before = snapshot(free_energy=10, paid_energy=5, last_regen_at=now_utc - timedelta(hours=2))
+    state_before = snapshot(
+        free_energy=10, paid_energy=5, last_regen_at=now_utc - timedelta(hours=2)
+    )
 
     state_after, ticks = apply_regen(state_before, now_utc=now_utc, premium_active=True)
 

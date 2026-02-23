@@ -89,7 +89,11 @@ async def test_handle_start_friend_token_invalid(monkeypatch) -> None:
         raise FriendChallengeNotFoundError()
 
     monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(start.GameSessionService, "join_friend_challenge_by_token", _fake_join_friend_challenge)
+    monkeypatch.setattr(
+        start.GameSessionService,
+        "join_friend_challenge_by_token",
+        _fake_join_friend_challenge,
+    )
 
     message = _StartMessage(
         text="/start fc_0123456789abcdef0123456789abcdef",
@@ -111,7 +115,11 @@ async def test_handle_start_friend_token_expired(monkeypatch) -> None:
         raise FriendChallengeExpiredError()
 
     monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(start.GameSessionService, "join_friend_challenge_by_token", _fake_join_friend_challenge)
+    monkeypatch.setattr(
+        start.GameSessionService,
+        "join_friend_challenge_by_token",
+        _fake_join_friend_challenge,
+    )
 
     message = _StartMessage(
         text="/start fc_0123456789abcdef0123456789abcdef",

@@ -38,7 +38,9 @@ async def _resolve_telegram_targets(user_ids: set[int]) -> dict[int, int]:
     return {int(user.id): int(user.telegram_user_id) for user in users}
 
 
-async def run_friend_challenge_deadlines_async(*, batch_size: int = DEADLINE_BATCH_SIZE) -> dict[str, int]:
+async def run_friend_challenge_deadlines_async(
+    *, batch_size: int = DEADLINE_BATCH_SIZE
+) -> dict[str, int]:
     now_utc = datetime.now(timezone.utc)
     expires_before_utc = now_utc + timedelta(seconds=LAST_CHANCE_SECONDS)
     resolved_batch_size = max(1, int(batch_size))
@@ -60,7 +62,11 @@ async def run_friend_challenge_deadlines_async(*, batch_size: int = DEADLINE_BAT
                 {
                     "challenge_id": str(challenge.id),
                     "creator_user_id": int(challenge.creator_user_id),
-                    "opponent_user_id": int(challenge.opponent_user_id) if challenge.opponent_user_id is not None else None,
+                    "opponent_user_id": (
+                        int(challenge.opponent_user_id)
+                        if challenge.opponent_user_id is not None
+                        else None
+                    ),
                     "expires_at": challenge.expires_at,
                 }
             )
@@ -79,7 +85,11 @@ async def run_friend_challenge_deadlines_async(*, batch_size: int = DEADLINE_BAT
                 {
                     "challenge_id": str(challenge.id),
                     "creator_user_id": int(challenge.creator_user_id),
-                    "opponent_user_id": int(challenge.opponent_user_id) if challenge.opponent_user_id is not None else None,
+                    "opponent_user_id": (
+                        int(challenge.opponent_user_id)
+                        if challenge.opponent_user_id is not None
+                        else None
+                    ),
                     "creator_score": int(challenge.creator_score),
                     "opponent_score": int(challenge.opponent_score),
                     "total_rounds": int(challenge.total_rounds),
@@ -95,7 +105,11 @@ async def run_friend_challenge_deadlines_async(*, batch_size: int = DEADLINE_BAT
                 payload={
                     "challenge_id": str(challenge.id),
                     "creator_user_id": int(challenge.creator_user_id),
-                    "opponent_user_id": int(challenge.opponent_user_id) if challenge.opponent_user_id is not None else None,
+                    "opponent_user_id": (
+                        int(challenge.opponent_user_id)
+                        if challenge.opponent_user_id is not None
+                        else None
+                    ),
                     "creator_score": int(challenge.creator_score),
                     "opponent_score": int(challenge.opponent_score),
                     "total_rounds": int(challenge.total_rounds),
@@ -131,8 +145,7 @@ async def run_friend_challenge_deadlines_async(*, batch_size: int = DEADLINE_BAT
                 continue
             hours, minutes = _format_remaining_hhmm(now_utc=now_utc, expires_at=expires_at)
             text = (
-                f"⏳ Dein Duell läuft bald ab ({hours:02d}:{minutes:02d}h). "
-                "Jetzt weiterspielen!"
+                f"⏳ Dein Duell läuft bald ab ({hours:02d}:{minutes:02d}h). " "Jetzt weiterspielen!"
             )
             challenge_id = str(item["challenge_id"])
             target_user_ids = [int(item["creator_user_id"])]
@@ -151,7 +164,9 @@ async def run_friend_challenge_deadlines_async(*, batch_size: int = DEADLINE_BAT
                     await bot.send_message(
                         chat_id=telegram_user_id,
                         text=text,
-                        reply_markup=build_friend_challenge_next_keyboard(challenge_id=challenge_id),
+                        reply_markup=build_friend_challenge_next_keyboard(
+                            challenge_id=challenge_id
+                        ),
                     )
                     sent_to += 1
                 except Exception:
@@ -189,7 +204,9 @@ async def run_friend_challenge_deadlines_async(*, batch_size: int = DEADLINE_BAT
                             "⌛ Dein Duell ist wegen Zeitablauf beendet.\n"
                             f"Finaler Score: Du {creator_score} | Gegner {opponent_score}."
                         ),
-                        reply_markup=build_friend_challenge_finished_keyboard(challenge_id=challenge_id),
+                        reply_markup=build_friend_challenge_finished_keyboard(
+                            challenge_id=challenge_id
+                        ),
                     )
                     sent_to += 1
                 except Exception:
@@ -207,7 +224,9 @@ async def run_friend_challenge_deadlines_async(*, batch_size: int = DEADLINE_BAT
                                 "⌛ Dein Duell ist wegen Zeitablauf beendet.\n"
                                 f"Finaler Score: Du {opponent_score} | Gegner {creator_score}."
                             ),
-                            reply_markup=build_friend_challenge_finished_keyboard(challenge_id=challenge_id),
+                            reply_markup=build_friend_challenge_finished_keyboard(
+                                challenge_id=challenge_id
+                            ),
                         )
                         sent_to += 1
                     except Exception:

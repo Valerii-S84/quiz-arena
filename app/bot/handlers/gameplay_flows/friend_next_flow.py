@@ -58,7 +58,9 @@ async def handle_friend_challenge_next(
         except FriendChallengeExpiredError:
             await callback.message.answer(
                 TEXTS_DE["msg.friend.challenge.expired"],
-                reply_markup=build_friend_challenge_finished_keyboard(challenge_id=str(challenge_id)),
+                reply_markup=build_friend_challenge_finished_keyboard(
+                    challenge_id=str(challenge_id)
+                ),
             )
             await callback.answer()
             return
@@ -68,7 +70,10 @@ async def handle_friend_challenge_next(
             FriendChallengeCompletedError,
             FriendChallengeFullError,
         ):
-            await callback.message.answer(TEXTS_DE["msg.friend.challenge.invalid"], reply_markup=build_home_keyboard())
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.invalid"],
+                reply_markup=build_home_keyboard(),
+            )
             await callback.answer()
             return
 

@@ -97,6 +97,8 @@ class OutboxEventsRepo:
             .limit(resolved_limit)
             .scalar_subquery()
         )
-        stmt = delete(OutboxEvent).where(OutboxEvent.id.in_(candidate_ids)).returning(OutboxEvent.id)
+        stmt = (
+            delete(OutboxEvent).where(OutboxEvent.id.in_(candidate_ids)).returning(OutboxEvent.id)
+        )
         result = await session.execute(stmt)
         return len(list(result.scalars()))

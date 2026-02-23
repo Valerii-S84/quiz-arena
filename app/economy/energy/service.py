@@ -19,7 +19,12 @@ from app.economy.energy.rules import (
     credit_paid_energy,
 )
 from app.economy.energy.time import berlin_local_date
-from app.economy.energy.types import EnergyBucketState, EnergyConsumeResult, EnergyCreditResult, EnergySnapshot
+from app.economy.energy.types import (
+    EnergyBucketState,
+    EnergyConsumeResult,
+    EnergyCreditResult,
+    EnergySnapshot,
+)
 
 
 class EnergyService:
@@ -35,7 +40,9 @@ class EnergyService:
         )
 
     @staticmethod
-    def _apply_snapshot_to_model(state: EnergyState, snapshot: EnergySnapshot, now_utc: datetime) -> None:
+    def _apply_snapshot_to_model(
+        state: EnergyState, snapshot: EnergySnapshot, now_utc: datetime
+    ) -> None:
         state.free_energy = snapshot.free_energy
         state.paid_energy = snapshot.paid_energy
         state.last_regen_at = snapshot.last_regen_at
@@ -99,7 +106,9 @@ class EnergyService:
         if not allowed:
             EnergyService._apply_snapshot_to_model(state, snapshot_after_consume, now_utc)
             await session.flush()
-            after_state = classify_energy_state(snapshot_after_consume, premium_active=premium_active)
+            after_state = classify_energy_state(
+                snapshot_after_consume, premium_active=premium_active
+            )
             return EnergyConsumeResult(
                 allowed=False,
                 idempotent_replay=False,
@@ -213,7 +222,9 @@ class EnergyService:
         )
 
     @staticmethod
-    async def sync_energy_clock(session: AsyncSession, *, user_id: int, now_utc: datetime) -> EnergySnapshot:
+    async def sync_energy_clock(
+        session: AsyncSession, *, user_id: int, now_utc: datetime
+    ) -> EnergySnapshot:
         state = await EnergyService._get_or_create_state_for_update(session, user_id, now_utc)
         premium_active = await EntitlementsRepo.has_active_premium(session, user_id, now_utc)
 
@@ -226,7 +237,9 @@ class EnergyService:
         return snapshot
 
     @staticmethod
-    async def initialize_user_state(session: AsyncSession, *, user_id: int, now_utc: datetime) -> EnergyState:
+    async def initialize_user_state(
+        session: AsyncSession, *, user_id: int, now_utc: datetime
+    ) -> EnergyState:
         return await EnergyRepo.create_default_state(
             session,
             user_id=user_id,

@@ -33,7 +33,9 @@ async def _create_user(seed: str) -> int:
         return user.id
 
 
-async def _create_discount_code(*, code_id: int, now_utc: datetime, status: str = "ACTIVE") -> PromoCode:
+async def _create_discount_code(
+    *, code_id: int, now_utc: datetime, status: str = "ACTIVE"
+) -> PromoCode:
     promo_code = PromoCode(
         id=code_id,
         code_hash=uuid4().hex + uuid4().hex,
@@ -170,7 +172,9 @@ async def test_promo_campaign_status_rollover_expires_and_depletes_active_codes(
     assert result["updated_campaigns"] == 2
 
     async with SessionLocal.begin() as session:
-        stmt = select(PromoCode.id, PromoCode.status).where(PromoCode.id.in_([expired_code_id, depleted_code_id, active_code_id]))
+        stmt = select(PromoCode.id, PromoCode.status).where(
+            PromoCode.id.in_([expired_code_id, depleted_code_id, active_code_id])
+        )
         rows = dict((row_id, status) for row_id, status in (await session.execute(stmt)).all())
         assert rows[expired_code_id] == "EXPIRED"
         assert rows[depleted_code_id] == "DEPLETED"

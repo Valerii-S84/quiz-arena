@@ -21,11 +21,14 @@ def test_is_mode_allowed(
     has_mode_access: bool,
     expected: bool,
 ) -> None:
-    assert is_mode_allowed(
-        mode_code=mode_code,
-        premium_active=premium_active,
-        has_mode_access=has_mode_access,
-    ) is expected
+    assert (
+        is_mode_allowed(
+            mode_code=mode_code,
+            premium_active=premium_active,
+            has_mode_access=has_mode_access,
+        )
+        is expected
+    )
 
 
 @pytest.mark.parametrize(

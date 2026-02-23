@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import random
 
 import structlog
@@ -18,7 +19,9 @@ logger = structlog.get_logger(__name__)
 settings = get_settings()
 PROCESSING_TTL_SECONDS = max(1, int(settings.telegram_update_processing_ttl_seconds))
 TASK_MAX_RETRIES = max(0, int(settings.telegram_update_task_max_retries))
-TASK_RETRY_BACKOFF_MAX_SECONDS = max(1, int(settings.telegram_update_task_retry_backoff_max_seconds))
+TASK_RETRY_BACKOFF_MAX_SECONDS = max(
+    1, int(settings.telegram_update_task_retry_backoff_max_seconds)
+)
 RETRY_JITTER_RATIO = 0.25
 
 EVENT_TELEGRAM_UPDATE_RECLAIMED = "telegram_update_reclaimed"

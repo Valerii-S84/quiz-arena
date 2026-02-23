@@ -55,7 +55,9 @@ def _minimal_message_update_payload(*, update_id: int, telegram_user_id: int) ->
 
 
 @pytest.mark.asyncio
-async def test_telegram_update_duplicate_delivery_processed_exactly_once(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_telegram_update_duplicate_delivery_processed_exactly_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     dispatcher = _RecordingDispatcher()
     monkeypatch.setattr(telegram_updates, "build_bot", lambda: _DummyBot())
     monkeypatch.setattr(telegram_updates, "build_dispatcher", lambda: dispatcher)

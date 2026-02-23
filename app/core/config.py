@@ -134,12 +134,20 @@ class Settings(BaseSettings):
     ops_alert_webhook_url: str = Field(default="", alias="OPS_ALERT_WEBHOOK_URL")
     ops_alert_slack_webhook_url: str = Field(default="", alias="OPS_ALERT_SLACK_WEBHOOK_URL")
     ops_alert_pagerduty_events_url: str = Field(default="", alias="OPS_ALERT_PAGERDUTY_EVENTS_URL")
-    ops_alert_pagerduty_routing_key: str = Field(default="", alias="OPS_ALERT_PAGERDUTY_ROUTING_KEY")
-    ops_alert_escalation_policy_json: str = Field(default="", alias="OPS_ALERT_ESCALATION_POLICY_JSON")
+    ops_alert_pagerduty_routing_key: str = Field(
+        default="", alias="OPS_ALERT_PAGERDUTY_ROUTING_KEY"
+    )
+    ops_alert_escalation_policy_json: str = Field(
+        default="", alias="OPS_ALERT_ESCALATION_POLICY_JSON"
+    )
     offers_alert_window_hours: int = Field(default=24, alias="OFFERS_ALERT_WINDOW_HOURS")
     offers_alert_min_impressions: int = Field(default=50, alias="OFFERS_ALERT_MIN_IMPRESSIONS")
-    offers_alert_min_conversion_rate: float = Field(default=0.03, alias="OFFERS_ALERT_MIN_CONVERSION_RATE")
-    offers_alert_max_dismiss_rate: float = Field(default=0.60, alias="OFFERS_ALERT_MAX_DISMISS_RATE")
+    offers_alert_min_conversion_rate: float = Field(
+        default=0.03, alias="OFFERS_ALERT_MIN_CONVERSION_RATE"
+    )
+    offers_alert_max_dismiss_rate: float = Field(
+        default=0.60, alias="OFFERS_ALERT_MAX_DISMISS_RATE"
+    )
     offers_alert_max_impressions_per_user: float = Field(
         default=4.0,
         alias="OFFERS_ALERT_MAX_IMPRESSIONS_PER_USER",
@@ -158,7 +166,9 @@ class Settings(BaseSettings):
         default=3,
         alias="REFERRALS_ALERT_MAX_REFERRER_REJECTED_FRAUD",
     )
-    promo_secret_pepper: str = Field(default="dev_promo_pepper_change_me", alias="PROMO_SECRET_PEPPER")
+    promo_secret_pepper: str = Field(
+        default="dev_promo_pepper_change_me", alias="PROMO_SECRET_PEPPER"
+    )
 
     database_url: str = Field(alias="DATABASE_URL")
     redis_url: str = Field(alias="REDIS_URL")

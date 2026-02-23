@@ -115,7 +115,9 @@ async def _seed_referrals_dashboard_dataset(now_utc: datetime) -> tuple[int, int
 
 
 @pytest.mark.asyncio
-async def test_internal_referrals_dashboard_returns_funnel_and_fraud_triage_metrics(monkeypatch) -> None:
+async def test_internal_referrals_dashboard_returns_funnel_and_fraud_triage_metrics(
+    monkeypatch,
+) -> None:
     now_utc = datetime.now(UTC)
     referrer_1, referrer_2 = await _seed_referrals_dashboard_dataset(now_utc)
 

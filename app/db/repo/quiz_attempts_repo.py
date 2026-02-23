@@ -11,7 +11,9 @@ from app.db.models.quiz_sessions import QuizSession
 
 class QuizAttemptsRepo:
     @staticmethod
-    async def get_by_idempotency_key(session: AsyncSession, idempotency_key: str) -> QuizAttempt | None:
+    async def get_by_idempotency_key(
+        session: AsyncSession, idempotency_key: str
+    ) -> QuizAttempt | None:
         stmt = select(QuizAttempt).where(QuizAttempt.idempotency_key == idempotency_key)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()

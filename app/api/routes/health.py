@@ -119,7 +119,7 @@ async def health() -> JSONResponse:
     checks = await _collect_health_checks()
     is_healthy = _all_checks_ok(checks)
     return JSONResponse(
-        status_code=status.HTTP_200_OK if is_healthy else status.HTTP_503_SERVICE_UNAVAILABLE,
+        status_code=(status.HTTP_200_OK if is_healthy else status.HTTP_503_SERVICE_UNAVAILABLE),
         content={
             "status": "ok" if is_healthy else "degraded",
             "checks": checks,
@@ -132,7 +132,7 @@ async def ready() -> JSONResponse:
     checks = await _collect_readiness_checks()
     is_ready = _all_checks_ok(checks)
     return JSONResponse(
-        status_code=status.HTTP_200_OK if is_ready else status.HTTP_503_SERVICE_UNAVAILABLE,
+        status_code=(status.HTTP_200_OK if is_ready else status.HTTP_503_SERVICE_UNAVAILABLE),
         content={
             "status": "ready" if is_ready else "not_ready",
             "checks": checks,

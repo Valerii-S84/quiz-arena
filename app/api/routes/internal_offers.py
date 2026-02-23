@@ -71,7 +71,11 @@ def _assert_internal_access(request: Request) -> None:
         request,
         expected_token=settings.internal_api_token,
     ):
-        logger.warning("internal_offers_auth_failed", reason="invalid_credentials", client_ip=client_ip)
+        logger.warning(
+            "internal_offers_auth_failed",
+            reason="invalid_credentials",
+            client_ip=client_ip,
+        )
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
 
 

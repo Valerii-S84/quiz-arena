@@ -10,7 +10,9 @@ from app.bot.handlers.payments import (
 
 
 def test_parse_buy_callback_without_optional_payload() -> None:
-    product_code, promo_redemption_id, offer_impression_id = _parse_buy_callback_data("buy:ENERGY_10")
+    product_code, promo_redemption_id, offer_impression_id = _parse_buy_callback_data(
+        "buy:ENERGY_10"
+    )
 
     assert product_code == "ENERGY_10"
     assert promo_redemption_id is None
@@ -28,7 +30,9 @@ def test_parse_buy_callback_with_promo_payload() -> None:
 
 
 def test_parse_buy_callback_with_offer_payload() -> None:
-    product_code, promo_redemption_id, offer_impression_id = _parse_buy_callback_data("buy:ENERGY_10:offer:987")
+    product_code, promo_redemption_id, offer_impression_id = _parse_buy_callback_data(
+        "buy:ENERGY_10:offer:987"
+    )
 
     assert product_code == "ENERGY_10"
     assert promo_redemption_id is None

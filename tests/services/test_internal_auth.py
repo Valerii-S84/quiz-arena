@@ -8,8 +8,8 @@ from app.services.internal_auth import (
     extract_client_ip,
     is_client_ip_allowed,
     is_internal_request_authenticated,
-    is_valid_ops_ui_session,
     is_valid_internal_token,
+    is_valid_ops_ui_session,
 )
 
 
@@ -37,7 +37,10 @@ def test_is_internal_request_authenticated_accepts_token_or_ops_session() -> Non
     assert is_internal_request_authenticated(request_with_session, expected_token="secret") is True
 
     request_without_credentials = SimpleNamespace(headers={}, cookies={})
-    assert is_internal_request_authenticated(request_without_credentials, expected_token="secret") is False
+    assert (
+        is_internal_request_authenticated(request_without_credentials, expected_token="secret")
+        is False
+    )
 
 
 def test_is_client_ip_allowed_supports_exact_ip_and_cidr() -> None:

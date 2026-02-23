@@ -96,7 +96,9 @@ def test_acquire_processing_slot_returns_reclaimed_stale(monkeypatch) -> None:
         _ = (args, kwargs)
         return True
 
-    monkeypatch.setattr(telegram_updates.ProcessedUpdatesRepo, "try_create_processing_slot", fake_false)
+    monkeypatch.setattr(
+        telegram_updates.ProcessedUpdatesRepo, "try_create_processing_slot", fake_false
+    )
     monkeypatch.setattr(
         telegram_updates.ProcessedUpdatesRepo,
         "try_reclaim_failed_processing_slot",
@@ -123,7 +125,9 @@ def test_acquire_processing_slot_returns_duplicate(monkeypatch) -> None:
         _ = (args, kwargs)
         return False
 
-    monkeypatch.setattr(telegram_updates.ProcessedUpdatesRepo, "try_create_processing_slot", fake_false)
+    monkeypatch.setattr(
+        telegram_updates.ProcessedUpdatesRepo, "try_create_processing_slot", fake_false
+    )
     monkeypatch.setattr(
         telegram_updates.ProcessedUpdatesRepo,
         "try_reclaim_failed_processing_slot",

@@ -140,23 +140,34 @@ async def _redeem_promo_from_text(message: Message) -> None:
                 now_utc=now_utc,
             )
     except PromoInvalidError:
-        await message.answer(TEXTS_DE["msg.promo.error.invalid"], reply_markup=build_shop_keyboard())
+        await message.answer(
+            TEXTS_DE["msg.promo.error.invalid"], reply_markup=build_shop_keyboard()
+        )
         return
     except PromoExpiredError:
-        await message.answer(TEXTS_DE["msg.promo.error.expired"], reply_markup=build_shop_keyboard())
+        await message.answer(
+            TEXTS_DE["msg.promo.error.expired"], reply_markup=build_shop_keyboard()
+        )
         return
     except (PromoAlreadyUsedError, PromoIdempotencyConflictError):
         await message.answer(TEXTS_DE["msg.promo.error.used"], reply_markup=build_shop_keyboard())
         return
     except PromoNotApplicableError:
-        await message.answer(TEXTS_DE["msg.promo.error.not_applicable"], reply_markup=build_shop_keyboard())
+        await message.answer(
+            TEXTS_DE["msg.promo.error.not_applicable"],
+            reply_markup=build_shop_keyboard(),
+        )
         return
     except PromoRateLimitedError:
-        await message.answer(TEXTS_DE["msg.promo.error.rate_limited"], reply_markup=build_shop_keyboard())
+        await message.answer(
+            TEXTS_DE["msg.promo.error.rate_limited"], reply_markup=build_shop_keyboard()
+        )
         return
 
     if result.result_type == "PREMIUM_GRANT":
-        await message.answer(TEXTS_DE["msg.promo.success.grant"], reply_markup=build_shop_keyboard())
+        await message.answer(
+            TEXTS_DE["msg.promo.success.grant"], reply_markup=build_shop_keyboard()
+        )
         await message.answer(
             TEXTS_DE["msg.promo.success.grant.details"].format(
                 premium_days=result.premium_days or 0,

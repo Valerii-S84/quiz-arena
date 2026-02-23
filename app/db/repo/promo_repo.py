@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.promo_attempts import PromoAttempt
 from app.db.models.promo_codes import PromoCode
-from app.db.models.purchases import Purchase
 from app.db.models.promo_redemptions import PromoRedemption
+from app.db.models.purchases import Purchase
 
 
 class PromoRepo:
@@ -21,7 +21,9 @@ class PromoRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_code_by_hash_for_update(session: AsyncSession, code_hash: str) -> PromoCode | None:
+    async def get_code_by_hash_for_update(
+        session: AsyncSession, code_hash: str
+    ) -> PromoCode | None:
         stmt = select(PromoCode).where(PromoCode.code_hash == code_hash).with_for_update()
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
@@ -31,7 +33,9 @@ class PromoRepo:
         return await session.get(PromoCode, promo_code_id)
 
     @staticmethod
-    async def get_code_by_id_for_update(session: AsyncSession, promo_code_id: int) -> PromoCode | None:
+    async def get_code_by_id_for_update(
+        session: AsyncSession, promo_code_id: int
+    ) -> PromoCode | None:
         stmt = select(PromoCode).where(PromoCode.id == promo_code_id).with_for_update()
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
@@ -44,7 +48,11 @@ class PromoRepo:
         campaign_name: str | None = None,
         limit: int = 50,
     ) -> list[PromoCode]:
-        stmt = select(PromoCode).order_by(PromoCode.updated_at.desc(), PromoCode.id.desc()).limit(limit)
+        stmt = (
+            select(PromoCode)
+            .order_by(PromoCode.updated_at.desc(), PromoCode.id.desc())
+            .limit(limit)
+        )
         if status is not None:
             stmt = stmt.where(PromoCode.status == status)
         if campaign_name:
@@ -53,7 +61,9 @@ class PromoRepo:
         return list(result.scalars().all())
 
     @staticmethod
-    async def get_redemption_by_id(session: AsyncSession, redemption_id: UUID) -> PromoRedemption | None:
+    async def get_redemption_by_id(
+        session: AsyncSession, redemption_id: UUID
+    ) -> PromoRedemption | None:
         return await session.get(PromoRedemption, redemption_id)
 
     @staticmethod
@@ -135,7 +145,11 @@ class PromoRepo:
         session: AsyncSession,
         idempotency_key: str,
     ) -> PromoRedemption | None:
-        stmt = select(PromoRedemption).where(PromoRedemption.idempotency_key == idempotency_key).with_for_update()
+        stmt = (
+            select(PromoRedemption)
+            .where(PromoRedemption.idempotency_key == idempotency_key)
+            .with_for_update()
+        )
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -158,7 +172,9 @@ class PromoRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def create_redemption(session: AsyncSession, *, redemption: PromoRedemption) -> PromoRedemption:
+    async def create_redemption(
+        session: AsyncSession, *, redemption: PromoRedemption
+    ) -> PromoRedemption:
         session.add(redemption)
         await session.flush()
         return redemption

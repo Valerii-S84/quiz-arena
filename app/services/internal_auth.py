@@ -43,7 +43,9 @@ def is_internal_request_authenticated(
 
 
 @lru_cache(maxsize=32)
-def _parse_allowlist(allowlist: str) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+def _parse_allowlist(
+    allowlist: str,
+) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
     networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
     for raw_entry in allowlist.split(","):
         entry = raw_entry.strip()

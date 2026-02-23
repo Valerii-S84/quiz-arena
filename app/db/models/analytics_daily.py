@@ -75,7 +75,10 @@ class AnalyticsDaily(Base):
             "purchase_credited_events_total >= 0",
             name="ck_analytics_daily_purchase_credited_events_non_negative",
         ),
-        CheckConstraint("purchase_rate >= 0 AND purchase_rate <= 1", name="ck_analytics_daily_purchase_rate"),
+        CheckConstraint(
+            "purchase_rate >= 0 AND purchase_rate <= 1",
+            name="ck_analytics_daily_purchase_rate",
+        ),
         CheckConstraint(
             "promo_redemption_rate >= 0 AND promo_redemption_rate <= 1",
             name="ck_analytics_daily_promo_redemption_rate",
@@ -91,10 +94,16 @@ class AnalyticsDaily(Base):
     dau: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     wau: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     mau: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
-    purchases_credited_total: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    purchases_credited_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
     purchasers_total: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
-    purchase_rate: Mapped[float] = mapped_column(Numeric(8, 6), nullable=False, server_default=text("0"))
-    promo_redemptions_total: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    purchase_rate: Mapped[float] = mapped_column(
+        Numeric(8, 6), nullable=False, server_default=text("0")
+    )
+    promo_redemptions_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
     promo_redemptions_applied_total: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
@@ -110,15 +119,23 @@ class AnalyticsDaily(Base):
         nullable=False,
         server_default=text("0"),
     )
-    quiz_sessions_started_total: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
-    quiz_sessions_completed_total: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    quiz_sessions_started_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    quiz_sessions_completed_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
     gameplay_completion_rate: Mapped[float] = mapped_column(
         Numeric(8, 6),
         nullable=False,
         server_default=text("0"),
     )
-    energy_zero_events_total: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
-    streak_lost_events_total: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    energy_zero_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    streak_lost_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
     referral_reward_milestone_events_total: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
@@ -129,7 +146,9 @@ class AnalyticsDaily(Base):
         nullable=False,
         server_default=text("0"),
     )
-    purchase_init_events_total: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    purchase_init_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
     purchase_invoice_sent_events_total: Mapped[int] = mapped_column(
         Integer,
         nullable=False,

@@ -32,7 +32,9 @@ class EntitlementsRepo:
 
     @staticmethod
     async def has_active_premium(session: AsyncSession, user_id: int, now_utc: datetime) -> bool:
-        entitlement = await EntitlementsRepo._get_active_premium_entitlement(session, user_id, now_utc)
+        entitlement = await EntitlementsRepo._get_active_premium_entitlement(
+            session, user_id, now_utc
+        )
         return entitlement is not None
 
     @staticmethod
@@ -41,7 +43,9 @@ class EntitlementsRepo:
         user_id: int,
         now_utc: datetime,
     ) -> str | None:
-        entitlement = await EntitlementsRepo._get_active_premium_entitlement(session, user_id, now_utc)
+        entitlement = await EntitlementsRepo._get_active_premium_entitlement(
+            session, user_id, now_utc
+        )
         return entitlement.scope if entitlement is not None else None
 
     @staticmethod

@@ -15,19 +15,25 @@ class FriendChallengesRepo:
         return await session.get(FriendChallenge, challenge_id)
 
     @staticmethod
-    async def get_by_id_for_update(session: AsyncSession, challenge_id: UUID) -> FriendChallenge | None:
+    async def get_by_id_for_update(
+        session: AsyncSession, challenge_id: UUID
+    ) -> FriendChallenge | None:
         stmt = select(FriendChallenge).where(FriendChallenge.id == challenge_id).with_for_update()
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_by_invite_token(session: AsyncSession, invite_token: str) -> FriendChallenge | None:
+    async def get_by_invite_token(
+        session: AsyncSession, invite_token: str
+    ) -> FriendChallenge | None:
         stmt = select(FriendChallenge).where(FriendChallenge.invite_token == invite_token)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_by_invite_token_for_update(session: AsyncSession, invite_token: str) -> FriendChallenge | None:
+    async def get_by_invite_token_for_update(
+        session: AsyncSession, invite_token: str
+    ) -> FriendChallenge | None:
         stmt = (
             select(FriendChallenge)
             .where(FriendChallenge.invite_token == invite_token)
@@ -122,7 +128,10 @@ class FriendChallengesRepo:
         stmt = (
             select(FriendChallenge)
             .where(FriendChallenge.series_id == series_id)
-            .order_by(FriendChallenge.series_game_number.asc(), FriendChallenge.created_at.asc())
+            .order_by(
+                FriendChallenge.series_game_number.asc(),
+                FriendChallenge.created_at.asc(),
+            )
             .with_for_update()
         )
         result = await session.execute(stmt)

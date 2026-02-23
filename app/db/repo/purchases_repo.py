@@ -21,19 +21,25 @@ class PurchasesRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_by_idempotency_key(session: AsyncSession, idempotency_key: str) -> Purchase | None:
+    async def get_by_idempotency_key(
+        session: AsyncSession, idempotency_key: str
+    ) -> Purchase | None:
         stmt = select(Purchase).where(Purchase.idempotency_key == idempotency_key)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_by_invoice_payload(session: AsyncSession, invoice_payload: str) -> Purchase | None:
+    async def get_by_invoice_payload(
+        session: AsyncSession, invoice_payload: str
+    ) -> Purchase | None:
         stmt = select(Purchase).where(Purchase.invoice_payload == invoice_payload)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_by_invoice_payload_for_update(session: AsyncSession, invoice_payload: str) -> Purchase | None:
+    async def get_by_invoice_payload_for_update(
+        session: AsyncSession, invoice_payload: str
+    ) -> Purchase | None:
         stmt = select(Purchase).where(Purchase.invoice_payload == invoice_payload).with_for_update()
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
@@ -92,7 +98,9 @@ class PurchasesRepo:
 
     @staticmethod
     async def sum_paid_stars_amount(session: AsyncSession) -> int:
-        stmt = select(func.coalesce(func.sum(Purchase.stars_amount), 0)).where(Purchase.paid_at.is_not(None))
+        stmt = select(func.coalesce(func.sum(Purchase.stars_amount), 0)).where(
+            Purchase.paid_at.is_not(None)
+        )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
 

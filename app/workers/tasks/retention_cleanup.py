@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
 import asyncio
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
 from random import randint
 from time import perf_counter
 
-from celery.schedules import crontab
 import structlog
+from celery.schedules import crontab
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -88,7 +88,11 @@ async def _cleanup_table_batched(
             break
         sleep_min_ms, sleep_max_ms = sleep_range_ms
         if sleep_max_ms > 0:
-            pause_ms = sleep_min_ms if sleep_min_ms == sleep_max_ms else randint(sleep_min_ms, sleep_max_ms)
+            pause_ms = (
+                sleep_min_ms
+                if sleep_min_ms == sleep_max_ms
+                else randint(sleep_min_ms, sleep_max_ms)
+            )
             await asyncio.sleep(pause_ms / 1000)
 
     duration_ms = int((perf_counter() - started_at) * 1000)

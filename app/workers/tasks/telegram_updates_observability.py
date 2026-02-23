@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
 
 import structlog
@@ -126,7 +127,9 @@ async def run_telegram_updates_reliability_alerts_async() -> dict[str, object]:
     return result
 
 
-@celery_app.task(name="app.workers.tasks.telegram_updates_observability.run_telegram_updates_reliability_alerts")
+@celery_app.task(
+    name="app.workers.tasks.telegram_updates_observability.run_telegram_updates_reliability_alerts"
+)
 def run_telegram_updates_reliability_alerts() -> dict[str, object]:
     return run_async_job(run_telegram_updates_reliability_alerts_async())
 

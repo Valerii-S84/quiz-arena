@@ -13,7 +13,6 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parent.parent
 QUIZBANK_DIR = ROOT / "QuizBank"
 REPORTS_DIR = ROOT / "reports"
@@ -141,9 +140,17 @@ def check_reports() -> int:
         _run_refresh(temp_path)
 
         json_pairs = [
-            ("reports/quizbank_inventory_audit.json", INVENTORY_JSON, temp_path / INVENTORY_JSON.name),
+            (
+                "reports/quizbank_inventory_audit.json",
+                INVENTORY_JSON,
+                temp_path / INVENTORY_JSON.name,
+            ),
             ("reports/quizbank_audit_report.json", AUDIT_JSON, temp_path / AUDIT_JSON.name),
-            ("reports/quizbank_ambiguity_scan.json", AMBIGUITY_JSON, temp_path / AMBIGUITY_JSON.name),
+            (
+                "reports/quizbank_ambiguity_scan.json",
+                AMBIGUITY_JSON,
+                temp_path / AMBIGUITY_JSON.name,
+            ),
         ]
         for rel_name, actual_path, expected_path in json_pairs:
             actual = _normalize_json(_load_json(actual_path))

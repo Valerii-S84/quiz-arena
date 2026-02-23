@@ -4,8 +4,8 @@ from dataclasses import replace
 from datetime import date, datetime, timedelta
 
 from app.economy.energy.constants import ENERGY_COST_PER_QUIZ
-from app.economy.energy.types import EnergyBucketState, EnergySnapshot
 from app.economy.energy.time import regen_ticks
+from app.economy.energy.types import EnergyBucketState, EnergySnapshot
 
 
 def classify_energy_state(snapshot: EnergySnapshot, *, premium_active: bool) -> EnergyBucketState:
@@ -18,14 +18,17 @@ def classify_energy_state(snapshot: EnergySnapshot, *, premium_active: bool) -> 
     return EnergyBucketState.AVAILABLE
 
 
-def apply_regen(snapshot: EnergySnapshot, *, now_utc: datetime, premium_active: bool) -> tuple[EnergySnapshot, int]:
+def apply_regen(
+    snapshot: EnergySnapshot, *, now_utc: datetime, premium_active: bool
+) -> tuple[EnergySnapshot, int]:
     ticks = regen_ticks(snapshot.last_regen_at, now_utc, snapshot.regen_interval_sec)
     if ticks <= 0:
         return snapshot, 0
 
     updated = replace(
         snapshot,
-        last_regen_at=snapshot.last_regen_at + timedelta(seconds=ticks * snapshot.regen_interval_sec),
+        last_regen_at=snapshot.last_regen_at
+        + timedelta(seconds=ticks * snapshot.regen_interval_sec),
     )
 
     if not premium_active:
@@ -37,7 +40,9 @@ def apply_regen(snapshot: EnergySnapshot, *, now_utc: datetime, premium_active: 
     return updated, ticks
 
 
-def apply_daily_topup(snapshot: EnergySnapshot, *, local_date_berlin: date) -> tuple[EnergySnapshot, bool]:
+def apply_daily_topup(
+    snapshot: EnergySnapshot, *, local_date_berlin: date
+) -> tuple[EnergySnapshot, bool]:
     if local_date_berlin <= snapshot.last_daily_topup_local_date:
         return snapshot, False
 
@@ -64,10 +69,18 @@ def consume_quiz_energy(
         return snapshot, True, "PREMIUM"
 
     if snapshot.free_energy > 0:
-        return replace(snapshot, free_energy=snapshot.free_energy - ENERGY_COST_PER_QUIZ), True, "FREE_ENERGY"
+        return (
+            replace(snapshot, free_energy=snapshot.free_energy - ENERGY_COST_PER_QUIZ),
+            True,
+            "FREE_ENERGY",
+        )
 
     if snapshot.paid_energy > 0:
-        return replace(snapshot, paid_energy=snapshot.paid_energy - ENERGY_COST_PER_QUIZ), True, "PAID_ENERGY"
+        return (
+            replace(snapshot, paid_energy=snapshot.paid_energy - ENERGY_COST_PER_QUIZ),
+            True,
+            "PAID_ENERGY",
+        )
 
     return snapshot, False, None
 

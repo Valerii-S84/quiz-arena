@@ -1,7 +1,9 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
-def build_quiz_keyboard(*, session_id: str, options: tuple[str, str, str, str]) -> InlineKeyboardMarkup:
+def build_quiz_keyboard(
+    *, session_id: str, options: tuple[str, str, str, str]
+) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=f"1. {options[0]}", callback_data=f"answer:{session_id}:0")],

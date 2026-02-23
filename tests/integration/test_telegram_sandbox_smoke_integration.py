@@ -8,7 +8,13 @@ from uuid import uuid4
 import pytest
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
-from aiogram.methods import AnswerCallbackQuery, AnswerPreCheckoutQuery, GetMe, SendInvoice, SendMessage
+from aiogram.methods import (
+    AnswerCallbackQuery,
+    AnswerPreCheckoutQuery,
+    GetMe,
+    SendInvoice,
+    SendMessage,
+)
 from aiogram.types import Message as TelegramMessage
 from aiogram.types import User as TelegramUser
 from httpx import ASGITransport, AsyncClient
@@ -284,7 +290,9 @@ async def _create_discount_promo_code(
     return promo_code
 
 
-def _configure_webhook_processing(monkeypatch: pytest.MonkeyPatch, bot_api: _BotApiStub) -> _InProcessUpdateQueue:
+def _configure_webhook_processing(
+    monkeypatch: pytest.MonkeyPatch, bot_api: _BotApiStub
+) -> _InProcessUpdateQueue:
     queue = _InProcessUpdateQueue()
     monkeypatch.setattr(
         telegram_webhook,
@@ -298,7 +306,9 @@ def _configure_webhook_processing(monkeypatch: pytest.MonkeyPatch, bot_api: _Bot
         lambda: Bot(token="42:TEST", default=DefaultBotProperties()),
     )
 
-    async def fake_bot_call(self: Bot, method: object, request_timeout: int | None = None) -> object:
+    async def fake_bot_call(
+        self: Bot, method: object, request_timeout: int | None = None
+    ) -> object:
         _ = request_timeout
         return await bot_api.dispatch(method)
 
@@ -336,7 +346,9 @@ async def test_telegram_webhook_smoke_promo_discount_purchase_flow(monkeypatch) 
         await queue.drain()
 
         async with SessionLocal.begin() as session:
-            user = await session.scalar(select(User).where(User.telegram_user_id == telegram_user_id))
+            user = await session.scalar(
+                select(User).where(User.telegram_user_id == telegram_user_id)
+            )
             assert user is not None
             redemption = await session.scalar(
                 select(PromoRedemption)
@@ -396,7 +408,9 @@ async def test_telegram_webhook_smoke_promo_discount_purchase_flow(monkeypatch) 
         await queue.drain()
 
     async with SessionLocal.begin() as session:
-        purchase = await session.scalar(select(Purchase).where(Purchase.invoice_payload == invoice_payload))
+        purchase = await session.scalar(
+            select(Purchase).where(Purchase.invoice_payload == invoice_payload)
+        )
         assert purchase is not None
         assert purchase.user_id == user_id
         assert purchase.status == "CREDITED"
@@ -423,7 +437,9 @@ async def test_telegram_webhook_smoke_promo_discount_purchase_flow(monkeypatch) 
 
 
 @pytest.mark.asyncio
-async def test_telegram_webhook_smoke_referral_reward_choice_duplicate_replay(monkeypatch) -> None:
+async def test_telegram_webhook_smoke_referral_reward_choice_duplicate_replay(
+    monkeypatch,
+) -> None:
     now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
     referrer = await _create_user(telegram_user_id=90_000_000_101, first_name="Referrer")
     referred_users = [

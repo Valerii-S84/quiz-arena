@@ -236,9 +236,9 @@ class ReferralsRepo:
         since_utc: datetime,
         limit: int = 20,
     ) -> list[dict[str, object]]:
-        rejected_count = func.sum(
-            case((Referral.status == "REJECTED_FRAUD", 1), else_=0)
-        ).label("rejected_count")
+        rejected_count = func.sum(case((Referral.status == "REJECTED_FRAUD", 1), else_=0)).label(
+            "rejected_count"
+        )
         total_count = func.count(Referral.id).label("total_count")
         last_start_at = func.max(Referral.created_at).label("last_start_at")
         stmt = (
@@ -250,7 +250,11 @@ class ReferralsRepo:
             )
             .where(Referral.created_at >= since_utc)
             .group_by(Referral.referrer_user_id)
-            .order_by(rejected_count.desc(), total_count.desc(), Referral.referrer_user_id.asc())
+            .order_by(
+                rejected_count.desc(),
+                total_count.desc(),
+                Referral.referrer_user_id.asc(),
+            )
             .limit(limit)
         )
         result = await session.execute(stmt)
@@ -291,7 +295,14 @@ class ReferralsRepo:
         )
         result = await session.execute(stmt)
         rows: list[dict[str, object]] = []
-        for referral_id, referrer_user_id, referred_user_id, fraud_score, created_at, status in result.all():
+        for (
+            referral_id,
+            referrer_user_id,
+            referred_user_id,
+            fraud_score,
+            created_at,
+            status,
+        ) in result.all():
             rows.append(
                 {
                     "referral_id": int(referral_id),
@@ -315,6 +326,8 @@ class ReferralsRepo:
         stmt = select(Referral).where(Referral.created_at >= since_utc)
         if status is not None:
             stmt = stmt.where(Referral.status == status)
-        stmt = stmt.order_by(Referral.fraud_score.desc(), Referral.created_at.desc(), Referral.id.desc()).limit(limit)
+        stmt = stmt.order_by(
+            Referral.fraud_score.desc(), Referral.created_at.desc(), Referral.id.desc()
+        ).limit(limit)
         result = await session.execute(stmt)
         return list(result.scalars().all())

@@ -46,7 +46,9 @@ def _build_purchase_idempotency_key(
     return f"buy:{product_token}:{callback_token}"
 
 
-def _extract_offer_impression_id_from_purchase_idempotency_key(idempotency_key: str) -> int | None:
+def _extract_offer_impression_id_from_purchase_idempotency_key(
+    idempotency_key: str,
+) -> int | None:
     parts = idempotency_key.split(":")
     if len(parts) != 5:
         return None
@@ -76,7 +78,9 @@ async def handle_buy(callback: CallbackQuery) -> None:
         return
 
     try:
-        product_code, promo_redemption_id, offer_impression_id = _parse_buy_callback_data(callback.data)
+        product_code, promo_redemption_id, offer_impression_id = _parse_buy_callback_data(
+            callback.data
+        )
     except ValueError:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
@@ -167,10 +171,14 @@ async def handle_precheckout(pre_checkout_query: PreCheckoutQuery) -> None:
                 total_amount=pre_checkout_query.total_amount,
             )
     except PurchasePrecheckoutValidationError:
-        await pre_checkout_query.answer(ok=False, error_message=TEXTS_DE["msg.purchase.error.failed"])
+        await pre_checkout_query.answer(
+            ok=False, error_message=TEXTS_DE["msg.purchase.error.failed"]
+        )
         return
     except ProductNotFoundError:
-        await pre_checkout_query.answer(ok=False, error_message=TEXTS_DE["msg.purchase.error.failed"])
+        await pre_checkout_query.answer(
+            ok=False, error_message=TEXTS_DE["msg.purchase.error.failed"]
+        )
         return
 
     await pre_checkout_query.answer(ok=True)
@@ -211,8 +219,14 @@ async def handle_successful_payment(message: Message) -> None:
                         impression_id=offer_impression_id,
                         purchase_id=credit_result.purchase_id,
                     )
-    except (PurchaseNotFoundError, ProductNotFoundError, PurchasePrecheckoutValidationError):
-        await message.answer(TEXTS_DE["msg.purchase.error.failed"], reply_markup=build_home_keyboard())
+    except (
+        PurchaseNotFoundError,
+        ProductNotFoundError,
+        PurchasePrecheckoutValidationError,
+    ):
+        await message.answer(
+            TEXTS_DE["msg.purchase.error.failed"], reply_markup=build_home_keyboard()
+        )
         return
 
     text_key = {
