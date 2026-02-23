@@ -1,0 +1,2 @@
+class OfferLoggingError(Exception):
+    pass
