@@ -1,11 +1,7 @@
 from __future__ import annotations
 
 from .builder import _as_init_result, _build_purchase
-from .constants import (
-    PREMIUM_PLAN_RANKS,
-    PROMO_RESERVATION_TTL,
-    STREAK_SAVER_PURCHASE_LOCK_WINDOW,
-)
+from .constants import PREMIUM_PLAN_RANKS, PROMO_RESERVATION_TTL, STREAK_SAVER_PURCHASE_LOCK_WINDOW
 from .credit import apply_successful_payment
 from .entitlements import _apply_premium_entitlement
 from .events import _emit_purchase_event

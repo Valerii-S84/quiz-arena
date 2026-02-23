@@ -165,7 +165,10 @@ async def apply_successful_payment(
             now_utc=now_utc,
         )
         if promo_redemption.status != "APPLIED":
-            if promo_code.max_total_uses is not None and promo_code.used_total >= promo_code.max_total_uses:
+            if (
+                promo_code.max_total_uses is not None
+                and promo_code.used_total >= promo_code.max_total_uses
+            ):
                 raise PurchasePrecheckoutValidationError
             promo_redemption.status = "APPLIED"
             promo_redemption.applied_at = now_utc

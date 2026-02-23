@@ -101,9 +101,7 @@ async def _validate_reserved_discount_for_purchase(
     if redemption.reserved_until is None or redemption.reserved_until <= now_utc:
         raise PurchasePrecheckoutValidationError
 
-    promo_code = await PromoRepo.get_code_by_id_for_update(
-        session, purchase.applied_promo_code_id
-    )
+    promo_code = await PromoRepo.get_code_by_id_for_update(session, purchase.applied_promo_code_id)
     if promo_code is None:
         raise PurchasePrecheckoutValidationError
     if promo_code.promo_type != "PERCENT_DISCOUNT":

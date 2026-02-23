@@ -38,7 +38,9 @@ async def _apply_premium_entitlement(
         if next_rank <= active_rank:
             raise PurchasePrecheckoutValidationError
 
-        active_end = active_entitlement.ends_at if active_entitlement.ends_at is not None else now_utc
+        active_end = (
+            active_entitlement.ends_at if active_entitlement.ends_at is not None else now_utc
+        )
         if active_end > now_utc:
             ends_at = active_end + timedelta(days=product.premium_days)
         active_entitlement.status = "REVOKED"

@@ -105,9 +105,7 @@ async def init_purchase(
         return _as_init_result(active_invoice, idempotent_replay=True)
 
     if promo_redemption_id is not None:
-        redemption = await PromoRepo.get_redemption_by_id_for_update(
-            session, promo_redemption_id
-        )
+        redemption = await PromoRepo.get_redemption_by_id_for_update(session, promo_redemption_id)
         if redemption is None:
             raise PurchaseInitValidationError
         redemption.applied_purchase_id = purchase.id

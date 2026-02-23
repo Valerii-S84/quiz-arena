@@ -6,10 +6,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repo.purchases_repo import PurchasesRepo
-from app.economy.purchases.errors import (
-    PurchaseNotFoundError,
-    PurchasePrecheckoutValidationError,
-)
+from app.economy.purchases.errors import PurchaseNotFoundError, PurchasePrecheckoutValidationError
 
 from .events import _emit_purchase_event
 from .validation import _validate_reserved_discount_for_purchase

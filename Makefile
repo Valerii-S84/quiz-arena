@@ -44,6 +44,15 @@ run-beat:
 lint:
 	.venv/bin/ruff check app tests
 
+format-check:
+	.venv/bin/black --check app tests
+	.venv/bin/isort --check-only app tests
+
+type-check:
+	.venv/bin/mypy
+
+check: lint format-check type-check test
+
 test:
 	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m scripts.ensure_test_db
 	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m alembic upgrade head

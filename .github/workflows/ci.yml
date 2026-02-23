@@ -73,6 +73,12 @@ jobs:
       - name: Ruff
         run: ruff check app tests
 
+      - name: Black
+        run: black --check app tests
+
+      - name: isort
+        run: isort --check-only app tests
+
       - name: Mypy
         run: mypy app tests
 
