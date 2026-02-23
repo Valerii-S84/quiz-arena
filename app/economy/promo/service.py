@@ -1,22 +1,17 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.db.models.entitlements import Entitlement
-from app.db.models.ledger_entries import LedgerEntry
-from app.db.models.promo_attempts import PromoAttempt
-from app.db.models.promo_codes import PromoCode
 from app.db.models.promo_redemptions import PromoRedemption
-from app.db.repo.entitlements_repo import EntitlementsRepo
-from app.db.repo.ledger_repo import LedgerRepo
 from app.db.repo.promo_repo import PromoRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.users_repo import UsersRepo
-from app.db.session import SessionLocal
+from app.economy.promo.attempts import record_attempt, record_failed_attempt
+from app.economy.promo.constants import PROMO_DISCOUNT_RESERVATION_TTL
 from app.economy.promo.errors import (
     PromoAlreadyUsedError,
     PromoExpiredError,
@@ -26,200 +21,19 @@ from app.economy.promo.errors import (
     PromoRateLimitedError,
     PromoUserNotFoundError,
 )
+from app.economy.promo.grants import apply_premium_grant
+from app.economy.promo.idempotency import build_idempotent_result
+from app.economy.promo.rate_limit import enforce_rate_limit
 from app.economy.promo.types import PromoRedeemResult
 from app.services.promo_codes import hash_promo_code, normalize_promo_code
 
-FAILED_PROMO_ATTEMPT_RESULTS = ("INVALID", "EXPIRED", "NOT_APPLICABLE")
-PROMO_ATTEMPT_BLOCK_WINDOW = timedelta(hours=1)
-PROMO_ATTEMPT_RATE_LIMIT_WINDOW = timedelta(hours=24)
-PROMO_ATTEMPT_MAX_FAILURES = 5
-PROMO_DISCOUNT_RESERVATION_TTL = timedelta(days=7)
-PROMO_PREMIUM_SCOPE_BY_DAYS: dict[int, str] = {
-    7: "PREMIUM_STARTER",
-    30: "PREMIUM_MONTH",
-    90: "PREMIUM_SEASON",
-}
-
 
 class PromoService:
-    @staticmethod
-    async def _record_attempt(
-        session: AsyncSession,
-        *,
-        user_id: int,
-        normalized_code_hash: str,
-        result: str,
-        now_utc: datetime,
-        metadata: dict[str, object] | None = None,
-    ) -> None:
-        await PromoRepo.create_attempt(
-            session,
-            attempt=PromoAttempt(
-                user_id=user_id,
-                normalized_code_hash=normalized_code_hash,
-                result=result,
-                source="API",
-                attempted_at=now_utc,
-                metadata_=metadata or {},
-            ),
-        )
-
-    @staticmethod
-    async def _record_failed_attempt(
-        *,
-        user_id: int,
-        normalized_code_hash: str,
-        result: str,
-        now_utc: datetime,
-        metadata: dict[str, object] | None = None,
-    ) -> None:
-        async with SessionLocal.begin() as attempt_session:
-            await PromoService._record_attempt(
-                attempt_session,
-                user_id=user_id,
-                normalized_code_hash=normalized_code_hash,
-                result=result,
-                now_utc=now_utc,
-                metadata=metadata,
-            )
-
-    @staticmethod
-    async def _enforce_rate_limit(
-        session: AsyncSession,
-        *,
-        user_id: int,
-        now_utc: datetime,
-    ) -> None:
-        block_since = now_utc - PROMO_ATTEMPT_BLOCK_WINDOW
-        recently_rate_limited = await PromoRepo.count_user_attempts(
-            session,
-            user_id=user_id,
-            since_utc=block_since,
-            attempt_results=("RATE_LIMITED",),
-        )
-        if recently_rate_limited > 0:
-            raise PromoRateLimitedError
-
-        window_start = now_utc - PROMO_ATTEMPT_RATE_LIMIT_WINDOW
-        failed_attempts = await PromoRepo.count_user_attempts(
-            session,
-            user_id=user_id,
-            since_utc=window_start,
-            attempt_results=FAILED_PROMO_ATTEMPT_RESULTS,
-        )
-        if failed_attempts < PROMO_ATTEMPT_MAX_FAILURES:
-            return
-
-        last_failed_at = await PromoRepo.get_last_user_attempt_at(
-            session,
-            user_id=user_id,
-            since_utc=window_start,
-            attempt_results=FAILED_PROMO_ATTEMPT_RESULTS,
-        )
-        if last_failed_at is not None and last_failed_at > block_since:
-            raise PromoRateLimitedError
-
-    @staticmethod
-    async def _build_idempotent_result(
-        session: AsyncSession,
-        *,
-        redemption: PromoRedemption,
-    ) -> PromoRedeemResult:
-        promo_code = await PromoRepo.get_code_by_id(session, redemption.promo_code_id)
-        if promo_code is None:
-            raise PromoInvalidError
-
-        if promo_code.promo_type == "PREMIUM_GRANT":
-            entitlement = None
-            if redemption.grant_entitlement_id is not None:
-                entitlement = await session.get(Entitlement, redemption.grant_entitlement_id)
-            return PromoRedeemResult(
-                redemption_id=redemption.id,
-                result_type="PREMIUM_GRANT",
-                idempotent_replay=True,
-                premium_days=promo_code.grant_premium_days,
-                premium_ends_at=(entitlement.ends_at if entitlement is not None else None),
-            )
-
-        if promo_code.promo_type == "PERCENT_DISCOUNT":
-            return PromoRedeemResult(
-                redemption_id=redemption.id,
-                result_type="PERCENT_DISCOUNT",
-                idempotent_replay=True,
-                discount_percent=promo_code.discount_percent,
-                reserved_until=redemption.reserved_until,
-                target_scope=promo_code.target_scope,
-            )
-
-        raise PromoInvalidError
-
-    @staticmethod
-    async def _apply_premium_grant(
-        session: AsyncSession,
-        *,
-        user_id: int,
-        redemption: PromoRedemption,
-        promo_code: PromoCode,
-        now_utc: datetime,
-    ) -> Entitlement:
-        if promo_code.grant_premium_days is None or promo_code.grant_premium_days <= 0:
-            raise PromoNotApplicableError
-
-        grant_days = promo_code.grant_premium_days
-        active_entitlement = await EntitlementsRepo.get_active_premium_for_update(
-            session, user_id, now_utc
-        )
-        if active_entitlement is not None:
-            base_end = (
-                active_entitlement.ends_at
-                if active_entitlement.ends_at and active_entitlement.ends_at > now_utc
-                else now_utc
-            )
-            active_entitlement.ends_at = base_end + timedelta(days=grant_days)
-            active_entitlement.updated_at = now_utc
-            entitlement = active_entitlement
-        else:
-            entitlement = await EntitlementsRepo.create(
-                session,
-                entitlement=Entitlement(
-                    user_id=user_id,
-                    entitlement_type="PREMIUM",
-                    scope=PROMO_PREMIUM_SCOPE_BY_DAYS.get(grant_days, "PREMIUM_MONTH"),
-                    status="ACTIVE",
-                    starts_at=now_utc,
-                    ends_at=now_utc + timedelta(days=grant_days),
-                    source_purchase_id=None,
-                    idempotency_key=f"entitlement:promo:{redemption.id}",
-                    metadata_={
-                        "promo_redemption_id": str(redemption.id),
-                        "promo_code_id": promo_code.id,
-                    },
-                    created_at=now_utc,
-                    updated_at=now_utc,
-                ),
-            )
-
-        await LedgerRepo.create(
-            session,
-            entry=LedgerEntry(
-                user_id=user_id,
-                purchase_id=None,
-                entry_type="PROMO_GRANT",
-                asset="PREMIUM",
-                direction="CREDIT",
-                amount=grant_days,
-                balance_after=None,
-                source="PROMO",
-                idempotency_key=f"promo:grant:{redemption.id}",
-                metadata_={
-                    "promo_redemption_id": str(redemption.id),
-                    "promo_code_id": promo_code.id,
-                    "grant_days": grant_days,
-                },
-                created_at=now_utc,
-            ),
-        )
-        return entitlement
+    _record_attempt = staticmethod(record_attempt)
+    _record_failed_attempt = staticmethod(record_failed_attempt)
+    _enforce_rate_limit = staticmethod(enforce_rate_limit)
+    _build_idempotent_result = staticmethod(build_idempotent_result)
+    _apply_premium_grant = staticmethod(apply_premium_grant)
 
     @staticmethod
     async def redeem(
