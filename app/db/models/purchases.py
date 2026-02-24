@@ -53,6 +53,19 @@ class Purchase(Base):
             postgresql_where=text("status IN ('CREATED','INVOICE_SENT') AND paid_at IS NULL"),
         ),
         Index(
+            "idx_purchases_paid_at_not_null",
+            "paid_at",
+            postgresql_where=text("paid_at IS NOT NULL"),
+            postgresql_include=("stars_amount", "product_code"),
+        ),
+        Index(
+            "idx_purchases_user_product_paid_at",
+            "user_id",
+            "product_code",
+            "paid_at",
+            postgresql_where=text("paid_at IS NOT NULL"),
+        ),
+        Index(
             "uq_purchases_active_invoice_user_product",
             "user_id",
             "product_code",
