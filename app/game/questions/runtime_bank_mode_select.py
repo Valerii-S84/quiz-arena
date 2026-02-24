@@ -13,11 +13,7 @@ from app.game.questions.runtime_bank_fallback import (
 )
 from app.game.questions.runtime_bank_filters import pick_from_pool
 from app.game.questions.runtime_bank_models import QUICK_MIX_MODE_CODE, to_quiz_question
-from app.game.questions.runtime_bank_pool import (
-    _get_pool_ids,
-    _repo,
-    clear_question_pool_cache,
-)
+from app.game.questions.runtime_bank_pool import _get_pool_ids, _repo, clear_question_pool_cache
 from app.game.questions.types import QuizQuestion
 
 

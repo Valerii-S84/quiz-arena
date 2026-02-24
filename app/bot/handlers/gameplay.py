@@ -9,6 +9,7 @@ from app.bot.handlers import (
     gameplay_helpers,
     gameplay_views,
 )
+from app.bot.handlers.gameplay_flows import answer_flow, friend_answer_flow, play_flow
 from app.bot.handlers.gameplay_friend_challenge import (  # noqa: F401
     handle_friend_challenge_create,
     handle_friend_challenge_create_selected,
@@ -17,11 +18,6 @@ from app.bot.handlers.gameplay_friend_challenge import (  # noqa: F401
     handle_friend_challenge_series_best3,
     handle_friend_challenge_series_next,
     handle_friend_challenge_share_result,
-)
-from app.bot.handlers.gameplay_flows import (
-    answer_flow,
-    friend_answer_flow,
-    play_flow,
 )
 from app.bot.keyboards.friend_challenge import build_friend_challenge_share_url
 from app.bot.keyboards.home import build_home_keyboard

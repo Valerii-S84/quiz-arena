@@ -21,7 +21,9 @@ def snapshot_from_model(state: EnergyState) -> EnergySnapshot:
     )
 
 
-def apply_snapshot_to_model(state: EnergyState, snapshot: EnergySnapshot, now_utc: datetime) -> None:
+def apply_snapshot_to_model(
+    state: EnergyState, snapshot: EnergySnapshot, now_utc: datetime
+) -> None:
     state.free_energy = snapshot.free_energy
     state.paid_energy = snapshot.paid_energy
     state.last_regen_at = snapshot.last_regen_at

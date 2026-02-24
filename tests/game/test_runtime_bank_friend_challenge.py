@@ -4,7 +4,10 @@ from datetime import date
 
 import pytest
 
-from app.game.questions.runtime_bank import clear_question_pool_cache, select_friend_challenge_question
+from app.game.questions.runtime_bank import (
+    clear_question_pool_cache,
+    select_friend_challenge_question,
+)
 from tests.game.runtime_bank_fixtures import _fake_record
 
 

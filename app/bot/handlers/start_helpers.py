@@ -72,7 +72,9 @@ async def _notify_creator_about_join(
     try:
         await bot.send_message(
             chat_id=creator.telegram_user_id,
-            text=TEXTS_DE["msg.friend.challenge.opponent.joined"].format(opponent_label=joiner_label),
+            text=TEXTS_DE["msg.friend.challenge.opponent.joined"].format(
+                opponent_label=joiner_label
+            ),
         )
     except Exception:
         return

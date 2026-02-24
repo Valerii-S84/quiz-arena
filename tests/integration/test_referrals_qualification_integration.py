@@ -10,7 +10,12 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.referrals.constants import REFERRAL_STARTS_DAILY_LIMIT
 from app.economy.referrals.service import ReferralService
-from tests.integration.referrals_fixtures import UTC, _create_referral_row, _create_user, _seed_attempts
+from tests.integration.referrals_fixtures import (
+    UTC,
+    _create_referral_row,
+    _create_user,
+    _seed_attempts,
+)
 
 
 @pytest.mark.asyncio

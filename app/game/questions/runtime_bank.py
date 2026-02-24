@@ -4,12 +4,16 @@ from app.db.models.quiz_questions import QuizQuestion as QuizQuestionRecord  # n
 from app.db.repo.quiz_questions_repo import QuizQuestionsRepo  # noqa: F401
 from app.game.questions.runtime_bank_filters import (  # noqa: F401
     filter_active_records as _filter_active_records,
-    pick_from_pool as _pick_from_pool,
+)
+from app.game.questions.runtime_bank_filters import pick_from_pool as _pick_from_pool  # noqa: F401
+from app.game.questions.runtime_bank_filters import (  # noqa: F401
     select_least_used_by_category as _select_least_used_by_category,
 )
 from app.game.questions.runtime_bank_models import (  # noqa: F401
     ALL_ACTIVE_SCOPE_CODE,
     QUICK_MIX_MODE_CODE,
+)
+from app.game.questions.runtime_bank_models import (  # noqa: F401
     to_quiz_question as _to_quiz_question,
 )
 from app.game.questions.runtime_bank_seed import stable_index as _stable_index  # noqa: F401

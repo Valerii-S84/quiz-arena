@@ -29,9 +29,7 @@ class AnalyticsRepo:
     )
     count_promo_to_paid_conversions_between = staticmethod(count_promo_to_paid_conversions_between)
     count_promo_redemptions_between = staticmethod(count_promo_redemptions_between)
-    count_applied_promo_redemptions_between = staticmethod(
-        count_applied_promo_redemptions_between
-    )
+    count_applied_promo_redemptions_between = staticmethod(count_applied_promo_redemptions_between)
     count_quiz_sessions_started_between = staticmethod(count_quiz_sessions_started_between)
     count_quiz_sessions_completed_between = staticmethod(count_quiz_sessions_completed_between)
     count_events_by_type_between = staticmethod(count_events_by_type_between)
