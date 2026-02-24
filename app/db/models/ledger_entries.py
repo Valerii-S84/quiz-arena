@@ -11,6 +11,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    event,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -25,7 +26,7 @@ class LedgerEntry(Base):
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_ledger_entries_amount_positive"),
         CheckConstraint(
-            "asset IN ('FREE_ENERGY','PAID_ENERGY','PREMIUM','MODE_ACCESS','STREAK_SAVER')",
+            "asset IN ('FREE_ENERGY','PAID_ENERGY','PREMIUM','MODE_ACCESS','STREAK_SAVER','PURCHASE')",
             name="ck_ledger_entries_asset",
         ),
         CheckConstraint("direction IN ('CREDIT','DEBIT')", name="ck_ledger_entries_direction"),
@@ -55,3 +56,17 @@ class LedgerEntry(Base):
         server_default=text("'{}'::jsonb"),
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+def _raise_append_only_error() -> None:
+    raise ValueError("ledger_entries is append-only")
+
+
+@event.listens_for(LedgerEntry, "before_update", propagate=True)
+def _prevent_ledger_update(*_: object) -> None:
+    _raise_append_only_error()
+
+
+@event.listens_for(LedgerEntry, "before_delete", propagate=True)
+def _prevent_ledger_delete(*_: object) -> None:
+    _raise_append_only_error()

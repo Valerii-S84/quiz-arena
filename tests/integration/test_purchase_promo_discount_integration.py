@@ -11,6 +11,7 @@ from app.db.repo.promo_repo import PromoRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
+from app.economy.promo.constants import PROMO_DISCOUNT_RESERVATION_TTL
 from app.economy.purchases.errors import (
     PurchaseInitValidationError,
     PurchasePrecheckoutValidationError,
@@ -130,6 +131,7 @@ async def test_init_purchase_applies_discount_and_reserves_redemption() -> None:
         assert redemption.applied_purchase_id == result.purchase_id
         assert redemption.reserved_until is not None
         assert redemption.reserved_until > now_utc
+        assert redemption.reserved_until - redemption.updated_at == PROMO_DISCOUNT_RESERVATION_TTL
 
 
 @pytest.mark.asyncio

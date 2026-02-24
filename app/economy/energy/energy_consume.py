@@ -34,6 +34,27 @@ async def consume_quiz(
     premium_active = await EntitlementsRepo.has_active_premium(session, user_id, now_utc)
     snapshot = snapshot_from_model(state)
 
+    if premium_active:
+        if existing_entry is not None:
+            return EnergyConsumeResult(
+                allowed=True,
+                idempotent_replay=True,
+                premium_bypass=existing_entry.asset == "PREMIUM",
+                consumed_asset=existing_entry.asset,
+                free_energy=snapshot.free_energy,
+                paid_energy=snapshot.paid_energy,
+                state=classify_energy_state(snapshot, premium_active=True),
+            )
+        return EnergyConsumeResult(
+            allowed=True,
+            idempotent_replay=False,
+            premium_bypass=True,
+            consumed_asset="PREMIUM",
+            free_energy=snapshot.free_energy,
+            paid_energy=snapshot.paid_energy,
+            state=classify_energy_state(snapshot, premium_active=True),
+        )
+
     snapshot, _ = apply_regen_tick(snapshot, now_utc=now_utc, premium_active=premium_active)
     snapshot, _ = apply_daily_topup_berlin(snapshot, now_utc=now_utc)
     before_state = classify_energy_state(snapshot, premium_active=premium_active)

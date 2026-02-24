@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta
+
+import pytest
+from sqlalchemy import select
+
+from app.db.models.energy_state import EnergyState
+from app.db.models.entitlements import Entitlement
+from app.db.models.ledger_entries import LedgerEntry
+from app.db.session import SessionLocal
+from app.economy.energy.service import EnergyService
+from tests.integration.payments_idempotency_fixtures import UTC, _create_user
+
+
+@pytest.mark.asyncio
+async def test_premium_consume_does_not_mutate_wallet_or_create_ledger() -> None:
+    now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
+    user_id = await _create_user("premium-bypass")
+
+    async with SessionLocal.begin() as session:
+        session.add(
+            EnergyState(
+                user_id=user_id,
+                free_energy=1,
+                paid_energy=3,
+                free_cap=20,
+                regen_interval_sec=1800,
+                last_regen_at=now_utc - timedelta(hours=6),
+                last_daily_topup_local_date=date(2026, 2, 17),
+                version=0,
+                updated_at=now_utc - timedelta(hours=6),
+            )
+        )
+        session.add(
+            Entitlement(
+                user_id=user_id,
+                entitlement_type="PREMIUM",
+                scope="PREMIUM_MONTH",
+                status="ACTIVE",
+                starts_at=now_utc - timedelta(days=1),
+                ends_at=now_utc + timedelta(days=1),
+                source_purchase_id=None,
+                idempotency_key="premium-bypass-entitlement",
+                metadata_={},
+                created_at=now_utc - timedelta(days=1),
+                updated_at=now_utc - timedelta(days=1),
+            )
+        )
+
+    async with SessionLocal.begin() as session:
+        result = await EnergyService.consume_quiz(
+            session,
+            user_id=user_id,
+            idempotency_key="premium-bypass-consume-1",
+            now_utc=now_utc,
+        )
+
+    assert result.allowed is True
+    assert result.premium_bypass is True
+    assert result.consumed_asset == "PREMIUM"
+    assert result.free_energy == 1
+    assert result.paid_energy == 3
+
+    async with SessionLocal.begin() as session:
+        state = await session.get(EnergyState, user_id)
+        assert state is not None
+        assert state.free_energy == 1
+        assert state.paid_energy == 3
+
+        ledger_entry = await session.scalar(
+            select(LedgerEntry).where(
+                LedgerEntry.idempotency_key == "premium-bypass-consume-1",
+            )
+        )
+        assert ledger_entry is None

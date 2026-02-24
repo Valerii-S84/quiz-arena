@@ -14,6 +14,7 @@ from app.db.models.promo_redemptions import PromoRedemption
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
+from app.economy.promo.constants import PROMO_DISCOUNT_RESERVATION_TTL
 from app.economy.purchases.service import PurchaseService
 from app.main import app
 from app.services.promo_codes import hash_promo_code, normalize_promo_code
@@ -170,6 +171,10 @@ async def test_redeem_discount_returns_reservation_and_is_idempotent_for_same_ke
             PromoRedemption.user_id == user_id,
         )
         assert (await session.scalar(stmt)) == 1
+        redemption = await session.get(PromoRedemption, UUID(first_payload["redemption_id"]))
+        assert redemption is not None
+        assert redemption.reserved_until is not None
+        assert redemption.reserved_until - redemption.updated_at == PROMO_DISCOUNT_RESERVATION_TTL
 
 
 @pytest.mark.asyncio
