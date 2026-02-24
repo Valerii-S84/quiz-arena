@@ -5,10 +5,8 @@ from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.entitlements import Entitlement
-from app.db.models.ledger_entries import LedgerEntry
 from app.db.models.purchases import Purchase
 from app.db.repo.entitlements_repo import EntitlementsRepo
-from app.db.repo.ledger_repo import LedgerRepo
 from app.economy.purchases.catalog import ProductSpec
 from app.economy.purchases.errors import PurchasePrecheckoutValidationError
 
@@ -60,22 +58,5 @@ async def _apply_premium_entitlement(
             metadata_={},
             created_at=now_utc,
             updated_at=now_utc,
-        ),
-    )
-
-    await LedgerRepo.create(
-        session,
-        entry=LedgerEntry(
-            user_id=user_id,
-            purchase_id=purchase.id,
-            entry_type="PURCHASE_CREDIT",
-            asset="PREMIUM",
-            direction="CREDIT",
-            amount=product.premium_days,
-            balance_after=None,
-            source="PURCHASE",
-            idempotency_key=f"credit:premium:{purchase.id}",
-            metadata_={"scope": product.product_code},
-            created_at=now_utc,
         ),
     )

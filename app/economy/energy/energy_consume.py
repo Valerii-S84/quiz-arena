@@ -16,11 +16,8 @@ from app.economy.energy.energy_models import (
     snapshot_from_model,
 )
 from app.economy.energy.energy_regen import apply_regen_tick
-from app.economy.energy.rules import (
-    classify_energy_state,
-    consume_quiz_energy,
-    credit_paid_energy as credit_paid_energy_snapshot,
-)
+from app.economy.energy.rules import classify_energy_state, consume_quiz_energy
+from app.economy.energy.rules import credit_paid_energy as credit_paid_energy_snapshot
 from app.economy.energy.types import EnergyBucketState, EnergyConsumeResult, EnergyCreditResult
 
 
@@ -135,12 +132,15 @@ async def credit_paid_energy(
     idempotency_key: str,
     now_utc: datetime,
     source: str = "PURCHASE",
+    write_ledger_entry: bool = True,
 ) -> EnergyCreditResult:
     if amount <= 0:
         raise ValueError("amount must be positive")
 
     state = await get_or_create_state_for_update(session, user_id, now_utc)
-    existing_entry = await LedgerRepo.get_by_idempotency_key(session, idempotency_key)
+    existing_entry = None
+    if write_ledger_entry:
+        existing_entry = await LedgerRepo.get_by_idempotency_key(session, idempotency_key)
     premium_active = await EntitlementsRepo.has_active_premium(session, user_id, now_utc)
 
     snapshot = snapshot_from_model(state)
@@ -149,27 +149,28 @@ async def credit_paid_energy(
 
     if existing_entry is None:
         snapshot = credit_paid_energy_snapshot(snapshot, amount=amount)
-        await LedgerRepo.create(
-            session,
-            entry=LedgerEntry(
-                user_id=user_id,
-                entry_type="PURCHASE_CREDIT",
-                asset="PAID_ENERGY",
-                direction="CREDIT",
-                amount=amount,
-                balance_after=snapshot.paid_energy,
-                source=source,
-                idempotency_key=idempotency_key,
-                metadata_={},
-                created_at=now_utc,
-            ),
-        )
+        if write_ledger_entry:
+            await LedgerRepo.create(
+                session,
+                entry=LedgerEntry(
+                    user_id=user_id,
+                    entry_type="PURCHASE_CREDIT",
+                    asset="PAID_ENERGY",
+                    direction="CREDIT",
+                    amount=amount,
+                    balance_after=snapshot.paid_energy,
+                    source=source,
+                    idempotency_key=idempotency_key,
+                    metadata_={},
+                    created_at=now_utc,
+                ),
+            )
 
     apply_snapshot_to_model(state, snapshot, now_utc)
     await session.flush()
     return EnergyCreditResult(
         amount=amount,
-        idempotent_replay=existing_entry is not None,
+        idempotent_replay=existing_entry is not None if write_ledger_entry else False,
         free_energy=snapshot.free_energy,
         paid_energy=snapshot.paid_energy,
         state=classify_energy_state(snapshot, premium_active=premium_active),

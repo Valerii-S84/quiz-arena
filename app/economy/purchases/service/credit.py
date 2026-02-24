@@ -11,7 +11,7 @@ from app.db.repo.mode_access_repo import ModeAccessRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.streak_repo import StreakRepo
 from app.economy.energy.service import EnergyService
-from app.economy.purchases.catalog import MEGA_PACK_MODE_CODES, get_product
+from app.economy.purchases.catalog import MEGA_PACK_MODE_CODES, ProductSpec, get_product
 from app.economy.purchases.errors import (
     ProductNotFoundError,
     PurchaseNotFoundError,
@@ -22,6 +22,21 @@ from app.economy.purchases.types import PurchaseCreditResult
 from .entitlements import _apply_premium_entitlement
 from .events import _emit_purchase_event
 from .validation import _validate_reserved_discount_for_purchase
+
+
+def _build_asset_breakdown(product: ProductSpec) -> dict[str, object]:
+    breakdown: dict[str, object] = {}
+    if product.energy_credit > 0:
+        breakdown["paid_energy"] = product.energy_credit
+    if product.premium_days > 0:
+        breakdown["premium_days"] = product.premium_days
+    if product.grants_mega_mode_access:
+        breakdown["mode_codes"] = list(MEGA_PACK_MODE_CODES)
+    if product.grants_streak_saver:
+        breakdown["streak_saver_tokens"] = 1
+    if product.friend_challenge_tickets > 0:
+        breakdown["friend_challenge_tickets"] = product.friend_challenge_tickets
+    return breakdown
 
 
 async def apply_successful_payment(
@@ -88,47 +103,14 @@ async def apply_successful_payment(
             amount=product.energy_credit,
             idempotency_key=f"credit:energy:{purchase.id}",
             now_utc=now_utc,
-        )
-
-    if product.friend_challenge_tickets > 0:
-        await LedgerRepo.create(
-            session,
-            entry=LedgerEntry(
-                user_id=user_id,
-                purchase_id=purchase.id,
-                entry_type="PURCHASE_CREDIT",
-                asset="MODE_ACCESS",
-                direction="CREDIT",
-                amount=product.friend_challenge_tickets,
-                balance_after=None,
-                source="PURCHASE",
-                idempotency_key=f"credit:friend_challenge_ticket:{purchase.id}",
-                metadata_={"product_code": product.product_code},
-                created_at=now_utc,
-            ),
+            write_ledger_entry=False,
         )
 
     if product.grants_streak_saver:
-        streak_state = await StreakRepo.add_streak_saver_token(
+        await StreakRepo.add_streak_saver_token(
             session,
             user_id=user_id,
             now_utc=now_utc,
-        )
-        await LedgerRepo.create(
-            session,
-            entry=LedgerEntry(
-                user_id=user_id,
-                purchase_id=purchase.id,
-                entry_type="PURCHASE_CREDIT",
-                asset="STREAK_SAVER",
-                direction="CREDIT",
-                amount=1,
-                balance_after=streak_state.streak_saver_tokens,
-                source="PURCHASE",
-                idempotency_key=f"credit:streak_saver:{purchase.id}",
-                metadata_={},
-                created_at=now_utc,
-            ),
         )
 
     if product.grants_mega_mode_access:
@@ -175,6 +157,26 @@ async def apply_successful_payment(
             promo_redemption.updated_at = now_utc
             promo_code.used_total += 1
             promo_code.updated_at = now_utc
+
+    await LedgerRepo.create(
+        session,
+        entry=LedgerEntry(
+            user_id=user_id,
+            purchase_id=purchase.id,
+            entry_type="PURCHASE_CREDIT",
+            asset="PURCHASE",
+            direction="CREDIT",
+            amount=purchase.stars_amount,
+            balance_after=None,
+            source="PURCHASE",
+            idempotency_key=f"credit:purchase:{purchase.id}",
+            metadata_={
+                "product_code": product.product_code,
+                "asset_breakdown": _build_asset_breakdown(product),
+            },
+            created_at=now_utc,
+        ),
+    )
 
     purchase.status = "CREDITED"
     purchase.credited_at = now_utc

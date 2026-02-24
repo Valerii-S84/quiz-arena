@@ -54,3 +54,28 @@ class StreakRepo:
         state.version += 1
         await session.flush()
         return state
+
+    @staticmethod
+    async def remove_streak_saver_tokens(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        amount: int,
+        now_utc: datetime,
+    ) -> StreakState | None:
+        if amount <= 0:
+            return await StreakRepo.get_by_user_id_for_update(session, user_id)
+
+        state = await StreakRepo.get_by_user_id_for_update(session, user_id)
+        if state is None:
+            return None
+
+        debit_amount = min(amount, state.streak_saver_tokens)
+        if debit_amount <= 0:
+            return state
+
+        state.streak_saver_tokens -= debit_amount
+        state.updated_at = now_utc
+        state.version += 1
+        await session.flush()
+        return state

@@ -7,6 +7,7 @@ from .entitlements import _apply_premium_entitlement
 from .events import _emit_purchase_event
 from .init import init_purchase
 from .precheckout import mark_invoice_sent, validate_precheckout
+from .refund import refund_purchase
 from .utilities import (
     _build_invoice_payload,
     _calculate_discount_amount,
@@ -40,6 +41,7 @@ class PurchaseService:
     mark_invoice_sent = staticmethod(mark_invoice_sent)
     validate_precheckout = staticmethod(validate_precheckout)
     apply_successful_payment = staticmethod(apply_successful_payment)
+    refund_purchase = staticmethod(refund_purchase)
 
 
 __all__ = [

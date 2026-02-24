@@ -7,6 +7,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import get_settings
+from app.db.models.ledger_entries import LedgerEntry
 from app.db.models.promo_codes import PromoCode
 from app.db.models.promo_redemptions import PromoRedemption
 from app.db.models.purchases import Purchase
@@ -167,6 +168,24 @@ async def test_internal_promo_refund_rollback_revokes_redemption_and_is_idempote
                 paid_at=now_utc - timedelta(hours=2),
                 credited_at=now_utc - timedelta(hours=1),
                 refunded_at=None,
+            )
+        )
+        session.add(
+            LedgerEntry(
+                user_id=user_id,
+                purchase_id=purchase_id,
+                entry_type="PURCHASE_CREDIT",
+                asset="PURCHASE",
+                direction="CREDIT",
+                amount=25,
+                balance_after=None,
+                source="PURCHASE",
+                idempotency_key=f"credit:purchase:{purchase_id}",
+                metadata_={
+                    "product_code": "PREMIUM_MONTH",
+                    "asset_breakdown": {"premium_days": 30},
+                },
+                created_at=now_utc - timedelta(hours=1),
             )
         )
         await session.flush()

@@ -80,12 +80,13 @@ async def test_premium_month_purchase_grants_active_entitlement() -> None:
         assert entitlement.ends_at == now_utc + timedelta(days=30)
 
         ledger_stmt = select(LedgerEntry).where(
-            LedgerEntry.idempotency_key == f"credit:premium:{init.purchase_id}",
+            LedgerEntry.idempotency_key == f"credit:purchase:{init.purchase_id}",
         )
         ledger_entry = await session.scalar(ledger_stmt)
         assert ledger_entry is not None
-        assert ledger_entry.asset == "PREMIUM"
-        assert ledger_entry.amount == 30
+        assert ledger_entry.asset == "PURCHASE"
+        assert ledger_entry.amount == purchase.stars_amount
+        assert ledger_entry.metadata_["asset_breakdown"]["premium_days"] == 30
 
 
 @pytest.mark.asyncio

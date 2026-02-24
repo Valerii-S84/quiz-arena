@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +23,29 @@ class LedgerRepo:
         session.add(entry)
         await session.flush()
         return entry
+
+    @staticmethod
+    async def get_purchase_credit_for_update(
+        session: AsyncSession,
+        *,
+        purchase_id: UUID,
+    ) -> LedgerEntry | None:
+        stmt = (
+            select(LedgerEntry)
+            .where(
+                LedgerEntry.purchase_id == purchase_id,
+                LedgerEntry.entry_type == "PURCHASE_CREDIT",
+                LedgerEntry.direction == "CREDIT",
+            )
+            .with_for_update()
+        )
+        result = await session.execute(stmt)
+        entries = list(result.scalars().all())
+        if not entries:
+            return None
+        if len(entries) > 1:
+            raise ValueError("multiple purchase credit ledger entries found")
+        return entries[0]
 
     @staticmethod
     async def count_distinct_purchase_credits(session: AsyncSession) -> int:

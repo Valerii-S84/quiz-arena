@@ -80,7 +80,7 @@ async def test_duplicate_payment_callbacks_credit_only_once() -> None:
         assert energy_state.paid_energy == 10
 
         count_stmt = select(func.count(LedgerEntry.id)).where(
-            LedgerEntry.idempotency_key == f"credit:energy:{init.purchase_id}",
+            LedgerEntry.idempotency_key == f"credit:purchase:{init.purchase_id}",
         )
         credit_entries_count = await session.scalar(count_stmt)
         assert credit_entries_count == 1

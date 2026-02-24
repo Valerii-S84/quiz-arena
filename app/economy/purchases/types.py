@@ -22,3 +22,11 @@ class PurchaseCreditResult:
     product_code: str
     status: str
     idempotent_replay: bool
+
+
+@dataclass(slots=True)
+class PurchaseRefundResult:
+    purchase_id: UUID
+    product_code: str
+    status: str
+    idempotent_replay: bool

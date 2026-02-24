@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -111,3 +112,27 @@ class EntitlementsRepo:
         )
         result = await session.execute(stmt)
         return result.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def revoke_active_or_scheduled_by_purchase(
+        session: AsyncSession,
+        *,
+        purchase_id: UUID,
+        now_utc: datetime,
+    ) -> int:
+        stmt = (
+            select(Entitlement)
+            .where(
+                Entitlement.source_purchase_id == purchase_id,
+                Entitlement.status.in_(("ACTIVE", "SCHEDULED")),
+            )
+            .with_for_update()
+        )
+        result = await session.execute(stmt)
+        rows = list(result.scalars().all())
+        for row in rows:
+            row.status = "REVOKED"
+            row.updated_at = now_utc
+        if rows:
+            await session.flush()
+        return len(rows)

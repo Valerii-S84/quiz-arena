@@ -18,6 +18,14 @@ class PurchaseInitValidationError(PurchaseError):
     pass
 
 
+class PurchaseRefundValidationError(PurchaseError):
+    pass
+
+
+class PurchaseRefundInvariantError(PurchaseError):
+    pass
+
+
 class PremiumDowngradeNotAllowedError(PurchaseInitValidationError):
     pass
 
