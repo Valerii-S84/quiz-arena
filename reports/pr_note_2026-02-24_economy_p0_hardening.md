@@ -50,6 +50,24 @@
   - `tests/integration/test_internal_promo_redeem_integration.py`
   - `tests/integration/test_purchase_promo_discount_integration.py`
 
+## Regression test pack
+- `tests/integration/test_economy_invariants_a_purchase_credit_integration.py::test_credit_creates_single_ledger_entry_per_purchase`
+- `tests/integration/test_economy_invariants_a_purchase_credit_integration.py::test_credit_is_idempotent_on_same_purchase`
+- `tests/integration/test_economy_invariants_a_purchase_credit_integration.py::test_credit_contains_expected_breakdown_keys_for_friend_challenge_ticket`
+- `tests/integration/test_economy_invariants_a_purchase_credit_integration.py::test_credit_mutates_wallet_only_by_expected_breakdown_delta`
+- `tests/integration/test_economy_invariants_b_refund_symmetry_integration.py::test_refund_creates_single_debit_and_marks_refunded`
+- `tests/integration/test_economy_invariants_b_refund_symmetry_integration.py::test_refund_is_idempotent_without_duplicate_debits`
+- `tests/integration/test_economy_invariants_b_refund_symmetry_integration.py::test_refund_revokes_entitlements_for_source_purchase`
+- `tests/integration/test_economy_invariants_b_refund_symmetry_integration.py::test_refund_revokes_mode_access_for_source_purchase`
+- `tests/integration/test_economy_invariants_b_refund_symmetry_integration.py::test_refund_requires_credited_purchase`
+- `tests/integration/test_economy_invariants_b_refund_symmetry_integration.py::test_refund_after_recovery_keeps_single_credit_and_single_debit`
+- `tests/integration/test_economy_invariants_c_premium_bypass_integration.py::test_premium_bypass_does_not_change_free_or_paid_energy`
+- `tests/integration/test_economy_invariants_c_premium_bypass_integration.py::test_non_premium_consume_decrements_paid_bucket_when_free_empty`
+- `tests/integration/test_economy_invariants_d_promo_ttl_integration.py::test_promo_reservation_ttl_is_15_minutes`
+- `tests/integration/test_economy_invariants_d_promo_ttl_integration.py::test_promo_reservation_expiry_blocks_precheckout_validation`
+- `tests/integration/test_economy_invariants_e_ledger_append_only_integration.py::test_ledger_update_fails_on_db_trigger`
+- `tests/integration/test_economy_invariants_e_ledger_append_only_integration.py::test_ledger_delete_fails_on_db_trigger`
+
 ## Gate результати
 - `docker compose up -d postgres redis` -> containers `quiz_arena_postgres` (healthy) і `quiz_arena_redis` (up)
 - `DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test .venv/bin/python -m scripts.ensure_test_db` -> `ensure_test_db: exists db=quiz_arena_test host=localhost:5432`
