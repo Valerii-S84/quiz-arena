@@ -1,0 +1,8 @@
+backup_files_after_rotation:
+quiz_arena_20260224T191304Z.dump
+quiz_arena_20260224T193423Z.dump
+
+backup_sizes:
+total 208K
+-rwxrwxrwx 1 serputko serputko 101K Feb 24 20:13 quiz_arena_20260224T191304Z.dump
+-rwxrwxrwx 1 serputko serputko 104K Feb 24 20:34 quiz_arena_20260224T193423Z.dump
