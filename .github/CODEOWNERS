@@ -1,0 +1,6 @@
+# replace @OWNER with real GitHub username
+/app/economy/** @OWNER
+/app/db/** @OWNER
+/alembic/** @OWNER
+/.github/workflows/** @OWNER
+/.pre-commit-config.yaml @OWNER
