@@ -17,6 +17,7 @@ from app.db.repo.referrals_queries import (  # noqa: F401
     get_reverse_pair_since,
     list_for_referrer,
     list_for_referrer_for_update,
+    list_for_referrers_for_update,
     list_for_review_since,
     list_referrer_ids_with_reward_candidates,
     list_started_ids,
@@ -34,6 +35,7 @@ class ReferralsRepo:
         list_referrer_ids_with_reward_candidates
     )
     list_for_referrer_for_update = staticmethod(list_for_referrer_for_update)
+    list_for_referrers_for_update = staticmethod(list_for_referrers_for_update)
     list_for_referrer = staticmethod(list_for_referrer)
     count_rewards_for_referrer_between = staticmethod(count_rewards_for_referrer_between)
     count_qualified_for_referrer = staticmethod(count_qualified_for_referrer)

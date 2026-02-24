@@ -30,6 +30,10 @@ async def run_reward_distribution(
         limit=batch_size,
     )
     month_start_utc, next_month_start_utc = _berlin_month_bounds_utc(now_utc)
+    referrals_by_referrer = await ReferralsRepo.list_for_referrers_for_update(
+        session,
+        referrer_user_ids=referrer_ids,
+    )
 
     result = {
         "referrers_examined": len(referrer_ids),
@@ -39,10 +43,7 @@ async def run_reward_distribution(
     }
 
     for referrer_user_id in referrer_ids:
-        referrals = await ReferralsRepo.list_for_referrer_for_update(
-            session,
-            referrer_user_id=referrer_user_id,
-        )
+        referrals = referrals_by_referrer.get(referrer_user_id, [])
         if not referrals:
             continue
 
@@ -50,11 +51,13 @@ async def run_reward_distribution(
         if not anchors:
             continue
 
-        rewarded_this_month = await ReferralsRepo.count_rewards_for_referrer_between(
-            session,
-            referrer_user_id=referrer_user_id,
-            from_utc=month_start_utc,
-            to_utc=next_month_start_utc,
+        rewarded_this_month = sum(
+            1
+            for referral in referrals
+            if referral.status == "REWARDED"
+            and referral.rewarded_at is not None
+            and referral.rewarded_at >= month_start_utc
+            and referral.rewarded_at < next_month_start_utc
         )
 
         for referral in anchors:

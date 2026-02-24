@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import defaultdict
+from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import distinct, select
@@ -94,6 +96,34 @@ async def list_for_referrer_for_update(
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def list_for_referrers_for_update(
+    session: AsyncSession,
+    *,
+    referrer_user_ids: Sequence[int],
+) -> dict[int, list[Referral]]:
+    referrer_ids = tuple({int(referrer_id) for referrer_id in referrer_user_ids})
+    if not referrer_ids:
+        return {}
+    stmt = (
+        select(Referral)
+        .where(
+            Referral.referrer_user_id.in_(referrer_ids),
+            Referral.status.in_(("QUALIFIED", "DEFERRED_LIMIT", "REWARDED", "REJECTED_FRAUD")),
+        )
+        .order_by(
+            Referral.referrer_user_id.asc(),
+            Referral.qualified_at.asc().nulls_last(),
+            Referral.created_at.asc(),
+        )
+        .with_for_update()
+    )
+    result = await session.execute(stmt)
+    grouped: dict[int, list[Referral]] = defaultdict(list)
+    for referral in result.scalars().all():
+        grouped[int(referral.referrer_user_id)].append(referral)
+    return dict(grouped)
 
 
 async def list_for_referrer(
