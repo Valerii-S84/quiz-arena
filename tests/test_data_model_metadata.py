@@ -71,6 +71,8 @@ def test_critical_constraints_present() -> None:
     assert "uq_purchases_active_invoice_user_product" in purchase_index_names
     assert "idx_purchases_paid_uncredited_paid_at" in purchase_index_names
     assert "idx_purchases_unpaid_created_at" in purchase_index_names
+    assert "idx_purchases_paid_at_not_null" in purchase_index_names
+    assert "idx_purchases_user_product_paid_at" in purchase_index_names
 
     quiz_sessions = Base.metadata.tables["quiz_sessions"]
     quiz_sessions_indexes = {index.name for index in quiz_sessions.indexes}
@@ -121,3 +123,7 @@ def test_critical_constraints_present() -> None:
     analytics_events = Base.metadata.tables["analytics_events"]
     analytics_events_indexes = {index.name for index in analytics_events.indexes}
     assert "idx_analytics_events_created_at" in analytics_events_indexes
+
+    quiz_questions = Base.metadata.tables["quiz_questions"]
+    quiz_questions_indexes = {index.name for index in quiz_questions.indexes}
+    assert "idx_quiz_questions_updated_at" in quiz_questions_indexes

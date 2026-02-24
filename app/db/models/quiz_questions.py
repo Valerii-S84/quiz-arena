@@ -22,6 +22,7 @@ class QuizQuestion(Base):
         Index("idx_quiz_questions_mode_status", "mode_code", "status"),
         Index("idx_quiz_questions_level", "level"),
         Index("idx_quiz_questions_source_file", "source_file"),
+        Index("idx_quiz_questions_updated_at", "updated_at"),
     )
 
     question_id: Mapped[str] = mapped_column(String(64), primary_key=True)
