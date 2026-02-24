@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 from aiogram.types import User as TelegramUser
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.users import User
 from app.core.referral_codes import generate_referral_code
+from app.db.models.users import User
 from app.db.repo.users_repo import UsersRepo
 from app.economy.energy.service import EnergyService
 from app.economy.referrals.service import ReferralService
@@ -28,9 +28,7 @@ class UserOnboardingService:
         return await UsersRepo.get_by_id(session, user_id)
 
     @staticmethod
-    async def get_by_telegram_user_id(
-        session: AsyncSession, telegram_user_id: int
-    ) -> User | None:
+    async def get_by_telegram_user_id(session: AsyncSession, telegram_user_id: int) -> User | None:
         return await UsersRepo.get_by_telegram_user_id(session, telegram_user_id)
 
     @staticmethod
