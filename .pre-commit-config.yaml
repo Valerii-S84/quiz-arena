@@ -24,6 +24,11 @@ repos:
         entry: bash scripts/check_architecture_imports.sh
         language: system
         pass_filenames: false
+      - id: architecture-import-cycles
+        name: architecture-import-cycles
+        entry: bash scripts/check_import_cycles.sh
+        language: system
+        pass_filenames: false
       - id: ruff
         name: ruff
         entry: .venv/bin/ruff check

@@ -5,7 +5,6 @@ from aiogram.types import Update
 
 from app.db.repo.processed_updates_repo import ProcessedUpdatesRepo
 from app.db.session import SessionLocal
-from app.workers.tasks import telegram_updates
 from app.workers.tasks.telegram_updates_config import (
     _ACQUIRE_CREATED,
     _ACQUIRE_DUPLICATE,
@@ -86,8 +85,10 @@ async def process_update_async(
     elif acquire_outcome == _ACQUIRE_RECLAIMED_FAILED:
         logger.info("telegram_update_processing_reclaimed_failed", update_id=update_id)
 
-    bot = telegram_updates.build_bot()
-    dispatcher = telegram_updates.build_dispatcher()
+    from app.workers.tasks import telegram_updates as telegram_updates_tasks
+
+    bot = telegram_updates_tasks.build_bot()
+    dispatcher = telegram_updates_tasks.build_dispatcher()
 
     try:
         update = Update.model_validate(update_payload)
