@@ -51,14 +51,11 @@
   - `tests/integration/test_purchase_promo_discount_integration.py`
 
 ## Gate результати
+- `docker compose up -d postgres redis` -> containers `quiz_arena_postgres` (healthy) і `quiz_arena_redis` (up)
+- `DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test .venv/bin/python -m scripts.ensure_test_db` -> `ensure_test_db: exists db=quiz_arena_test host=localhost:5432`
+- `DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test .venv/bin/python -m alembic upgrade head` -> upgraded to `c9d8e7f6a5b4`
 - `.venv/bin/ruff check .` -> `All checks passed!`
 - `.venv/bin/mypy .` -> `Success: no issues found in 429 source files`
-- `DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q` -> `260 passed, 86 skipped`
-- `pytest -q -s tests/integration` -> `86 skipped` (Postgres недоступний у цьому оточенні)
-- `make check` -> FAIL на `black --check` через pre-existing форматування у нецільових файлах:
-  - `app/db/repo/analytics_repo.py`
-  - `app/db/repo/referrals_repo.py`
-  - `app/economy/energy/energy_models.py`
-  - `tests/game/test_runtime_bank_friend_challenge.py`
-  - `app/bot/handlers/start_helpers.py`
-  - `tests/integration/test_referrals_qualification_integration.py`
+- `make check` -> `346 passed in 90.75s`
+- `TMPDIR=/tmp .venv/bin/pytest -q --ignore=tests/integration` -> `260 passed in 28.95s`
+- `DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q -s tests/integration` -> `86 passed in 87.88s`

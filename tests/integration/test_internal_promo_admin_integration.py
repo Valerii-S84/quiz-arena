@@ -170,6 +170,7 @@ async def test_internal_promo_refund_rollback_revokes_redemption_and_is_idempote
                 refunded_at=None,
             )
         )
+        await session.flush()
         session.add(
             LedgerEntry(
                 user_id=user_id,
