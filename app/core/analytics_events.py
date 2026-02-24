@@ -6,7 +6,8 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repo.analytics_repo import AnalyticsRepo
-from app.economy.energy.constants import BERLIN_TIMEZONE
+
+BERLIN_TIMEZONE = "Europe/Berlin"
 
 EVENT_SOURCE_BOT = "BOT"
 EVENT_SOURCE_WORKER = "WORKER"
