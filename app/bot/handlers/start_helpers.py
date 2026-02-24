@@ -3,9 +3,9 @@ from __future__ import annotations
 from aiogram.types import Message
 
 from app.bot.texts.de import TEXTS_DE
-from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.sessions.types import FriendChallengeSnapshot
+from app.services.user_onboarding import UserOnboardingService
 
 
 def _format_user_label(
@@ -34,7 +34,7 @@ async def _resolve_opponent_label(*, challenge: FriendChallengeSnapshot, user_id
         return "Freund"
 
     async with SessionLocal.begin() as session:
-        opponent = await UsersRepo.get_by_id(session, opponent_user_id)
+        opponent = await UserOnboardingService.get_by_id(session, opponent_user_id)
 
     if opponent is None:
         return "Freund"
@@ -55,8 +55,8 @@ async def _notify_creator_about_join(
         return
 
     async with SessionLocal.begin() as session:
-        creator = await UsersRepo.get_by_id(session, challenge.creator_user_id)
-        joiner = await UsersRepo.get_by_id(session, joiner_user_id)
+        creator = await UserOnboardingService.get_by_id(session, challenge.creator_user_id)
+        joiner = await UserOnboardingService.get_by_id(session, joiner_user_id)
 
     if creator is None or joiner is None:
         return

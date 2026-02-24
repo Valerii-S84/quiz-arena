@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.db.repo.purchases_repo import PurchasesRepo
+
 from .builder import _as_init_result, _build_purchase
 from .constants import PREMIUM_PLAN_RANKS, PROMO_RESERVATION_TTL, STREAK_SAVER_PURCHASE_LOCK_WINDOW
 from .credit import apply_successful_payment
@@ -37,6 +39,7 @@ class PurchaseService:
         _validate_reserved_discount_for_purchase
     )
     _apply_premium_entitlement = staticmethod(_apply_premium_entitlement)
+    get_by_id = staticmethod(PurchasesRepo.get_by_id)
     init_purchase = staticmethod(init_purchase)
     mark_invoice_sent = staticmethod(mark_invoice_sent)
     validate_precheckout = staticmethod(validate_precheckout)

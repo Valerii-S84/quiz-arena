@@ -147,7 +147,7 @@ async def test_handle_successful_payment_sends_success_text(monkeypatch) -> None
 
     monkeypatch.setattr(payments.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(payments.PurchaseService, "apply_successful_payment", _fake_apply_payment)
-    monkeypatch.setattr(payments.PurchasesRepo, "get_by_id", _fake_get_by_id)
+    monkeypatch.setattr(payments.PurchaseService, "get_by_id", _fake_get_by_id)
 
     message = _PaymentMessage(
         from_user=SimpleNamespace(id=1), successful_payment=_SuccessfulPayment()
@@ -235,7 +235,7 @@ async def test_handle_successful_payment_marks_offer_conversion(monkeypatch) -> 
 
     monkeypatch.setattr(payments.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(payments.PurchaseService, "apply_successful_payment", _fake_apply_payment)
-    monkeypatch.setattr(payments.PurchasesRepo, "get_by_id", _fake_get_by_id)
+    monkeypatch.setattr(payments.PurchaseService, "get_by_id", _fake_get_by_id)
     monkeypatch.setattr(
         payments.OfferService, "mark_offer_converted_purchase", _fake_mark_converted
     )

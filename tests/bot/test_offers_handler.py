@@ -35,7 +35,11 @@ async def test_handle_offer_dismiss_rejects_when_user_not_found(monkeypatch) -> 
         assert telegram_user_id == 777
         return None
 
-    monkeypatch.setattr(offers.UsersRepo, "get_by_telegram_user_id", _fake_get_user)
+    monkeypatch.setattr(
+        offers.UserOnboardingService,
+        "get_by_telegram_user_id",
+        _fake_get_user,
+    )
     callback = DummyCallback(data="offer:dismiss:10", from_user=SimpleNamespace(id=777))
 
     await offers.handle_offer_dismiss(callback)
@@ -55,7 +59,11 @@ async def test_handle_offer_dismiss_replies_with_success(monkeypatch) -> None:
         assert impression_id == 99
         return True
 
-    monkeypatch.setattr(offers.UsersRepo, "get_by_telegram_user_id", _fake_get_user)
+    monkeypatch.setattr(
+        offers.UserOnboardingService,
+        "get_by_telegram_user_id",
+        _fake_get_user,
+    )
     monkeypatch.setattr(offers.OfferService, "dismiss_offer", _fake_dismiss_offer)
     callback = DummyCallback(data="offer:dismiss:99", from_user=SimpleNamespace(id=500))
 
@@ -76,7 +84,11 @@ async def test_handle_offer_dismiss_replies_error_when_not_dismissed(
     async def _fake_dismiss_offer(session, user_id: int, impression_id: int, now_utc):
         return False
 
-    monkeypatch.setattr(offers.UsersRepo, "get_by_telegram_user_id", _fake_get_user)
+    monkeypatch.setattr(
+        offers.UserOnboardingService,
+        "get_by_telegram_user_id",
+        _fake_get_user,
+    )
     monkeypatch.setattr(offers.OfferService, "dismiss_offer", _fake_dismiss_offer)
     callback = DummyCallback(data="offer:dismiss:3", from_user=SimpleNamespace(id=100))
 

@@ -10,7 +10,6 @@ from aiogram.types import CallbackQuery, LabeledPrice, Message, PreCheckoutQuery
 
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
-from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.session import SessionLocal
 from app.economy.offers.service import OfferService
 from app.economy.purchases.catalog import get_product
@@ -207,7 +206,7 @@ async def handle_successful_payment(message: Message) -> None:
                 raw_successful_payment=payment.model_dump(exclude_none=True),
                 now_utc=now_utc,
             )
-            purchase = await PurchasesRepo.get_by_id(session, credit_result.purchase_id)
+            purchase = await PurchaseService.get_by_id(session, credit_result.purchase_id)
             if purchase is not None:
                 offer_impression_id = _extract_offer_impression_id_from_purchase_idempotency_key(
                     purchase.idempotency_key

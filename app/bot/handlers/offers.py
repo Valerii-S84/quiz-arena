@@ -7,9 +7,9 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
 from app.bot.texts.de import TEXTS_DE
-from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.offers.service import OfferService
+from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="offers")
 
@@ -31,7 +31,7 @@ async def handle_offer_dismiss(callback: CallbackQuery) -> None:
     now_utc = datetime.now(timezone.utc)
 
     async with SessionLocal.begin() as session:
-        user = await UsersRepo.get_by_telegram_user_id(session, callback.from_user.id)
+        user = await UserOnboardingService.get_by_telegram_user_id(session, callback.from_user.id)
         if user is None:
             await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
             return

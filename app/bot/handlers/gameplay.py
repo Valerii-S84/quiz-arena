@@ -22,7 +22,6 @@ from app.bot.handlers.gameplay_friend_challenge import (  # noqa: F401
 from app.bot.keyboards.friend_challenge import build_friend_challenge_share_url
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
-from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.offers.constants import TRG_LOCKED_MODE_CLICK
 from app.economy.offers.service import OfferLoggingError, OfferService
@@ -68,7 +67,7 @@ async def _resolve_opponent_label(*, challenge, user_id: int) -> str:
         challenge=challenge,
         user_id=user_id,
         session_local=SessionLocal,
-        users_repo=UsersRepo,
+        users_repo=UserOnboardingService,
         format_user_label=_format_user_label,
     )
 
@@ -85,7 +84,7 @@ async def _notify_opponent(
         opponent_user_id=opponent_user_id,
         text=text,
         session_local=SessionLocal,
-        users_repo=UsersRepo,
+        users_repo=UserOnboardingService,
         reply_markup=reply_markup,
     )
 
