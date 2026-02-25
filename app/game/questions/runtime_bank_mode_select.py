@@ -12,9 +12,11 @@ from app.game.questions.runtime_bank_fallback import (
     fallback_select_question_for_mode,
 )
 from app.game.questions.runtime_bank_filters import pick_from_pool
-from app.game.questions.runtime_bank_models import QUICK_MIX_MODE_CODE, to_quiz_question
+from app.game.questions.runtime_bank_models import to_quiz_question
 from app.game.questions.runtime_bank_pool import _get_pool_ids, _repo, clear_question_pool_cache
 from app.game.questions.types import QuizQuestion
+
+_LEVEL_ORDER: tuple[str, ...] = ("A1", "A2", "B1", "B2", "C1", "C2")
 
 
 def _pick_from_pool(
@@ -30,6 +32,16 @@ def _pick_from_pool(
     )
 
 
+def _next_level(level: str) -> str | None:
+    normalized = level.strip().upper()
+    if normalized not in _LEVEL_ORDER:
+        return None
+    level_index = _LEVEL_ORDER.index(normalized)
+    if level_index >= len(_LEVEL_ORDER) - 1:
+        return None
+    return _LEVEL_ORDER[level_index + 1]
+
+
 async def _list_candidate_ids_for_mode(
     session: AsyncSession,
     *,
@@ -37,14 +49,7 @@ async def _list_candidate_ids_for_mode(
     exclude_question_ids: Sequence[str] | None,
     preferred_levels: Sequence[str] | None,
 ) -> list[str]:
-    repo = _repo()
-    if mode_code == QUICK_MIX_MODE_CODE:
-        return await repo.list_question_ids_all_active(
-            session,
-            exclude_question_ids=exclude_question_ids,
-            preferred_levels=preferred_levels,
-        )
-    return await repo.list_question_ids_for_mode(
+    return await _repo().list_question_ids_for_mode(
         session,
         mode_code=mode_code,
         exclude_question_ids=exclude_question_ids,
@@ -60,8 +65,8 @@ async def _pick_from_mode(
     selection_seed: str,
     preferred_level: str | None,
 ) -> QuizQuestion | None:
-    async def _select_candidate_id_once() -> str | None:
-        preferred_levels = (preferred_level,) if preferred_level is not None else None
+    async def _select_candidate_id_once(level: str | None) -> str | None:
+        preferred_levels = (level,) if level is not None else None
         candidate_ids = await _get_pool_ids(
             session,
             mode_code=mode_code,
@@ -78,27 +83,17 @@ async def _pick_from_mode(
                 exclude_question_ids=(),
                 selection_seed=selection_seed,
             )
-
-        if selected_id_local is None and preferred_levels is not None:
-            fallback_candidate_ids = await _get_pool_ids(
-                session,
-                mode_code=mode_code,
-                preferred_levels=None,
-            )
-            selected_id_local = _pick_from_pool(
-                fallback_candidate_ids,
-                exclude_question_ids=recent_question_ids,
-                selection_seed=selection_seed,
-            )
-            if selected_id_local is None:
-                selected_id_local = _pick_from_pool(
-                    fallback_candidate_ids,
-                    exclude_question_ids=(),
-                    selection_seed=selection_seed,
-                )
         return selected_id_local
 
-    selected_id = await _select_candidate_id_once()
+    async def _select_candidate_id() -> str | None:
+        selected_id_local = await _select_candidate_id_once(preferred_level)
+        if selected_id_local is None and preferred_level is not None:
+            next_level = _next_level(preferred_level)
+            if next_level is not None:
+                selected_id_local = await _select_candidate_id_once(next_level)
+        return selected_id_local
+
+    selected_id = await _select_candidate_id()
     if selected_id is None:
         return None
 
@@ -106,7 +101,7 @@ async def _pick_from_mode(
     selected = await repo.get_by_id(session, selected_id)
     if selected is None:
         clear_question_pool_cache()
-        retry_selected_id = await _select_candidate_id_once()
+        retry_selected_id = await _select_candidate_id()
         if retry_selected_id is None:
             return None
         selected = await repo.get_by_id(session, retry_selected_id)

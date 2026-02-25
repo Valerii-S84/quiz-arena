@@ -49,7 +49,8 @@ from .question_loading import (
     _infer_preferred_level_from_recent_attempt,
     _load_question_for_session,
 )
-from .sessions_start import get_session_user_id, start_session
+from .sessions_queries import get_session_user_id
+from .sessions_start import start_session
 from .sessions_submit import submit_answer
 
 
