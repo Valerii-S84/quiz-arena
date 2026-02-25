@@ -1,0 +1,23 @@
+{
+  "timestamp_utc": "2026-02-24T19:13:25Z",
+  "drill_db": "quiz_arena_restore_drill",
+  "backup_file": "reports/restore_drill_20260224T191313Z.dump",
+  "backup_size_bytes": 106482,
+  "before": {
+    "users_count": 1,
+    "processed_updates_count": 1,
+    "public_tables_count": 24,
+    "alembic_version": "e7f8a9b0c1d2",
+    "seed_user_present": 1,
+    "seed_update_present": 1
+  },
+  "after_restore": {
+    "users_count": 1,
+    "processed_updates_count": 1,
+    "public_tables_count": 24,
+    "alembic_version": "e7f8a9b0c1d2",
+    "seed_user_present": 1,
+    "seed_update_present": 1
+  },
+  "restore_success": true
+}

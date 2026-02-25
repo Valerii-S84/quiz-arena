@@ -9,27 +9,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.mode_access_repo import ModeAccessRepo
-from app.db.repo.mode_progress_repo import ModeProgressRepo
 from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.economy.energy.service import EnergyService
 from app.economy.streak.time import berlin_local_date
 from app.game.modes.rules import is_mode_allowed, is_zero_cost_source
-from app.game.questions.types import QuizQuestion
 from app.game.sessions.errors import (
     DailyChallengeAlreadyPlayedError,
     EnergyInsufficientError,
     FriendChallengeAccessError,
     ModeLockedError,
-    SessionNotFoundError,
 )
 from app.game.sessions.types import SessionQuestionView, StartSessionResult
 
-from .levels import _clamp_level_for_mode, _is_persistent_adaptive_mode
-from .question_loading import (
-    _build_start_result_from_existing_session,
-    _infer_preferred_level_from_recent_attempt,
-)
+from .question_loading import _build_start_result_from_existing_session
+from .sessions_start_events import emit_question_level_served_event
+from .sessions_start_forced import load_forced_question
+from .sessions_start_guard import enforce_menu_served_mode_guard
+from .sessions_start_preferred import resolve_effective_preferred_level
 
 
 async def start_session(
@@ -100,57 +97,25 @@ async def start_session(
         energy_paid = energy_result.paid_energy
         energy_cost_total = 1
 
-    question: QuizQuestion | None = None
-    if forced_question_id is not None:
-        from app.game.sessions import service as service_module
-
-        question = await service_module.get_question_by_id(
+    effective_preferred_level = preferred_question_level
+    recent_question_ids: list[str] = []
+    selection_seed = selection_seed_override or idempotency_key
+    question = await load_forced_question(
+        session,
+        mode_code=mode_code,
+        forced_question_id=forced_question_id,
+        local_date_berlin=local_date,
+    )
+    if question is None:
+        effective_preferred_level = await resolve_effective_preferred_level(
             session,
-            mode_code,
-            question_id=forced_question_id,
-            local_date_berlin=local_date,
+            user_id=user_id,
+            mode_code=mode_code,
+            source=source,
+            preferred_question_level=effective_preferred_level,
+            now_utc=now_utc,
         )
 
-    if question is None:
-        effective_preferred_level = preferred_question_level
-        if _is_persistent_adaptive_mode(mode_code=mode_code):
-            mode_progress = None
-            if effective_preferred_level is None:
-                mode_progress = await ModeProgressRepo.get_by_user_mode(
-                    session,
-                    user_id=user_id,
-                    mode_code=mode_code,
-                )
-                if mode_progress is not None:
-                    effective_preferred_level = mode_progress.preferred_level
-                else:
-                    # Backfill for existing users: infer last reached level from history.
-                    effective_preferred_level = await _infer_preferred_level_from_recent_attempt(
-                        session,
-                        user_id=user_id,
-                        mode_code=mode_code,
-                    )
-
-            if mode_progress is None and effective_preferred_level is not None:
-                seeded_level = _clamp_level_for_mode(
-                    mode_code=mode_code,
-                    level=effective_preferred_level,
-                )
-                if seeded_level is not None:
-                    await ModeProgressRepo.upsert_preferred_level(
-                        session,
-                        user_id=user_id,
-                        mode_code=mode_code,
-                        preferred_level=seeded_level,
-                        now_utc=now_utc,
-                    )
-                    effective_preferred_level = seeded_level
-            effective_preferred_level = _clamp_level_for_mode(
-                mode_code=mode_code,
-                level=effective_preferred_level,
-            )
-
-        recent_question_ids: list[str] = []
         if source != "FRIEND_CHALLENGE":
             recent_question_ids = await QuizAttemptsRepo.get_recent_question_ids_for_mode(
                 session,
@@ -158,7 +123,6 @@ async def start_session(
                 mode_code=mode_code,
                 limit=20,
             )
-        selection_seed = selection_seed_override or idempotency_key
         from app.game.sessions import service as service_module
 
         question = await service_module.select_question_for_mode(
@@ -169,6 +133,22 @@ async def start_session(
             selection_seed=selection_seed,
             preferred_level=effective_preferred_level,
         )
+    assert question is not None
+
+    question, fallback_step, served_question_mode, retry_count, mismatch_reason = (
+        await enforce_menu_served_mode_guard(
+            session,
+            user_id=user_id,
+            mode_code=mode_code,
+            source=source,
+            question=question,
+            local_date_berlin=local_date,
+            recent_question_ids=recent_question_ids,
+            selection_seed=selection_seed,
+            preferred_level=effective_preferred_level,
+            now_utc=now_utc,
+        )
+    )
 
     try:
         created = await QuizSessionsRepo.create(
@@ -193,6 +173,21 @@ async def start_session(
             raise DailyChallengeAlreadyPlayedError from exc
         raise
 
+    await emit_question_level_served_event(
+        session,
+        user_id=user_id,
+        mode_code=mode_code,
+        source=source,
+        expected_level=effective_preferred_level,
+        served_level=question.level,
+        served_question_mode=served_question_mode,
+        question_id=question.question_id,
+        fallback_step=fallback_step,
+        retry_count=retry_count,
+        mismatch_reason=mismatch_reason,
+        now_utc=now_utc,
+    )
+
     return StartSessionResult(
         session=SessionQuestionView(
             session_id=created.id,
@@ -209,10 +204,3 @@ async def start_session(
         energy_paid=energy_paid,
         idempotent_replay=False,
     )
-
-
-async def get_session_user_id(session: AsyncSession, session_id: UUID) -> int:
-    quiz_session = await QuizSessionsRepo.get_by_id(session, session_id)
-    if quiz_session is None:
-        raise SessionNotFoundError
-    return quiz_session.user_id

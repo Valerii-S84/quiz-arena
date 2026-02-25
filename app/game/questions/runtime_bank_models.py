@@ -18,6 +18,7 @@ def to_quiz_question(record: QuizQuestionRecord) -> QuizQuestion:
             record.option_4,
         ),
         correct_option=record.correct_option_id,
+        mode_code=record.mode_code,
         level=record.level,
         category=record.category,
     )

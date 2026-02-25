@@ -19,6 +19,27 @@ services:
       timeout: 3s
       retries: 10
 
+  postgres_backup:
+    image: postgres:16-alpine
+    container_name: quiz_arena_postgres_backup_prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:?POSTGRES_DB is required}
+      PGUSER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_COUNT: ${POSTGRES_BACKUP_RETENTION_COUNT:-7}
+      BACKUP_INTERVAL_SECONDS: ${POSTGRES_BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - pg_backups:/backups
+      - ./scripts/postgres_backup.sh:/scripts/postgres_backup.sh:ro
+    command: ["sh", "/scripts/postgres_backup.sh", "loop"]
+
   redis:
     image: redis:7-alpine
     container_name: quiz_arena_redis_prod
@@ -144,6 +165,7 @@ services:
 
 volumes:
   pg_data:
+  pg_backups:
   redis_data:
   caddy_data:
   caddy_config:
