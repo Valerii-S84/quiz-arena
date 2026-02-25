@@ -165,9 +165,7 @@ def select_question_for_mode(
         else None
     )
     primary_levels = (
-        (normalized_preferred,)
-        if normalized_preferred is not None
-        else normalized_allowed_levels
+        (normalized_preferred,) if normalized_preferred is not None else normalized_allowed_levels
     )
 
     pool = _question_pool_for_mode(mode_code)
@@ -202,7 +200,9 @@ def select_question_for_mode(
     ):
         candidates = [question for question in pool if question.level in normalized_allowed_levels]
     if not candidates:
-        raise LookupError(f"No fallback questions available for mode={mode_code} levels={primary_levels}")
+        raise LookupError(
+            f"No fallback questions available for mode={mode_code} levels={primary_levels}"
+        )
 
     index = _stable_index(selection_seed, len(candidates))
     return candidates[index]

@@ -67,7 +67,9 @@ async def _pick_from_mode(
             if allowed_levels
             else None
         )
-        preferred_levels = (preferred_level,) if preferred_level is not None else allowed_levels_tuple
+        preferred_levels = (
+            (preferred_level,) if preferred_level is not None else allowed_levels_tuple
+        )
         candidate_ids = await _get_pool_ids(
             session,
             mode_code=mode_code,

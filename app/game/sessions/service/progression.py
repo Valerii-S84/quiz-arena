@@ -203,7 +203,9 @@ async def resolve_start_progression_state(
                 user_id=user_id,
                 mode_code=mode_code,
             )
-    effective_level = _clamp_level_for_mode(mode_code=mode_code, level=effective_level) or LEVEL_CHAIN[0]
+    effective_level = (
+        _clamp_level_for_mode(mode_code=mode_code, level=effective_level) or LEVEL_CHAIN[0]
+    )
 
     if mode_progress is None:
         mode_progress = await ModeProgressRepo.upsert_preferred_level(
