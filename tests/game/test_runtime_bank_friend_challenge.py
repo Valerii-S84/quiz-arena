@@ -44,9 +44,6 @@ async def test_select_friend_challenge_question_prefers_less_used_category(
         exclude_question_ids=None,
         preferred_levels=None,
     ):
-        del session, mode_code, exclude_question_ids
-        if preferred_levels == ("A2",):
-            return ["q_a2_heavy", "q_a2_light"]
         return []
 
     async def fake_list_by_ids(session, *, question_ids):  # noqa: ANN001

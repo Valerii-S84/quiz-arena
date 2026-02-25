@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import replace
 from datetime import date
 from typing import Sequence
 
@@ -12,7 +11,6 @@ def _daily_challenge_question(local_date_berlin: date) -> QuizQuestion:
     question_id = f"dc_{local_date_berlin.isoformat()}"
     return QuizQuestion(
         question_id=question_id,
-        mode_code="DAILY_CHALLENGE",
         text="Daily Challenge: Was ist der richtige Artikel für 'Tisch'?",
         options=("das", "die", "der", "den"),
         correct_option=2,
@@ -119,12 +117,6 @@ def _question_pool_for_mode(mode_code: str) -> tuple[QuizQuestion, ...]:
     return _GENERIC_POOL
 
 
-def _with_mode(question: QuizQuestion, *, mode_code: str) -> QuizQuestion:
-    if question.mode_code == mode_code:
-        return question
-    return replace(question, mode_code=mode_code)
-
-
 def _stable_index(seed: str, size: int) -> int:
     digest = hashlib.sha256(seed.encode("utf-8")).digest()
     return int.from_bytes(digest[:8], "big") % size
@@ -142,7 +134,7 @@ def get_question_by_id(
 
     for question in _question_pool_for_mode(mode_code):
         if question.question_id == question_id:
-            return _with_mode(question, mode_code=mode_code)
+            return question
     return None
 
 
@@ -164,11 +156,11 @@ def select_question_for_mode(
         candidates = list(pool)
 
     index = _stable_index(selection_seed, len(candidates))
-    return _with_mode(candidates[index], mode_code=mode_code)
+    return candidates[index]
 
 
 def get_question_for_mode(mode_code: str, *, local_date_berlin: date) -> QuizQuestion:
     if mode_code == "DAILY_CHALLENGE":
         return _daily_challenge_question(local_date_berlin)
 
-    return _with_mode(_question_pool_for_mode(mode_code)[0], mode_code=mode_code)
+    return _question_pool_for_mode(mode_code)[0]
