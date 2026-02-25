@@ -23,4 +23,5 @@ FRIEND_CHALLENGE_LEVEL_SEQUENCE: tuple[str, ...] = (
 LEVEL_ORDER: tuple[str, ...] = ("A1", "A2", "B1", "B2", "C1", "C2")
 PERSISTENT_ADAPTIVE_MODE_BOUNDS: dict[str, tuple[str, str]] = {
     "ARTIKEL_SPRINT": ("A1", "B2"),
+    "QUICK_MIX_A1A2": ("A1", "B2"),
 }

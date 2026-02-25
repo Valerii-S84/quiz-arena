@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.mode_access_repo import ModeAccessRepo
-from app.db.repo.mode_progress_repo import ModeProgressRepo
 from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.economy.energy.service import EnergyService
@@ -25,11 +24,9 @@ from app.game.sessions.errors import (
 )
 from app.game.sessions.types import SessionQuestionView, StartSessionResult
 
-from .levels import _clamp_level_for_mode, _is_persistent_adaptive_mode
-from .question_loading import (
-    _build_start_result_from_existing_session,
-    _infer_preferred_level_from_recent_attempt,
-)
+from .levels import _is_persistent_adaptive_mode
+from .progression import resolve_start_progression_state, select_level_weighted
+from .question_loading import _build_start_result_from_existing_session
 
 
 async def start_session(
@@ -113,41 +110,19 @@ async def start_session(
 
     if question is None:
         effective_preferred_level = preferred_question_level
+        allowed_levels: tuple[str, ...] | None = None
+        mix_step = 0
         if _is_persistent_adaptive_mode(mode_code=mode_code):
-            mode_progress = None
-            if effective_preferred_level is None:
-                mode_progress = await ModeProgressRepo.get_by_user_mode(
-                    session,
-                    user_id=user_id,
-                    mode_code=mode_code,
-                )
-                if mode_progress is not None:
-                    effective_preferred_level = mode_progress.preferred_level
-                else:
-                    # Backfill for existing users: infer last reached level from history.
-                    effective_preferred_level = await _infer_preferred_level_from_recent_attempt(
-                        session,
-                        user_id=user_id,
-                        mode_code=mode_code,
-                    )
-
-            if mode_progress is None and effective_preferred_level is not None:
-                seeded_level = _clamp_level_for_mode(
-                    mode_code=mode_code,
-                    level=effective_preferred_level,
-                )
-                if seeded_level is not None:
-                    await ModeProgressRepo.upsert_preferred_level(
-                        session,
-                        user_id=user_id,
-                        mode_code=mode_code,
-                        preferred_level=seeded_level,
-                        now_utc=now_utc,
-                    )
-                    effective_preferred_level = seeded_level
-            effective_preferred_level = _clamp_level_for_mode(
+            (
+                effective_preferred_level,
+                mix_step,
+                allowed_levels,
+            ) = await resolve_start_progression_state(
+                session,
+                user_id=user_id,
                 mode_code=mode_code,
-                level=effective_preferred_level,
+                preferred_level_override=effective_preferred_level,
+                now_utc=now_utc,
             )
 
         recent_question_ids: list[str] = []
@@ -159,6 +134,15 @@ async def start_session(
                 limit=20,
             )
         selection_seed = selection_seed_override or idempotency_key
+        if (
+            _is_persistent_adaptive_mode(mode_code=mode_code)
+            and effective_preferred_level is not None
+        ):
+            effective_preferred_level = select_level_weighted(
+                effective_preferred_level,
+                mix_step,
+                selection_seed=selection_seed,
+            )
         from app.game.sessions import service as service_module
 
         question = await service_module.select_question_for_mode(
@@ -168,6 +152,7 @@ async def start_session(
             recent_question_ids=recent_question_ids,
             selection_seed=selection_seed,
             preferred_level=effective_preferred_level,
+            allowed_levels=allowed_levels,
         )
 
     try:

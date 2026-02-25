@@ -31,6 +31,7 @@ def fallback_select_question_for_mode(
     recent_question_ids: Sequence[str],
     selection_seed: str,
     preferred_level: str | None = None,
+    allowed_levels: Sequence[str] | None = None,
 ) -> QuizQuestion:
     return select_question_for_mode_fallback(
         mode_code,
@@ -38,6 +39,7 @@ def fallback_select_question_for_mode(
         recent_question_ids=recent_question_ids,
         selection_seed=selection_seed,
         preferred_level=preferred_level,
+        allowed_levels=allowed_levels,
     )
 
 

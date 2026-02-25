@@ -145,7 +145,7 @@ async def test_artikel_sprint_persists_level_between_sessions_and_days() -> None
             idempotency_key="artikel:progress:first:answer",
             now_utc=now_utc,
         )
-        assert first_answer.next_preferred_level == "A2"
+        assert first_answer.next_preferred_level == "A1"
 
         second = await GameSessionService.start_session(
             session,
@@ -157,7 +157,7 @@ async def test_artikel_sprint_persists_level_between_sessions_and_days() -> None
         )
         second_question = await session.get(QuizQuestionModel, second.session.question_id)
         assert second_question is not None
-        assert second_question.level == "A2"
+        assert second_question.level == "A1"
 
         second_answer = await GameSessionService.submit_answer(
             session,
@@ -167,7 +167,7 @@ async def test_artikel_sprint_persists_level_between_sessions_and_days() -> None
             idempotency_key="artikel:progress:second:answer",
             now_utc=now_utc + timedelta(minutes=1),
         )
-        assert second_answer.next_preferred_level == "B1"
+        assert second_answer.next_preferred_level == "A1"
 
         progress_row = await session.get(
             ModeProgress,
@@ -177,7 +177,9 @@ async def test_artikel_sprint_persists_level_between_sessions_and_days() -> None
             },
         )
         assert progress_row is not None
-        assert progress_row.preferred_level == "B1"
+        assert progress_row.preferred_level == "A1"
+        assert progress_row.mix_step == 0
+        assert progress_row.correct_in_mix == 0
 
         next_day = await GameSessionService.start_session(
             session,
@@ -189,7 +191,7 @@ async def test_artikel_sprint_persists_level_between_sessions_and_days() -> None
         )
         next_day_question = await session.get(QuizQuestionModel, next_day.session.question_id)
         assert next_day_question is not None
-        assert next_day_question.level == "B1"
+        assert next_day_question.level == "A1"
 
 
 @pytest.mark.asyncio

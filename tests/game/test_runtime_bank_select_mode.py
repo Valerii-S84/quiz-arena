@@ -237,7 +237,7 @@ async def test_select_question_for_mode_prefers_requested_level(
 
 
 @pytest.mark.asyncio
-async def test_select_question_for_mode_falls_back_when_preferred_level_absent(
+async def test_select_question_for_mode_relaxes_only_within_allowed_levels(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     recorded_levels: list[tuple[str, ...] | None] = []
@@ -258,9 +258,11 @@ async def test_select_question_for_mode_falls_back_when_preferred_level_absent(
         preferred_levels=None,
     ):
         recorded_levels.append(tuple(preferred_levels) if preferred_levels else None)
-        if preferred_levels is not None:
+        if preferred_levels == ("C2",):
             return []
-        return ["q_default"]
+        if preferred_levels == ("A1", "A2"):
+            return ["q_default"]
+        return []
 
     async def fake_get_by_id(session, question_id):  # noqa: ANN001
         return _fake_record(question_id, mode_code="ARTIKEL_SPRINT")
@@ -285,7 +287,9 @@ async def test_select_question_for_mode_falls_back_when_preferred_level_absent(
         recent_question_ids=[],
         selection_seed="seed-level-fallback",
         preferred_level="C2",
+        allowed_levels=("A1", "A2"),
     )
     assert selected.question_id == "q_default"
     assert ("C2",) in recorded_levels
-    assert None in recorded_levels
+    assert ("A1", "A2") in recorded_levels
+    assert None not in recorded_levels

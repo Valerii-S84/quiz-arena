@@ -28,6 +28,7 @@ _QUICK_MIX_A1A2_POOL: tuple[QuizQuestion, ...] = (
             "Ich gehst heute zur Arbeit.",
         ),
         correct_option=0,
+        level="A1",
     ),
     QuizQuestion(
         question_id="qm_a1a2_002",
@@ -39,6 +40,7 @@ _QUICK_MIX_A1A2_POOL: tuple[QuizQuestion, ...] = (
             "Wir gelernen heute Deutsch.",
         ),
         correct_option=1,
+        level="A2",
     ),
     QuizQuestion(
         question_id="qm_a1a2_003",
@@ -50,6 +52,7 @@ _QUICK_MIX_A1A2_POOL: tuple[QuizQuestion, ...] = (
             "Er sein Zeit.",
         ),
         correct_option=1,
+        level="B1",
     ),
     QuizQuestion(
         question_id="qm_a1a2_004",
@@ -61,6 +64,7 @@ _QUICK_MIX_A1A2_POOL: tuple[QuizQuestion, ...] = (
             "Heute spielen ich Fußball.",
         ),
         correct_option=1,
+        level="B2",
     ),
 )
 
@@ -71,24 +75,28 @@ _ARTIKEL_SPRINT_POOL: tuple[QuizQuestion, ...] = (
         text="Welcher Artikel passt zu 'Auto'?",
         options=("die", "das", "der", "den"),
         correct_option=1,
+        level="A1",
     ),
     QuizQuestion(
         question_id="artikel_002",
         text="Welcher Artikel passt zu 'Bahnhof'?",
         options=("die", "dem", "das", "der"),
         correct_option=3,
+        level="A2",
     ),
     QuizQuestion(
         question_id="artikel_003",
         text="Welcher Artikel passt zu 'Prüfung'?",
         options=("der", "die", "das", "den"),
         correct_option=1,
+        level="B1",
     ),
     QuizQuestion(
         question_id="artikel_004",
         text="Welcher Artikel passt zu 'Film'?",
         options=("das", "die", "den", "der"),
         correct_option=3,
+        level="B2",
     ),
 )
 
@@ -145,15 +153,56 @@ def select_question_for_mode(
     recent_question_ids: Sequence[str],
     selection_seed: str,
     preferred_level: str | None = None,
+    allowed_levels: Sequence[str] | None = None,
 ) -> QuizQuestion:
     if mode_code == "DAILY_CHALLENGE":
         return _daily_challenge_question(local_date_berlin)
 
+    normalized_preferred = preferred_level.strip().upper() if preferred_level else None
+    normalized_allowed_levels = (
+        tuple(dict.fromkeys(level.strip().upper() for level in allowed_levels if level))
+        if allowed_levels
+        else None
+    )
+    primary_levels = (
+        (normalized_preferred,) if normalized_preferred is not None else normalized_allowed_levels
+    )
+
     pool = _question_pool_for_mode(mode_code)
     recent_ids_set = set(recent_question_ids)
-    candidates = [question for question in pool if question.question_id not in recent_ids_set]
+    candidates = [
+        question
+        for question in pool
+        if question.question_id not in recent_ids_set
+        and (primary_levels is None or question.level in primary_levels)
+    ]
+    if (
+        not candidates
+        and normalized_preferred is not None
+        and normalized_allowed_levels is not None
+    ):
+        candidates = [
+            question
+            for question in pool
+            if question.question_id not in recent_ids_set
+            and question.level in normalized_allowed_levels
+        ]
     if not candidates:
-        candidates = list(pool)
+        candidates = [
+            question
+            for question in pool
+            if primary_levels is None or question.level in primary_levels
+        ]
+    if (
+        not candidates
+        and normalized_preferred is not None
+        and normalized_allowed_levels is not None
+    ):
+        candidates = [question for question in pool if question.level in normalized_allowed_levels]
+    if not candidates:
+        raise LookupError(
+            f"No fallback questions available for mode={mode_code} levels={primary_levels}"
+        )
 
     index = _stable_index(selection_seed, len(candidates))
     return candidates[index]
