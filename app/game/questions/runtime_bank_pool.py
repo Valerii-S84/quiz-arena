@@ -8,6 +8,7 @@ from time import monotonic
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.game.questions.runtime_bank_models import ALL_ACTIVE_SCOPE_CODE, QUICK_MIX_MODE_CODE
 
 
 @dataclass(slots=True)
@@ -36,11 +37,11 @@ def clear_question_pool_cache() -> None:
 
 
 def _pool_cache_scope(mode_code: str) -> str:
-    return mode_code
+    return ALL_ACTIVE_SCOPE_CODE if mode_code == QUICK_MIX_MODE_CODE else mode_code
 
 
 def _pool_matches_mode(mode_code: str, *, question_mode_code: str) -> bool:
-    return question_mode_code == mode_code
+    return mode_code == QUICK_MIX_MODE_CODE or question_mode_code == mode_code
 
 
 def _pool_matches_level(
@@ -72,12 +73,20 @@ async def _load_pool_ids(
     mode_code: str,
     preferred_levels: tuple[str, ...] | None,
 ) -> tuple[str, ...]:
-    pool_ids = await _repo().list_question_ids_for_mode(
-        session,
-        mode_code=mode_code,
-        exclude_question_ids=None,
-        preferred_levels=preferred_levels,
-    )
+    repo = _repo()
+    if mode_code == QUICK_MIX_MODE_CODE:
+        pool_ids = await repo.list_question_ids_all_active(
+            session,
+            exclude_question_ids=None,
+            preferred_levels=preferred_levels,
+        )
+    else:
+        pool_ids = await repo.list_question_ids_for_mode(
+            session,
+            mode_code=mode_code,
+            exclude_question_ids=None,
+            preferred_levels=preferred_levels,
+        )
     return tuple(pool_ids)
 
 

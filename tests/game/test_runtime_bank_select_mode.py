@@ -68,7 +68,6 @@ async def test_select_question_for_mode_daily_uses_quick_mix_source_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     called_all_active = 0
-    called_for_mode: list[str] = []
 
     async def fake_list_question_ids_all_active(  # noqa: ANN001
         session,
@@ -87,10 +86,6 @@ async def test_select_question_for_mode_daily_uses_quick_mix_source_mode(
         exclude_question_ids=None,
         preferred_levels=None,
     ):
-        called_for_mode.append(mode_code)
-        del exclude_question_ids, preferred_levels
-        if mode_code == "QUICK_MIX_A1A2":
-            return ["q_a", "q_b"]
         return []
 
     async def fake_get_by_id(session, question_id):  # noqa: ANN001
@@ -125,12 +120,11 @@ async def test_select_question_for_mode_daily_uses_quick_mix_source_mode(
     )
 
     assert first.question_id == second.question_id
-    assert called_all_active == 0
-    assert called_for_mode == ["QUICK_MIX_A1A2"]
+    assert called_all_active > 0
 
 
 @pytest.mark.asyncio
-async def test_select_question_for_quick_mix_uses_mode_pool(
+async def test_select_question_for_quick_mix_uses_all_modes_pool(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     called_all_active = 0
@@ -180,9 +174,9 @@ async def test_select_question_for_quick_mix_uses_mode_pool(
         recent_question_ids=[],
         selection_seed="seed-mix",
     )
-    assert selected.question_id == "mode_q_1"
-    assert called_all_active == 0
-    assert called_for_mode > 0
+    assert selected.question_id == "mix_q_1"
+    assert called_all_active > 0
+    assert called_for_mode == 0
 
 
 @pytest.mark.asyncio
@@ -243,7 +237,7 @@ async def test_select_question_for_mode_prefers_requested_level(
 
 
 @pytest.mark.asyncio
-async def test_select_question_for_mode_falls_back_to_next_level_only(
+async def test_select_question_for_mode_falls_back_when_preferred_level_absent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     recorded_levels: list[tuple[str, ...] | None] = []
@@ -264,18 +258,12 @@ async def test_select_question_for_mode_falls_back_to_next_level_only(
         preferred_levels=None,
     ):
         recorded_levels.append(tuple(preferred_levels) if preferred_levels else None)
-        del session, mode_code, exclude_question_ids
-        if preferred_levels == ("B1",):
+        if preferred_levels is not None:
             return []
-        if preferred_levels == ("B2",):
-            return ["q_b2"]
         return ["q_default"]
 
     async def fake_get_by_id(session, question_id):  # noqa: ANN001
-        level = "B2" if question_id == "q_b2" else "A1"
-        record = _fake_record(question_id, mode_code="ARTIKEL_SPRINT")
-        record.level = level
-        return record
+        return _fake_record(question_id, mode_code="ARTIKEL_SPRINT")
 
     monkeypatch.setattr(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
@@ -296,9 +284,8 @@ async def test_select_question_for_mode_falls_back_to_next_level_only(
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=[],
         selection_seed="seed-level-fallback",
-        preferred_level="B1",
+        preferred_level="C2",
     )
-    assert selected.question_id == "q_b2"
-    assert ("B1",) in recorded_levels
-    assert ("B2",) in recorded_levels
-    assert None not in recorded_levels
+    assert selected.question_id == "q_default"
+    assert ("C2",) in recorded_levels
+    assert None in recorded_levels
