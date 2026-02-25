@@ -131,6 +131,7 @@ Additional guards (CI + pre-commit unless noted):
 - Reverse proxy config: `deploy/Caddyfile`
 - Deploy helper: `scripts/deploy.sh`
 - Runbook: `docs/runbooks/first_deploy_and_rollback.md`
+- Post-deploy gate: `python -m scripts.post_deploy_gate` (checks `Code + Runtime + Data = head`)
 
 ## 9. QuizBank report refresh flow
 
