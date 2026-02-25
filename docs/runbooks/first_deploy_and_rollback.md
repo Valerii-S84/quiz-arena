@@ -57,9 +57,27 @@ Capacity guardrails before scaling:
 Note:
 - `scripts/deploy.sh` now runs both DB migrations and mandatory QuizBank import (`python -m scripts.quizbank_import_tool --replace-all`) before bringing up `api/worker/beat/caddy`.
 - Deploy now includes an automatic gate `python -m scripts.quizbank_assert_non_empty`; deploy fails immediately if `quiz_questions` is empty.
+- Deploy now enforces runtime rebuild (`docker compose build api worker beat` + `up -d --build`) before migration and service start.
+- Deploy now runs mandatory post-deploy gate `python -m scripts.post_deploy_gate`.
 - If you deploy manually (without `scripts/deploy.sh`), run this import step explicitly after migrations.
 
-## 3) Webhook setup
+## 3) Release Invariant (mandatory)
+Release is considered DONE only if all three layers are on head state:
+- `Code`: deployed repo files match intended release.
+- `Runtime`: `api/worker/beat` are rebuilt from deployed code.
+- `Data`: DB schema/data gates pass for that runtime.
+
+Formal gate (must pass):
+- Alembic DB version equals expected head.
+- Required schema columns exist (`mode_progress.mix_step`, `mode_progress.correct_in_mix`).
+- Canary session starts from `A1` for both modes (`ARTIKEL_SPRINT`, `QUICK_MIX_A1A2`).
+
+These checks are automated by:
+```bash
+docker compose -f docker-compose.prod.yml run --rm api python -m scripts.post_deploy_gate
+```
+
+## 4) Webhook setup
 Run on server or local machine:
 
 ```bash
@@ -74,7 +92,7 @@ Check:
 curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"
 ```
 
-## 4) Smoke checks
+## 5) Smoke checks
 - API health:
 ```bash
 curl -sS https://deutchquizarena.de/health
@@ -121,7 +139,7 @@ asyncio.run(main())
 PY
 ```
 
-## 5) Telegram update reliability (P0-1)
+## 6) Telegram update reliability (P0-1)
 Default knobs in `.env` (tune only if needed):
 - `TELEGRAM_UPDATE_PROCESSING_TTL_SECONDS=300`
 - `TELEGRAM_UPDATE_TASK_MAX_RETRIES=7`
@@ -187,14 +205,14 @@ asyncio.run(main())
 PY
 ```
 
-## 6) Backups (minimum)
+## 7) Backups (minimum)
 Daily Postgres dump (cron example):
 
 ```bash
 docker exec -t quiz_arena_postgres_prod pg_dump -U quiz -d quiz_arena -Fc > /var/backups/quiz_arena_$(date +%F).dump
 ```
 
-## 7) Rollback
+## 8) Rollback
 If deploy is broken after new commit:
 
 1. On server, switch to previous git commit/tag.
@@ -207,7 +225,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 pg_restore -U quiz -d quiz_arena --clean --if-exists /var/backups/<last_good_dump>.dump
 ```
 
-## 8) Notes
+## 9) Notes
 - Keep `.env` only on server, never commit.
 - Apply migrations before exposing webhook after schema changes.
 - For first production launch, prefer clean DB init instead of local dump import (current local data is dev/smoke level).
