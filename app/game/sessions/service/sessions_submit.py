@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.quiz_attempts import QuizAttempt
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
-from app.db.repo.mode_progress_repo import ModeProgressRepo
 from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.economy.streak.service import StreakService
@@ -15,7 +14,8 @@ from app.game.sessions.errors import InvalidAnswerOptionError, SessionNotFoundEr
 from app.game.sessions.types import AnswerSessionResult
 
 from .friend_challenges_internal import _build_friend_challenge_snapshot
-from .levels import _is_persistent_adaptive_mode, _next_preferred_level
+from .levels import _is_persistent_adaptive_mode
+from .progression import check_and_advance
 from .question_loading import _load_question_for_session
 from .sessions_submit_friend_challenge import _apply_friend_challenge_answer
 
@@ -108,23 +108,15 @@ async def submit_answer(
         user_id=user_id,
         activity_at_utc=now_utc,
     )
-    next_preferred_level = _next_preferred_level(
-        question_level=question.level,
-        is_correct=is_correct,
-        mode_code=quiz_session.mode_code,
-    )
-    if (
-        _is_persistent_adaptive_mode(mode_code=quiz_session.mode_code)
-        and next_preferred_level is not None
-    ):
-        progress = await ModeProgressRepo.upsert_preferred_level(
-            session,
+    next_preferred_level = None
+    if _is_persistent_adaptive_mode(mode_code=quiz_session.mode_code):
+        advanced_level, _, _ = await check_and_advance(
             user_id=user_id,
-            mode_code=quiz_session.mode_code,
-            preferred_level=next_preferred_level,
+            mode=quiz_session.mode_code,
+            db=session,
             now_utc=now_utc,
         )
-        next_preferred_level = progress.preferred_level
+        next_preferred_level = advanced_level
 
     return AnswerSessionResult(
         session_id=quiz_session.id,
