@@ -36,6 +36,7 @@ from app.db.session import SessionLocal
 from app.economy.offers.constants import TRG_LOCKED_MODE_CLICK
 from app.economy.offers.service import OfferLoggingError, OfferService
 from app.economy.referrals.service import ReferralService
+from app.services.channel_bonus import ChannelBonusService
 from app.game.sessions.errors import SessionNotFoundError
 from app.game.sessions.service import GameSessionService
 from app.services.user_onboarding import UserOnboardingService
@@ -96,13 +97,11 @@ _start_mode = partial(
     **_session_deps(),
     offer_service=OfferService,
     offer_logging_error=OfferLoggingError,
+    channel_bonus_service=ChannelBonusService,
     trg_locked_mode_click=TRG_LOCKED_MODE_CLICK,
     build_question_text=_build_question_text,
 )
-_send_friend_round_question = partial(
-    play_flow.send_friend_round_question,
-    build_question_text=_build_question_text,
-)
+_send_friend_round_question = partial(play_flow.send_friend_round_question, build_question_text=_build_question_text)
 
 
 @router.callback_query(F.data.startswith("game:stop"))
@@ -178,6 +177,7 @@ async def handle_answer(callback: CallbackQuery) -> None:
         parse_answer_callback=gameplay_callbacks.parse_answer_callback,
         **_session_deps(),
         referral_service=ReferralService,
+        channel_bonus_service=ChannelBonusService,
         offer_service=OfferService,
         offer_logging_error=OfferLoggingError,
         build_question_text=_build_question_text,

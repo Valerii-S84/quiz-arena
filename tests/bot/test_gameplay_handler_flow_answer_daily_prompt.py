@@ -45,6 +45,10 @@ async def test_handle_answer_daily_branch_shows_referral_prompt_when_reserved(mo
         del session, user_id, now_utc
         return True
 
+    async def _fake_show_channel_bonus(session, *, user_id: int, idempotent_replay: bool):
+        del session, user_id, idempotent_replay
+        return False
+
     async def _fake_emit(*args, **kwargs):
         emitted_events.append(kwargs["event_type"])
         del args, kwargs
@@ -59,6 +63,11 @@ async def test_handle_answer_daily_branch_shows_referral_prompt_when_reserved(mo
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(gameplay.GameSessionService, "submit_answer", _fake_submit_answer)
     monkeypatch.setattr(gameplay.ReferralService, "reserve_post_game_prompt", _fake_reserve_prompt)
+    monkeypatch.setattr(
+        gameplay.ChannelBonusService,
+        "should_show_post_game_prompt",
+        _fake_show_channel_bonus,
+    )
     monkeypatch.setattr(gameplay, "emit_analytics_event", _fake_emit)
     monkeypatch.setattr(gameplay.daily_flow, "handle_daily_answer_branch", _fake_daily_branch)
 
