@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import distinct, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.referrals import Referral
@@ -68,12 +68,14 @@ async def list_referrer_ids_with_reward_candidates(
     limit: int = 200,
 ) -> list[int]:
     stmt = (
-        select(distinct(Referral.referrer_user_id))
+        select(Referral.referrer_user_id)
         .where(
             Referral.status.in_(("QUALIFIED", "DEFERRED_LIMIT")),
             Referral.qualified_at.is_not(None),
             Referral.qualified_at <= qualified_before_utc,
         )
+        .group_by(Referral.referrer_user_id)
+        .order_by(func.min(Referral.qualified_at).asc(), Referral.referrer_user_id.asc())
         .limit(limit)
     )
     result = await session.execute(stmt)
@@ -158,3 +160,18 @@ async def list_for_review_since(
     ).limit(limit)
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def list_referrer_ids_with_reward_notifications(
+    session: AsyncSession,
+    *,
+    notified_at: datetime,
+) -> list[int]:
+    stmt = (
+        select(Referral.referrer_user_id)
+        .where(Referral.notified_at == notified_at)
+        .group_by(Referral.referrer_user_id)
+        .order_by(Referral.referrer_user_id.asc())
+    )
+    result = await session.execute(stmt)
+    return [int(user_id) for user_id in result.scalars().all()]

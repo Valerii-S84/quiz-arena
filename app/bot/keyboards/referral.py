@@ -11,6 +11,10 @@ def _build_share_url(*, invite_link: str, share_text: str) -> str:
     )
 
 
+def build_referral_share_url(*, invite_link: str, share_text: str) -> str:
+    return _build_share_url(invite_link=invite_link, share_text=share_text)
+
+
 def build_referral_keyboard(
     *,
     invite_link: str | None,
@@ -23,10 +27,7 @@ def build_referral_keyboard(
             [
                 InlineKeyboardButton(
                     text="Link teilen",
-                    url=_build_share_url(
-                        invite_link=invite_link,
-                        share_text="Quiz Arena: Spiele mit mir!",
-                    ),
+                    callback_data="referral:share",
                 )
             ]
         )
@@ -47,3 +48,12 @@ def build_referral_keyboard(
 
     rows.append([InlineKeyboardButton(text="Aktualisieren", callback_data="referral:open")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_referral_share_keyboard(*, share_url: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Jetzt teilen", url=share_url)],
+            [InlineKeyboardButton(text="⬅️ Zurueck", callback_data="referral:open")],
+        ]
+    )

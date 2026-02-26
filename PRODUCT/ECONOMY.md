@@ -166,10 +166,14 @@ Jeder Nutzer erhält individuellen Link.
 
 ### 8.2 Referral Milestones
 
-* 1 Freund → 1 Free Entry
-* 3 Freunde → 3 Free Entries
-* 5 Freunde → 7 Free Entries + Badge
-* 10 Freunde → Temporärer Premium-Zugang
+Aktive Produktlogik (Stand: 26.02.2026):
+
+* Jede **3** qualifizierten Freunde → **1** Belohnungs-Slot
+* Cap: **2 Belohnungen pro Monat** pro Referrer
+* Delay: Belohnung wird erst **48h nach qualified_at** claimable
+* Reward Choice: **MEGA_PACK_15** oder **PREMIUM_STARTER**
+
+Hinweis: Die alten Milestones `1/3/5/10` wurden verworfen, um Fraud-Risiko und Reward-Inflation zu senken und den Claim-Flow klar/idempotent zu halten.
 
 Referral-Belohnungen dürfen keine Stars enthalten.
 

@@ -12,6 +12,12 @@ from app.economy.referrals.service import ReferralService
 from app.services.alerts import send_ops_alert
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
+from app.workers.tasks.referrals_notifications import (
+    send_referral_ready_notifications as _send_referral_ready_notifications,
+)
+from app.workers.tasks.referrals_notifications import (
+    send_referral_rejected_notifications as _send_referral_rejected_notifications,
+)
 
 logger = structlog.get_logger(__name__)
 REFERRAL_REWARD_EVENT_TYPES = (
@@ -22,12 +28,22 @@ REFERRAL_REWARD_EVENT_TYPES = (
 
 async def run_referral_qualification_checks_async(*, batch_size: int = 200) -> dict[str, int]:
     now_utc = datetime.now(timezone.utc)
+    rejected_referrer_user_ids: list[int] = []
+
+    async def _collect_rejected_referrer(_referral_id: int, referrer_user_id: int) -> None:
+        rejected_referrer_user_ids.append(referrer_user_id)
+
     async with SessionLocal.begin() as session:
         result = await ReferralService.run_qualification_checks(
             session,
             now_utc=now_utc,
             batch_size=batch_size,
+            on_rejected_fraud=_collect_rejected_referrer,
         )
+    rejected_notifications = await _send_referral_rejected_notifications(
+        referrer_user_ids=rejected_referrer_user_ids
+    )
+    result = {**result, **rejected_notifications}
     logger.info("referral_qualification_checks_finished", **result)
     return result
 
@@ -42,8 +58,14 @@ async def run_referral_reward_distribution_async(*, batch_size: int = 200) -> di
             reward_code=None,
         )
 
+    notifications_sent = {
+        "reward_user_notified": 0,
+        "reward_user_notify_failed": 0,
+    }
+    if result.get("newly_notified", 0) > 0:
+        notifications_sent = await _send_referral_ready_notifications(notified_at=now_utc)
     alerts_sent = await _send_referral_reward_alerts(result=result)
-    result = {**result, **alerts_sent}
+    result = {**result, **notifications_sent, **alerts_sent}
     logger.info("referral_reward_distribution_finished", **result)
     return result
 
@@ -52,7 +74,7 @@ async def _send_referral_reward_alerts(*, result: dict[str, int]) -> dict[str, i
     milestone_alert_sent = 0
     reward_alert_sent = 0
 
-    if result.get("awaiting_choice", 0) > 0:
+    if result.get("newly_notified", 0) > 0:
         milestone_event = REFERRAL_REWARD_EVENT_TYPES[0]
         milestone_alert_sent = int(
             await send_ops_alert(
