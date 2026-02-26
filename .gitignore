@@ -32,5 +32,8 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# Local assets
+foto/
+
 # Alembic artifacts
 alembic/versions/*.pyc
