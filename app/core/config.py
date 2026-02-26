@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     telegram_home_header_file_id: str = Field(default="", alias="TELEGRAM_HOME_HEADER_FILE_ID")
     # Telegram channel target for one-time Kanal-Bonus check (supports @username or chat id).
     bonus_channel_id: str = Field(default="", alias="BONUS_CHANNEL_ID")
+    # Optional dedicated bot token for get_chat_member subscription checks.
+    bonus_check_bot_token: str = Field(default="", alias="BONUS_CHECK_BOT_TOKEN")
     telegram_webhook_enqueue_timeout_ms: int = Field(
         default=250,
         alias="TELEGRAM_WEBHOOK_ENQUEUE_TIMEOUT_MS",

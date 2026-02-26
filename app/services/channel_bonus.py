@@ -109,12 +109,27 @@ async def _is_user_subscribed_to_bonus_channel(
     bot: Bot,
     channel_target: int | str,
     telegram_user_id: int,
+    checker_bot_token: str,
 ) -> bool | None:
+    active_bot = bot
+    checker_bot: Bot | None = None
+    normalized_checker_token = checker_bot_token.strip()
+    if normalized_checker_token:
+        try:
+            checker_bot = Bot(token=normalized_checker_token)
+            active_bot = checker_bot
+        except ValueError as exc:
+            logger.warning("channel_bonus_checker_bot_invalid_token", exc_info=exc)
+            return None
+
     try:
-        member = await bot.get_chat_member(chat_id=channel_target, user_id=telegram_user_id)
+        member = await active_bot.get_chat_member(chat_id=channel_target, user_id=telegram_user_id)
     except (TelegramAPIError, TimeoutError, OSError) as exc:
         logger.warning("channel_bonus_check_failed", exc_info=exc)
         return None
+    finally:
+        if checker_bot is not None:
+            await checker_bot.session.close()
 
     member_status = str(getattr(member, "status", "")).lower().strip()
     return member_status in _SUBSCRIBED_MEMBER_STATUSES
@@ -128,7 +143,8 @@ async def claim_bonus_if_subscribed(
     bot: Bot,
     now_utc: datetime,
 ) -> ChannelBonusClaimResult:
-    channel_target = _resolve_channel_target(get_settings().bonus_channel_id)
+    settings = get_settings()
+    channel_target = _resolve_channel_target(settings.bonus_channel_id)
     if channel_target is None:
         logger.warning("channel_bonus_channel_not_configured")
         return ChannelBonusClaimResult(status=_CHANNEL_BONUS_STATUS_CHECK_ERROR)
@@ -137,6 +153,7 @@ async def claim_bonus_if_subscribed(
         bot=bot,
         channel_target=channel_target,
         telegram_user_id=telegram_user_id,
+        checker_bot_token=str(getattr(settings, "bonus_check_bot_token", "") or ""),
     )
     if subscribed is None:
         return ChannelBonusClaimResult(status=_CHANNEL_BONUS_STATUS_CHECK_ERROR)
