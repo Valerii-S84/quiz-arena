@@ -46,3 +46,7 @@ class User(Base):
         server_default=text("now()"),
     )
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    referral_prompt_shown_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )

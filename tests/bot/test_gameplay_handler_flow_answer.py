@@ -13,6 +13,24 @@ from tests.bot.gameplay_flow_fixtures import _start_result
 from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessionLocal
 
 
+@pytest.fixture(autouse=True)
+def _patch_referral_prompt(monkeypatch):
+    async def _fake_reserve_post_game_prompt(session, *, user_id: int, now_utc):
+        del session, user_id, now_utc
+        return False
+
+    async def _fake_emit(*args, **kwargs):
+        del args, kwargs
+        return None
+
+    monkeypatch.setattr(
+        gameplay.ReferralService,
+        "reserve_post_game_prompt",
+        _fake_reserve_post_game_prompt,
+    )
+    monkeypatch.setattr(gameplay, "emit_analytics_event", _fake_emit)
+
+
 @pytest.mark.asyncio
 async def test_handle_answer_handles_missing_session(monkeypatch) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
@@ -233,6 +251,70 @@ async def test_handle_answer_starts_next_round_for_regular_mode(monkeypatch) -> 
     await gameplay.handle_answer(callback)
 
     assert any(call.kwargs.get("parse_mode") == "HTML" for call in callback.message.answers)
+
+
+@pytest.mark.asyncio
+async def test_handle_answer_shows_referral_prompt_once_when_reserved(monkeypatch) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+    emitted_events: list[str] = []
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        del session, telegram_user
+        return SimpleNamespace(user_id=12, free_energy=19, paid_energy=1, current_streak=5)
+
+    async def _fake_submit_answer(*args, **kwargs):
+        del args, kwargs
+        return AnswerSessionResult(
+            session_id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+            question_id="q-main",
+            is_correct=True,
+            current_streak=2,
+            best_streak=8,
+            idempotent_replay=False,
+            mode_code="QUICK_MIX_A1A2",
+            source="MENU",
+            selected_answer_text="die",
+            correct_answer_text="die",
+            next_preferred_level="A2",
+        )
+
+    async def _fake_start_session(*args, **kwargs):
+        del args, kwargs
+        return _start_result()
+
+    async def _fake_reserve_prompt(session, *, user_id: int, now_utc):
+        del session, user_id, now_utc
+        return True
+
+    async def _fake_emit(*args, **kwargs):
+        emitted_events.append(kwargs["event_type"])
+        del args, kwargs
+        return None
+
+    monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(gameplay.GameSessionService, "submit_answer", _fake_submit_answer)
+    monkeypatch.setattr(gameplay.GameSessionService, "start_session", _fake_start_session)
+    monkeypatch.setattr(gameplay.ReferralService, "reserve_post_game_prompt", _fake_reserve_prompt)
+    monkeypatch.setattr(gameplay, "emit_analytics_event", _fake_emit)
+
+    callback = DummyCallback(
+        data="answer:123e4567-e89b-12d3-a456-426614174000:0",
+        from_user=SimpleNamespace(id=12),
+    )
+    await gameplay.handle_answer(callback)
+
+    prompt_call = next(
+        call
+        for call in callback.message.answers
+        if call.text == TEXTS_DE["msg.referral.prompt.after_game"]
+    )
+    callbacks = [
+        button.callback_data
+        for row in prompt_call.kwargs["reply_markup"].inline_keyboard
+        for button in row
+    ]
+    assert callbacks == ["referral:prompt:share", "referral:prompt:later"]
+    assert "referral_prompt_shown" in emitted_events
 
 
 @pytest.mark.asyncio

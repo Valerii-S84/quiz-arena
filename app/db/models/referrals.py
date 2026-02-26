@@ -36,6 +36,7 @@ class Referral(Base):
         ),
         Index("idx_referrals_referrer", "referrer_user_id"),
         Index("idx_referrals_code", "referral_code"),
+        Index("idx_referrals_notified_at", "notified_at"),
         Index("idx_referrals_status_created", "status", "created_at"),
         Index(
             "idx_referrals_status_qualified_referrer",
@@ -65,6 +66,7 @@ class Referral(Base):
     status: Mapped[str] = mapped_column(String(24), nullable=False)
     qualified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     rewarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     fraud_score: Mapped[Decimal] = mapped_column(
         Numeric(5, 2), nullable=False, server_default=text("0")
     )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +22,7 @@ async def run_qualification_checks(
     *,
     now_utc: datetime,
     batch_size: int = 200,
+    on_rejected_fraud: Callable[[int, int], Awaitable[None]] | None = None,
 ) -> dict[str, int]:
     started_ids = await ReferralsRepo.list_started_ids(session, limit=batch_size)
     result = {
@@ -45,6 +47,14 @@ async def run_qualification_checks(
             referral.status = "REJECTED_FRAUD"
             referral.fraud_score = FRAUD_SCORE_CYCLIC
             result["rejected_fraud"] += 1
+            if on_rejected_fraud is not None:
+                await on_rejected_fraud(int(referral.id), int(referral.referrer_user_id))
+            continue
+
+        referrer_user = await UsersRepo.get_by_id(session, referral.referrer_user_id)
+        if referrer_user is None or referrer_user.status == "DELETED":
+            referral.status = "CANCELED"
+            result["canceled"] += 1
             continue
 
         referred_user = await UsersRepo.get_by_id(session, referral.referred_user_id)
