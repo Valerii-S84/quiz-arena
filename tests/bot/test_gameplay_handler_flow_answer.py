@@ -304,7 +304,9 @@ async def test_handle_answer_shows_referral_prompt_once_when_reserved(monkeypatc
     await gameplay.handle_answer(callback)
 
     prompt_call = next(
-        call for call in callback.message.answers if call.text == TEXTS_DE["msg.referral.prompt.after_game"]
+        call
+        for call in callback.message.answers
+        if call.text == TEXTS_DE["msg.referral.prompt.after_game"]
     )
     callbacks = [
         button.callback_data

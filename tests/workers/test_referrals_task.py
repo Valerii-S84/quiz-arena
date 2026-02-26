@@ -48,7 +48,9 @@ def test_run_referral_qualification_checks_sends_rejected_notifications(monkeypa
             "rejected_user_notify_failed": 0,
         }
 
-    monkeypatch.setattr(referrals.ReferralService, "run_qualification_checks", fake_run_qualification_checks)
+    monkeypatch.setattr(
+        referrals.ReferralService, "run_qualification_checks", fake_run_qualification_checks
+    )
     monkeypatch.setattr(
         referrals,
         "_send_referral_rejected_notifications",

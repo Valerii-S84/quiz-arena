@@ -70,7 +70,9 @@ async def test_handle_answer_daily_branch_shows_referral_prompt_when_reserved(mo
 
     assert daily_branch_called is True
     prompt_call = next(
-        call for call in callback.message.answers if call.text == TEXTS_DE["msg.referral.prompt.after_game"]
+        call
+        for call in callback.message.answers
+        if call.text == TEXTS_DE["msg.referral.prompt.after_game"]
     )
     callbacks = [
         button.callback_data

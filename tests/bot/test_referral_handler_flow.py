@@ -77,7 +77,10 @@ async def test_handle_referral_command_renders_overview(monkeypatch) -> None:
     assert "https://t.me/" not in (response.text or "")
     keyboard = response.kwargs["reply_markup"]
     callbacks = [
-        button.callback_data for row in keyboard.inline_keyboard for button in row if button.callback_data
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+        if button.callback_data
     ]
     assert "referral:share" in callbacks
 
@@ -112,6 +115,7 @@ async def test_handle_referral_reward_choice_success(monkeypatch) -> None:
     monkeypatch.setattr(referral.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(referral.ReferralService, "claim_next_reward_choice", _fake_claim)
     monkeypatch.setattr(referral, "_build_invite_link", _fake_invite_link)
+
     async def _fake_emit(*args, **kwargs):
         emitted_events.append(kwargs["event_type"])
         del args, kwargs
@@ -151,6 +155,7 @@ async def test_handle_referral_share_opens_share_keyboard(monkeypatch) -> None:
     monkeypatch.setattr(referral, "_load_overview", _fake_load_overview)
     monkeypatch.setattr(referral, "_build_invite_link", _fake_invite_link)
     monkeypatch.setattr(referral.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+
     async def _fake_emit(*args, **kwargs):
         emitted_events.append(kwargs["event_type"])
         del args, kwargs
@@ -164,7 +169,10 @@ async def test_handle_referral_share_opens_share_keyboard(monkeypatch) -> None:
     response = callback.message.answers[0]
     assert TEXTS_DE["msg.referral.share.ready"] in (response.text or "")
     urls = [
-        button.url for row in response.kwargs["reply_markup"].inline_keyboard for button in row if button.url
+        button.url
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.url
     ]
     assert any(url and "https://t.me/share/url" in url for url in urls)
     assert "referral_link_shared" in emitted_events
