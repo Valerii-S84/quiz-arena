@@ -8,13 +8,13 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 from aiogram.types import User as TelegramUser
 
+from app.bot.handlers.referral_views import _build_claim_status_text, _build_overview_text
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.keyboards.referral import (
     build_referral_keyboard,
     build_referral_share_keyboard,
     build_referral_share_url,
 )
-from app.bot.handlers.referral_views import _build_claim_status_text, _build_overview_text
 from app.bot.texts.de import TEXTS_DE
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.session import SessionLocal

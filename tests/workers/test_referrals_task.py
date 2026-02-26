@@ -2,8 +2,7 @@ import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-from app.workers.tasks import referrals
-from app.workers.tasks import referrals_notifications
+from app.workers.tasks import referrals, referrals_notifications
 
 
 def test_run_referral_qualification_checks_task_wrapper(monkeypatch) -> None:
