@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 from uuid import UUID
 
 import pytest
@@ -25,6 +26,22 @@ class _StartMessage(DummyMessage):
         self.text = text
         self.from_user = from_user
         self.message_id = message_id
+
+
+class _StartMessageWithPhotoGuard(_StartMessage):
+    def __init__(
+        self,
+        *,
+        text: str,
+        from_user: SimpleNamespace | None,
+        message_id: int = 100,
+    ) -> None:
+        super().__init__(text=text, from_user=from_user, message_id=message_id)
+        self.photo_calls = 0
+
+    async def answer_photo(self, *args: Any, **kwargs: Any) -> None:
+        self.photo_calls += 1
+        await super().answer(*args, **kwargs)
 
 
 def test_extract_start_payload() -> None:
@@ -160,3 +177,59 @@ async def test_handle_start_sends_home_and_offer_when_available(monkeypatch) -> 
     assert len(message.answers) == 2
     assert TEXTS_DE["msg.home.title"] in (message.answers[0].text or "")
     assert message.answers[1].text == TEXTS_DE["msg.offer.energy.low"]
+
+
+@pytest.mark.asyncio
+async def test_handle_start_home_menu_does_not_send_photo(monkeypatch) -> None:
+    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
+        return SimpleNamespace(user_id=8, free_energy=12, paid_energy=3, current_streak=4)
+
+    async def _fake_offer(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(start.OfferService, "evaluate_and_log_offer", _fake_offer)
+    monkeypatch.setattr(
+        start.start_flow,
+        "get_settings",
+        lambda: SimpleNamespace(telegram_home_header_file_id=""),
+    )
+
+    message = _StartMessageWithPhotoGuard(
+        text="/start",
+        from_user=SimpleNamespace(id=2, username="bob", first_name="Bob", language_code="de"),
+    )
+    await start.handle_start(message)
+
+    assert message.photo_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_handle_start_home_menu_sends_photo_when_file_id_configured(monkeypatch) -> None:
+    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
+        return SimpleNamespace(user_id=8, free_energy=12, paid_energy=3, current_streak=4)
+
+    async def _fake_offer(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(start.OfferService, "evaluate_and_log_offer", _fake_offer)
+    monkeypatch.setattr(
+        start.start_flow,
+        "get_settings",
+        lambda: SimpleNamespace(telegram_home_header_file_id="AgAC-home-header"),
+    )
+
+    message = _StartMessage(
+        text="/start",
+        from_user=SimpleNamespace(id=2, username="bob", first_name="Bob", language_code="de"),
+    )
+    await start.handle_start(message)
+
+    assert len(message.answers) == 1
+    assert message.answers[0].kwargs.get("photo") == "AgAC-home-header"
+    assert TEXTS_DE["msg.home.title"] in (message.answers[0].text or "")

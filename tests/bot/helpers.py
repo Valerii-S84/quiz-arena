@@ -57,6 +57,22 @@ class DummyMessage:
     async def answer(self, text: str | None = None, **kwargs: Any) -> None:
         self.answers.append(DummyAnswerCall(text=text, kwargs=kwargs))
 
+    async def answer_photo(
+        self,
+        photo: Any,
+        caption: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.answers.append(
+            DummyAnswerCall(
+                text=caption,
+                kwargs={
+                    "photo": photo,
+                    **kwargs,
+                },
+            )
+        )
+
 
 class DummyCallback:
     def __init__(
