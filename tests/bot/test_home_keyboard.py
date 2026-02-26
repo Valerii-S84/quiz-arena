@@ -7,7 +7,7 @@ def test_home_keyboard_has_exact_5_buttons_in_canonical_order() -> None:
     assert len(buttons) == 5
     assert [button.text for button in buttons] == [
         "⚡ MIX SPRINT",
-        "⚡ DAILY CHALLENGE",
+        "⚡ TÄGLICHE CHALLENGE",
         "🧠 ARTIKEL SPRINT",
         "🥊 DUELL",
         "🛒 SHOP",
