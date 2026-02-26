@@ -76,7 +76,9 @@ async def ensure_daily_question_set(
     if generated:
         resolved = generated
         if len(generated) < DAILY_CHALLENGE_TOTAL_QUESTIONS:
-            resolved = generated + (generated[0],) * (DAILY_CHALLENGE_TOTAL_QUESTIONS - len(generated))
+            resolved = generated + (generated[0],) * (
+                DAILY_CHALLENGE_TOTAL_QUESTIONS - len(generated)
+            )
         await DailyQuestionSetsRepo.upsert_question_ids(
             session,
             berlin_date=berlin_date,

@@ -114,7 +114,9 @@ async def test_handle_answer_finishes_daily_challenge_hides_streak_when_zero(mon
 
 
 @pytest.mark.asyncio
-async def test_handle_answer_daily_in_progress_sends_progress_and_next_question(monkeypatch) -> None:
+async def test_handle_answer_daily_in_progress_sends_progress_and_next_question(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):

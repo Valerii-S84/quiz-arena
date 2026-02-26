@@ -10,9 +10,7 @@ from app.db.models.base import Base
 
 class DailyPushLog(Base):
     __tablename__ = "daily_push_logs"
-    __table_args__ = (
-        Index("idx_daily_push_logs_berlin_date", "berlin_date"),
-    )
+    __table_args__ = (Index("idx_daily_push_logs_berlin_date", "berlin_date"),)
 
     user_id: Mapped[int] = mapped_column(
         BigInteger,

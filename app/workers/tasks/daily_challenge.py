@@ -4,6 +4,8 @@ from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.tasks.daily_challenge_async import (
     run_daily_push_notifications_async as _run_daily_push_notifications_async,
+)
+from app.workers.tasks.daily_challenge_async import (
     run_daily_question_set_precompute_async as _run_daily_question_set_precompute_async,
 )
 from app.workers.tasks.daily_challenge_config import DAILY_PUSH_BATCH_SIZE

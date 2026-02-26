@@ -52,9 +52,7 @@ class DailyRun(Base):
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
     berlin_date: Mapped[date] = mapped_column(Date, nullable=False)
-    current_question: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("0")
-    )
+    current_question: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     score: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

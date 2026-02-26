@@ -79,9 +79,7 @@ async def run_daily_push_notifications_async(
                     continue
                 lines = [TEXTS_DE["msg.daily.push.base"]]
                 if current_streak > 0:
-                    lines.append(
-                        TEXTS_DE["msg.daily.push.streak"].format(streak=current_streak)
-                    )
+                    lines.append(TEXTS_DE["msg.daily.push.streak"].format(streak=current_streak))
                 text = "\n".join(lines)
                 try:
                     await bot.send_message(

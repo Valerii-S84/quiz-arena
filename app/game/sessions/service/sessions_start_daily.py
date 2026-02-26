@@ -11,12 +11,11 @@ from app.db.models.daily_runs import DailyRun
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.daily_runs_repo import DailyRunsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
-from app.game.questions.types import QuizQuestion
 from app.game.sessions.errors import DailyChallengeAlreadyPlayedError
 from app.game.sessions.types import SessionQuestionView, StartSessionResult
 
 from .constants import DAILY_CHALLENGE_TOTAL_QUESTIONS
-from .daily_question_sets import ensure_daily_question_set
+from .daily_question_resolver import resolve_daily_question_for_position
 from .question_loading import _build_start_result_from_existing_session
 
 
@@ -98,37 +97,6 @@ async def _create_or_resume_daily_run(
     return created, True
 
 
-async def _resolve_daily_question_for_position(
-    session: AsyncSession,
-    *,
-    berlin_date: date,
-    position: int,
-) -> tuple[str, QuizQuestion]:
-    question_ids = await ensure_daily_question_set(session, berlin_date=berlin_date)
-    if not question_ids:
-        raise DailyChallengeAlreadyPlayedError
-
-    from app.game.sessions import service as service_module
-
-    index = max(0, min(len(question_ids) - 1, position - 1))
-    question_id = question_ids[index]
-    question = await service_module.get_question_by_id(
-        session,
-        "DAILY_CHALLENGE",
-        question_id=question_id,
-        local_date_berlin=berlin_date,
-    )
-    if question is not None:
-        return question_id, question
-
-    fallback_question = await service_module.get_question_for_mode(
-        session,
-        "DAILY_CHALLENGE",
-        local_date_berlin=berlin_date,
-    )
-    return fallback_question.question_id, fallback_question
-
-
 async def start_daily_session(
     session: AsyncSession,
     *,
@@ -168,7 +136,7 @@ async def start_daily_session(
 
     question_number = run.current_question + 1
     total_questions = DAILY_CHALLENGE_TOTAL_QUESTIONS
-    question_id, question = await _resolve_daily_question_for_position(
+    question_id, question = await resolve_daily_question_for_position(
         session,
         berlin_date=local_date,
         position=question_number,

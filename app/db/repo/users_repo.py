@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
