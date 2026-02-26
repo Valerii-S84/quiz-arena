@@ -10,6 +10,11 @@ def build_quiz_keyboard(
             [InlineKeyboardButton(text=f"2. {options[1]}", callback_data=f"answer:{session_id}:1")],
             [InlineKeyboardButton(text=f"3. {options[2]}", callback_data=f"answer:{session_id}:2")],
             [InlineKeyboardButton(text=f"4. {options[3]}", callback_data=f"answer:{session_id}:3")],
-            [InlineKeyboardButton(text="Stoppen und Menü", callback_data="game:stop")],
+            [
+                InlineKeyboardButton(
+                    text="Stoppen und Menü",
+                    callback_data=f"game:stop:{session_id}",
+                )
+            ],
         ]
     )

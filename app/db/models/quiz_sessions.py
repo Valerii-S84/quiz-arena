@@ -44,17 +44,19 @@ class QuizSession(Base):
         Index("idx_sessions_user_started", "user_id", "started_at"),
         Index("idx_sessions_mode", "mode_code"),
         Index("idx_sessions_local_date", "local_date_berlin"),
+        Index("idx_sessions_daily_run", "daily_run_id"),
         Index(
             "idx_sessions_friend_challenge",
             "friend_challenge_id",
             "friend_challenge_round",
         ),
         Index(
-            "uq_daily_challenge_user_date",
-            "user_id",
-            "local_date_berlin",
+            "uq_daily_run_single_started_session",
+            "daily_run_id",
             unique=True,
-            postgresql_where=text("source = 'DAILY_CHALLENGE'"),
+            postgresql_where=text(
+                "source = 'DAILY_CHALLENGE' AND status = 'STARTED' AND daily_run_id IS NOT NULL"
+            ),
         ),
         Index(
             "uq_sessions_friend_challenge_user_round",
@@ -73,6 +75,11 @@ class QuizSession(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     energy_cost_total: Mapped[int] = mapped_column(Integer, nullable=False)
     question_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    daily_run_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("daily_runs.id"),
+        nullable=True,
+    )
     friend_challenge_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("friend_challenges.id"),

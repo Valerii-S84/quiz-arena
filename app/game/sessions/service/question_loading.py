@@ -3,12 +3,14 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.quiz_sessions import QuizSession
+from app.db.repo.daily_runs_repo import DailyRunsRepo
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
 from app.db.repo.quiz_questions_repo import QuizQuestionsRepo
 from app.game.questions.types import QuizQuestion
 from app.game.sessions.types import SessionQuestionView, StartSessionResult
 
+from .constants import DAILY_CHALLENGE_TOTAL_QUESTIONS
 from .levels import _normalize_level
 
 
@@ -75,6 +77,11 @@ async def _build_start_result_from_existing_session(
             challenge = await FriendChallengesRepo.get_by_id(session, existing.friend_challenge_id)
             if challenge is not None:
                 total_questions = challenge.total_rounds
+    elif existing.source == "DAILY_CHALLENGE" and existing.daily_run_id is not None:
+        run = await DailyRunsRepo.get_by_id(session, existing.daily_run_id)
+        total_questions = DAILY_CHALLENGE_TOTAL_QUESTIONS
+        if run is not None:
+            question_number = min(DAILY_CHALLENGE_TOTAL_QUESTIONS, run.current_question + 1)
     return StartSessionResult(
         session=SessionQuestionView(
             session_id=existing.id,

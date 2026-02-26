@@ -22,6 +22,7 @@ async def handle_answer(
     offer_logging_error,
     build_question_text,
     continue_regular_mode_after_answer,
+    handle_daily_answer_branch,
     handle_friend_answer_branch,
     resolve_opponent_label,
     notify_opponent,
@@ -75,6 +76,23 @@ async def handle_answer(
             return
 
     answer_key = "msg.game.answer.correct" if result.is_correct else "msg.game.answer.incorrect"
+    if result.source == "DAILY_CHALLENGE":
+        await handle_daily_answer_branch(
+            callback,
+            result=result,
+            now_utc=now_utc,
+            session_local=session_local,
+            user_onboarding_service=user_onboarding_service,
+            game_session_service=game_session_service,
+            build_question_text=build_question_text,
+        )
+        return
+
+    if result.mode_code is None or result.source is None:
+        await _send_home_message(message, text=TEXTS_DE["msg.game.stopped"])
+        await callback.answer()
+        return
+
     response_lines = [TEXTS_DE[answer_key]]
     if result.selected_answer_text is not None:
         response_lines.append(
@@ -91,16 +109,6 @@ async def handle_answer(
         )
     )
     await callback.message.answer("\n".join(response_lines))
-
-    if result.mode_code is None or result.source is None:
-        await _send_home_message(message, text=TEXTS_DE["msg.game.stopped"])
-        await callback.answer()
-        return
-
-    if result.source == "DAILY_CHALLENGE":
-        await _send_home_message(message, text=TEXTS_DE["msg.game.daily.finished"])
-        await callback.answer()
-        return
 
     if result.source == "FRIEND_CHALLENGE":
         await handle_friend_answer_branch(

@@ -207,6 +207,35 @@ async def test_handle_start_home_menu_does_not_send_photo(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_handle_start_home_menu_hides_streak_when_zero(monkeypatch) -> None:
+    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
+        return SimpleNamespace(user_id=8, free_energy=12, paid_energy=3, current_streak=0)
+
+    async def _fake_offer(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(start.OfferService, "evaluate_and_log_offer", _fake_offer)
+    monkeypatch.setattr(
+        start.start_flow,
+        "get_settings",
+        lambda: SimpleNamespace(telegram_home_header_file_id=""),
+    )
+
+    message = _StartMessage(
+        text="/start",
+        from_user=SimpleNamespace(id=2, username="bob", first_name="Bob", language_code="de"),
+    )
+    await start.handle_start(message)
+
+    home_text = message.answers[0].text or ""
+    assert "⚡ 12/20 + 3 Bonus" in home_text
+    assert "🔥" not in home_text
+
+
+@pytest.mark.asyncio
 async def test_handle_start_home_menu_sends_photo_when_file_id_configured(monkeypatch) -> None:
     monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
 

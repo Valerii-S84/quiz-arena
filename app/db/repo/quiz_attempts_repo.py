@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from sqlalchemy import Date, cast, distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +24,21 @@ class QuizAttemptsRepo:
         session.add(attempt)
         await session.flush()
         return attempt
+
+    @staticmethod
+    async def get_latest_for_session(
+        session: AsyncSession,
+        *,
+        session_id: UUID,
+    ) -> QuizAttempt | None:
+        stmt = (
+            select(QuizAttempt)
+            .where(QuizAttempt.session_id == session_id)
+            .order_by(QuizAttempt.answered_at.desc(), QuizAttempt.id.desc())
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
 
     @staticmethod
     async def get_recent_question_ids_for_mode(

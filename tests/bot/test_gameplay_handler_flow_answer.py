@@ -54,6 +54,11 @@ async def test_handle_answer_finishes_daily_challenge(monkeypatch) -> None:
             source="DAILY_CHALLENGE",
             selected_answer_text="der",
             correct_answer_text="der",
+            daily_run_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            daily_current_question=7,
+            daily_total_questions=7,
+            daily_score=6,
+            daily_completed=True,
         )
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
@@ -65,9 +70,129 @@ async def test_handle_answer_finishes_daily_challenge(monkeypatch) -> None:
     )
     await gameplay.handle_answer(callback)
 
-    assert any(
-        call.text == TEXTS_DE["msg.game.daily.finished"] for call in callback.message.answers
+    assert any("🏆 Heute: 6/7 richtig" in (call.text or "") for call in callback.message.answers)
+
+
+@pytest.mark.asyncio
+async def test_handle_answer_finishes_daily_challenge_hides_streak_when_zero(monkeypatch) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        return SimpleNamespace(user_id=9, free_energy=11, paid_energy=2, current_streak=0)
+
+    async def _fake_submit_answer(*args, **kwargs):
+        return AnswerSessionResult(
+            session_id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+            question_id="q-daily",
+            is_correct=True,
+            current_streak=0,
+            best_streak=10,
+            idempotent_replay=False,
+            mode_code="DAILY_CHALLENGE",
+            source="DAILY_CHALLENGE",
+            selected_answer_text="der",
+            correct_answer_text="der",
+            daily_run_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            daily_current_question=7,
+            daily_total_questions=7,
+            daily_score=6,
+            daily_completed=True,
+        )
+
+    monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(gameplay.GameSessionService, "submit_answer", _fake_submit_answer)
+
+    callback = DummyCallback(
+        data="answer:123e4567-e89b-12d3-a456-426614174000:2",
+        from_user=SimpleNamespace(id=9),
     )
+    await gameplay.handle_answer(callback)
+
+    result_messages = [call.text or "" for call in callback.message.answers]
+    assert any("🏆 Heute: 6/7 richtig" in text for text in result_messages)
+    assert all("🔥 Streak:" not in text for text in result_messages)
+
+
+@pytest.mark.asyncio
+async def test_handle_answer_daily_in_progress_sends_progress_and_next_question(monkeypatch) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        del session, telegram_user
+        return SimpleNamespace(user_id=9, free_energy=11, paid_energy=2, current_streak=3)
+
+    async def _fake_submit_answer(*args, **kwargs):
+        return AnswerSessionResult(
+            session_id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+            question_id="q-daily",
+            is_correct=False,
+            current_streak=7,
+            best_streak=10,
+            idempotent_replay=False,
+            mode_code="DAILY_CHALLENGE",
+            source="DAILY_CHALLENGE",
+            selected_answer_text="der",
+            correct_answer_text="die Küche",
+            daily_run_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            daily_current_question=4,
+            daily_total_questions=7,
+            daily_score=2,
+            daily_completed=False,
+        )
+
+    async def _fake_start_session(*args, **kwargs):
+        return _start_result()
+
+    monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(gameplay.GameSessionService, "submit_answer", _fake_submit_answer)
+    monkeypatch.setattr(gameplay.GameSessionService, "start_session", _fake_start_session)
+
+    callback = DummyCallback(
+        data="answer:123e4567-e89b-12d3-a456-426614174000:2",
+        from_user=SimpleNamespace(id=9),
+    )
+    await gameplay.handle_answer(callback)
+
+    assert any("(4/7)" in (call.text or "") for call in callback.message.answers)
+    assert any(call.kwargs.get("parse_mode") == "HTML" for call in callback.message.answers)
+
+
+@pytest.mark.asyncio
+async def test_handle_answer_daily_idempotent_replay_is_silent(monkeypatch) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        return SimpleNamespace(user_id=9, free_energy=11, paid_energy=2, current_streak=3)
+
+    async def _fake_submit_answer(*args, **kwargs):
+        return AnswerSessionResult(
+            session_id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+            question_id="q-daily",
+            is_correct=True,
+            current_streak=3,
+            best_streak=10,
+            idempotent_replay=True,
+            mode_code="DAILY_CHALLENGE",
+            source="DAILY_CHALLENGE",
+            selected_answer_text=None,
+            correct_answer_text=None,
+            daily_run_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            daily_current_question=1,
+            daily_total_questions=7,
+            daily_score=1,
+            daily_completed=False,
+        )
+
+    monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(gameplay.GameSessionService, "submit_answer", _fake_submit_answer)
+
+    callback = DummyCallback(
+        data="answer:123e4567-e89b-12d3-a456-426614174000:2",
+        from_user=SimpleNamespace(id=9),
+    )
+    await gameplay.handle_answer(callback)
+
+    assert callback.message.answers == []
 
 
 @pytest.mark.asyncio

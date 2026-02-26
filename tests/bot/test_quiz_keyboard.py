@@ -12,4 +12,4 @@ def test_quiz_keyboard_contains_answer_callbacks_and_stop_button() -> None:
     assert "answer:00000000-0000-0000-0000-000000000001:1" in callbacks
     assert "answer:00000000-0000-0000-0000-000000000001:2" in callbacks
     assert "answer:00000000-0000-0000-0000-000000000001:3" in callbacks
-    assert "game:stop" in callbacks
+    assert "game:stop:00000000-0000-0000-0000-000000000001" in callbacks

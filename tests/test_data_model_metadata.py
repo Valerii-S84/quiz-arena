@@ -5,6 +5,9 @@ from sqlalchemy import CheckConstraint, UniqueConstraint
 from app.db.models import AnalyticsEvent  # noqa: F401
 from app.db.models import (  # noqa: F401
     AnalyticsDaily,
+    DailyPushLog,
+    DailyQuestionSet,
+    DailyRun,
     EnergyState,
     Entitlement,
     FriendChallenge,
@@ -53,6 +56,9 @@ def test_all_m2_tables_registered() -> None:
         "outbox_events",
         "analytics_events",
         "analytics_daily",
+        "daily_runs",
+        "daily_push_logs",
+        "daily_question_sets",
         "reconciliation_runs",
         "promo_code_batches",
     }
@@ -76,8 +82,17 @@ def test_critical_constraints_present() -> None:
 
     quiz_sessions = Base.metadata.tables["quiz_sessions"]
     quiz_sessions_indexes = {index.name for index in quiz_sessions.indexes}
-    assert "uq_daily_challenge_user_date" in quiz_sessions_indexes
+    assert "idx_sessions_daily_run" in quiz_sessions_indexes
+    assert "uq_daily_run_single_started_session" in quiz_sessions_indexes
     assert "uq_sessions_friend_challenge_user_round" in quiz_sessions_indexes
+
+    daily_runs = Base.metadata.tables["daily_runs"]
+    daily_runs_indexes = {index.name for index in daily_runs.indexes}
+    assert "uq_daily_runs_user_date_completed" in daily_runs_indexes
+
+    daily_push_logs = Base.metadata.tables["daily_push_logs"]
+    daily_push_logs_indexes = {index.name for index in daily_push_logs.indexes}
+    assert "idx_daily_push_logs_berlin_date" in daily_push_logs_indexes
 
     referrals = Base.metadata.tables["referrals"]
     referrals_indexes = {index.name for index in referrals.indexes}

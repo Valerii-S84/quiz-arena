@@ -8,6 +8,7 @@ from app.game.questions.runtime_bank import (
 )
 
 from .constants import (
+    DAILY_CHALLENGE_TOTAL_QUESTIONS,
     FRIEND_CHALLENGE_FREE_CREATES,
     FRIEND_CHALLENGE_LEVEL_SEQUENCE,
     FRIEND_CHALLENGE_TICKET_PRODUCT_CODE,
@@ -49,6 +50,7 @@ from .question_loading import (
     _infer_preferred_level_from_recent_attempt,
     _load_question_for_session,
 )
+from .sessions_daily import abandon_session, get_daily_run_summary
 from .sessions_start import get_session_user_id, start_session
 from .sessions_submit import submit_answer
 
@@ -87,12 +89,15 @@ class GameSessionService:
     get_friend_series_score_for_user = staticmethod(get_friend_series_score_for_user)
     start_session = staticmethod(start_session)
     submit_answer = staticmethod(submit_answer)
+    abandon_session = staticmethod(abandon_session)
+    get_daily_run_summary = staticmethod(get_daily_run_summary)
     get_session_user_id = staticmethod(get_session_user_id)
 
 
 __all__ = [
     "FRIEND_CHALLENGE_FREE_CREATES",
     "FRIEND_CHALLENGE_LEVEL_SEQUENCE",
+    "DAILY_CHALLENGE_TOTAL_QUESTIONS",
     "FRIEND_CHALLENGE_TICKET_PRODUCT_CODE",
     "FRIEND_CHALLENGE_TOTAL_ROUNDS",
     "FRIEND_CHALLENGE_TTL_SECONDS",

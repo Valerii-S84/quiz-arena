@@ -56,6 +56,26 @@ class Settings(BaseSettings):
         default=300,
         alias="FRIEND_CHALLENGE_DEADLINE_SCAN_INTERVAL_SECONDS",
     )
+    daily_challenge_precompute_hour_berlin: int = Field(
+        default=0,
+        alias="DAILY_CHALLENGE_PRECOMPUTE_HOUR_BERLIN",
+    )
+    daily_challenge_precompute_minute_berlin: int = Field(
+        default=0,
+        alias="DAILY_CHALLENGE_PRECOMPUTE_MINUTE_BERLIN",
+    )
+    daily_challenge_push_hour_berlin: int = Field(
+        default=8,
+        alias="DAILY_CHALLENGE_PUSH_HOUR_BERLIN",
+    )
+    daily_challenge_push_minute_berlin: int = Field(
+        default=0,
+        alias="DAILY_CHALLENGE_PUSH_MINUTE_BERLIN",
+    )
+    daily_challenge_push_batch_size: int = Field(
+        default=200,
+        alias="DAILY_CHALLENGE_PUSH_BATCH_SIZE",
+    )
     telegram_updates_alert_window_minutes: int = Field(
         default=15,
         alias="TELEGRAM_UPDATES_ALERT_WINDOW_MINUTES",
