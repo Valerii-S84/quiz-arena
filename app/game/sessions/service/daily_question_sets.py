@@ -11,9 +11,27 @@ from app.game.questions.runtime_bank_filters import pick_from_pool
 
 from .constants import DAILY_CHALLENGE_TOTAL_QUESTIONS
 
+DAILY_LEVEL_CHAIN: tuple[str, ...] = ("A1", "A2", "B1", "B2")
+DAILY_POSITION_PREFERRED_LEVELS: tuple[str, ...] = (
+    "A1",
+    "A1",
+    "A2",
+    "A2",
+    "B1",
+    "B1",
+    "B2",
+)
+
 
 def _daily_selection_seed(*, berlin_date: date, position: int) -> str:
     return f"daily:{berlin_date.isoformat()}:{DAILY_CHALLENGE_SOURCE_MODE}:{position}"
+
+
+def _daily_level_window_for_position(position: int) -> tuple[str, tuple[str, ...]]:
+    index = min(max(position - 1, 0), len(DAILY_POSITION_PREFERRED_LEVELS) - 1)
+    preferred_level = DAILY_POSITION_PREFERRED_LEVELS[index]
+    max_chain_index = DAILY_LEVEL_CHAIN.index(preferred_level)
+    return preferred_level, DAILY_LEVEL_CHAIN[: max_chain_index + 1]
 
 
 async def _build_daily_question_ids(
@@ -21,13 +39,30 @@ async def _build_daily_question_ids(
     *,
     berlin_date: date,
 ) -> tuple[str, ...]:
-    candidate_ids = await QuizQuestionsRepo.list_question_ids_all_active(session)
-    if not candidate_ids:
-        return ()
+    candidate_ids_cache: dict[tuple[str, ...] | None, list[str]] = {}
+
+    async def _cached_candidate_ids(preferred_levels: tuple[str, ...] | None) -> list[str]:
+        if preferred_levels not in candidate_ids_cache:
+            candidate_ids_cache[preferred_levels] = (
+                await QuizQuestionsRepo.list_question_ids_all_active(
+                    session,
+                    preferred_levels=preferred_levels,
+                )
+            )
+        return candidate_ids_cache[preferred_levels]
 
     selected_question_ids: list[str] = []
     for position in range(1, DAILY_CHALLENGE_TOTAL_QUESTIONS + 1):
         seed = _daily_selection_seed(berlin_date=berlin_date, position=position)
+        preferred_level, allowed_levels = _daily_level_window_for_position(position)
+        candidate_ids = await _cached_candidate_ids((preferred_level,))
+        if not candidate_ids:
+            candidate_ids = await _cached_candidate_ids(allowed_levels)
+        if not candidate_ids:
+            candidate_ids = await _cached_candidate_ids(None)
+        if not candidate_ids:
+            break
+
         selected = pick_from_pool(
             candidate_ids,
             exclude_question_ids=selected_question_ids,

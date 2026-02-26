@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.db.models.quiz_attempts import QuizAttempt
+from app.db.models.quiz_questions import QuizQuestion as QuizQuestionModel
 from app.db.repo.daily_runs_repo import DailyRunsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.db.repo.users_repo import UsersRepo
@@ -17,6 +18,33 @@ from app.game.sessions.service import GameSessionService
 from app.game.sessions.types import AnswerSessionResult, StartSessionResult
 
 UTC = timezone.utc
+
+
+def _build_quick_mix_question(
+    *,
+    question_id: str,
+    level: str,
+    now_utc: datetime,
+) -> QuizQuestionModel:
+    return QuizQuestionModel(
+        question_id=question_id,
+        mode_code="QUICK_MIX_A1A2",
+        source_file="daily_progress_seed.csv",
+        level=level,
+        category="DailyProgress",
+        question_text=f"Daily {level} {question_id}?",
+        option_1="a",
+        option_2="b",
+        option_3="c",
+        option_4="d",
+        correct_option_id=0,
+        correct_answer="a",
+        explanation="Seed",
+        key=question_id,
+        status="ACTIVE",
+        created_at=now_utc,
+        updated_at=now_utc,
+    )
 
 
 async def _create_user(seed: str) -> int:
@@ -142,6 +170,53 @@ async def test_daily_blocks_after_first_completed_run_today() -> None:
         )
         assert run is not None
         assert run.status == "COMPLETED"
+
+
+@pytest.mark.asyncio
+async def test_daily_questions_start_from_a1_and_progress_by_level() -> None:
+    user_id = await _create_user("daily-level-progress")
+    now_utc = datetime(2026, 2, 26, 8, 30, tzinfo=UTC)
+
+    async with SessionLocal.begin() as session:
+        session.add_all(
+            [
+                _build_quick_mix_question(
+                    question_id=f"daily_level_seed_{index}",
+                    level=level,
+                    now_utc=now_utc,
+                )
+                for index, level in enumerate(
+                    ("A1", "A1", "A2", "A2", "B1", "B1", "B2", "B2"),
+                    start=1,
+                )
+            ]
+        )
+        await session.flush()
+
+    seen_levels: list[str] = []
+    for idx in range(7):
+        started = await _start_daily(
+            user_id=user_id,
+            idempotency_key=f"daily-level-progress:start:{idx}",
+            now_utc=now_utc + timedelta(seconds=idx),
+        )
+        async with SessionLocal.begin() as session:
+            selected = await session.get(QuizQuestionModel, started.session.question_id)
+            assert selected is not None
+            seen_levels.append(selected.level)
+
+        await _answer_daily_correctly(
+            user_id=user_id,
+            session_id=started.session.session_id,
+            idempotency_key=f"daily-level-progress:answer:{idx}",
+            now_utc=now_utc + timedelta(seconds=40 + idx),
+        )
+
+    assert seen_levels[0] == "A1"
+    level_order = {"A1": 0, "A2": 1, "B1": 2, "B2": 3}
+    assert all(
+        level_order[left] <= level_order[right] for left, right in zip(seen_levels, seen_levels[1:])
+    )
 
 
 @pytest.mark.asyncio
