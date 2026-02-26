@@ -215,8 +215,7 @@ async def test_daily_questions_start_from_a1_and_progress_by_level() -> None:
     assert seen_levels[0] == "A1"
     level_order = {"A1": 0, "A2": 1, "B1": 2, "B2": 3}
     assert all(
-        level_order[left] <= level_order[right]
-        for left, right in zip(seen_levels, seen_levels[1:])
+        level_order[left] <= level_order[right] for left, right in zip(seen_levels, seen_levels[1:])
     )
 
 

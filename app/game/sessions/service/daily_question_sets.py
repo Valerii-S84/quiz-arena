@@ -43,9 +43,11 @@ async def _build_daily_question_ids(
 
     async def _cached_candidate_ids(preferred_levels: tuple[str, ...] | None) -> list[str]:
         if preferred_levels not in candidate_ids_cache:
-            candidate_ids_cache[preferred_levels] = await QuizQuestionsRepo.list_question_ids_all_active(
-                session,
-                preferred_levels=preferred_levels,
+            candidate_ids_cache[preferred_levels] = (
+                await QuizQuestionsRepo.list_question_ids_all_active(
+                    session,
+                    preferred_levels=preferred_levels,
+                )
             )
         return candidate_ids_cache[preferred_levels]
 
