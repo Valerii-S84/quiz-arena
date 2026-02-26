@@ -1,3 +1,6 @@
+from app.db.repo.daily_push_logs_repo import DailyPushLogsRepo
+from app.db.repo.daily_question_sets_repo import DailyQuestionSetsRepo
+from app.db.repo.daily_runs_repo import DailyRunsRepo
 from app.db.repo.energy_repo import EnergyRepo
 from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
@@ -18,6 +21,9 @@ from app.db.repo.users_repo import UsersRepo
 
 __all__ = [
     "EnergyRepo",
+    "DailyQuestionSetsRepo",
+    "DailyPushLogsRepo",
+    "DailyRunsRepo",
     "EntitlementsRepo",
     "FriendChallengesRepo",
     "LedgerRepo",

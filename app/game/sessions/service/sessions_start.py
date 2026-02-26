@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.quiz_sessions import QuizSession
@@ -16,7 +15,6 @@ from app.economy.streak.time import berlin_local_date
 from app.game.modes.rules import is_mode_allowed, is_zero_cost_source
 from app.game.questions.types import QuizQuestion
 from app.game.sessions.errors import (
-    DailyChallengeAlreadyPlayedError,
     EnergyInsufficientError,
     FriendChallengeAccessError,
     ModeLockedError,
@@ -27,6 +25,7 @@ from app.game.sessions.types import SessionQuestionView, StartSessionResult
 from .levels import _is_persistent_adaptive_mode
 from .progression import resolve_start_progression_state, select_level_weighted
 from .question_loading import _build_start_result_from_existing_session
+from .sessions_start_daily import start_daily_session
 
 
 async def start_session(
@@ -59,13 +58,13 @@ async def start_session(
         )
 
     if source == "DAILY_CHALLENGE":
-        already_played = await QuizSessionsRepo.has_daily_challenge_on_date(
+        return await start_daily_session(
             session,
             user_id=user_id,
-            local_date_berlin=local_date,
+            idempotency_key=idempotency_key,
+            local_date=local_date,
+            now_utc=now_utc,
         )
-        if already_played:
-            raise DailyChallengeAlreadyPlayedError
 
     premium_active = await EntitlementsRepo.has_active_premium(session, user_id, now_utc)
     has_mode_access = await ModeAccessRepo.has_active_access(
@@ -155,28 +154,23 @@ async def start_session(
             allowed_levels=allowed_levels,
         )
 
-    try:
-        created = await QuizSessionsRepo.create(
-            session,
-            quiz_session=QuizSession(
-                id=uuid4(),
-                user_id=user_id,
-                mode_code=mode_code,
-                source=source,
-                status="STARTED",
-                energy_cost_total=energy_cost_total,
-                question_id=question.question_id,
-                friend_challenge_id=friend_challenge_id,
-                friend_challenge_round=friend_challenge_round,
-                started_at=now_utc,
-                local_date_berlin=local_date,
-                idempotency_key=idempotency_key,
-            ),
-        )
-    except IntegrityError as exc:
-        if source == "DAILY_CHALLENGE":
-            raise DailyChallengeAlreadyPlayedError from exc
-        raise
+    created = await QuizSessionsRepo.create(
+        session,
+        quiz_session=QuizSession(
+            id=uuid4(),
+            user_id=user_id,
+            mode_code=mode_code,
+            source=source,
+            status="STARTED",
+            energy_cost_total=energy_cost_total,
+            question_id=question.question_id,
+            friend_challenge_id=friend_challenge_id,
+            friend_challenge_round=friend_challenge_round,
+            started_at=now_utc,
+            local_date_berlin=local_date,
+            idempotency_key=idempotency_key,
+        ),
+    )
 
     return StartSessionResult(
         session=SessionQuestionView(

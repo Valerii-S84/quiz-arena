@@ -102,6 +102,25 @@ class QuizSessionsRepo:
         return result.scalar_one_or_none() is not None
 
     @staticmethod
+    async def get_active_daily_session_for_run(
+        session: AsyncSession,
+        *,
+        daily_run_id: UUID,
+    ) -> QuizSession | None:
+        stmt = (
+            select(QuizSession)
+            .where(
+                QuizSession.daily_run_id == daily_run_id,
+                QuizSession.source == "DAILY_CHALLENGE",
+                QuizSession.status == "STARTED",
+            )
+            .order_by(QuizSession.started_at.desc(), QuizSession.id.desc())
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def create(session: AsyncSession, *, quiz_session: QuizSession) -> QuizSession:
         session.add(quiz_session)
         await session.flush()

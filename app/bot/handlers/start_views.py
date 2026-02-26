@@ -46,14 +46,21 @@ def _build_friend_ttl_text(*, challenge: FriendChallengeSnapshot, now_utc: datet
 
 
 def _build_home_text(*, free_energy: int, paid_energy: int, current_streak: int) -> str:
+    if current_streak > 0:
+        stats_line = TEXTS_DE["msg.home.stats.with_streak"].format(
+            streak=current_streak,
+            free_energy=free_energy,
+            paid_energy=paid_energy,
+        )
+    else:
+        stats_line = TEXTS_DE["msg.home.stats.no_streak"].format(
+            free_energy=free_energy,
+            paid_energy=paid_energy,
+        )
     return "\n".join(
         [
             TEXTS_DE["msg.home.title"],
-            TEXTS_DE["msg.home.energy"].format(
-                free_energy=free_energy,
-                paid_energy=paid_energy,
-            ),
-            TEXTS_DE["msg.home.streak"].format(streak=current_streak),
+            stats_line,
             TEXTS_DE["msg.home.hint"],
         ]
     )

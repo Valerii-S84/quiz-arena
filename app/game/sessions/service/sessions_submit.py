@@ -6,18 +6,18 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.quiz_attempts import QuizAttempt
-from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.economy.streak.service import StreakService
 from app.game.sessions.errors import InvalidAnswerOptionError, SessionNotFoundError
 from app.game.sessions.types import AnswerSessionResult
 
-from .friend_challenges_internal import _build_friend_challenge_snapshot
 from .levels import _is_persistent_adaptive_mode
 from .progression import check_and_advance
 from .question_loading import _load_question_for_session
+from .sessions_submit_daily import apply_daily_answer
 from .sessions_submit_friend_challenge import _apply_friend_challenge_answer
+from .sessions_submit_replay import build_replay_answer_result
 
 
 async def submit_answer(
@@ -34,45 +34,31 @@ async def submit_answer(
 
     existing_attempt = await QuizAttemptsRepo.get_by_idempotency_key(session, idempotency_key)
     if existing_attempt is not None:
-        streak_snapshot = await StreakService.sync_rollover(
+        replay_session = await QuizSessionsRepo.get_by_id(session, existing_attempt.session_id)
+        return await build_replay_answer_result(
             session,
             user_id=user_id,
+            replay_session=replay_session,
+            replay_attempt=existing_attempt,
             now_utc=now_utc,
-        )
-        replay_session = await QuizSessionsRepo.get_by_id(session, existing_attempt.session_id)
-        friend_snapshot = None
-        waiting_for_opponent = False
-        if replay_session is not None and replay_session.friend_challenge_id is not None:
-            challenge = await FriendChallengesRepo.get_by_id(
-                session, replay_session.friend_challenge_id
-            )
-            if challenge is not None:
-                friend_snapshot = _build_friend_challenge_snapshot(challenge)
-                waiting_for_opponent = challenge.status == "ACTIVE"
-        return AnswerSessionResult(
-            session_id=existing_attempt.session_id,
-            question_id=existing_attempt.question_id,
-            is_correct=existing_attempt.is_correct,
-            current_streak=streak_snapshot.current_streak,
-            best_streak=streak_snapshot.best_streak,
-            idempotent_replay=True,
-            mode_code=(replay_session.mode_code if replay_session is not None else None),
-            source=replay_session.source if replay_session is not None else None,
-            selected_answer_text=None,
-            correct_answer_text=None,
-            question_level=None,
-            next_preferred_level=None,
-            friend_challenge=friend_snapshot,
-            friend_challenge_answered_round=(
-                replay_session.friend_challenge_round if replay_session is not None else None
-            ),
-            friend_challenge_round_completed=False,
-            friend_challenge_waiting_for_opponent=waiting_for_opponent,
         )
 
     quiz_session = await QuizSessionsRepo.get_by_id_for_update(session, session_id)
     if quiz_session is None or quiz_session.user_id != user_id:
         raise SessionNotFoundError
+
+    if quiz_session.source == "DAILY_CHALLENGE" and quiz_session.status != "STARTED":
+        replay_attempt = await QuizAttemptsRepo.get_latest_for_session(
+            session,
+            session_id=quiz_session.id,
+        )
+        return await build_replay_answer_result(
+            session,
+            user_id=user_id,
+            replay_session=quiz_session,
+            replay_attempt=replay_attempt,
+            now_utc=now_utc,
+        )
 
     question = await _load_question_for_session(session, quiz_session=quiz_session)
     is_correct = selected_option == question.correct_option
@@ -92,6 +78,38 @@ async def submit_answer(
 
     quiz_session.status = "COMPLETED"
     quiz_session.completed_at = now_utc
+
+    if quiz_session.source == "DAILY_CHALLENGE":
+        daily_state = await apply_daily_answer(
+            session,
+            user_id=user_id,
+            quiz_session=quiz_session,
+            is_correct=is_correct,
+            now_utc=now_utc,
+        )
+        return AnswerSessionResult(
+            session_id=quiz_session.id,
+            question_id=question.question_id,
+            is_correct=is_correct,
+            current_streak=daily_state.current_streak,
+            best_streak=daily_state.best_streak,
+            idempotent_replay=False,
+            mode_code=quiz_session.mode_code,
+            source=quiz_session.source,
+            selected_answer_text=question.options[selected_option],
+            correct_answer_text=question.options[question.correct_option],
+            question_level=question.level,
+            next_preferred_level=None,
+            friend_challenge=None,
+            friend_challenge_answered_round=None,
+            friend_challenge_round_completed=False,
+            friend_challenge_waiting_for_opponent=False,
+            daily_run_id=daily_state.daily_run_id,
+            daily_current_question=daily_state.current_question,
+            daily_total_questions=daily_state.total_questions,
+            daily_score=daily_state.score,
+            daily_completed=daily_state.completed,
+        )
 
     friend_snapshot, friend_round_completed, friend_waiting_for_opponent = (
         await _apply_friend_challenge_answer(

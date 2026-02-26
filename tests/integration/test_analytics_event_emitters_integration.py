@@ -16,6 +16,7 @@ from app.economy.energy.time import berlin_local_date
 from app.economy.purchases.service import PurchaseService
 from app.economy.streak.service import StreakService
 from app.game.questions.runtime_bank import get_question_by_id
+from app.game.sessions.errors import DailyChallengeAlreadyPlayedError
 from app.game.sessions.service import GameSessionService
 
 UTC = timezone.utc
@@ -242,3 +243,74 @@ async def test_friend_challenge_flow_emits_created_joined_completed_and_rematch_
     assert len(opponent_joined) == 1
     assert len(opponent_completed) == 1
     assert len(creator_rematch) == 1
+
+
+@pytest.mark.asyncio
+async def test_daily_challenge_flow_emits_started_abandoned_completed_and_blocked_events() -> None:
+    user_id = await _create_user("daily-events")
+    now_utc = datetime.now(UTC)
+
+    async with SessionLocal.begin() as session:
+        started = await GameSessionService.start_session(
+            session,
+            user_id=user_id,
+            mode_code="DAILY_CHALLENGE",
+            source="DAILY_CHALLENGE",
+            idempotency_key="daily-events:start:1",
+            now_utc=now_utc,
+        )
+        await GameSessionService.abandon_session(
+            session,
+            user_id=user_id,
+            session_id=started.session.session_id,
+            now_utc=now_utc + timedelta(seconds=1),
+        )
+
+    for idx in range(7):
+        async with SessionLocal.begin() as session:
+            started = await GameSessionService.start_session(
+                session,
+                user_id=user_id,
+                mode_code="DAILY_CHALLENGE",
+                source="DAILY_CHALLENGE",
+                idempotency_key=f"daily-events:start:{idx + 2}",
+                now_utc=now_utc + timedelta(seconds=idx + 2),
+            )
+            quiz_session = await QuizSessionsRepo.get_by_id(session, started.session.session_id)
+            assert quiz_session is not None
+            question = await get_question_by_id(
+                session,
+                quiz_session.mode_code,
+                question_id=quiz_session.question_id or "",
+                local_date_berlin=quiz_session.local_date_berlin,
+            )
+            assert question is not None
+            await GameSessionService.submit_answer(
+                session,
+                user_id=user_id,
+                session_id=started.session.session_id,
+                selected_option=question.correct_option,
+                idempotency_key=f"daily-events:answer:{idx}",
+                now_utc=now_utc + timedelta(seconds=idx + 20),
+            )
+
+    async with SessionLocal.begin() as session:
+        with pytest.raises(DailyChallengeAlreadyPlayedError):
+            await GameSessionService.start_session(
+                session,
+                user_id=user_id,
+                mode_code="DAILY_CHALLENGE",
+                source="DAILY_CHALLENGE",
+                idempotency_key="daily-events:start:blocked",
+                now_utc=now_utc + timedelta(minutes=5),
+            )
+
+    started_events = await _list_user_events(user_id, event_type="daily_started")
+    abandoned_events = await _list_user_events(user_id, event_type="daily_abandoned")
+    completed_events = await _list_user_events(user_id, event_type="daily_completed")
+    blocked_events = await _list_user_events(user_id, event_type="daily_blocked_already_played")
+
+    assert len(started_events) == 1
+    assert len(abandoned_events) == 1
+    assert len(completed_events) == 1
+    assert len(blocked_events) == 1

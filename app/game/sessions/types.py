@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 
@@ -24,6 +24,15 @@ class StartSessionResult:
     energy_free: int
     energy_paid: int
     idempotent_replay: bool
+
+
+@dataclass(slots=True)
+class DailyRunSummary:
+    daily_run_id: UUID
+    berlin_date: date
+    score: int
+    total_questions: int
+    status: str
 
 
 @dataclass(slots=True)
@@ -78,3 +87,8 @@ class AnswerSessionResult:
     friend_challenge_answered_round: int | None = None
     friend_challenge_round_completed: bool = False
     friend_challenge_waiting_for_opponent: bool = False
+    daily_run_id: UUID | None = None
+    daily_current_question: int | None = None
+    daily_total_questions: int | None = None
+    daily_score: int | None = None
+    daily_completed: bool = False

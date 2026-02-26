@@ -1,5 +1,8 @@
 from app.db.models.analytics_daily import AnalyticsDaily
 from app.db.models.analytics_events import AnalyticsEvent
+from app.db.models.daily_push_logs import DailyPushLog
+from app.db.models.daily_question_sets import DailyQuestionSet
+from app.db.models.daily_runs import DailyRun
 from app.db.models.energy_state import EnergyState
 from app.db.models.entitlements import Entitlement
 from app.db.models.friend_challenges import FriendChallenge
@@ -25,6 +28,9 @@ from app.db.models.users import User
 __all__ = [
     "AnalyticsDaily",
     "AnalyticsEvent",
+    "DailyPushLog",
+    "DailyQuestionSet",
+    "DailyRun",
     "EnergyState",
     "FriendChallenge",
     "Entitlement",

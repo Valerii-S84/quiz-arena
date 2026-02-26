@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from functools import partial
+from typing import cast
+
 from aiogram import F, Router
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
 
 from app.bot.handlers import (
     gameplay_callbacks,
@@ -9,7 +13,13 @@ from app.bot.handlers import (
     gameplay_helpers,
     gameplay_views,
 )
-from app.bot.handlers.gameplay_flows import answer_flow, friend_answer_flow, play_flow
+from app.bot.handlers.gameplay_flows import (
+    answer_flow,
+    daily_flow,
+    daily_result_flow,
+    friend_answer_flow,
+    play_flow,
+)
 from app.bot.handlers.gameplay_friend_challenge import (  # noqa: F401
     handle_friend_challenge_create,
     handle_friend_challenge_create_selected,
@@ -19,12 +29,13 @@ from app.bot.handlers.gameplay_friend_challenge import (  # noqa: F401
     handle_friend_challenge_series_next,
     handle_friend_challenge_share_result,
 )
+from app.bot.handlers.start_flow import _send_home_message
 from app.bot.keyboards.friend_challenge import build_friend_challenge_share_url
-from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
 from app.economy.offers.constants import TRG_LOCKED_MODE_CLICK
 from app.economy.offers.service import OfferLoggingError, OfferService
+from app.game.sessions.errors import SessionNotFoundError
 from app.game.sessions.service import GameSessionService
 from app.services.user_onboarding import UserOnboardingService
 
@@ -32,6 +43,7 @@ router = Router(name="gameplay")
 EVENT_SOURCE_BOT = "BOT"
 
 ANSWER_RE = gameplay_callbacks.ANSWER_RE
+DAILY_RESULT_RE = gameplay_callbacks.DAILY_RESULT_RE
 
 gameplay_friend_challenge.register(router)
 
@@ -62,82 +74,65 @@ async def emit_analytics_event(*args, **kwargs):
     await _emit_analytics_event(*args, **kwargs)
 
 
-async def _resolve_opponent_label(*, challenge, user_id: int) -> str:
-    return await gameplay_helpers._resolve_opponent_label(
-        challenge=challenge,
-        user_id=user_id,
-        session_local=SessionLocal,
-        users_repo=UserOnboardingService,
-        format_user_label=_format_user_label,
-    )
+_resolve_opponent_label = partial(
+    gameplay_helpers._resolve_opponent_label,
+    session_local=SessionLocal,
+    users_repo=UserOnboardingService,
+    format_user_label=_format_user_label,
+)
+_notify_opponent = partial(
+    gameplay_helpers._notify_opponent,
+    session_local=SessionLocal,
+    users_repo=UserOnboardingService,
+)
+_build_friend_result_share_url = partial(
+    gameplay_helpers._build_friend_result_share_url,
+    share_cta_text=TEXTS_DE["msg.friend.challenge.proof.share.cta"],
+    build_share_url=build_friend_challenge_share_url,
+)
+_start_mode = partial(
+    play_flow.start_mode,
+    **_session_deps(),
+    offer_service=OfferService,
+    offer_logging_error=OfferLoggingError,
+    trg_locked_mode_click=TRG_LOCKED_MODE_CLICK,
+    build_question_text=_build_question_text,
+)
+_send_friend_round_question = partial(
+    play_flow.send_friend_round_question,
+    build_question_text=_build_question_text,
+)
 
 
-async def _notify_opponent(
-    callback: CallbackQuery,
-    *,
-    opponent_user_id: int | None,
-    text: str,
-    reply_markup=None,
-) -> None:
-    await gameplay_helpers._notify_opponent(
-        callback,
-        opponent_user_id=opponent_user_id,
-        text=text,
-        session_local=SessionLocal,
-        users_repo=UserOnboardingService,
-        reply_markup=reply_markup,
-    )
-
-
-async def _build_friend_result_share_url(
-    callback: CallbackQuery, *, proof_card_text: str
-) -> str | None:
-    return await gameplay_helpers._build_friend_result_share_url(
-        callback,
-        proof_card_text=proof_card_text,
-        share_cta_text=TEXTS_DE["msg.friend.challenge.proof.share.cta"],
-        build_share_url=build_friend_challenge_share_url,
-    )
-
-
-async def _start_mode(
-    callback: CallbackQuery, *, mode_code: str, source: str, idempotency_key: str
-) -> None:
-    await play_flow.start_mode(
-        callback,
-        mode_code=mode_code,
-        source=source,
-        idempotency_key=idempotency_key,
-        **_session_deps(),
-        offer_service=OfferService,
-        offer_logging_error=OfferLoggingError,
-        trg_locked_mode_click=TRG_LOCKED_MODE_CLICK,
-        build_question_text=_build_question_text,
-    )
-
-
-async def _send_friend_round_question(
-    callback: CallbackQuery,
-    *,
-    snapshot_free_energy: int,
-    snapshot_paid_energy: int,
-    round_start,
-) -> None:
-    await play_flow.send_friend_round_question(
-        callback,
-        snapshot_free_energy=snapshot_free_energy,
-        snapshot_paid_energy=snapshot_paid_energy,
-        round_start=round_start,
-        build_question_text=_build_question_text,
-    )
-
-
-@router.callback_query(F.data == "game:stop")
+@router.callback_query(F.data.startswith("game:stop"))
 async def handle_game_stop(callback: CallbackQuery) -> None:
-    if callback.message is None:
+    if callback.message is None or callback.data is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
-    await callback.message.answer(TEXTS_DE["msg.game.stopped"], reply_markup=build_home_keyboard())
+    if callback.data != "game:stop":
+        if callback.from_user is None:
+            await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+            return
+        session_id = gameplay_callbacks.parse_stop_callback(callback.data)
+        if session_id is None:
+            await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+            return
+        now_utc = datetime.now(timezone.utc)
+        async with SessionLocal.begin() as session:
+            snapshot = await UserOnboardingService.ensure_home_snapshot(
+                session,
+                telegram_user=callback.from_user,
+            )
+            try:
+                await GameSessionService.abandon_session(
+                    session,
+                    user_id=snapshot.user_id,
+                    session_id=session_id,
+                    now_utc=now_utc,
+                )
+            except SessionNotFoundError:
+                pass
+    await _send_home_message(cast(Message, callback.message), text=TEXTS_DE["msg.game.stopped"])
     await callback.answer()
 
 
@@ -185,6 +180,7 @@ async def handle_answer(callback: CallbackQuery) -> None:
         offer_logging_error=OfferLoggingError,
         build_question_text=_build_question_text,
         continue_regular_mode_after_answer=play_flow.continue_regular_mode_after_answer,
+        handle_daily_answer_branch=daily_flow.handle_daily_answer_branch,
         handle_friend_answer_branch=friend_answer_flow.handle_friend_answer_branch,
         resolve_opponent_label=_resolve_opponent_label,
         notify_opponent=_notify_opponent,
@@ -196,4 +192,25 @@ async def handle_answer(callback: CallbackQuery) -> None:
         build_friend_proof_card_text=_build_friend_proof_card_text,
         build_series_progress_text=_build_series_progress_text,
         send_friend_round_question=_send_friend_round_question,
+    )
+
+
+@router.callback_query(F.data.regexp(DAILY_RESULT_RE))
+async def handle_daily_result(callback: CallbackQuery) -> None:
+    if callback.data is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    daily_run_id = gameplay_callbacks.parse_uuid_callback(
+        pattern=DAILY_RESULT_RE,
+        callback_data=callback.data,
+    )
+    if daily_run_id is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    await daily_result_flow.handle_daily_result_screen(
+        callback,
+        daily_run_id=daily_run_id,
+        session_local=SessionLocal,
+        user_onboarding_service=UserOnboardingService,
+        game_session_service=GameSessionService,
     )

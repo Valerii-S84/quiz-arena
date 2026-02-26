@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models.daily_push_logs import DailyPushLog
+from app.db.models.daily_runs import DailyRun
+from app.db.models.streak_state import StreakState
 from app.db.models.users import User
 
 
@@ -75,3 +78,55 @@ class UsersRepo:
         stmt = update(User).where(User.id == user_id).values(last_seen_at=seen_at)
         result = await session.execute(stmt)
         return result.rowcount or 0
+
+    @staticmethod
+    async def list_daily_push_targets(
+        session: AsyncSession,
+        *,
+        berlin_date: date,
+        after_user_id: int | None,
+        limit: int,
+    ) -> list[tuple[int, int, int]]:
+        resolved_limit = max(1, min(1000, int(limit)))
+        completed_daily_exists = (
+            select(DailyRun.id)
+            .where(
+                DailyRun.user_id == User.id,
+                DailyRun.berlin_date == berlin_date,
+                DailyRun.status == "COMPLETED",
+            )
+            .exists()
+        )
+        push_logged_exists = (
+            select(DailyPushLog.user_id)
+            .where(
+                DailyPushLog.user_id == User.id,
+                DailyPushLog.berlin_date == berlin_date,
+            )
+            .exists()
+        )
+        stmt = (
+            select(
+                User.id,
+                User.telegram_user_id,
+                func.coalesce(StreakState.current_streak, 0),
+            )
+            .outerjoin(StreakState, StreakState.user_id == User.id)
+            .where(User.status == "ACTIVE", ~completed_daily_exists, ~push_logged_exists)
+            .order_by(User.id.asc())
+            .limit(resolved_limit)
+        )
+        if after_user_id is not None:
+            stmt = stmt.where(User.id > after_user_id)
+
+        result = await session.execute(stmt)
+        rows: list[tuple[int, int, int]] = []
+        for user_id_raw, telegram_user_id_raw, streak_raw in result.all():
+            rows.append(
+                (
+                    int(user_id_raw),
+                    int(telegram_user_id_raw),
+                    int(streak_raw),
+                )
+            )
+        return rows
