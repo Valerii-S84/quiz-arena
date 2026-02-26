@@ -4,10 +4,10 @@ from datetime import datetime, timezone
 
 from aiogram.types import CallbackQuery
 
+from app.bot.handlers.gameplay_flows.energy_zero_flow import handle_energy_insufficient
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.keyboards.offers import build_offer_keyboard
 from app.bot.keyboards.quiz import build_quiz_keyboard
-from app.bot.handlers.gameplay_flows.energy_zero_flow import handle_energy_insufficient
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import (
     DailyChallengeAlreadyPlayedError,
@@ -42,7 +42,9 @@ async def start_mode(
         return
     now_utc = datetime.now(timezone.utc)
     async with session_local.begin() as session:
-        snapshot = await user_onboarding_service.ensure_home_snapshot(session, telegram_user=callback.from_user)
+        snapshot = await user_onboarding_service.ensure_home_snapshot(
+            session, telegram_user=callback.from_user
+        )
         try:
             result = await game_session_service.start_session(
                 session,
@@ -92,7 +94,9 @@ async def start_mode(
             await callback.answer()
             return
         except DailyChallengeAlreadyPlayedError:
-            await callback.message.answer(TEXTS_DE["msg.daily.challenge.used"], reply_markup=build_home_keyboard())
+            await callback.message.answer(
+                TEXTS_DE["msg.daily.challenge.used"], reply_markup=build_home_keyboard()
+            )
             await callback.answer()
             return
     question_text = build_question_text(
@@ -156,7 +160,9 @@ async def continue_regular_mode_after_answer(
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
     async with session_local.begin() as session:
-        snapshot = await user_onboarding_service.ensure_home_snapshot(session, telegram_user=callback.from_user)
+        snapshot = await user_onboarding_service.ensure_home_snapshot(
+            session, telegram_user=callback.from_user
+        )
         try:
             next_result = await game_session_service.start_session(
                 session,

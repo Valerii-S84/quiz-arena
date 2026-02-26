@@ -36,9 +36,9 @@ from app.db.session import SessionLocal
 from app.economy.offers.constants import TRG_LOCKED_MODE_CLICK
 from app.economy.offers.service import OfferLoggingError, OfferService
 from app.economy.referrals.service import ReferralService
-from app.services.channel_bonus import ChannelBonusService
 from app.game.sessions.errors import SessionNotFoundError
 from app.game.sessions.service import GameSessionService
+from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="gameplay")
@@ -101,7 +101,9 @@ _start_mode = partial(
     trg_locked_mode_click=TRG_LOCKED_MODE_CLICK,
     build_question_text=_build_question_text,
 )
-_send_friend_round_question = partial(play_flow.send_friend_round_question, build_question_text=_build_question_text)
+_send_friend_round_question = partial(
+    play_flow.send_friend_round_question, build_question_text=_build_question_text
+)
 
 
 @router.callback_query(F.data.startswith("game:stop"))

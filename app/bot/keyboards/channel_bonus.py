@@ -16,6 +16,10 @@ def build_channel_bonus_keyboard(*, channel_url: str | None) -> InlineKeyboardMa
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [channel_button],
-            [InlineKeyboardButton(text="✅ Ich habe abonniert", callback_data="channel_bonus:check")],
+            [
+                InlineKeyboardButton(
+                    text="✅ Ich habe abonniert", callback_data="channel_bonus:check"
+                )
+            ],
         ]
     )
