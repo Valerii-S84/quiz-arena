@@ -11,7 +11,6 @@ def build_shop_keyboard() -> InlineKeyboardMarkup:
                     callback_data="buy:FRIEND_CHALLENGE_5",
                 )
             ],
-            [InlineKeyboardButton(text="📦 MEGA PACK  |  15⭐", callback_data="buy:MEGA_PACK_15")],
             [
                 InlineKeyboardButton(
                     text="💎 PREMIUM STARTER  |  29⭐",
@@ -21,6 +20,12 @@ def build_shop_keyboard() -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="💎 PREMIUM MONTH  |  99⭐", callback_data="buy:PREMIUM_MONTH"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="👥 Freunde einladen → Belohnung",
+                    callback_data="referral:open",
                 )
             ],
             [InlineKeyboardButton(text="🎟 PROMO-CODE", callback_data="promo:open")],

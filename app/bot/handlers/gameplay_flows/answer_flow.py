@@ -7,6 +7,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.bot.handlers.start_flow import _send_home_message
 from app.bot.keyboards.home import build_home_keyboard
+from app.bot.keyboards.referral_prompt import build_referral_prompt_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import InvalidAnswerOptionError, SessionNotFoundError
 
@@ -17,10 +18,13 @@ async def handle_answer(
     parse_answer_callback,
     session_local,
     user_onboarding_service,
+    referral_service,
     game_session_service,
     offer_service,
     offer_logging_error,
     build_question_text,
+    emit_analytics_event,
+    event_source_bot,
     continue_regular_mode_after_answer,
     handle_daily_answer_branch,
     handle_friend_answer_branch,
@@ -47,6 +51,7 @@ async def handle_answer(
 
     session_id, selected_option = parsed_answer
     now_utc = datetime.now(timezone.utc)
+    show_referral_prompt = False
 
     async with session_local.begin() as session:
         snapshot = await user_onboarding_service.ensure_home_snapshot(
@@ -75,6 +80,22 @@ async def handle_answer(
             await callback.answer()
             return
 
+        if result.source in {"MENU", "DAILY_CHALLENGE"}:
+            show_referral_prompt = await referral_service.reserve_post_game_prompt(
+                session,
+                user_id=snapshot.user_id,
+                now_utc=now_utc,
+            )
+            if show_referral_prompt:
+                await emit_analytics_event(
+                    session,
+                    event_type="referral_prompt_shown",
+                    source=event_source_bot,
+                    happened_at=now_utc,
+                    user_id=snapshot.user_id,
+                    payload={"entrypoint": "post_game"},
+                )
+
     answer_key = "msg.game.answer.correct" if result.is_correct else "msg.game.answer.incorrect"
     if result.source == "DAILY_CHALLENGE":
         await handle_daily_answer_branch(
@@ -86,6 +107,11 @@ async def handle_answer(
             game_session_service=game_session_service,
             build_question_text=build_question_text,
         )
+        if show_referral_prompt:
+            await callback.message.answer(
+                TEXTS_DE["msg.referral.prompt.after_game"],
+                reply_markup=build_referral_prompt_keyboard(),
+            )
         return
 
     if result.mode_code is None or result.source is None:
@@ -142,3 +168,8 @@ async def handle_answer(
         offer_logging_error=offer_logging_error,
         build_question_text=build_question_text,
     )
+    if show_referral_prompt:
+        await callback.message.answer(
+            TEXTS_DE["msg.referral.prompt.after_game"],
+            reply_markup=build_referral_prompt_keyboard(),
+        )

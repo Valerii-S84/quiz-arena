@@ -35,6 +35,7 @@ from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
 from app.economy.offers.constants import TRG_LOCKED_MODE_CLICK
 from app.economy.offers.service import OfferLoggingError, OfferService
+from app.economy.referrals.service import ReferralService
 from app.game.sessions.errors import SessionNotFoundError
 from app.game.sessions.service import GameSessionService
 from app.services.user_onboarding import UserOnboardingService
@@ -176,9 +177,12 @@ async def handle_answer(callback: CallbackQuery) -> None:
         callback,
         parse_answer_callback=gameplay_callbacks.parse_answer_callback,
         **_session_deps(),
+        referral_service=ReferralService,
         offer_service=OfferService,
         offer_logging_error=OfferLoggingError,
         build_question_text=_build_question_text,
+        emit_analytics_event=emit_analytics_event,
+        event_source_bot=EVENT_SOURCE_BOT,
         continue_regular_mode_after_answer=play_flow.continue_regular_mode_after_answer,
         handle_daily_answer_branch=daily_flow.handle_daily_answer_branch,
         handle_friend_answer_branch=friend_answer_flow.handle_friend_answer_branch,

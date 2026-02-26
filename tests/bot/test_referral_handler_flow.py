@@ -76,8 +76,10 @@ async def test_handle_referral_command_renders_overview(monkeypatch) -> None:
     assert TEXTS_DE["msg.referral.invite"] in (response.text or "")
     assert "https://t.me/" not in (response.text or "")
     keyboard = response.kwargs["reply_markup"]
-    share_urls = [button.url for row in keyboard.inline_keyboard for button in row if button.url]
-    assert any("start%3Dref_ABC123" in url for url in share_urls)
+    callbacks = [
+        button.callback_data for row in keyboard.inline_keyboard for button in row if button.callback_data
+    ]
+    assert "referral:share" in callbacks
 
 
 @pytest.mark.asyncio
@@ -92,6 +94,7 @@ async def test_handle_referral_reward_choice_rejects_invalid_callback() -> None:
 @pytest.mark.asyncio
 async def test_handle_referral_reward_choice_success(monkeypatch) -> None:
     monkeypatch.setattr(referral, "SessionLocal", DummySessionLocal())
+    emitted_events: list[str] = []
 
     async def _fake_home_snapshot(session, *, telegram_user):
         return SimpleNamespace(user_id=42)
@@ -109,6 +112,12 @@ async def test_handle_referral_reward_choice_success(monkeypatch) -> None:
     monkeypatch.setattr(referral.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(referral.ReferralService, "claim_next_reward_choice", _fake_claim)
     monkeypatch.setattr(referral, "_build_invite_link", _fake_invite_link)
+    async def _fake_emit(*args, **kwargs):
+        emitted_events.append(kwargs["event_type"])
+        del args, kwargs
+        return None
+
+    monkeypatch.setattr(referral, "emit_analytics_event", _fake_emit)
 
     callback = DummyCallback(
         data="referral:reward:MEGA_PACK_15",
@@ -119,3 +128,43 @@ async def test_handle_referral_reward_choice_success(monkeypatch) -> None:
     response = callback.message.answers[0]
     assert TEXTS_DE["msg.referral.reward.claimed.megapack"] in (response.text or "")
     assert "https://t.me/" not in (response.text or "")
+    assert "referral_reward_claimed" in emitted_events
+
+
+@pytest.mark.asyncio
+async def test_handle_referral_share_opens_share_keyboard(monkeypatch) -> None:
+    monkeypatch.setattr(referral, "SessionLocal", DummySessionLocal())
+    emitted_events: list[str] = []
+
+    async def _fake_load_overview(*, telegram_user, now_utc):
+        del telegram_user, now_utc
+        return _overview(claimable=1)
+
+    async def _fake_invite_link(bot, *, referral_code: str):
+        del bot, referral_code
+        return "https://t.me/testbot?start=ref_ABC123"
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        del session, telegram_user
+        return SimpleNamespace(user_id=9)
+
+    monkeypatch.setattr(referral, "_load_overview", _fake_load_overview)
+    monkeypatch.setattr(referral, "_build_invite_link", _fake_invite_link)
+    monkeypatch.setattr(referral.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    async def _fake_emit(*args, **kwargs):
+        emitted_events.append(kwargs["event_type"])
+        del args, kwargs
+        return None
+
+    monkeypatch.setattr(referral, "emit_analytics_event", _fake_emit)
+
+    callback = DummyCallback(data="referral:share", from_user=SimpleNamespace(id=9))
+    await referral.handle_referral_share(callback)
+
+    response = callback.message.answers[0]
+    assert TEXTS_DE["msg.referral.share.ready"] in (response.text or "")
+    urls = [
+        button.url for row in response.kwargs["reply_markup"].inline_keyboard for button in row if button.url
+    ]
+    assert any(url and "https://t.me/share/url" in url for url in urls)
+    assert "referral_link_shared" in emitted_events

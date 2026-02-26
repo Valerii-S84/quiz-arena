@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.db.models.referrals import Referral
+from app.db.repo.referrals_repo import ReferralsRepo
 from app.db.session import SessionLocal
 from app.economy.referrals.service import ReferralService
 from tests.integration.referrals_fixtures import UTC, _create_referral_row, _create_user
@@ -111,3 +112,38 @@ async def test_reward_distribution_without_reward_code_keeps_reward_for_choice()
             Referral.status == "REWARDED",
         )
         assert int(await session.scalar(rewarded_stmt) or 0) == 0
+
+
+@pytest.mark.asyncio
+async def test_reward_distribution_candidate_query_orders_by_oldest_qualified_at() -> None:
+    now_utc = datetime(2026, 2, 26, 12, 0, tzinfo=UTC)
+    older_referrer = await _create_user("referrer-candidate-oldest")
+    newer_referrer = await _create_user("referrer-candidate-newer")
+    older_referred = await _create_user("referred-candidate-oldest")
+    newer_referred = await _create_user("referred-candidate-newer")
+
+    await _create_referral_row(
+        referrer_user_id=newer_referrer.id,
+        referred_user_id=newer_referred.id,
+        referral_code=newer_referrer.referral_code,
+        status="QUALIFIED",
+        created_at=now_utc - timedelta(days=3),
+        qualified_at=now_utc - timedelta(hours=49),
+    )
+    await _create_referral_row(
+        referrer_user_id=older_referrer.id,
+        referred_user_id=older_referred.id,
+        referral_code=older_referrer.referral_code,
+        status="QUALIFIED",
+        created_at=now_utc - timedelta(days=4),
+        qualified_at=now_utc - timedelta(hours=72),
+    )
+
+    async with SessionLocal.begin() as session:
+        referrer_ids = await ReferralsRepo.list_referrer_ids_with_reward_candidates(
+            session,
+            qualified_before_utc=now_utc - timedelta(hours=48),
+            limit=1,
+        )
+
+    assert referrer_ids == [older_referrer.id]

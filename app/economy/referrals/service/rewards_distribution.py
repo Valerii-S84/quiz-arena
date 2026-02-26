@@ -40,6 +40,7 @@ async def run_reward_distribution(
         "rewards_granted": 0,
         "deferred_limit": 0,
         "awaiting_choice": 0,
+        "newly_notified": 0,
     }
 
     for referrer_user_id in referrer_ids:
@@ -77,6 +78,9 @@ async def run_reward_distribution(
 
             if reward_code is None:
                 result["awaiting_choice"] += 1
+                if referral.notified_at is None:
+                    referral.notified_at = now_utc
+                    result["newly_notified"] += 1
                 rewarded_this_month += 1
                 continue
 

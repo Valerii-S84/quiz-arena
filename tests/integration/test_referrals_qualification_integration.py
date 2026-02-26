@@ -79,6 +79,35 @@ async def test_started_referral_with_deleted_user_is_canceled() -> None:
 
 
 @pytest.mark.asyncio
+async def test_started_referral_with_deleted_referrer_is_canceled() -> None:
+    now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
+    referrer = await _create_user("referrer-deleted-cancel")
+    referred = await _create_user("referred-for-deleted-referrer")
+
+    async with SessionLocal.begin() as session:
+        user = await UsersRepo.get_by_id(session, referrer.id)
+        assert user is not None
+        user.status = "DELETED"
+
+    await _create_referral_row(
+        referrer_user_id=referrer.id,
+        referred_user_id=referred.id,
+        referral_code=referrer.referral_code,
+        status="STARTED",
+        created_at=now_utc - timedelta(days=1),
+    )
+
+    async with SessionLocal.begin() as session:
+        result = await ReferralService.run_qualification_checks(session, now_utc=now_utc)
+        assert result["canceled"] == 1
+
+        stmt = select(Referral).where(Referral.referred_user_id == referred.id)
+        referral = await session.scalar(stmt)
+        assert referral is not None
+        assert referral.status == "CANCELED"
+
+
+@pytest.mark.asyncio
 async def test_velocity_limit_marks_extra_referral_as_rejected_fraud() -> None:
     now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
     referrer = await _create_user("referrer-velocity")

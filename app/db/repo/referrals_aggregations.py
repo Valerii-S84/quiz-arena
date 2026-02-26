@@ -68,6 +68,16 @@ async def count_rewarded_for_referrer(
     return int(result.scalar_one() or 0)
 
 
+async def count_for_referrer(
+    session: AsyncSession,
+    *,
+    referrer_user_id: int,
+) -> int:
+    stmt = select(func.count(Referral.id)).where(Referral.referrer_user_id == referrer_user_id)
+    result = await session.execute(stmt)
+    return int(result.scalar_one() or 0)
+
+
 async def count_started_since(
     session: AsyncSession,
     *,

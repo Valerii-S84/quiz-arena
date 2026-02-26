@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.quiz_sessions import QuizSession
@@ -125,3 +125,12 @@ class QuizSessionsRepo:
         session.add(quiz_session)
         await session.flush()
         return quiz_session
+
+    @staticmethod
+    async def count_completed_for_user(session: AsyncSession, *, user_id: int) -> int:
+        stmt = select(func.count(QuizSession.id)).where(
+            QuizSession.user_id == user_id,
+            QuizSession.status == "COMPLETED",
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
