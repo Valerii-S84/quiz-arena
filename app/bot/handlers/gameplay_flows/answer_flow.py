@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import cast
 
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
 
+from app.bot.handlers.start_flow import _send_home_message
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import InvalidAnswerOptionError, SessionNotFoundError
@@ -35,6 +37,7 @@ async def handle_answer(
     if callback.data is None or callback.from_user is None or callback.message is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
+    message = cast(Message, callback.message)
 
     parsed_answer = parse_answer_callback(callback.data)
     if parsed_answer is None:
@@ -90,16 +93,12 @@ async def handle_answer(
     await callback.message.answer("\n".join(response_lines))
 
     if result.mode_code is None or result.source is None:
-        await callback.message.answer(
-            TEXTS_DE["msg.game.stopped"], reply_markup=build_home_keyboard()
-        )
+        await _send_home_message(message, text=TEXTS_DE["msg.game.stopped"])
         await callback.answer()
         return
 
     if result.source == "DAILY_CHALLENGE":
-        await callback.message.answer(
-            TEXTS_DE["msg.game.daily.finished"], reply_markup=build_home_keyboard()
-        )
+        await _send_home_message(message, text=TEXTS_DE["msg.game.daily.finished"])
         await callback.answer()
         return
 

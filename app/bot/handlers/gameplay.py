@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from typing import cast
+
 from aiogram import F, Router
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
 
 from app.bot.handlers import (
     gameplay_callbacks,
@@ -9,6 +11,7 @@ from app.bot.handlers import (
     gameplay_helpers,
     gameplay_views,
 )
+from app.bot.handlers.start_flow import _send_home_message
 from app.bot.handlers.gameplay_flows import answer_flow, friend_answer_flow, play_flow
 from app.bot.handlers.gameplay_friend_challenge import (  # noqa: F401
     handle_friend_challenge_create,
@@ -20,7 +23,6 @@ from app.bot.handlers.gameplay_friend_challenge import (  # noqa: F401
     handle_friend_challenge_share_result,
 )
 from app.bot.keyboards.friend_challenge import build_friend_challenge_share_url
-from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
 from app.economy.offers.constants import TRG_LOCKED_MODE_CLICK
@@ -137,7 +139,7 @@ async def handle_game_stop(callback: CallbackQuery) -> None:
     if callback.message is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
-    await callback.message.answer(TEXTS_DE["msg.game.stopped"], reply_markup=build_home_keyboard())
+    await _send_home_message(cast(Message, callback.message), text=TEXTS_DE["msg.game.stopped"])
     await callback.answer()
 
 

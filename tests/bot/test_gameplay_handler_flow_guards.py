@@ -20,6 +20,23 @@ async def test_handle_game_stop_with_missing_message_returns_error() -> None:
 
 
 @pytest.mark.asyncio
+async def test_handle_game_stop_sends_home_message_via_photo_helper(monkeypatch) -> None:
+    captured: dict[str, str] = {}
+
+    async def _fake_send_home_message(message, *, text: str) -> None:
+        del message
+        captured["text"] = text
+
+    monkeypatch.setattr(gameplay, "_send_home_message", _fake_send_home_message)
+
+    callback = DummyCallback(data="game:stop", from_user=SimpleNamespace(id=1))
+    await gameplay.handle_game_stop(callback)
+
+    assert captured["text"] == TEXTS_DE["msg.game.stopped"]
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
+
+
+@pytest.mark.asyncio
 async def test_handle_mode_with_missing_data_returns_error() -> None:
     callback = DummyCallback(data=None, from_user=SimpleNamespace(id=1))
 
