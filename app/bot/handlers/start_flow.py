@@ -31,6 +31,7 @@ from app.game.sessions.errors import (
     FriendChallengeNotFoundError,
 )
 from app.game.sessions.service import GameSessionService
+from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
 
 
@@ -179,10 +180,23 @@ async def handle_start_message(message: Message) -> None:
 
 
 async def handle_shop_open(callback: CallbackQuery) -> None:
-    if callback.message is not None:
-        await callback.message.answer(
-            TEXTS_DE["msg.shop.title"], reply_markup=build_shop_keyboard()
+    if callback.from_user is None or callback.message is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
+    async with SessionLocal.begin() as session:
+        snapshot = await UserOnboardingService.ensure_home_snapshot(
+            session,
+            telegram_user=callback.from_user,
         )
+        channel_bonus_claimed = await ChannelBonusService.is_bonus_claimed(
+            session, user_id=snapshot.user_id
+        )
+
+    await callback.message.answer(
+        TEXTS_DE["msg.shop.title"],
+        reply_markup=build_shop_keyboard(channel_bonus_claimed=channel_bonus_claimed),
+    )
     await callback.answer()
 
 

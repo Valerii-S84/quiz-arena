@@ -90,6 +90,22 @@ class EnergyService:
         return snapshot
 
     @staticmethod
+    async def fill_to_free_cap(
+        session: AsyncSession, *, user_id: int, now_utc: datetime
+    ) -> EnergySnapshot:
+        state = await EnergyService._get_or_create_state_for_update(session, user_id, now_utc)
+        premium_active = await EntitlementsRepo.has_active_premium(session, user_id, now_utc)
+
+        snapshot = EnergyService._snapshot_from_model(state)
+        snapshot, _ = apply_regen_tick(snapshot, now_utc=now_utc, premium_active=premium_active)
+        snapshot, _ = apply_daily_topup_berlin(snapshot, now_utc=now_utc)
+        snapshot.free_energy = snapshot.free_cap
+
+        EnergyService._apply_snapshot_to_model(state, snapshot, now_utc)
+        await session.flush()
+        return snapshot
+
+    @staticmethod
     async def initialize_user_state(
         session: AsyncSession, *, user_id: int, now_utc: datetime
     ) -> EnergyState:
