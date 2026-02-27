@@ -16,6 +16,12 @@ FRIEND_SERIES_NEXT_RE = re.compile(r"^friend:series:next:([0-9a-f\-]{36})$")
 FRIEND_COPY_LINK_RE = re.compile(r"^friend:copy:([0-9a-f\-]{36})$")
 FRIEND_OPEN_REPOST_RE = re.compile(r"^friend:open:repost:([0-9a-f\-]{36})$")
 FRIEND_DELETE_RE = re.compile(r"^friend:delete:([0-9a-f\-]{36})$")
+TOURNAMENT_FORMAT_RE = re.compile(r"^friend:tournament:format:(5|12)$")
+TOURNAMENT_JOIN_RE = re.compile(r"^friend:tournament:join:([a-f0-9]{12})$", re.IGNORECASE)
+TOURNAMENT_COPY_LINK_RE = re.compile(r"^friend:tournament:copy:([0-9a-f\-]{36})$")
+TOURNAMENT_START_RE = re.compile(r"^friend:tournament:start:([0-9a-f\-]{36})$")
+TOURNAMENT_VIEW_RE = re.compile(r"^friend:tournament:view:([0-9a-f\-]{36})$")
+TOURNAMENT_SHARE_RE = re.compile(r"^friend:tournament:share:([0-9a-f\-]{36})$")
 DAILY_RESULT_RE = re.compile(r"^daily:result:([0-9a-f\-]{36})$")
 
 
@@ -65,6 +71,20 @@ def parse_uuid_callback(*, pattern: re.Pattern[str], callback_data: str) -> UUID
     if matched is None:
         return None
     return UUID(matched.group(1))
+
+
+def parse_tournament_format(callback_data: str) -> int | None:
+    matched = TOURNAMENT_FORMAT_RE.match(callback_data)
+    if matched is None:
+        return None
+    return int(matched.group(1))
+
+
+def parse_tournament_invite_code(callback_data: str) -> str | None:
+    matched = TOURNAMENT_JOIN_RE.match(callback_data)
+    if matched is None:
+        return None
+    return matched.group(1).lower()
 
 
 def parse_mode_code(callback_data: str) -> str:

@@ -48,3 +48,23 @@ class SwissParticipant:
 class SwissPair:
     user_a: int
     user_b: int | None
+
+
+@dataclass(slots=True)
+class TournamentParticipantSnapshot:
+    tournament_id: UUID
+    user_id: int
+    score: Decimal
+    tie_break: Decimal
+    joined_at: datetime
+
+
+@dataclass(slots=True)
+class TournamentLobbySnapshot:
+    tournament: TournamentSnapshot
+    participants: tuple[TournamentParticipantSnapshot, ...]
+    viewer_joined: bool
+    viewer_is_creator: bool
+    can_start: bool
+    viewer_current_match_challenge_id: UUID | None
+    viewer_current_opponent_user_id: int | None

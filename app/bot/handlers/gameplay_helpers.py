@@ -121,3 +121,39 @@ async def _build_friend_result_share_url(
         base_link=f"https://t.me/{me.username}",
         share_text=share_text,
     )
+
+
+async def _build_tournament_invite_link(
+    callback: CallbackQuery,
+    *,
+    invite_code: str,
+) -> str | None:
+    bot = callback.bot
+    assert bot is not None
+    try:
+        me = await bot.get_me()
+    except Exception:
+        return None
+    if not me.username:
+        return None
+    return f"https://t.me/{me.username}?start=tournament_{invite_code}"
+
+
+async def _build_tournament_share_url(
+    callback: CallbackQuery,
+    *,
+    share_text: str,
+    build_share_url,
+) -> str | None:
+    bot = callback.bot
+    assert bot is not None
+    try:
+        me = await bot.get_me()
+    except Exception:
+        return None
+    if not me.username:
+        return None
+    return build_share_url(
+        base_link=f"https://t.me/{me.username}",
+        share_text=share_text,
+    )

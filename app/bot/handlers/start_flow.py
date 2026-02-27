@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from uuid import UUID
 
 from aiogram.types import CallbackQuery, Message
 
+from app.bot.handlers.start_friend_challenge_flow import handle_start_friend_challenge_payload
 from app.bot.handlers.start_helpers import (
     _notify_creator_about_join,
     _resolve_opponent_label,
@@ -14,7 +14,9 @@ from app.bot.handlers.start_parsing import (
     _extract_duel_challenge_id,
     _extract_friend_challenge_token,
     _extract_start_payload,
+    _extract_tournament_invite_code,
 )
+from app.bot.handlers.start_tournament_flow import handle_start_tournament_payload
 from app.bot.handlers.start_views import (
     _build_friend_plan_text,
     _build_friend_score_text,
@@ -22,25 +24,14 @@ from app.bot.handlers.start_views import (
     _build_home_text,
     _build_question_text,
 )
-from app.bot.keyboards.friend_challenge import (
-    build_friend_challenge_back_keyboard,
-    build_friend_open_taken_keyboard,
-)
-from app.bot.keyboards.home import build_home_keyboard
 from app.bot.keyboards.offers import build_offer_keyboard
-from app.bot.keyboards.quiz import build_quiz_keyboard
 from app.bot.keyboards.shop import build_shop_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.core.config import get_settings
+from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.offers.service import OfferLoggingError, OfferService
-from app.game.sessions.errors import (
-    FriendChallengeAccessError,
-    FriendChallengeCompletedError,
-    FriendChallengeExpiredError,
-    FriendChallengeFullError,
-    FriendChallengeNotFoundError,
-)
+from app.game import TournamentServiceFacade
 from app.game.sessions.service import GameSessionService
 from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
@@ -56,137 +47,53 @@ async def handle_start_message(message: Message) -> None:
     start_payload = _extract_start_payload(message.text)
     friend_invite_token = _extract_friend_challenge_token(start_payload)
     duel_challenge_id = _extract_duel_challenge_id(start_payload)
-    challenge_start = None
-    challenge_joined_now = False
-    challenge_error_key: str | None = None
+    tournament_invite_code = _extract_tournament_invite_code(start_payload)
+
     async with SessionLocal.begin() as session:
         snapshot = await UserOnboardingService.ensure_home_snapshot(
             session,
             telegram_user=message.from_user,
             start_payload=start_payload,
         )
-        if friend_invite_token is not None or duel_challenge_id is not None:
-            try:
-                if duel_challenge_id is not None:
-                    try:
-                        parsed_duel_id = UUID(duel_challenge_id)
-                    except ValueError:
-                        challenge_error_key = "msg.friend.challenge.invalid"
-                        join_result = None
-                    else:
-                        join_result = await GameSessionService.join_friend_challenge_by_id(
-                            session,
-                            user_id=snapshot.user_id,
-                            challenge_id=parsed_duel_id,
-                            now_utc=now_utc,
-                        )
-                else:
-                    join_result = await GameSessionService.join_friend_challenge_by_token(
-                        session,
-                        user_id=snapshot.user_id,
-                        invite_token=friend_invite_token or "",
-                        now_utc=now_utc,
-                    )
-                if join_result is None:
-                    raise FriendChallengeNotFoundError
-                challenge = join_result.snapshot
-                challenge_joined_now = join_result.joined_now
-                challenge_start = await GameSessionService.start_friend_challenge_round(
-                    session,
-                    user_id=snapshot.user_id,
-                    challenge_id=challenge.challenge_id,
-                    idempotency_key=f"start:friend:join:{challenge.challenge_id}:{message.message_id}",
-                    now_utc=now_utc,
-                )
-            except (
-                FriendChallengeNotFoundError,
-                FriendChallengeCompletedError,
-                FriendChallengeAccessError,
-            ):
-                challenge_error_key = "msg.friend.challenge.invalid"
-            except FriendChallengeExpiredError:
-                challenge_error_key = "msg.friend.challenge.expired"
-            except FriendChallengeFullError:
-                challenge_error_key = (
-                    "msg.friend.challenge.open.taken"
-                    if duel_challenge_id is not None
-                    else "msg.friend.challenge.full"
-                )
-        else:
-            try:
-                offer_selection = await OfferService.evaluate_and_log_offer(
-                    session,
-                    user_id=snapshot.user_id,
-                    idempotency_key=f"offer:start:{message.from_user.id}:{message.message_id}",
-                    now_utc=now_utc,
-                )
-            except OfferLoggingError:
-                offer_selection = None
 
-    if friend_invite_token is not None or duel_challenge_id is not None:
-        if challenge_error_key is not None or challenge_start is None:
-            reply_markup = (
-                build_friend_open_taken_keyboard()
-                if challenge_error_key == "msg.friend.challenge.open.taken"
-                else build_home_keyboard()
-            )
-            await message.answer(
-                TEXTS_DE[challenge_error_key or "msg.friend.challenge.invalid"],
-                reply_markup=reply_markup,
-            )
+        handled_friend_challenge = await handle_start_friend_challenge_payload(
+            message,
+            session=session,
+            now_utc=now_utc,
+            snapshot=snapshot,
+            friend_invite_token=friend_invite_token,
+            duel_challenge_id=duel_challenge_id,
+            game_session_service=GameSessionService,
+            notify_creator_about_join=_notify_creator_about_join,
+            resolve_opponent_label=_resolve_opponent_label,
+            build_friend_plan_text=_build_friend_plan_text,
+            build_friend_score_text=_build_friend_score_text,
+            build_friend_ttl_text=_build_friend_ttl_text,
+            build_question_text=_build_question_text,
+        )
+        if handled_friend_challenge:
             return
 
-        if challenge_joined_now:
-            await _notify_creator_about_join(
-                message,
-                challenge=challenge_start.snapshot,
-                joiner_user_id=snapshot.user_id,
-            )
+        handled_tournament = await handle_start_tournament_payload(
+            message,
+            session=session,
+            tournament_invite_code=tournament_invite_code,
+            viewer_user_id=snapshot.user_id,
+            tournament_service=TournamentServiceFacade,
+            users_repo=UsersRepo,
+        )
+        if handled_tournament:
+            return
 
-        opponent_label = await _resolve_opponent_label(
-            challenge=challenge_start.snapshot,
-            user_id=snapshot.user_id,
-        )
-        summary_lines = [
-            TEXTS_DE["msg.friend.challenge.joined"],
-            TEXTS_DE["msg.friend.challenge.with"].format(opponent_label=opponent_label),
-            _build_friend_plan_text(total_rounds=challenge_start.snapshot.total_rounds),
-            TEXTS_DE["msg.friend.challenge.play.instant"].format(
-                total_rounds=challenge_start.snapshot.total_rounds
-            ),
-            _build_friend_score_text(
-                challenge=challenge_start.snapshot,
+        try:
+            offer_selection = await OfferService.evaluate_and_log_offer(
+                session,
                 user_id=snapshot.user_id,
-                opponent_label=opponent_label,
-            ),
-        ]
-        ttl_text = _build_friend_ttl_text(challenge=challenge_start.snapshot, now_utc=now_utc)
-        if ttl_text is not None:
-            summary_lines.append(ttl_text)
-        if challenge_start.waiting_for_opponent:
-            summary_lines.append(TEXTS_DE["msg.friend.challenge.waiting"])
-        if challenge_start.already_answered_current_round:
-            summary_lines.append(TEXTS_DE["msg.friend.challenge.round.already.answered"])
-        await message.answer(
-            "\n".join(summary_lines),
-            reply_markup=build_friend_challenge_back_keyboard(),
-        )
-        if challenge_start.start_result is not None:
-            question_text = _build_question_text(
-                source="FRIEND_CHALLENGE",
-                snapshot_free_energy=snapshot.free_energy,
-                snapshot_paid_energy=snapshot.paid_energy,
-                start_result=challenge_start.start_result,
+                idempotency_key=f"offer:start:{message.from_user.id}:{message.message_id}",
+                now_utc=now_utc,
             )
-            await message.answer(
-                question_text,
-                reply_markup=build_quiz_keyboard(
-                    session_id=str(challenge_start.start_result.session.session_id),
-                    options=challenge_start.start_result.session.options,
-                ),
-                parse_mode="HTML",
-            )
-        return
+        except OfferLoggingError:
+            offer_selection = None
 
     response_text = _build_home_text(
         free_energy=snapshot.free_energy,

@@ -13,7 +13,7 @@ from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_type_tournament_shows_soon_text(monkeypatch) -> None:
+async def test_handle_friend_challenge_type_tournament_shows_format_picker(monkeypatch) -> None:
     callback = DummyCallback(
         data="friend:challenge:type:tournament",
         from_user=SimpleNamespace(id=17),
@@ -21,7 +21,16 @@ async def test_handle_friend_challenge_type_tournament_shows_soon_text(monkeypat
     )
     await gameplay_friend_challenge.handle_friend_challenge_type_selected(callback)
 
-    assert callback.message.answers[0].text == TEXTS_DE["msg.friend.challenge.tournament.soon"]
+    response = callback.message.answers[0]
+    assert response.text == TEXTS_DE["msg.friend.challenge.tournament.format"]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "friend:tournament:format:5" in callbacks
+    assert "friend:tournament:format:12" in callbacks
 
 
 @pytest.mark.asyncio

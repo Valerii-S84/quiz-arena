@@ -35,7 +35,7 @@ def build_friend_challenge_create_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text="🏆 Turnier mit Freunden (🔜 Bald verfügbar!)",
+                    text="🏆 Turnier mit Freunden",
                     callback_data="friend:challenge:type:tournament",
                 )
             ],

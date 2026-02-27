@@ -13,6 +13,7 @@ from app.bot.handlers.start_parsing import (  # noqa: F401
     _extract_duel_challenge_id,
     _extract_friend_challenge_token,
     _extract_start_payload,
+    _extract_tournament_invite_code,
 )
 from app.bot.handlers.start_views import (  # noqa: F401
     _build_friend_plan_text,

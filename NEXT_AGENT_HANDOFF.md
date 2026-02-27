@@ -1,5 +1,37 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-27, Phase 2 UX + deep-link shipped; concrete remaining scope)
+
+### What was completed in this slice
+1. Private tournament bot UX baseline is now live:
+   - replaced `🏆 Turnier mit Freunden (🔜 Bald verfügbar!)` with real flow
+   - format select (`5/12`) + invite share (`t.me/share/url`) + copy link + start/view callbacks
+2. Deep-link routing is implemented:
+   - `/start tournament_<invite_code>` parses and opens tournament lobby after onboarding
+3. Tournament analytics was partially closed:
+   - emitted in bot flow: `private_tournament_created`, `private_tournament_joined`, `private_tournament_started`, `private_tournament_result_shared`
+4. Local mandatory gate is green on this branch head:
+   - `.venv/bin/ruff check .`
+   - `.venv/bin/mypy .`
+   - `DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q`
+
+### Exactly what remains to close Phase 2
+1. Round messaging + single-message table edit (TЗ step `18`):
+   - send round-start DM to each participant with opponent/deadline and `▶️ Jetzt spielen!`
+   - keep one standings message per participant and update it via `edit_message_text` after each round
+2. Private tournament proof cards (TЗ step `19`):
+   - async-only generation (worker/background), never in handlers
+   - personal card for each participant, special variant for top-3
+   - upload + reuse Telegram `file_id`
+3. Completion/finalization path (TЗ steps `20-21`):
+   - ensure final participant-facing result screen is sent to all users after round 3
+   - keep `private_tournament_result_shared` wired from final screen
+   - verify `private_tournament_completed` is emitted exactly once per tournament completion path (worker-driven)
+4. Final Phase 2 regression closure (TЗ step `22`):
+   - add tests for round-start DM dispatch and leaderboard `edit` behavior
+   - add tests for private tournament proof-card enqueue/cache reuse path
+   - rerun full gate and only then start Phase 3
+
 ## Update (2026-02-27, PR #15 merged; next agent plan to close Phase 2)
 
 ### Current baseline

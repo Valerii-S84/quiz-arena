@@ -12,6 +12,7 @@ from app.bot.handlers import (
     gameplay_friend_challenge,
     gameplay_helpers,
     gameplay_proof_cards,
+    gameplay_tournaments,
     gameplay_views,
 )
 from app.bot.handlers.gameplay_flows import (
@@ -32,6 +33,7 @@ from app.bot.handlers.gameplay_friend_challenge import (  # noqa: F401
 )
 from app.bot.handlers.start_flow import _send_home_message
 from app.bot.keyboards.friend_challenge import build_friend_challenge_share_url
+from app.bot.keyboards.tournament import build_tournament_share_url
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
 from app.economy.offers.constants import TRG_LOCKED_MODE_CLICK
@@ -39,6 +41,7 @@ from app.economy.offers.service import OfferLoggingError, OfferService
 from app.economy.referrals.service import ReferralService
 from app.game.sessions.errors import SessionNotFoundError
 from app.game.sessions.service import GameSessionService
+from app.game.tournaments import TournamentServiceFacade
 from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
 
@@ -48,6 +51,7 @@ EVENT_SOURCE_BOT = "BOT"
 ANSWER_RE = gameplay_callbacks.ANSWER_RE
 DAILY_RESULT_RE = gameplay_callbacks.DAILY_RESULT_RE
 gameplay_friend_challenge.register(router)
+gameplay_tournaments.register(router)
 
 _format_user_label = gameplay_views._format_user_label
 _build_friend_plan_text = gameplay_views._build_friend_plan_text
@@ -60,6 +64,8 @@ _build_friend_proof_card_text = gameplay_views._build_friend_proof_card_text
 _build_friend_ttl_text = gameplay_views._build_friend_ttl_text
 _friend_opponent_user_id = gameplay_helpers._friend_opponent_user_id
 _build_friend_invite_link = gameplay_helpers._build_friend_invite_link
+_build_tournament_invite_link = gameplay_helpers._build_tournament_invite_link
+_tournament_service = TournamentServiceFacade
 _SESSION_DEPS: dict[str, object] = {
     "session_local": SessionLocal,
     "user_onboarding_service": UserOnboardingService,
@@ -88,6 +94,10 @@ _build_friend_result_share_url = partial(
     gameplay_helpers._build_friend_result_share_url,
     share_cta_text=TEXTS_DE["msg.friend.challenge.proof.share.cta"],
     build_share_url=build_friend_challenge_share_url,
+)
+_build_tournament_share_result_url = partial(
+    gameplay_helpers._build_tournament_share_url,
+    build_share_url=build_tournament_share_url,
 )
 _start_mode = partial(
     play_flow.start_mode,
