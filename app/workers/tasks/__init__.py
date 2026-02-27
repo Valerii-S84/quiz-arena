@@ -24,6 +24,7 @@ from app.workers.tasks.referrals_observability import run_referrals_fraud_alerts
 from app.workers.tasks.retention_cleanup import run_retention_cleanup
 from app.workers.tasks.telegram_updates import process_telegram_update
 from app.workers.tasks.telegram_updates_observability import run_telegram_updates_reliability_alerts
+from app.workers.tasks.tournaments import run_private_tournament_rounds
 
 __all__ = [
     "process_telegram_update",
@@ -43,5 +44,6 @@ __all__ = [
     "run_referral_qualification_checks",
     "run_referral_reward_distribution",
     "run_referrals_fraud_alerts",
+    "run_private_tournament_rounds",
     "run_telegram_updates_reliability_alerts",
 ]
