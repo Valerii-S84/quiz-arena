@@ -134,3 +134,12 @@ async def test_handle_friend_my_duels_groups_sections_with_my_turn_first(monkeyp
     completed_pos = text.find(TEXTS_DE["msg.friend.challenge.my.completed"])
     assert -1 not in {my_turn_pos, waiting_pos, open_pos, completed_pos}
     assert my_turn_pos < waiting_pos < open_pos < completed_pos
+
+    keyboard = callback.message.answers[0].kwargs["reply_markup"]
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    callbacks = [button.callback_data for button in buttons if button.callback_data]
+    urls = [button.url for button in buttons if button.url]
+    assert "friend:next:cccccccc-cccc-cccc-cccc-cccccccccccc" in callbacks
+    assert "friend:rematch:dddddddd-dddd-dddd-dddd-dddddddddddd" in callbacks
+    assert "home:open" in callbacks
+    assert any(url and "https://t.me/share/url" in url for url in urls)

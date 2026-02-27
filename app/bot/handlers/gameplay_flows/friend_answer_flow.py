@@ -7,9 +7,11 @@ from aiogram.types import CallbackQuery
 from app.bot.handlers.gameplay_flows.friend_answer_completion_flow import (
     handle_completed_friend_challenge,
 )
+from app.bot.handlers.gameplay_flows.friend_challenge_push_quota import reserve_duel_push_slot
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
     build_friend_challenge_finished_keyboard,
+    build_friend_challenge_next_keyboard,
 )
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
@@ -84,23 +86,31 @@ async def handle_friend_answer_branch(
         await callback.message.answer(
             round_result_text,
         )
-        if not result.idempotent_replay and opponent_user_id is not None:
-            opponent_label_for_opponent = await resolve_opponent_label(
+
+    if (
+        not result.idempotent_replay
+        and opponent_user_id is not None
+        and challenge.status in {"CREATOR_DONE", "OPPONENT_DONE"}
+    ):
+        push_reserved = await reserve_duel_push_slot(
+            session_local=session_local,
+            challenge_id=challenge.challenge_id,
+            target_user_id=opponent_user_id,
+            now_utc=now_utc,
+        )
+        if push_reserved:
+            actor_label_for_target = await resolve_opponent_label(
                 challenge=challenge,
                 user_id=opponent_user_id,
             )
             await notify_opponent(
                 callback,
                 opponent_user_id=opponent_user_id,
-                text="\n".join(
-                    [
-                        build_friend_score_text(
-                            challenge=challenge,
-                            user_id=opponent_user_id,
-                            opponent_label=opponent_label_for_opponent,
-                        ),
-                        round_result_text,
-                    ]
+                text=TEXTS_DE["msg.friend.challenge.turn.reminder"].format(
+                    opponent_label=actor_label_for_target
+                ),
+                reply_markup=build_friend_challenge_next_keyboard(
+                    challenge_id=str(challenge.challenge_id)
                 ),
             )
 
