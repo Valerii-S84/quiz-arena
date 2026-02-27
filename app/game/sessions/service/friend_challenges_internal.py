@@ -24,14 +24,14 @@ from app.game.friend_challenges.constants import (
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengePaymentRequiredError
 from app.game.sessions.types import FriendChallengeSnapshot
 
-from .friend_challenges_analytics import (
-    _emit_friend_challenge_expired_event as _emit_friend_challenge_expired_event_analytics,
-)
 from .constants import (
     DUEL_ACCEPTED_TTL_SECONDS,
     DUEL_PENDING_TTL_SECONDS,
     FRIEND_CHALLENGE_FREE_CREATES,
     FRIEND_CHALLENGE_TICKET_PRODUCT_CODE,
+)
+from .friend_challenges_analytics import (
+    _emit_friend_challenge_expired_event as _emit_friend_challenge_expired_event_analytics,
 )
 
 

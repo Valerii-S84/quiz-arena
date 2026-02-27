@@ -5,10 +5,8 @@ from typing import Protocol, cast
 
 from aiogram.types import CallbackQuery
 
-from app.bot.keyboards.friend_challenge import (
-    build_friend_challenge_finished_keyboard,
-)
 from app.bot.handlers.gameplay_flows.friend_challenge_result_share import build_result_share_url
+from app.bot.keyboards.friend_challenge import build_friend_challenge_finished_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 

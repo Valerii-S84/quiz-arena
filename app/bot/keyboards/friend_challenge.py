@@ -130,15 +130,19 @@ def build_friend_challenge_finished_keyboard(
     if include_share:
         rows.append(
             [
-                InlineKeyboardButton(text="📤 Ergebnis teilen", url=share_url)
-                if share_url
-                else InlineKeyboardButton(
-                    text="📤 Ergebnis teilen",
-                    callback_data=f"friend:share:result:{challenge_id}",
+                (
+                    InlineKeyboardButton(text="📤 Ergebnis teilen", url=share_url)
+                    if share_url
+                    else InlineKeyboardButton(
+                        text="📤 Ergebnis teilen",
+                        callback_data=f"friend:share:result:{challenge_id}",
+                    )
                 )
             ]
         )
-    rows.append([InlineKeyboardButton(text="🔄 Revanche", callback_data=f"friend:rematch:{challenge_id}")])
+    rows.append(
+        [InlineKeyboardButton(text="🔄 Revanche", callback_data=f"friend:rematch:{challenge_id}")]
+    )
     rows.append([InlineKeyboardButton(text="🏠 Menü", callback_data="home:open")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

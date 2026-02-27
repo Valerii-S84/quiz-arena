@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from aiogram.types import CallbackQuery
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.keyboards.friend_challenge import build_friend_challenge_share_url
 from app.bot.texts.de import TEXTS_DE
