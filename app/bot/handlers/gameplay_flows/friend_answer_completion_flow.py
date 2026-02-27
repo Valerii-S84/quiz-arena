@@ -31,6 +31,7 @@ async def handle_completed_friend_challenge(
     build_friend_finish_text,
     build_public_badge_label,
     build_friend_proof_card_text,
+    enqueue_friend_challenge_proof_cards,
     build_series_progress_text,
 ) -> None:
     series_my_wins = 0
@@ -191,3 +192,5 @@ async def handle_completed_friend_challenge(
             text="\n".join(opponent_message_lines),
             reply_markup=opponent_finish_keyboard,
         )
+    if not idempotent_replay:
+        enqueue_friend_challenge_proof_cards(challenge_id=str(challenge.challenge_id))

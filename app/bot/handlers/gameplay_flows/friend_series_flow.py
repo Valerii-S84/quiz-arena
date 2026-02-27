@@ -12,6 +12,7 @@ from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import (
     FriendChallengeAccessError,
+    FriendChallengeLimitExceededError,
     FriendChallengeNotFoundError,
     FriendChallengePaymentRequiredError,
 )
@@ -54,7 +55,7 @@ async def handle_friend_challenge_series_best3(
                 now_utc=now_utc,
                 best_of=3,
             )
-        except FriendChallengePaymentRequiredError:
+        except (FriendChallengePaymentRequiredError, FriendChallengeLimitExceededError):
             await callback.message.answer(
                 TEXTS_DE["msg.friend.challenge.limit.reached"],
                 reply_markup=build_friend_challenge_limit_keyboard(),
@@ -171,7 +172,7 @@ async def handle_friend_challenge_series_next(
                     now_utc=now_utc,
                 )
             )
-        except FriendChallengePaymentRequiredError:
+        except (FriendChallengePaymentRequiredError, FriendChallengeLimitExceededError):
             await callback.message.answer(
                 TEXTS_DE["msg.friend.challenge.limit.reached"],
                 reply_markup=build_friend_challenge_limit_keyboard(),

@@ -60,7 +60,7 @@ async def handle_friend_challenge_share_result(
             await callback.answer()
             return
 
-        if challenge.status not in {"COMPLETED", "EXPIRED"}:
+        if challenge.status not in {"COMPLETED", "EXPIRED", "WALKOVER"}:
             await callback.message.answer(
                 TEXTS_DE["msg.friend.challenge.proof.not_ready"],
                 reply_markup=build_friend_challenge_back_keyboard(),

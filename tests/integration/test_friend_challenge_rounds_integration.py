@@ -23,7 +23,7 @@ async def test_friend_challenge_uses_same_question_for_both_users_and_updates_ro
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=3,
+            total_rounds=5,
         )
         await GameSessionService.join_friend_challenge_by_token(
             session,
@@ -91,7 +91,7 @@ async def test_friend_challenge_uses_same_question_for_both_users_and_updates_ro
 
     assert second_answer.friend_challenge is not None
     assert second_answer.friend_challenge_round_completed is True
-    assert second_answer.friend_challenge.status == "ACTIVE"
+    assert second_answer.friend_challenge.status == "ACCEPTED"
     assert second_answer.friend_challenge.current_round == 2
     assert second_answer.friend_challenge.creator_score == 1
     assert second_answer.friend_challenge.opponent_score == 0
@@ -109,7 +109,7 @@ async def test_friend_challenge_completes_and_sets_winner() -> None:
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=1,
+            total_rounds=5,
         )
         await GameSessionService.join_friend_challenge_by_token(
             session,
@@ -117,56 +117,56 @@ async def test_friend_challenge_completes_and_sets_winner() -> None:
             invite_token=challenge.invite_token,
             now_utc=now_utc,
         )
-        creator_round = await GameSessionService.start_friend_challenge_round(
-            session,
-            user_id=creator_user_id,
-            challenge_id=challenge.challenge_id,
-            idempotency_key="fc:done:creator:start",
-            now_utc=now_utc,
-        )
-        opponent_round = await GameSessionService.start_friend_challenge_round(
-            session,
-            user_id=opponent_user_id,
-            challenge_id=challenge.challenge_id,
-            idempotency_key="fc:done:opponent:start",
-            now_utc=now_utc,
-        )
+        final_answer = None
+        for round_no in range(1, 6):
+            creator_round = await GameSessionService.start_friend_challenge_round(
+                session,
+                user_id=creator_user_id,
+                challenge_id=challenge.challenge_id,
+                idempotency_key=f"fc:done:creator:start:{round_no}",
+                now_utc=now_utc,
+            )
+            opponent_round = await GameSessionService.start_friend_challenge_round(
+                session,
+                user_id=opponent_user_id,
+                challenge_id=challenge.challenge_id,
+                idempotency_key=f"fc:done:opponent:start:{round_no}",
+                now_utc=now_utc,
+            )
+            assert creator_round.start_result is not None
+            assert opponent_round.start_result is not None
 
-    assert creator_round.start_result is not None
-    assert opponent_round.start_result is not None
+            creator_session = await QuizSessionsRepo.get_by_id(
+                session, creator_round.start_result.session.session_id
+            )
+            assert creator_session is not None
+            question = await get_question_by_id(
+                session,
+                creator_session.mode_code,
+                question_id=creator_session.question_id or "",
+                local_date_berlin=creator_session.local_date_berlin,
+            )
+            assert question is not None
+            correct_option = question.correct_option
 
-    creator_session_id = creator_round.start_result.session.session_id
-    opponent_session_id = opponent_round.start_result.session.session_id
+            await GameSessionService.submit_answer(
+                session,
+                user_id=creator_user_id,
+                session_id=creator_round.start_result.session.session_id,
+                selected_option=(correct_option + 1) % 4,
+                idempotency_key=f"fc:done:creator:answer:{round_no}",
+                now_utc=now_utc,
+            )
+            final_answer = await GameSessionService.submit_answer(
+                session,
+                user_id=opponent_user_id,
+                session_id=opponent_round.start_result.session.session_id,
+                selected_option=correct_option,
+                idempotency_key=f"fc:done:opponent:answer:{round_no}",
+                now_utc=now_utc,
+            )
 
-    async with SessionLocal.begin() as session:
-        creator_session = await QuizSessionsRepo.get_by_id(session, creator_session_id)
-        assert creator_session is not None
-        question = await get_question_by_id(
-            session,
-            creator_session.mode_code,
-            question_id=creator_session.question_id or "",
-            local_date_berlin=creator_session.local_date_berlin,
-        )
-        assert question is not None
-        correct_option = question.correct_option
-
-        await GameSessionService.submit_answer(
-            session,
-            user_id=creator_user_id,
-            session_id=creator_session_id,
-            selected_option=(correct_option + 1) % 4,
-            idempotency_key="fc:done:creator:answer",
-            now_utc=now_utc,
-        )
-        final_answer = await GameSessionService.submit_answer(
-            session,
-            user_id=opponent_user_id,
-            session_id=opponent_session_id,
-            selected_option=correct_option,
-            idempotency_key="fc:done:opponent:answer",
-            now_utc=now_utc,
-        )
-
+    assert final_answer is not None
     assert final_answer.friend_challenge is not None
     assert final_answer.friend_challenge_round_completed is True
     assert final_answer.friend_challenge.status == "COMPLETED"
@@ -185,7 +185,7 @@ async def test_friend_challenge_creator_can_continue_without_waiting_for_opponen
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=3,
+            total_rounds=5,
         )
         await GameSessionService.join_friend_challenge_by_token(
             session,

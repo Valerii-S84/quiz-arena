@@ -30,9 +30,9 @@ async def test_handle_friend_challenge_create_opens_format_picker(monkeypatch) -
         for button in row
         if button.callback_data
     ]
-    assert "friend:challenge:create:3" in callbacks
-    assert "friend:challenge:create:5" in callbacks
-    assert "friend:challenge:create:12" in callbacks
+    assert "friend:challenge:type:direct" in callbacks
+    assert "friend:challenge:type:open" in callbacks
+    assert "friend:challenge:type:tournament" in callbacks
 
 
 @pytest.mark.asyncio
@@ -48,6 +48,7 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
         return FriendChallengeSnapshot(
             challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
             invite_token="0123456789abcdef0123456789abcdef",
+            challenge_type="DIRECT",
             mode_code="QUICK_MIX_A1A2",
             access_type="FREE",
             status="ACTIVE",
@@ -60,9 +61,9 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
             winner_user_id=None,
         )
 
-    async def _fake_friend_invite_link(callback, *, invite_token: str):
-        assert invite_token == "0123456789abcdef0123456789abcdef"
-        return "https://t.me/testbot?start=fc_0123456789abcdef0123456789abcdef"
+    async def _fake_friend_invite_link(callback, *, challenge_id: str):
+        assert challenge_id == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        return "https://t.me/testbot?start=duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(
@@ -73,7 +74,7 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
     monkeypatch.setattr(gameplay, "_build_friend_invite_link", _fake_friend_invite_link)
 
     callback = DummyCallback(
-        data="friend:challenge:create:5",
+        data="friend:challenge:format:direct:5",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(),
     )
@@ -83,5 +84,5 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
     assert "https://t.me/" not in (response.text or "")
     keyboard = response.kwargs["reply_markup"]
     share_urls = [button.url for row in keyboard.inline_keyboard for button in row if button.url]
-    assert any("start%3Dfc_0123456789abcdef0123456789abcdef" in url for url in share_urls)
-    assert len(share_urls) == 3
+    assert any("start%3Dduel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in url for url in share_urls)
+    assert len(share_urls) == 1

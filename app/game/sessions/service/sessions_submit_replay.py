@@ -9,6 +9,7 @@ from app.db.models.quiz_attempts import QuizAttempt
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.economy.streak.service import StreakService
+from app.game.friend_challenges.constants import is_duel_playable_status, normalize_duel_status
 from app.game.sessions.types import AnswerSessionResult
 
 from .friend_challenges_internal import _build_friend_challenge_snapshot
@@ -35,8 +36,12 @@ async def build_replay_answer_result(
             session, replay_session.friend_challenge_id
         )
         if challenge is not None:
+            challenge.status = normalize_duel_status(
+                status=challenge.status,
+                has_opponent=challenge.opponent_user_id is not None,
+            )
             friend_snapshot = _build_friend_challenge_snapshot(challenge)
-            waiting_for_opponent = challenge.status == "ACTIVE"
+            waiting_for_opponent = is_duel_playable_status(challenge.status)
 
     daily_state = None
     if replay_session is not None and replay_session.source == "DAILY_CHALLENGE":

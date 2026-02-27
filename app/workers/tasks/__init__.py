@@ -4,6 +4,7 @@ from app.workers.tasks.daily_challenge import (
     run_daily_question_set_precompute,
 )
 from app.workers.tasks.friend_challenges import run_friend_challenge_deadlines
+from app.workers.tasks.friend_challenges_proof_cards import run_friend_challenge_proof_cards
 from app.workers.tasks.offers_observability import run_offers_funnel_alerts
 from app.workers.tasks.payments_reliability import (
     recover_paid_uncredited,
@@ -33,6 +34,7 @@ __all__ = [
     "run_daily_question_set_precompute",
     "run_daily_push_notifications",
     "run_friend_challenge_deadlines",
+    "run_friend_challenge_proof_cards",
     "run_offers_funnel_alerts",
     "run_promo_reservation_expiry",
     "run_promo_campaign_status_rollover",

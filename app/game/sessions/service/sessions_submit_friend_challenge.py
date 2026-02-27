@@ -7,6 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
+from app.game.friend_challenges.constants import (
+    DUEL_STATUS_ACCEPTED,
+    DUEL_STATUS_COMPLETED,
+    DUEL_STATUS_CREATOR_DONE,
+    DUEL_STATUS_OPPONENT_DONE,
+    is_duel_playable_status,
+    normalize_duel_status,
+)
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 from app.game.sessions.types import FriendChallengeSnapshot
 
@@ -35,6 +43,10 @@ async def _apply_friend_challenge_answer(
         )
         if challenge is None:
             raise FriendChallengeNotFoundError
+        challenge.status = normalize_duel_status(
+            status=challenge.status,
+            has_opponent=challenge.opponent_user_id is not None,
+        )
 
         is_creator = challenge.creator_user_id == user_id
         if not is_creator and challenge.opponent_user_id != user_id:
@@ -53,7 +65,7 @@ async def _apply_friend_challenge_answer(
                 source=EVENT_SOURCE_BOT,
             )
 
-        if challenge.status == "ACTIVE":
+        if is_duel_playable_status(challenge.status):
             if is_creator:
                 if challenge.creator_answered_round < answered_round:
                     if is_correct:
@@ -70,7 +82,7 @@ async def _apply_friend_challenge_answer(
                 and challenge.creator_answered_round >= answered_round
                 and challenge.opponent_answered_round >= answered_round
             )
-            if both_answered_round and challenge.status == "ACTIVE":
+            if both_answered_round and is_duel_playable_status(challenge.status):
                 friend_round_completed = True
 
             max_answered_round = max(
@@ -79,27 +91,16 @@ async def _apply_friend_challenge_answer(
             )
             challenge.current_round = min(challenge.total_rounds, max_answered_round + 1)
 
-            if (
-                challenge.status == "ACTIVE"
-                and challenge.opponent_user_id is not None
-                and challenge.creator_answered_round >= challenge.total_rounds
-                and challenge.opponent_answered_round >= challenge.total_rounds
-            ):
+            if challenge.creator_answered_round >= challenge.total_rounds:
+                challenge.creator_finished_at = challenge.creator_finished_at or now_utc
+            if challenge.opponent_answered_round >= challenge.total_rounds:
+                challenge.opponent_finished_at = challenge.opponent_finished_at or now_utc
+
+            if challenge.creator_finished_at and challenge.opponent_finished_at:
                 friend_round_completed = True
                 challenge.current_round = challenge.total_rounds
-                challenge.status = "COMPLETED"
+                challenge.status = DUEL_STATUS_COMPLETED
                 challenge.completed_at = now_utc
-                if challenge.creator_score > challenge.opponent_score:
-                    challenge.winner_user_id = challenge.creator_user_id
-                elif challenge.opponent_score > challenge.creator_score:
-                    challenge.winner_user_id = challenge.opponent_user_id
-                else:
-                    challenge.winner_user_id = None
-
-            if (
-                challenge.status == "COMPLETED"
-                and challenge.current_round >= challenge.total_rounds
-            ):
                 if challenge.creator_score > challenge.opponent_score:
                     challenge.winner_user_id = challenge.creator_user_id
                 elif (
@@ -109,10 +110,16 @@ async def _apply_friend_challenge_answer(
                     challenge.winner_user_id = challenge.opponent_user_id
                 else:
                     challenge.winner_user_id = None
+            elif challenge.creator_finished_at:
+                challenge.status = DUEL_STATUS_CREATOR_DONE
+            elif challenge.opponent_finished_at:
+                challenge.status = DUEL_STATUS_OPPONENT_DONE
+            else:
+                challenge.status = DUEL_STATUS_ACCEPTED
 
         challenge.updated_at = now_utc
         friend_snapshot = _build_friend_challenge_snapshot(challenge)
-        friend_waiting_for_opponent = challenge.status == "ACTIVE" and (
+        friend_waiting_for_opponent = is_duel_playable_status(challenge.status) and (
             challenge.opponent_user_id is None
             or (
                 challenge.opponent_answered_round < answered_round
@@ -120,7 +127,7 @@ async def _apply_friend_challenge_answer(
                 else challenge.creator_answered_round < answered_round
             )
         )
-        if challenge.status == "COMPLETED" and challenge.completed_at == now_utc:
+        if challenge.status == DUEL_STATUS_COMPLETED and challenge.completed_at == now_utc:
             await emit_analytics_event(
                 session,
                 event_type="friend_challenge_completed",

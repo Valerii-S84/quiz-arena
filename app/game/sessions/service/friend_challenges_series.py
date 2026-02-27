@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
+from app.game.friend_challenges.constants import DUEL_STATUS_ACCEPTED, DUEL_TYPE_DIRECT
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 from app.game.sessions.types import FriendChallengeSnapshot
 
@@ -40,7 +41,7 @@ async def create_friend_challenge_best_of_three(
             happened_at=now_utc,
             source=EVENT_SOURCE_BOT,
         )
-    if challenge.status not in {"COMPLETED", "EXPIRED"}:
+    if challenge.status not in {"COMPLETED", "EXPIRED", "WALKOVER"}:
         raise FriendChallengeAccessError
     if initiator_user_id not in {
         challenge.creator_user_id,
@@ -64,6 +65,7 @@ async def create_friend_challenge_best_of_three(
         session,
         creator_user_id=initiator_user_id,
         opponent_user_id=opponent_user_id,
+        challenge_type=DUEL_TYPE_DIRECT,
         mode_code=challenge.mode_code,
         access_type=access_type,
         total_rounds=challenge.total_rounds,
@@ -71,6 +73,7 @@ async def create_friend_challenge_best_of_three(
         series_id=series_id,
         series_game_number=1,
         series_best_of=resolved_best_of,
+        status=DUEL_STATUS_ACCEPTED,
     )
     await emit_analytics_event(
         session,
@@ -126,7 +129,7 @@ async def create_friend_challenge_series_next_game(
             happened_at=now_utc,
             source=EVENT_SOURCE_BOT,
         )
-    if challenge.status not in {"COMPLETED", "EXPIRED"}:
+    if challenge.status not in {"COMPLETED", "EXPIRED", "WALKOVER"}:
         raise FriendChallengeAccessError
     if initiator_user_id not in {
         challenge.creator_user_id,
@@ -167,6 +170,7 @@ async def create_friend_challenge_series_next_game(
         session,
         creator_user_id=initiator_user_id,
         opponent_user_id=opponent_user_id,
+        challenge_type=DUEL_TYPE_DIRECT,
         mode_code=challenge.mode_code,
         access_type=access_type,
         total_rounds=challenge.total_rounds,
@@ -174,6 +178,7 @@ async def create_friend_challenge_series_next_game(
         series_id=challenge.series_id,
         series_game_number=max_game_number + 1,
         series_best_of=challenge.series_best_of,
+        status=DUEL_STATUS_ACCEPTED,
     )
     await emit_analytics_event(
         session,

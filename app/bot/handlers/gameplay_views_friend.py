@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from app.bot.texts.de import TEXTS_DE
+from app.game.friend_challenges.constants import is_duel_active_status
 from app.game.friend_challenges.ui_contract import FRIEND_CHALLENGE_LEVEL_SEQUENCE
 
 if TYPE_CHECKING:
@@ -194,7 +195,7 @@ def _build_friend_proof_card_text(
 
 
 def _build_friend_ttl_text(*, challenge: FriendChallengeSnapshot, now_utc: datetime) -> str | None:
-    if challenge.status != "ACTIVE":
+    if not is_duel_active_status(challenge.status):
         return None
     if challenge.expires_at is None:
         return None

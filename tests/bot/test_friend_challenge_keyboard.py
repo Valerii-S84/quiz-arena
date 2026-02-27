@@ -25,12 +25,12 @@ def test_friend_challenge_back_keyboard_contains_home_only() -> None:
     assert callbacks == ["home:open"]
 
 
-def test_friend_challenge_create_keyboard_contains_sprint_and_classic_options() -> None:
+def test_friend_challenge_create_keyboard_contains_type_options() -> None:
     keyboard = build_friend_challenge_create_keyboard()
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
-    assert "friend:challenge:create:3" in callbacks
-    assert "friend:challenge:create:5" in callbacks
-    assert "friend:challenge:create:12" in callbacks
+    assert "friend:challenge:type:direct" in callbacks
+    assert "friend:challenge:type:open" in callbacks
+    assert "friend:challenge:type:tournament" in callbacks
     assert "home:open" in callbacks
 
 
@@ -82,17 +82,15 @@ def test_friend_challenge_share_keyboard_contains_share_url_and_back() -> None:
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     share_buttons = [button for button in buttons if button.url]
-    assert len(share_buttons) == 3
-    assert all("https://t.me/share/url" in (button.url or "") for button in share_buttons)
-    assert all(
-        "https%3A%2F%2Ft.me%2Fquizarena_bot%3Fstart%3Dfc_token" in (button.url or "")
-        for button in share_buttons
-    )
-    assert any("5+Fragen" in (button.url or "") for button in share_buttons)
+    assert len(share_buttons) == 1
+    assert "https://t.me/share/url" in (share_buttons[0].url or "")
+    assert "https%3A%2F%2Ft.me%2Fquizarena_bot%3Fstart%3Dfc_token" in (share_buttons[0].url or "")
+    assert "5+Fragen" in (share_buttons[0].url or "")
     assert any(
-        button.callback_data == "friend:next:00000000-0000-0000-0000-000000000001"
+        button.callback_data == "friend:copy:00000000-0000-0000-0000-000000000001"
         for button in buttons
     )
+    assert any(button.callback_data == "friend:my:duels" for button in buttons)
     assert any(button.callback_data == "home:open" for button in buttons)
 
 
@@ -104,7 +102,7 @@ def test_friend_challenge_share_keyboard_without_link_contains_back_only() -> No
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert all(button.url is None for button in buttons)
     callbacks = [button.callback_data for button in buttons]
-    assert callbacks == ["home:open"]
+    assert callbacks == ["friend:my:duels", "home:open"]
 
 
 def test_friend_challenge_share_url_builder_encodes_target_and_text() -> None:

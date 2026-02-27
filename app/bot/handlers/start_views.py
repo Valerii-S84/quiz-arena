@@ -4,6 +4,7 @@ import html
 from datetime import datetime
 
 from app.bot.texts.de import TEXTS_DE
+from app.game.friend_challenges.constants import is_duel_active_status
 from app.game.modes.presentation import display_mode_label
 from app.game.modes.rules import is_zero_cost_source
 from app.game.sessions.service import FRIEND_CHALLENGE_LEVEL_SEQUENCE
@@ -32,7 +33,7 @@ def _build_friend_plan_text(*, total_rounds: int) -> str:
 
 
 def _build_friend_ttl_text(*, challenge: FriendChallengeSnapshot, now_utc: datetime) -> str | None:
-    if challenge.status != "ACTIVE":
+    if not is_duel_active_status(challenge.status):
         return None
     if challenge.expires_at is None:
         return None

@@ -24,6 +24,7 @@ async def test_handle_friend_challenge_rematch_creates_duel_and_notifies_opponen
         return FriendChallengeSnapshot(
             challenge_id=UUID("cccccccc-cccc-cccc-cccc-cccccccccccc"),
             invite_token="token-rematch",
+            challenge_type="DIRECT",
             mode_code="QUICK_MIX_A1A2",
             access_type="FREE",
             status="ACTIVE",
@@ -87,6 +88,7 @@ async def test_handle_friend_challenge_series_best3_creates_duel_and_notifies_op
         return FriendChallengeSnapshot(
             challenge_id=UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
             invite_token="token-series",
+            challenge_type="DIRECT",
             mode_code="QUICK_MIX_A1A2",
             access_type="FREE",
             status="ACTIVE",
@@ -155,6 +157,7 @@ async def test_handle_friend_challenge_series_next_creates_game_and_notifies_opp
         return FriendChallengeSnapshot(
             challenge_id=UUID("ffffffff-ffff-ffff-ffff-ffffffffffff"),
             invite_token="token-series-next",
+            challenge_type="DIRECT",
             mode_code="QUICK_MIX_A1A2",
             access_type="FREE",
             status="ACTIVE",

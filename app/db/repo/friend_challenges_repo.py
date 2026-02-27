@@ -1,14 +1,16 @@
 from __future__ import annotations
-
 from datetime import datetime
 from uuid import UUID
-
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.db.models.friend_challenges import FriendChallenge
-
-
+_DUEL_LIVE_STATUSES: tuple[str, ...] = (
+    "ACTIVE",
+    "PENDING",
+    "ACCEPTED",
+    "CREATOR_DONE",
+    "OPPONENT_DONE",
+)
 class FriendChallengesRepo:
     @staticmethod
     async def get_by_id(session: AsyncSession, challenge_id: UUID) -> FriendChallenge | None:
@@ -75,6 +77,72 @@ class FriendChallengesRepo:
         return int(result.scalar_one() or 0)
 
     @staticmethod
+    async def count_live_for_user(
+        session: AsyncSession,
+        *,
+        user_id: int,
+    ) -> int:
+        stmt = select(func.count(FriendChallenge.id)).where(
+            FriendChallenge.status.in_(_DUEL_LIVE_STATUSES),
+            or_(
+                FriendChallenge.creator_user_id == user_id,
+                FriendChallenge.opponent_user_id == user_id,
+            ),
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_live_open_by_creator(
+        session: AsyncSession,
+        *,
+        creator_user_id: int,
+    ) -> int:
+        stmt = select(func.count(FriendChallenge.id)).where(
+            FriendChallenge.creator_user_id == creator_user_id,
+            FriendChallenge.challenge_type == "OPEN",
+            FriendChallenge.status.in_(_DUEL_LIVE_STATUSES),
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_created_since(
+        session: AsyncSession,
+        *,
+        creator_user_id: int,
+        created_after_utc: datetime,
+    ) -> int:
+        stmt = select(func.count(FriendChallenge.id)).where(
+            FriendChallenge.creator_user_id == creator_user_id,
+            FriendChallenge.created_at >= created_after_utc,
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def list_recent_for_user(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        limit: int,
+    ) -> list[FriendChallenge]:
+        resolved_limit = max(1, int(limit))
+        stmt = (
+            select(FriendChallenge)
+            .where(
+                or_(
+                    FriendChallenge.creator_user_id == user_id,
+                    FriendChallenge.opponent_user_id == user_id,
+                )
+            )
+            .order_by(FriendChallenge.created_at.desc())
+            .limit(resolved_limit)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
     async def list_active_due_for_last_chance_for_update(
         session: AsyncSession,
         *,
@@ -86,7 +154,7 @@ class FriendChallengesRepo:
         stmt = (
             select(FriendChallenge)
             .where(
-                FriendChallenge.status == "ACTIVE",
+                FriendChallenge.status.in_(("ACCEPTED", "CREATOR_DONE", "OPPONENT_DONE", "ACTIVE")),
                 FriendChallenge.expires_at > now_utc,
                 FriendChallenge.expires_at <= expires_before_utc,
                 FriendChallenge.expires_last_chance_notified_at.is_(None),
@@ -109,7 +177,50 @@ class FriendChallengesRepo:
         stmt = (
             select(FriendChallenge)
             .where(
-                FriendChallenge.status == "ACTIVE",
+                FriendChallenge.status.in_(_DUEL_LIVE_STATUSES),
+                FriendChallenge.expires_at <= now_utc,
+            )
+            .order_by(FriendChallenge.expires_at.asc())
+            .limit(resolved_limit)
+            .with_for_update(skip_locked=True)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def list_pending_due_for_expire_for_update(
+        session: AsyncSession,
+        *,
+        now_utc: datetime,
+        limit: int,
+    ) -> list[FriendChallenge]:
+        resolved_limit = max(1, int(limit))
+        stmt = (
+            select(FriendChallenge)
+            .where(
+                FriendChallenge.status == "PENDING",
+                FriendChallenge.expires_at <= now_utc,
+            )
+            .order_by(FriendChallenge.expires_at.asc())
+            .limit(resolved_limit)
+            .with_for_update(skip_locked=True)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def list_joined_due_for_walkover_for_update(
+        session: AsyncSession,
+        *,
+        now_utc: datetime,
+        limit: int,
+    ) -> list[FriendChallenge]:
+        resolved_limit = max(1, int(limit))
+        stmt = (
+            select(FriendChallenge)
+            .where(
+                FriendChallenge.status.in_(("ACCEPTED", "CREATOR_DONE", "OPPONENT_DONE", "ACTIVE")),
+                FriendChallenge.opponent_user_id.is_not(None),
                 FriendChallenge.expires_at <= now_utc,
             )
             .order_by(FriendChallenge.expires_at.asc())

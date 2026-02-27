@@ -79,7 +79,12 @@ async def _notify_opponent(
         return
 
 
-async def _build_friend_invite_link(callback: CallbackQuery, *, invite_token: str) -> str | None:
+async def _build_friend_invite_link(
+    callback: CallbackQuery,
+    *,
+    challenge_id: str | None = None,
+    invite_token: str | None = None,
+) -> str | None:
     bot = callback.bot
     assert bot is not None
     try:
@@ -88,7 +93,11 @@ async def _build_friend_invite_link(callback: CallbackQuery, *, invite_token: st
         return None
     if not me.username:
         return None
-    return f"https://t.me/{me.username}?start=fc_{invite_token}"
+    if challenge_id:
+        return f"https://t.me/{me.username}?start=duel_{challenge_id}"
+    if invite_token:
+        return f"https://t.me/{me.username}?start=fc_{invite_token}"
+    return None
 
 
 async def _build_friend_result_share_url(

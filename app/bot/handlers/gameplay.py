@@ -11,6 +11,7 @@ from app.bot.handlers import (
     gameplay_callbacks,
     gameplay_friend_challenge,
     gameplay_helpers,
+    gameplay_proof_cards,
     gameplay_views,
 )
 from app.bot.handlers.gameplay_flows import (
@@ -46,7 +47,6 @@ EVENT_SOURCE_BOT = "BOT"
 
 ANSWER_RE = gameplay_callbacks.ANSWER_RE
 DAILY_RESULT_RE = gameplay_callbacks.DAILY_RESULT_RE
-
 gameplay_friend_challenge.register(router)
 
 _format_user_label = gameplay_views._format_user_label
@@ -60,14 +60,11 @@ _build_friend_proof_card_text = gameplay_views._build_friend_proof_card_text
 _build_friend_ttl_text = gameplay_views._build_friend_ttl_text
 _friend_opponent_user_id = gameplay_helpers._friend_opponent_user_id
 _build_friend_invite_link = gameplay_helpers._build_friend_invite_link
-
-
-def _session_deps() -> dict[str, object]:
-    return {
-        "session_local": SessionLocal,
-        "user_onboarding_service": UserOnboardingService,
-        "game_session_service": GameSessionService,
-    }
+_SESSION_DEPS: dict[str, object] = {
+    "session_local": SessionLocal,
+    "user_onboarding_service": UserOnboardingService,
+    "game_session_service": GameSessionService,
+}
 
 
 async def emit_analytics_event(*args, **kwargs):
@@ -94,7 +91,7 @@ _build_friend_result_share_url = partial(
 )
 _start_mode = partial(
     play_flow.start_mode,
-    **_session_deps(),
+    **_SESSION_DEPS,
     offer_service=OfferService,
     offer_logging_error=OfferLoggingError,
     channel_bonus_service=ChannelBonusService,
@@ -177,7 +174,7 @@ async def handle_answer(callback: CallbackQuery) -> None:
     await answer_flow.handle_answer(
         callback,
         parse_answer_callback=gameplay_callbacks.parse_answer_callback,
-        **_session_deps(),
+        **_SESSION_DEPS,
         referral_service=ReferralService,
         channel_bonus_service=ChannelBonusService,
         offer_service=OfferService,
@@ -196,6 +193,7 @@ async def handle_answer(callback: CallbackQuery) -> None:
         build_friend_finish_text=_build_friend_finish_text,
         build_public_badge_label=_build_public_badge_label,
         build_friend_proof_card_text=_build_friend_proof_card_text,
+        enqueue_friend_challenge_proof_cards=gameplay_proof_cards.enqueue_duel_proof_cards,
         build_series_progress_text=_build_series_progress_text,
         send_friend_round_question=_send_friend_round_question,
     )

@@ -166,7 +166,7 @@ async def test_friend_challenge_flow_emits_created_joined_completed_and_rematch_
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=1,
+            total_rounds=5,
         )
         await GameSessionService.join_friend_challenge_by_token(
             session,
@@ -174,56 +174,57 @@ async def test_friend_challenge_flow_emits_created_joined_completed_and_rematch_
             invite_token=challenge.invite_token,
             now_utc=now_utc + timedelta(seconds=1),
         )
-        creator_round = await GameSessionService.start_friend_challenge_round(
-            session,
-            user_id=creator_user_id,
-            challenge_id=challenge.challenge_id,
-            idempotency_key="fc-events:creator:start",
-            now_utc=now_utc + timedelta(seconds=2),
-        )
-        opponent_round = await GameSessionService.start_friend_challenge_round(
-            session,
-            user_id=opponent_user_id,
-            challenge_id=challenge.challenge_id,
-            idempotency_key="fc-events:opponent:start",
-            now_utc=now_utc + timedelta(seconds=3),
-        )
-        assert creator_round.start_result is not None
-        assert opponent_round.start_result is not None
+        for round_no in range(1, 6):
+            creator_round = await GameSessionService.start_friend_challenge_round(
+                session,
+                user_id=creator_user_id,
+                challenge_id=challenge.challenge_id,
+                idempotency_key=f"fc-events:creator:start:{round_no}",
+                now_utc=now_utc + timedelta(seconds=round_no * 2),
+            )
+            opponent_round = await GameSessionService.start_friend_challenge_round(
+                session,
+                user_id=opponent_user_id,
+                challenge_id=challenge.challenge_id,
+                idempotency_key=f"fc-events:opponent:start:{round_no}",
+                now_utc=now_utc + timedelta(seconds=round_no * 2 + 1),
+            )
+            assert creator_round.start_result is not None
+            assert opponent_round.start_result is not None
 
-        creator_session = await QuizSessionsRepo.get_by_id(
-            session, creator_round.start_result.session.session_id
-        )
-        assert creator_session is not None
-        question = await get_question_by_id(
-            session,
-            creator_session.mode_code,
-            question_id=creator_session.question_id or "",
-            local_date_berlin=creator_session.local_date_berlin,
-        )
-        assert question is not None
+            creator_session = await QuizSessionsRepo.get_by_id(
+                session, creator_round.start_result.session.session_id
+            )
+            assert creator_session is not None
+            question = await get_question_by_id(
+                session,
+                creator_session.mode_code,
+                question_id=creator_session.question_id or "",
+                local_date_berlin=creator_session.local_date_berlin,
+            )
+            assert question is not None
 
-        await GameSessionService.submit_answer(
-            session,
-            user_id=creator_user_id,
-            session_id=creator_round.start_result.session.session_id,
-            selected_option=question.correct_option,
-            idempotency_key="fc-events:creator:answer",
-            now_utc=now_utc + timedelta(seconds=4),
-        )
-        await GameSessionService.submit_answer(
-            session,
-            user_id=opponent_user_id,
-            session_id=opponent_round.start_result.session.session_id,
-            selected_option=(question.correct_option + 1) % 4,
-            idempotency_key="fc-events:opponent:answer",
-            now_utc=now_utc + timedelta(seconds=5),
-        )
+            await GameSessionService.submit_answer(
+                session,
+                user_id=creator_user_id,
+                session_id=creator_round.start_result.session.session_id,
+                selected_option=question.correct_option,
+                idempotency_key=f"fc-events:creator:answer:{round_no}",
+                now_utc=now_utc + timedelta(seconds=round_no * 2 + 1),
+            )
+            await GameSessionService.submit_answer(
+                session,
+                user_id=opponent_user_id,
+                session_id=opponent_round.start_result.session.session_id,
+                selected_option=(question.correct_option + 1) % 4,
+                idempotency_key=f"fc-events:opponent:answer:{round_no}",
+                now_utc=now_utc + timedelta(seconds=round_no * 2 + 2),
+            )
         await GameSessionService.create_friend_challenge_rematch(
             session,
             initiator_user_id=creator_user_id,
             challenge_id=challenge.challenge_id,
-            now_utc=now_utc + timedelta(seconds=6),
+            now_utc=now_utc + timedelta(seconds=20),
         )
 
     creator_created = await _list_user_events(

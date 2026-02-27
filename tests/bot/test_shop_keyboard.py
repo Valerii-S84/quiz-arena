@@ -13,6 +13,7 @@ def test_shop_keyboard_contains_products_and_back() -> None:
     assert "buy:PREMIUM_SEASON" not in callbacks
     assert "buy:PREMIUM_YEAR" not in callbacks
     assert "channel_bonus:open" in callbacks
+    assert "friend:challenge:type:tournament" in callbacks
     assert "referral:open" in callbacks
     assert "promo:open" in callbacks
     assert "home:open" in callbacks

@@ -39,6 +39,7 @@ class DailyRunSummary:
 class FriendChallengeSnapshot:
     challenge_id: UUID
     invite_token: str
+    challenge_type: str
     mode_code: str
     access_type: str
     status: str
@@ -48,6 +49,9 @@ class FriendChallengeSnapshot:
     total_rounds: int
     creator_score: int
     opponent_score: int
+    question_ids: tuple[str, ...] = ()
+    creator_finished_at: datetime | None = None
+    opponent_finished_at: datetime | None = None
     series_id: UUID | None = None
     series_game_number: int = 1
     series_best_of: int = 1

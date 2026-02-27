@@ -11,6 +11,7 @@ def _challenge_snapshot(
     return FriendChallengeSnapshot(
         challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
         invite_token="token",
+        challenge_type="DIRECT",
         mode_code="QUICK_MIX_A1A2",
         access_type="FREE",
         status=status,
