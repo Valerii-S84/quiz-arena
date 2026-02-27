@@ -38,10 +38,12 @@ def test_friend_challenge_finished_keyboard_contains_rematch_and_back() -> None:
     keyboard = build_friend_challenge_finished_keyboard(
         challenge_id="00000000-0000-0000-0000-000000000001"
     )
-    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
-    assert "friend:rematch:00000000-0000-0000-0000-000000000001" in callbacks
-    assert "friend:series:best3:00000000-0000-0000-0000-000000000001" in callbacks
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    labels = [button.text for button in buttons]
+    callbacks = [button.callback_data for button in buttons if button.callback_data]
+    assert labels == ["📤 Ergebnis teilen", "🔄 Revanche", "🏠 Menü"]
     assert "friend:share:result:00000000-0000-0000-0000-000000000001" in callbacks
+    assert "friend:rematch:00000000-0000-0000-0000-000000000001" in callbacks
     assert "home:open" in callbacks
 
 
@@ -52,18 +54,18 @@ def test_friend_challenge_finished_keyboard_can_hide_share() -> None:
     )
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
     assert "friend:rematch:00000000-0000-0000-0000-000000000001" in callbacks
-    assert "friend:series:best3:00000000-0000-0000-0000-000000000001" in callbacks
     assert "friend:share:result:00000000-0000-0000-0000-000000000001" not in callbacks
     assert "home:open" in callbacks
 
 
-def test_friend_challenge_finished_keyboard_can_show_next_series_game() -> None:
+def test_friend_challenge_finished_keyboard_uses_direct_share_url_when_provided() -> None:
     keyboard = build_friend_challenge_finished_keyboard(
         challenge_id="00000000-0000-0000-0000-000000000001",
-        show_next_series_game=True,
+        share_url="https://t.me/share/url?url=x&text=y",
     )
-    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
-    assert "friend:series:next:00000000-0000-0000-0000-000000000001" in callbacks
+    share_button = keyboard.inline_keyboard[0][0]
+    assert share_button.url == "https://t.me/share/url?url=x&text=y"
+    assert share_button.callback_data is None
 
 
 def test_friend_challenge_limit_keyboard_contains_buy_options_and_back() -> None:

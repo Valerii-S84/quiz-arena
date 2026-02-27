@@ -87,7 +87,7 @@ async def handle_friend_challenge_share_result(
 
         await emit_analytics_event(
             session,
-            event_type="friend_challenge_proof_card_share_clicked",
+            event_type="duel_share_clicked",
             source=event_source_bot,
             happened_at=now_utc,
             user_id=snapshot.user_id,

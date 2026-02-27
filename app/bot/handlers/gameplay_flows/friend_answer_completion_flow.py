@@ -5,6 +5,7 @@ from typing import Protocol, cast
 
 from aiogram.types import CallbackQuery
 
+from app.bot.handlers.gameplay_flows.friend_challenge_result_share import build_result_share_url
 from app.bot.keyboards.friend_challenge import build_friend_challenge_finished_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
@@ -94,8 +95,13 @@ async def handle_completed_friend_challenge(
         user_id=snapshot_user_id,
         opponent_label=opponent_label,
     )
+    my_share_url = await build_result_share_url(
+        callback=callback,
+        proof_card_text=my_proof_card_text,
+    )
     finish_keyboard = build_friend_challenge_finished_keyboard(
         challenge_id=str(challenge.challenge_id),
+        share_url=my_share_url,
         show_next_series_game=show_next_series_game,
     )
     my_message_lines = [my_finish_text]
@@ -144,8 +150,13 @@ async def handle_completed_friend_challenge(
             user_id=opponent_user_id,
             opponent_label=opponent_label_for_opponent,
         )
+        opponent_share_url = await build_result_share_url(
+            callback=callback,
+            proof_card_text=opponent_proof_card_text,
+        )
         opponent_finish_keyboard = build_friend_challenge_finished_keyboard(
             challenge_id=str(challenge.challenge_id),
+            share_url=opponent_share_url,
             show_next_series_game=show_next_series_game,
         )
         opponent_message_lines = [

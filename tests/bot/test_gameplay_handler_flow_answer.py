@@ -389,11 +389,6 @@ async def test_handle_answer_friend_challenge_completion_sends_proof_card_with_s
     )
     assert TEXTS_DE["msg.friend.challenge.finished.win"] in (finish_call.text or "")
     keyboard = finish_call.kwargs["reply_markup"]
-    callbacks = [
-        button.callback_data
-        for row in keyboard.inline_keyboard
-        for button in row
-        if button.callback_data
-    ]
-    assert "friend:share:result:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
+    urls = [button.url for row in keyboard.inline_keyboard for button in row if button.url]
+    assert any(url and "https://t.me/share/url" in url for url in urls)
     assert queued_challenges == ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
