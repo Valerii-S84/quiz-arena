@@ -92,6 +92,8 @@ orjson==3.11.7
     # via quiz-arena-bot (pyproject.toml)
 packaging==26.0
     # via kombu
+pillow==11.3.0
+    # via quiz-arena-bot (pyproject.toml)
 prompt-toolkit==3.0.52
     # via click-repl
 propcache==0.4.1

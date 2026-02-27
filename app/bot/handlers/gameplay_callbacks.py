@@ -6,11 +6,16 @@ from uuid import UUID
 ANSWER_RE = re.compile(r"^answer:([0-9a-f\-]{36}):([0-3])$")
 STOP_RE = re.compile(r"^game:stop:([0-9a-f\-]{36})$")
 FRIEND_NEXT_RE = re.compile(r"^friend:next:([0-9a-f\-]{36})$")
-FRIEND_CREATE_RE = re.compile(r"^friend:challenge:create:(3|5|12)$")
+FRIEND_CREATE_TYPE_RE = re.compile(r"^friend:challenge:type:(direct|open|tournament)$")
+FRIEND_CREATE_FORMAT_RE = re.compile(r"^friend:challenge:format:(direct|open):(5|12)$")
+FRIEND_CREATE_LEGACY_RE = re.compile(r"^friend:challenge:create:(5|12)$")
 FRIEND_REMATCH_RE = re.compile(r"^friend:rematch:([0-9a-f\-]{36})$")
 FRIEND_SHARE_RESULT_RE = re.compile(r"^friend:share:result:([0-9a-f\-]{36})$")
 FRIEND_SERIES_BEST3_RE = re.compile(r"^friend:series:best3:([0-9a-f\-]{36})$")
 FRIEND_SERIES_NEXT_RE = re.compile(r"^friend:series:next:([0-9a-f\-]{36})$")
+FRIEND_COPY_LINK_RE = re.compile(r"^friend:copy:([0-9a-f\-]{36})$")
+FRIEND_OPEN_REPOST_RE = re.compile(r"^friend:open:repost:([0-9a-f\-]{36})$")
+FRIEND_DELETE_RE = re.compile(r"^friend:delete:([0-9a-f\-]{36})$")
 DAILY_RESULT_RE = re.compile(r"^daily:result:([0-9a-f\-]{36})$")
 
 
@@ -32,13 +37,25 @@ def parse_stop_callback(callback_data: str) -> UUID | None:
     return UUID(matched.group(1))
 
 
-def parse_challenge_rounds(callback_data: str) -> int | None:
-    """Parses friend challenge rounds payload."""
+def parse_friend_create_format(callback_data: str) -> tuple[str, int] | None:
+    """Parses friend challenge format callback into type and rounds."""
 
-    matched = FRIEND_CREATE_RE.match(callback_data)
+    matched = FRIEND_CREATE_FORMAT_RE.match(callback_data)
     if matched is None:
         return None
-    return int(matched.group(1))
+    return matched.group(1), int(matched.group(2))
+
+
+def parse_challenge_rounds(callback_data: str) -> int | None:
+    """Legacy parser kept for backward compatibility with older callbacks/tests."""
+
+    legacy_match = FRIEND_CREATE_LEGACY_RE.match(callback_data)
+    if legacy_match is not None:
+        return int(legacy_match.group(1))
+    parsed = parse_friend_create_format(callback_data)
+    if parsed is None:
+        return None
+    return parsed[1]
 
 
 def parse_uuid_callback(*, pattern: re.Pattern[str], callback_data: str) -> UUID | None:

@@ -39,6 +39,7 @@ async def handle_answer(
     build_friend_finish_text,
     build_public_badge_label,
     build_friend_proof_card_text,
+    enqueue_friend_challenge_proof_cards,
     build_series_progress_text,
     send_friend_round_question,
 ) -> None:
@@ -178,6 +179,7 @@ async def handle_answer(
             build_friend_finish_text=build_friend_finish_text,
             build_public_badge_label=build_public_badge_label,
             build_friend_proof_card_text=build_friend_proof_card_text,
+            enqueue_friend_challenge_proof_cards=enqueue_friend_challenge_proof_cards,
             build_series_progress_text=build_series_progress_text,
             send_friend_round_question=send_friend_round_question,
         )

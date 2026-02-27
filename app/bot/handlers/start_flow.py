@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import UUID
 
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 
 from app.bot.handlers.start_helpers import _notify_creator_about_join, _resolve_opponent_label
-from app.bot.handlers.start_parsing import _extract_friend_challenge_token, _extract_start_payload
+from app.bot.handlers.start_parsing import (
+    _extract_duel_challenge_id,
+    _extract_friend_challenge_token,
+    _extract_start_payload,
+)
 from app.bot.handlers.start_views import (
     _build_friend_plan_text,
     _build_friend_score_text,
@@ -14,7 +19,10 @@ from app.bot.handlers.start_views import (
     _build_home_text,
     _build_question_text,
 )
-from app.bot.keyboards.friend_challenge import build_friend_challenge_back_keyboard
+from app.bot.keyboards.friend_challenge import (
+    build_friend_challenge_back_keyboard,
+    build_friend_open_taken_keyboard,
+)
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.keyboards.offers import build_offer_keyboard
 from app.bot.keyboards.quiz import build_quiz_keyboard
@@ -59,6 +67,7 @@ async def handle_start_message(message: Message) -> None:
     offer_selection = None
     start_payload = _extract_start_payload(message.text)
     friend_invite_token = _extract_friend_challenge_token(start_payload)
+    duel_challenge_id = _extract_duel_challenge_id(start_payload)
     challenge_start = None
     challenge_joined_now = False
     challenge_error_key: str | None = None
@@ -68,14 +77,30 @@ async def handle_start_message(message: Message) -> None:
             telegram_user=message.from_user,
             start_payload=start_payload,
         )
-        if friend_invite_token is not None:
+        if friend_invite_token is not None or duel_challenge_id is not None:
             try:
-                join_result = await GameSessionService.join_friend_challenge_by_token(
-                    session,
-                    user_id=snapshot.user_id,
-                    invite_token=friend_invite_token,
-                    now_utc=now_utc,
-                )
+                if duel_challenge_id is not None:
+                    try:
+                        parsed_duel_id = UUID(duel_challenge_id)
+                    except ValueError:
+                        challenge_error_key = "msg.friend.challenge.invalid"
+                        join_result = None
+                    else:
+                        join_result = await GameSessionService.join_friend_challenge_by_id(
+                            session,
+                            user_id=snapshot.user_id,
+                            challenge_id=parsed_duel_id,
+                            now_utc=now_utc,
+                        )
+                else:
+                    join_result = await GameSessionService.join_friend_challenge_by_token(
+                        session,
+                        user_id=snapshot.user_id,
+                        invite_token=friend_invite_token or "",
+                        now_utc=now_utc,
+                    )
+                if join_result is None:
+                    raise FriendChallengeNotFoundError
                 challenge = join_result.snapshot
                 challenge_joined_now = join_result.joined_now
                 challenge_start = await GameSessionService.start_friend_challenge_round(
@@ -94,7 +119,11 @@ async def handle_start_message(message: Message) -> None:
             except FriendChallengeExpiredError:
                 challenge_error_key = "msg.friend.challenge.expired"
             except FriendChallengeFullError:
-                challenge_error_key = "msg.friend.challenge.full"
+                challenge_error_key = (
+                    "msg.friend.challenge.open.taken"
+                    if duel_challenge_id is not None
+                    else "msg.friend.challenge.full"
+                )
         else:
             try:
                 offer_selection = await OfferService.evaluate_and_log_offer(
@@ -106,11 +135,16 @@ async def handle_start_message(message: Message) -> None:
             except OfferLoggingError:
                 offer_selection = None
 
-    if friend_invite_token is not None:
+    if friend_invite_token is not None or duel_challenge_id is not None:
         if challenge_error_key is not None or challenge_start is None:
+            reply_markup = (
+                build_friend_open_taken_keyboard()
+                if challenge_error_key == "msg.friend.challenge.open.taken"
+                else build_home_keyboard()
+            )
             await message.answer(
                 TEXTS_DE[challenge_error_key or "msg.friend.challenge.invalid"],
-                reply_markup=build_home_keyboard(),
+                reply_markup=reply_markup,
             )
             return
 

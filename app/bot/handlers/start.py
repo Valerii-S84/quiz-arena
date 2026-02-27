@@ -10,6 +10,7 @@ from app.bot.handlers.start_helpers import (  # noqa: F401
     _resolve_opponent_label,
 )
 from app.bot.handlers.start_parsing import (  # noqa: F401
+    _extract_duel_challenge_id,
     _extract_friend_challenge_token,
     _extract_start_payload,
 )

@@ -44,7 +44,7 @@ async def test_friend_challenge_second_player_reuses_round_question_from_first(
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=1,
+            total_rounds=5,
         )
         await GameSessionService.join_friend_challenge_by_token(
             session,
@@ -73,4 +73,4 @@ async def test_friend_challenge_second_player_reuses_round_question_from_first(
         creator_round.start_result.session.question_id
         == opponent_round.start_result.session.question_id
     )
-    assert selection_calls == 1
+    assert selection_calls == challenge.total_rounds

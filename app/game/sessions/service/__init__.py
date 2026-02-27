@@ -9,6 +9,10 @@ from app.game.questions.runtime_bank import (
 
 from .constants import (
     DAILY_CHALLENGE_TOTAL_QUESTIONS,
+    DUEL_ACCEPTED_TTL_SECONDS,
+    DUEL_MAX_ACTIVE_PER_USER,
+    DUEL_MAX_NEW_PER_DAY,
+    DUEL_PENDING_TTL_SECONDS,
     FRIEND_CHALLENGE_FREE_CREATES,
     FRIEND_CHALLENGE_LEVEL_SEQUENCE,
     FRIEND_CHALLENGE_TICKET_PRODUCT_CODE,
@@ -32,8 +36,14 @@ from .friend_challenges_internal import (
 from .friend_challenges_queries import (
     get_friend_challenge_snapshot_for_user,
     get_friend_series_score_for_user,
+    list_friend_challenges_for_user,
 )
-from .friend_challenges_rounds import join_friend_challenge_by_token, start_friend_challenge_round
+from .friend_challenges_join import join_friend_challenge_by_id, join_friend_challenge_by_token
+from .friend_challenges_manage import (
+    cancel_friend_challenge_by_creator,
+    repost_friend_challenge_as_open,
+)
+from .friend_challenges_rounds import start_friend_challenge_round
 from .friend_challenges_series import (
     create_friend_challenge_best_of_three,
     create_friend_challenge_series_next_game,
@@ -83,9 +93,13 @@ class GameSessionService:
     create_friend_challenge_series_next_game = staticmethod(
         create_friend_challenge_series_next_game
     )
+    join_friend_challenge_by_id = staticmethod(join_friend_challenge_by_id)
     join_friend_challenge_by_token = staticmethod(join_friend_challenge_by_token)
+    repost_friend_challenge_as_open = staticmethod(repost_friend_challenge_as_open)
+    cancel_friend_challenge_by_creator = staticmethod(cancel_friend_challenge_by_creator)
     start_friend_challenge_round = staticmethod(start_friend_challenge_round)
     get_friend_challenge_snapshot_for_user = staticmethod(get_friend_challenge_snapshot_for_user)
+    list_friend_challenges_for_user = staticmethod(list_friend_challenges_for_user)
     get_friend_series_score_for_user = staticmethod(get_friend_series_score_for_user)
     start_session = staticmethod(start_session)
     submit_answer = staticmethod(submit_answer)
@@ -98,6 +112,10 @@ __all__ = [
     "FRIEND_CHALLENGE_FREE_CREATES",
     "FRIEND_CHALLENGE_LEVEL_SEQUENCE",
     "DAILY_CHALLENGE_TOTAL_QUESTIONS",
+    "DUEL_ACCEPTED_TTL_SECONDS",
+    "DUEL_MAX_ACTIVE_PER_USER",
+    "DUEL_MAX_NEW_PER_DAY",
+    "DUEL_PENDING_TTL_SECONDS",
     "FRIEND_CHALLENGE_TICKET_PRODUCT_CODE",
     "FRIEND_CHALLENGE_TOTAL_ROUNDS",
     "FRIEND_CHALLENGE_TTL_SECONDS",

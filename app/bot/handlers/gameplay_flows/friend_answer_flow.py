@@ -39,6 +39,7 @@ async def handle_friend_answer_branch(
     build_friend_finish_text,
     build_public_badge_label,
     build_friend_proof_card_text,
+    enqueue_friend_challenge_proof_cards,
     build_series_progress_text,
     send_friend_round_question,
 ) -> None:
@@ -103,7 +104,7 @@ async def handle_friend_answer_branch(
                 ),
             )
 
-    if challenge.status in {"COMPLETED", "EXPIRED"}:
+    if challenge.status in {"COMPLETED", "EXPIRED", "WALKOVER", "CANCELED"}:
         await handle_completed_friend_challenge(
             callback,
             challenge=challenge,
@@ -120,6 +121,7 @@ async def handle_friend_answer_branch(
             build_friend_finish_text=build_friend_finish_text,
             build_public_badge_label=build_public_badge_label,
             build_friend_proof_card_text=build_friend_proof_card_text,
+            enqueue_friend_challenge_proof_cards=enqueue_friend_challenge_proof_cards,
             build_series_progress_text=build_series_progress_text,
         )
         await callback.answer()
