@@ -7,11 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.game.tournaments.service import (
     create_private_tournament,
+    get_private_tournament_lobby_by_id,
+    get_private_tournament_lobby_by_invite_code,
     join_private_tournament_by_code,
     start_private_tournament,
 )
 from app.game.tournaments.types import (
     TournamentJoinResult,
+    TournamentLobbySnapshot,
     TournamentSnapshot,
     TournamentStartResult,
 )
@@ -50,6 +53,32 @@ class TournamentServiceFacade:
             user_id=user_id,
             invite_code=invite_code,
             now_utc=now_utc,
+        )
+
+    @staticmethod
+    async def get_private_tournament_lobby_by_id(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+        viewer_user_id: int,
+    ) -> TournamentLobbySnapshot:
+        return await get_private_tournament_lobby_by_id(
+            session,
+            tournament_id=tournament_id,
+            viewer_user_id=viewer_user_id,
+        )
+
+    @staticmethod
+    async def get_private_tournament_lobby_by_invite_code(
+        session: AsyncSession,
+        *,
+        invite_code: str,
+        viewer_user_id: int,
+    ) -> TournamentLobbySnapshot:
+        return await get_private_tournament_lobby_by_invite_code(
+            session,
+            invite_code=invite_code,
+            viewer_user_id=viewer_user_id,
         )
 
     @staticmethod

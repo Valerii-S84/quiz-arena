@@ -1,5 +1,147 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-27, Phase 2 UX + deep-link shipped; concrete remaining scope)
+
+### What was completed in this slice
+1. Private tournament bot UX baseline is now live:
+   - replaced `🏆 Turnier mit Freunden (🔜 Bald verfügbar!)` with real flow
+   - format select (`5/12`) + invite share (`t.me/share/url`) + copy link + start/view callbacks
+2. Deep-link routing is implemented:
+   - `/start tournament_<invite_code>` parses and opens tournament lobby after onboarding
+3. Tournament analytics was partially closed:
+   - emitted in bot flow: `private_tournament_created`, `private_tournament_joined`, `private_tournament_started`, `private_tournament_result_shared`
+4. Local mandatory gate is green on this branch head:
+   - `.venv/bin/ruff check .`
+   - `.venv/bin/mypy .`
+   - `DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q`
+
+### Exactly what remains to close Phase 2
+1. Round messaging + single-message table edit (TЗ step `18`):
+   - send round-start DM to each participant with opponent/deadline and `▶️ Jetzt spielen!`
+   - keep one standings message per participant and update it via `edit_message_text` after each round
+2. Private tournament proof cards (TЗ step `19`):
+   - async-only generation (worker/background), never in handlers
+   - personal card for each participant, special variant for top-3
+   - upload + reuse Telegram `file_id`
+3. Completion/finalization path (TЗ steps `20-21`):
+   - ensure final participant-facing result screen is sent to all users after round 3
+   - keep `private_tournament_result_shared` wired from final screen
+   - verify `private_tournament_completed` is emitted exactly once per tournament completion path (worker-driven)
+4. Final Phase 2 regression closure (TЗ step `22`):
+   - add tests for round-start DM dispatch and leaderboard `edit` behavior
+   - add tests for private tournament proof-card enqueue/cache reuse path
+   - rerun full gate and only then start Phase 3
+
+## Update (2026-02-27, PR #15 merged; next agent plan to close Phase 2)
+
+### Current baseline
+1. DUELL Phase 1 was merged into `origin/main` as `9998658` (`Duel (#15)`).
+2. Working branch for continuation: `duel`.
+3. Tournament foundation is already in place:
+   - migration `M32` + DB tables (`tournaments`, `tournament_participants`, `tournament_matches`)
+   - private tournament service `create/join/start`
+   - Swiss pairing + lifecycle worker + tournament-match bridge to `friend_challenge`
+
+### What next agent must implement to close Phase 2 (strict TЗ order 15-22)
+1. Complete private tournament bot UX (`15`):
+   - replace placeholder button `🏆 Turnier mit Freunden (🔜 Bald verfügbar!)` with real flow
+   - format select (`5/12`), invite share screen, participant roster, creator `start` action
+2. Deep link join routing (`15`):
+   - handle `/start tournament_<invite_code>` including onboarding continuation for new users
+3. Round player messaging and table updates (`18`):
+   - round-start DM for each participant with opponent + deadline + `▶️ Jetzt spielen!`
+   - maintain one standings message per user and update it via `edit` (not new messages)
+4. Proof cards for all participants (`19`):
+   - async generation only (worker/background), no render in handlers
+   - top-3 special variant + regular variant for other places
+   - upload and reuse Telegram `file_id`
+5. Share tournament result (`20`):
+   - per-user share via `t.me/share/url` from final result screen
+6. Complete private tournament analytics (`21`):
+   - ensure end-to-end emission:
+     - `private_tournament_created`
+     - `private_tournament_joined`
+     - `private_tournament_started`
+     - `private_tournament_completed`
+     - `private_tournament_result_shared`
+7. Close test gap and run full gate (`22`):
+   - add/finish bot flow tests for create/join/start/table/share
+   - cover round deadline technical losses + leaderboard message edit path
+   - run mandatory gate:
+     - `.venv/bin/ruff check .`
+     - `.venv/bin/mypy .`
+     - `DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q`
+
+### Phase 2 done criteria to enforce before moving to Phase 3
+1. Creator can create private tournament, share invite link, start only with `>=2` participants.
+2. Up to 8 users can join by deep link and see roster.
+3. Swiss 3 rounds run through duel engine with 24h TTL and technical losses for no-show.
+4. Standings are updated by message edit (single message per participant).
+5. Every participant gets personal proof card; top-3 gets medal variant.
+6. Share result works through Telegram share sheet (`t.me/share/url`).
+7. Gate is fully green (`ruff`, `mypy`, `pytest`) on `.venv`.
+
+## Update (2026-02-27, DUELL PR conflict resolved; CI green; Phase 2 remaining scope)
+
+### Branch and CI state
+1. Active working branch: `duel`.
+2. Merge conflict with `main` was resolved and pushed:
+   - merge commit: `ddf51cd`
+3. GitHub Actions on latest `duel` head completed successfully:
+   - `lint_unit`: success
+   - `integration`: success
+
+### Phase 2 already done
+1. DB foundation:
+   - `tournaments`, `tournament_participants`, `tournament_matches` (+ indexes/constraints)
+2. Domain/repo foundation:
+   - tournament repos + models
+   - orchestration service `create/join/start`
+   - Swiss pairing core
+3. Match engine reuse:
+   - `tournament_match -> friend_challenge` bridge is in place
+4. Worker foundation:
+   - round lifecycle worker (`registration close`, `settle`, `advance`, `complete`) exists
+5. Test baseline:
+   - unit/integration/worker tests for current scope are green
+
+### Phase 2 remaining (must complete to close phase)
+1. Bot UX private tournament (TЗ steps 15, 18, 20):
+   - replace `🏆 Turnier mit Freunden (🔜 Bald verfügbar!)` with real flow
+   - creation: format select (`5/12`)
+   - share screen with `t.me/share/url`
+   - creator start button enabled only with `>=2` participants
+   - join view via deep link with participant roster
+2. Start/deep-link routing:
+   - parse and handle `/start tournament_<invite_code>`
+   - preserve onboarding behavior for new users, then route into tournament join
+3. Tournament chat updates (TЗ step 18):
+   - one message per participant for standings
+   - update leaderboard via message edit after each round (no spam)
+4. Round notifications and CTA:
+   - send round start DM to each participant with opponent and deadline
+   - provide `▶️ Jetzt spielen!` path to duel match
+5. Proof cards for private tournament (TЗ step 19):
+   - async generation for all participants
+   - top-3 special card variants
+   - reuse/upload `file_id` cache
+6. Result sharing (TЗ step 20):
+   - per-user result share button via `t.me/share/url`
+7. Analytics completion (TЗ step 21):
+   - ensure these events are emitted end-to-end:
+     - `private_tournament_created`
+     - `private_tournament_joined`
+     - `private_tournament_started`
+     - `private_tournament_completed`
+     - `private_tournament_result_shared`
+8. Final test closure for phase (TЗ step 22):
+   - bot flow tests for create/join/start/table/share
+   - integration checks for round transitions + technical losses + leaderboard edits
+   - full gate:
+     - `.venv/bin/ruff check .`
+     - `.venv/bin/mypy .`
+     - `DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q`
+
 ## Update (2026-02-27, DUELL v2 Phase 1 closed; Phase 2 planning started)
 
 ### What was changed

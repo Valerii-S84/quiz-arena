@@ -12,6 +12,7 @@ from app.bot.handlers import (
     gameplay_friend_challenge,
     gameplay_helpers,
     gameplay_proof_cards,
+    gameplay_tournaments,
     gameplay_views,
 )
 from app.bot.handlers.gameplay_flows import (
@@ -45,10 +46,9 @@ from app.services.user_onboarding import UserOnboardingService
 router = Router(name="gameplay")
 EVENT_SOURCE_BOT = "BOT"
 
-ANSWER_RE = gameplay_callbacks.ANSWER_RE
-DAILY_RESULT_RE = gameplay_callbacks.DAILY_RESULT_RE
+ANSWER_RE, DAILY_RESULT_RE = gameplay_callbacks.ANSWER_RE, gameplay_callbacks.DAILY_RESULT_RE
 gameplay_friend_challenge.register(router)
-
+gameplay_tournaments.register(router)
 _format_user_label = gameplay_views._format_user_label
 _build_friend_plan_text = gameplay_views._build_friend_plan_text
 _build_question_text = gameplay_views._build_question_text

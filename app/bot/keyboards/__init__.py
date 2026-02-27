@@ -17,6 +17,13 @@ from app.bot.keyboards.offers import build_offer_keyboard
 from app.bot.keyboards.promo import build_promo_discount_keyboard
 from app.bot.keyboards.quiz import build_quiz_keyboard
 from app.bot.keyboards.referral import build_referral_keyboard
+from app.bot.keyboards.tournament import (
+    build_tournament_created_keyboard,
+    build_tournament_format_keyboard,
+    build_tournament_lobby_keyboard,
+    build_tournament_share_keyboard,
+    build_tournament_share_url,
+)
 
 __all__ = [
     "build_home_keyboard",
@@ -37,4 +44,9 @@ __all__ = [
     "build_promo_discount_keyboard",
     "build_quiz_keyboard",
     "build_referral_keyboard",
+    "build_tournament_created_keyboard",
+    "build_tournament_format_keyboard",
+    "build_tournament_lobby_keyboard",
+    "build_tournament_share_keyboard",
+    "build_tournament_share_url",
 ]
