@@ -6,7 +6,7 @@ from uuid import UUID
 
 import pytest
 
-from app.bot.handlers import gameplay, gameplay_tournaments
+from app.bot.handlers import gameplay, gameplay_tournaments, gameplay_tournaments_more
 from app.bot.texts.de import TEXTS_DE
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
@@ -38,11 +38,15 @@ async def test_handle_tournament_create_from_format_sends_share_lobby(monkeypatc
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(
-        gameplay,
-        "_tournament_service",
+        gameplay_tournaments,
+        "TournamentServiceFacade",
         SimpleNamespace(create_private_tournament=_fake_create_tournament),
     )
-    monkeypatch.setattr(gameplay, "_build_tournament_invite_link", _fake_invite_link)
+    monkeypatch.setattr(
+        gameplay_tournaments.gameplay_helpers,
+        "_build_tournament_invite_link",
+        _fake_invite_link,
+    )
     monkeypatch.setattr(gameplay, "emit_analytics_event", _fake_emit)
 
     callback = DummyCallback(
@@ -91,11 +95,15 @@ async def test_handle_tournament_share_result_sends_share_keyboard_and_emits_eve
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(
-        gameplay,
-        "_tournament_service",
+        gameplay_tournaments_more,
+        "TournamentServiceFacade",
         SimpleNamespace(get_private_tournament_lobby_by_id=_fake_lobby),
     )
-    monkeypatch.setattr(gameplay, "_build_tournament_share_result_url", _fake_share_url)
+    monkeypatch.setattr(
+        gameplay_tournaments_more,
+        "_build_tournament_share_result_url",
+        _fake_share_url,
+    )
     monkeypatch.setattr(gameplay, "emit_analytics_event", _fake_emit)
 
     callback = DummyCallback(

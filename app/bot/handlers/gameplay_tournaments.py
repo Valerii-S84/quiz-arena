@@ -3,7 +3,7 @@ from __future__ import annotations
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
-from app.bot.handlers import gameplay_callbacks
+from app.bot.handlers import gameplay_callbacks, gameplay_helpers
 from app.bot.handlers.gameplay_flows import tournament_flow, tournament_lobby_flow
 from app.bot.handlers.gameplay_tournaments_more import (
     handle_tournament_copy_link,
@@ -12,6 +12,7 @@ from app.bot.handlers.gameplay_tournaments_more import (
 )
 from app.bot.texts.de import TEXTS_DE
 from app.db.repo.users_repo import UsersRepo
+from app.game.tournaments import TournamentServiceFacade
 from app.game.tournaments.errors import (
     TournamentAccessError,
     TournamentAlreadyStartedError,
@@ -74,8 +75,8 @@ async def handle_tournament_create_from_format(callback: CallbackQuery) -> None:
             rounds=rounds,
             session_local=gameplay.SessionLocal,
             user_onboarding_service=gameplay.UserOnboardingService,
-            tournament_service=gameplay._tournament_service,
-            build_tournament_invite_link=gameplay._build_tournament_invite_link,
+            tournament_service=TournamentServiceFacade,
+            build_tournament_invite_link=gameplay_helpers._build_tournament_invite_link,
             emit_analytics_event=gameplay.emit_analytics_event,
             event_source_bot=gameplay.EVENT_SOURCE_BOT,
         )
@@ -98,7 +99,7 @@ async def handle_tournament_join(callback: CallbackQuery) -> None:
             invite_code=invite_code,
             session_local=gameplay.SessionLocal,
             user_onboarding_service=gameplay.UserOnboardingService,
-            tournament_service=gameplay._tournament_service,
+            tournament_service=TournamentServiceFacade,
             users_repo=UsersRepo,
             emit_analytics_event=gameplay.emit_analytics_event,
             event_source_bot=gameplay.EVENT_SOURCE_BOT,
@@ -125,7 +126,7 @@ async def handle_tournament_start(callback: CallbackQuery) -> None:
             tournament_id=tournament_id,
             session_local=gameplay.SessionLocal,
             user_onboarding_service=gameplay.UserOnboardingService,
-            tournament_service=gameplay._tournament_service,
+            tournament_service=TournamentServiceFacade,
             users_repo=UsersRepo,
             emit_analytics_event=gameplay.emit_analytics_event,
             event_source_bot=gameplay.EVENT_SOURCE_BOT,
