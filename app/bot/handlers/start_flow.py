@@ -42,7 +42,6 @@ from app.game.sessions.service import GameSessionService
 from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
 
-
 async def _send_home_message(message: Message, *, text: str) -> None:
     home_header_file_id = get_settings().telegram_home_header_file_id.strip()
     if not home_header_file_id:
@@ -56,7 +55,6 @@ async def _send_home_message(message: Message, *, text: str) -> None:
         )
     except TelegramBadRequest:
         await message.answer(text, reply_markup=build_home_keyboard())
-
 
 async def handle_start_message(message: Message) -> None:
     if message.from_user is None:
@@ -212,7 +210,6 @@ async def handle_start_message(message: Message) -> None:
             reply_markup=build_offer_keyboard(offer_selection),
         )
 
-
 async def handle_shop_open(callback: CallbackQuery) -> None:
     if callback.from_user is None or callback.message is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
@@ -232,7 +229,6 @@ async def handle_shop_open(callback: CallbackQuery) -> None:
         reply_markup=build_shop_keyboard(channel_bonus_claimed=channel_bonus_claimed),
     )
     await callback.answer()
-
 
 async def handle_home_open(callback: CallbackQuery) -> None:
     if callback.from_user is None or not isinstance(callback.message, Message):

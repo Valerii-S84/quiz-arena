@@ -12,7 +12,6 @@ from app.game.sessions.types import AnswerSessionResult, FriendChallengeSnapshot
 from tests.bot.gameplay_flow_fixtures import _start_result
 from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessionLocal
 
-
 @pytest.fixture(autouse=True)
 def _patch_referral_prompt(monkeypatch):
     async def _fake_reserve_post_game_prompt(session, *, user_id: int, now_utc):
