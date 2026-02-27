@@ -1,5 +1,21 @@
 # Next Agent Handoff (2026-02-19)
 
+## Update (2026-02-27, DUELL v2 Phase 1 closed; Phase 2 planning started)
+
+### What was changed
+1. Locked active branch for DUELL+Turnier execution:
+   - active branch: `duel`
+2. Updated DUELL+Turnier priority doc:
+   - `docs/duel_turnier_v2_priority.md`
+   - Phase 1 marked as `DONE` (baseline accepted).
+   - Added execution plan for Phase 2 (items 14-22 in fixed order).
+
+### Next implementation target (immediate)
+1. Start Phase 2 with migration `M32`:
+   - add `tournaments`, `tournament_participants`, `tournament_matches`.
+2. Build tournament orchestration layer on top of existing `friend_challenge` engine.
+3. Implement private tournament bot flow + worker lifecycle + analytics + tests.
+
 ## Update (2026-02-22, P2-4 lockfile + QuizBank docs/reports completed)
 
 ### What was changed

@@ -50,6 +50,7 @@ from .friend_challenges_series_utils import (
     _resolve_challenge_opponent_user_id,
     _series_wins_needed,
 )
+from .friend_challenges_tournament import create_tournament_match_friend_challenge
 from .levels import (
     _clamp_level_for_mode,
     _friend_challenge_level_for_round,
@@ -94,6 +95,9 @@ class GameSessionService:
     create_friend_challenge_best_of_three = staticmethod(create_friend_challenge_best_of_three)
     create_friend_challenge_series_next_game = staticmethod(
         create_friend_challenge_series_next_game
+    )
+    create_tournament_match_friend_challenge = staticmethod(
+        create_tournament_match_friend_challenge
     )
     join_friend_challenge_by_id = staticmethod(join_friend_challenge_by_id)
     join_friend_challenge_by_token = staticmethod(join_friend_challenge_by_token)

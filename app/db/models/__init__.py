@@ -23,6 +23,9 @@ from app.db.models.quiz_sessions import QuizSession
 from app.db.models.reconciliation_runs import ReconciliationRun
 from app.db.models.referrals import Referral
 from app.db.models.streak_state import StreakState
+from app.db.models.tournament_matches import TournamentMatch
+from app.db.models.tournament_participants import TournamentParticipant
+from app.db.models.tournaments import Tournament
 from app.db.models.users import User
 
 __all__ = [
@@ -51,5 +54,8 @@ __all__ = [
     "ReconciliationRun",
     "Referral",
     "StreakState",
+    "Tournament",
+    "TournamentMatch",
+    "TournamentParticipant",
     "User",
 ]
