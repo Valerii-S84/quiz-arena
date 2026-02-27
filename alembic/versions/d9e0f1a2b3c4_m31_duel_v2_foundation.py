@@ -85,6 +85,10 @@ def upgrade() -> None:
         """
     )
 
+    # Old status check allows only ACTIVE/COMPLETED/CANCELED/EXPIRED.
+    # Drop it before remapping ACTIVE -> new duel statuses.
+    op.drop_constraint("ck_friend_challenges_status", "friend_challenges", type_="check")
+
     op.execute(
         """
         UPDATE friend_challenges
@@ -136,7 +140,6 @@ def upgrade() -> None:
     op.alter_column("friend_challenges", "creator_push_count", server_default=None)
     op.alter_column("friend_challenges", "opponent_push_count", server_default=None)
 
-    op.drop_constraint("ck_friend_challenges_status", "friend_challenges", type_="check")
     op.create_check_constraint(
         "ck_friend_challenges_status",
         "friend_challenges",

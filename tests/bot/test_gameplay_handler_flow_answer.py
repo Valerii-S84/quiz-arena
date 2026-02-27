@@ -12,6 +12,7 @@ from app.game.sessions.types import AnswerSessionResult, FriendChallengeSnapshot
 from tests.bot.gameplay_flow_fixtures import _start_result
 from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessionLocal
 
+
 @pytest.fixture(autouse=True)
 def _patch_referral_prompt(monkeypatch):
     async def _fake_reserve_post_game_prompt(session, *, user_id: int, now_utc):
@@ -131,9 +132,7 @@ async def test_handle_answer_finishes_daily_challenge_hides_streak_when_zero(mon
 
 
 @pytest.mark.asyncio
-async def test_handle_answer_daily_in_progress_sends_progress_and_next_question(
-    monkeypatch,
-) -> None:
+async def test_handle_answer_daily_in_progress_sends_next_question(monkeypatch) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):

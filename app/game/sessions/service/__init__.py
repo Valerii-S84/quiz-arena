@@ -24,29 +24,31 @@ from .constants import (
 from .friend_challenges_create import create_friend_challenge, create_friend_challenge_rematch
 from .friend_challenges_internal import (
     _build_friend_challenge_snapshot,
-    _count_series_wins,
     _create_friend_challenge_row,
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
     _friend_challenge_expires_at,
-    _resolve_challenge_opponent_user_id,
     _resolve_friend_challenge_access_type,
-    _series_wins_needed,
-)
-from .friend_challenges_queries import (
-    get_friend_challenge_snapshot_for_user,
-    get_friend_series_score_for_user,
-    list_friend_challenges_for_user,
 )
 from .friend_challenges_join import join_friend_challenge_by_id, join_friend_challenge_by_token
 from .friend_challenges_manage import (
     cancel_friend_challenge_by_creator,
     repost_friend_challenge_as_open,
 )
+from .friend_challenges_queries import (
+    get_friend_challenge_snapshot_for_user,
+    get_friend_series_score_for_user,
+    list_friend_challenges_for_user,
+)
 from .friend_challenges_rounds import start_friend_challenge_round
 from .friend_challenges_series import (
     create_friend_challenge_best_of_three,
     create_friend_challenge_series_next_game,
+)
+from .friend_challenges_series_utils import (
+    _count_series_wins,
+    _resolve_challenge_opponent_user_id,
+    _series_wins_needed,
 )
 from .levels import (
     _clamp_level_for_mode,

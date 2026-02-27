@@ -10,7 +10,10 @@ from app.game.friend_challenges.constants import (
     DUEL_TYPE_DIRECT,
     DUEL_TYPE_OPEN,
 )
-from app.game.friend_challenges.ui_contract import FRIEND_CHALLENGE_LEVEL_SEQUENCE, FriendSeriesScore
+from app.game.friend_challenges.ui_contract import (
+    FRIEND_CHALLENGE_LEVEL_SEQUENCE,
+    FriendSeriesScore,
+)
 
 __all__ = [
     "DUEL_STATUS_ACCEPTED",

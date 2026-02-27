@@ -95,7 +95,9 @@ async def run_friend_challenge_deadlines_async(
                     "opponent_score": int(challenge.opponent_score),
                     "total_rounds": int(challenge.total_rounds),
                     "winner_user_id": (
-                        int(challenge.winner_user_id) if challenge.winner_user_id is not None else None
+                        int(challenge.winner_user_id)
+                        if challenge.winner_user_id is not None
+                        else None
                     ),
                     "status": challenge.status,
                     "previous_status": previous_status,
@@ -119,7 +121,9 @@ async def run_friend_challenge_deadlines_async(
                     "creator_score": int(challenge.creator_score),
                     "opponent_score": int(challenge.opponent_score),
                     "winner_user_id": (
-                        int(challenge.winner_user_id) if challenge.winner_user_id is not None else None
+                        int(challenge.winner_user_id)
+                        if challenge.winner_user_id is not None
+                        else None
                     ),
                     "status": challenge.status,
                     "previous_status": previous_status,

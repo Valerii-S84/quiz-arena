@@ -39,7 +39,9 @@ async def join_friend_challenge_by_token(
     now_utc: datetime,
 ) -> FriendChallengeJoinResult:
     challenge = await FriendChallengesRepo.get_by_invite_token_for_update(session, invite_token)
-    return await _join_friend_challenge_locked(session, user_id=user_id, challenge=challenge, now_utc=now_utc)
+    return await _join_friend_challenge_locked(
+        session, user_id=user_id, challenge=challenge, now_utc=now_utc
+    )
 
 
 async def join_friend_challenge_by_id(
@@ -50,7 +52,9 @@ async def join_friend_challenge_by_id(
     now_utc: datetime,
 ) -> FriendChallengeJoinResult:
     challenge = await FriendChallengesRepo.get_by_id_for_update(session, challenge_id)
-    return await _join_friend_challenge_locked(session, user_id=user_id, challenge=challenge, now_utc=now_utc)
+    return await _join_friend_challenge_locked(
+        session, user_id=user_id, challenge=challenge, now_utc=now_utc
+    )
 
 
 async def _join_friend_challenge_locked(

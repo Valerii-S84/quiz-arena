@@ -31,10 +31,16 @@ from .constants import (
     FRIEND_CHALLENGE_FREE_CREATES,
     FRIEND_CHALLENGE_TICKET_PRODUCT_CODE,
 )
+
+
 def _friend_challenge_expires_at(*, now_utc: datetime) -> datetime:
     return now_utc + timedelta(seconds=DUEL_PENDING_TTL_SECONDS)
+
+
 def _friend_challenge_expires_at_accepted(*, now_utc: datetime) -> datetime:
     return now_utc + timedelta(seconds=DUEL_ACCEPTED_TTL_SECONDS)
+
+
 def _expire_friend_challenge_if_due(*, challenge: FriendChallenge, now_utc: datetime) -> bool:
     challenge.status = normalize_duel_status(
         status=challenge.status,
@@ -72,6 +78,8 @@ def _expire_friend_challenge_if_due(*, challenge: FriendChallenge, now_utc: date
     challenge.completed_at = now_utc
     challenge.updated_at = now_utc
     return True
+
+
 async def _emit_friend_challenge_expired_event(
     session: AsyncSession,
     *,
@@ -95,6 +103,8 @@ async def _emit_friend_challenge_expired_event(
             "expires_at": challenge.expires_at.isoformat(),
         },
     )
+
+
 async def _resolve_friend_challenge_access_type(
     session: AsyncSession,
     *,
@@ -130,6 +140,8 @@ async def _resolve_friend_challenge_access_type(
                 raise FriendChallengePaymentRequiredError
             access_type = "PAID_TICKET"
     return access_type
+
+
 async def _create_friend_challenge_row(
     session: AsyncSession,
     *,
@@ -189,6 +201,8 @@ async def _create_friend_challenge_row(
         ),
     )
     return challenge
+
+
 def _build_friend_challenge_snapshot(challenge: FriendChallenge) -> FriendChallengeSnapshot:
     return FriendChallengeSnapshot(
         challenge_id=challenge.id,
@@ -212,34 +226,3 @@ def _build_friend_challenge_snapshot(challenge: FriendChallenge) -> FriendChalle
         winner_user_id=challenge.winner_user_id,
         expires_at=challenge.expires_at,
     )
-def _series_wins_needed(*, best_of: int) -> int:
-    resolved_best_of = max(1, int(best_of))
-    return (resolved_best_of // 2) + 1
-def _count_series_wins(
-    *,
-    series_challenges: list[FriendChallenge],
-    creator_user_id: int,
-    opponent_user_id: int | None,
-) -> tuple[int, int]:
-    creator_wins = 0
-    opponent_wins = 0
-    for item in series_challenges:
-        if item.status not in {"COMPLETED", "EXPIRED", "WALKOVER"}:
-            continue
-        if item.winner_user_id == creator_user_id:
-            creator_wins += 1
-        elif opponent_user_id is not None and item.winner_user_id == opponent_user_id:
-            opponent_wins += 1
-    return creator_wins, opponent_wins
-def _resolve_challenge_opponent_user_id(
-    *,
-    challenge: FriendChallenge,
-    initiator_user_id: int,
-) -> int:
-    if challenge.creator_user_id == initiator_user_id:
-        opponent_user_id = challenge.opponent_user_id
-    else:
-        opponent_user_id = challenge.creator_user_id
-    if opponent_user_id is None:
-        raise FriendChallengeAccessError
-    return opponent_user_id

@@ -18,6 +18,7 @@ from app.game.sessions.errors import (
     FriendChallengeNotFoundError,
     FriendChallengePaymentRequiredError,
 )
+
 from . import friend_my_duels_flow
 
 
@@ -90,7 +91,9 @@ async def handle_friend_challenge_create_selected(
     invite_link = await build_friend_invite_link(callback, challenge_id=str(challenge.challenge_id))
     if invite_link is None:
         await callback.message.answer(
-            TEXTS_DE["msg.friend.challenge.created.fallback"].format(invite_token=challenge.invite_token),
+            TEXTS_DE["msg.friend.challenge.created.fallback"].format(
+                invite_token=challenge.invite_token
+            ),
             reply_markup=build_friend_challenge_back_keyboard(),
         )
         await callback.answer()

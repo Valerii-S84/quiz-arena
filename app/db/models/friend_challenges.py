@@ -84,7 +84,9 @@ class FriendChallenge(Base):
     winner_user_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("users.id"), nullable=True
     )
-    creator_finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    creator_finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     opponent_finished_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

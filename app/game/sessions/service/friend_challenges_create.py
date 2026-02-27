@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 from datetime import datetime
 from uuid import UUID, uuid4
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.game.friend_challenges.constants import (
@@ -15,26 +18,27 @@ from app.game.sessions.errors import (
     FriendChallengeNotFoundError,
 )
 from app.game.sessions.types import FriendChallengeSnapshot
-from .constants import (
-    DUEL_MAX_ACTIVE_PER_USER,
-    DUEL_MAX_NEW_PER_DAY,
-    FRIEND_CHALLENGE_TOTAL_ROUNDS,
-)
+
+from .constants import DUEL_MAX_ACTIVE_PER_USER, DUEL_MAX_NEW_PER_DAY, FRIEND_CHALLENGE_TOTAL_ROUNDS
 from .friend_challenges_internal import (
     _build_friend_challenge_snapshot,
-    _count_series_wins,
     _create_friend_challenge_row,
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
-    _resolve_challenge_opponent_user_id,
     _resolve_friend_challenge_access_type,
-    _series_wins_needed,
 )
 from .friend_challenges_question_plan import (
     berlin_day_start_utc,
     resolve_duel_rounds,
     select_duel_question_ids,
 )
+from .friend_challenges_series_utils import (
+    _count_series_wins,
+    _resolve_challenge_opponent_user_id,
+    _series_wins_needed,
+)
+
+
 async def create_friend_challenge(
     session: AsyncSession,
     *,
@@ -67,7 +71,6 @@ async def create_friend_challenge(
     )
     if created_today >= DUEL_MAX_NEW_PER_DAY:
         raise FriendChallengeLimitExceededError
-
     access_type = await _resolve_friend_challenge_access_type(
         session,
         creator_user_id=creator_user_id,
@@ -124,6 +127,8 @@ async def create_friend_challenge(
         },
     )
     return _build_friend_challenge_snapshot(challenge)
+
+
 async def create_friend_challenge_rematch(
     session: AsyncSession,
     *,
@@ -143,10 +148,7 @@ async def create_friend_challenge_rematch(
         )
     if challenge.status not in {"COMPLETED", "EXPIRED", "WALKOVER"}:
         raise FriendChallengeAccessError
-    if initiator_user_id not in {
-        challenge.creator_user_id,
-        challenge.opponent_user_id,
-    }:
+    if initiator_user_id not in (challenge.creator_user_id, challenge.opponent_user_id):
         raise FriendChallengeAccessError
 
     opponent_user_id = _resolve_challenge_opponent_user_id(
