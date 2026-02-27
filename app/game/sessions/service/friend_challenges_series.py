@@ -13,12 +13,14 @@ from app.game.sessions.types import FriendChallengeSnapshot
 
 from .friend_challenges_internal import (
     _build_friend_challenge_snapshot,
-    _count_series_wins,
     _create_friend_challenge_row,
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
-    _resolve_challenge_opponent_user_id,
     _resolve_friend_challenge_access_type,
+)
+from .friend_challenges_series_utils import (
+    _count_series_wins,
+    _resolve_challenge_opponent_user_id,
     _series_wins_needed,
 )
 

@@ -228,10 +228,15 @@ async def test_handle_start_duel_payload_joins_and_shows_challenge_immediately(m
     async def _fake_notify_creator(*args, **kwargs):
         return None
 
+    async def _fake_resolve_label(*, challenge, user_id):
+        del challenge, user_id
+        return "Freund"
+
     monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(start.GameSessionService, "join_friend_challenge_by_id", _fake_join_by_id)
     monkeypatch.setattr(start.GameSessionService, "start_friend_challenge_round", _fake_start_round)
     monkeypatch.setattr(start.start_flow, "_notify_creator_about_join", _fake_notify_creator)
+    monkeypatch.setattr(start.start_flow, "_resolve_opponent_label", _fake_resolve_label)
 
     message = _StartMessage(
         text="/start duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",

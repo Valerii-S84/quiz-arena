@@ -1,9 +1,13 @@
 from __future__ import annotations
+
 from datetime import datetime
 from uuid import UUID
+
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.models.friend_challenges import FriendChallenge
+
 _DUEL_LIVE_STATUSES: tuple[str, ...] = (
     "ACTIVE",
     "PENDING",
@@ -11,6 +15,8 @@ _DUEL_LIVE_STATUSES: tuple[str, ...] = (
     "CREATOR_DONE",
     "OPPONENT_DONE",
 )
+
+
 class FriendChallengesRepo:
     @staticmethod
     async def get_by_id(session: AsyncSession, challenge_id: UUID) -> FriendChallenge | None:
@@ -49,18 +55,6 @@ class FriendChallengesRepo:
         session.add(challenge)
         await session.flush()
         return challenge
-
-    @staticmethod
-    async def count_by_creator(
-        session: AsyncSession,
-        *,
-        creator_user_id: int,
-    ) -> int:
-        stmt = select(func.count(FriendChallenge.id)).where(
-            FriendChallenge.creator_user_id == creator_user_id
-        )
-        result = await session.execute(stmt)
-        return int(result.scalar_one() or 0)
 
     @staticmethod
     async def count_by_creator_access_type(

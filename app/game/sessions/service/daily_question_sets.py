@@ -11,7 +11,7 @@ from app.game.questions.runtime_bank_filters import pick_from_pool
 
 from .constants import DAILY_CHALLENGE_TOTAL_QUESTIONS
 
-DAILY_LEVEL_CHAIN: tuple[str, ...] = ("A1", "A2", "B1", "B2")
+DAILY_LEVEL_CHAIN: tuple[str, ...] = ("A1", "A2", "B1")
 DAILY_POSITION_PREFERRED_LEVELS: tuple[str, ...] = (
     "A1",
     "A1",
@@ -19,7 +19,7 @@ DAILY_POSITION_PREFERRED_LEVELS: tuple[str, ...] = (
     "A2",
     "B1",
     "B1",
-    "B2",
+    "B1",
 )
 
 
@@ -44,8 +44,9 @@ async def _build_daily_question_ids(
     async def _cached_candidate_ids(preferred_levels: tuple[str, ...] | None) -> list[str]:
         if preferred_levels not in candidate_ids_cache:
             candidate_ids_cache[preferred_levels] = (
-                await QuizQuestionsRepo.list_question_ids_all_active(
+                await QuizQuestionsRepo.list_question_ids_for_mode(
                     session,
+                    mode_code=DAILY_CHALLENGE_SOURCE_MODE,
                     preferred_levels=preferred_levels,
                 )
             )
@@ -59,7 +60,7 @@ async def _build_daily_question_ids(
         if not candidate_ids:
             candidate_ids = await _cached_candidate_ids(allowed_levels)
         if not candidate_ids:
-            candidate_ids = await _cached_candidate_ids(None)
+            candidate_ids = await _cached_candidate_ids(DAILY_LEVEL_CHAIN)
         if not candidate_ids:
             break
 
@@ -87,10 +88,14 @@ async def _fallback_daily_question_id(
 ) -> str:
     from app.game.sessions import service as service_module
 
-    question = await service_module.get_question_for_mode(
+    question = await service_module.select_question_for_mode(
         session,
         "DAILY_CHALLENGE",
         local_date_berlin=berlin_date,
+        recent_question_ids=(),
+        selection_seed=f"daily:fallback:{berlin_date.isoformat()}",
+        preferred_level=DAILY_POSITION_PREFERRED_LEVELS[0],
+        allowed_levels=DAILY_LEVEL_CHAIN,
     )
     return question.question_id
 

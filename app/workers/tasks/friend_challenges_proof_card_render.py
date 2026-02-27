@@ -240,4 +240,3 @@ if __name__ == "__main__":
     )
     output = Path(__file__).resolve().parents[3] / "proof_card_preview.png"
     output.write_bytes(preview_png)
-    print(f"Saved: {output}")

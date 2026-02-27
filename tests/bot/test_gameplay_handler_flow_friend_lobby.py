@@ -115,7 +115,9 @@ async def test_handle_friend_my_duels_groups_sections_with_my_turn_first(monkeyp
         return labels[challenge.challenge_id]
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(gameplay.GameSessionService, "list_friend_challenges_for_user", _fake_list_duels)
+    monkeypatch.setattr(
+        gameplay.GameSessionService, "list_friend_challenges_for_user", _fake_list_duels
+    )
     monkeypatch.setattr(gameplay, "_resolve_opponent_label", _fake_opponent_label)
 
     callback = DummyCallback(

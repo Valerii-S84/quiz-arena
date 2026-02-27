@@ -11,7 +11,9 @@ from app.workers.tasks.friend_challenges_async import run_friend_challenge_deadl
 from tests.integration.friend_challenge_fixtures import UTC, _create_user
 
 
-def _notifications_stub(monkeypatch: pytest.MonkeyPatch, captured_expired_items: list[dict[str, object]]) -> None:
+def _notifications_stub(
+    monkeypatch: pytest.MonkeyPatch, captured_expired_items: list[dict[str, object]]
+) -> None:
     async def _fake_notifications(*, now_utc, reminder_items, expired_items):
         del now_utc, reminder_items
         captured_expired_items.extend(expired_items)

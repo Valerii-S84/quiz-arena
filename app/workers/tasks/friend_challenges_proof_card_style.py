@@ -25,18 +25,26 @@ _FontType = ImageFont.FreeTypeFont | ImageFont.ImageFont
 
 def font(*, size: int, bold: bool) -> _FontType:
     candidates = [
-        Path("/usr/share/fonts/truetype/inter/Inter-Bold.ttf")
-        if bold
-        else Path("/usr/share/fonts/truetype/inter/Inter-Regular.ttf"),
-        Path("/usr/share/fonts/truetype/roboto/unhinted/RobotoTTF/Roboto-Bold.ttf")
-        if bold
-        else Path("/usr/share/fonts/truetype/roboto/unhinted/RobotoTTF/Roboto-Regular.ttf"),
-        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
-        if bold
-        else Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-        Path("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf")
-        if bold
-        else Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+        (
+            Path("/usr/share/fonts/truetype/inter/Inter-Bold.ttf")
+            if bold
+            else Path("/usr/share/fonts/truetype/inter/Inter-Regular.ttf")
+        ),
+        (
+            Path("/usr/share/fonts/truetype/roboto/unhinted/RobotoTTF/Roboto-Bold.ttf")
+            if bold
+            else Path("/usr/share/fonts/truetype/roboto/unhinted/RobotoTTF/Roboto-Regular.ttf")
+        ),
+        (
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+            if bold
+            else Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+        ),
+        (
+            Path("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf")
+            if bold
+            else Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf")
+        ),
     ]
     for path in candidates:
         if path.exists():
@@ -44,14 +52,18 @@ def font(*, size: int, bold: bool) -> _FontType:
     return ImageFont.load_default()
 
 
-def text_width(*, draw: ImageDraw.ImageDraw, text: str, font_obj: _FontType, tracking: int = 0) -> int:
+def text_width(
+    *, draw: ImageDraw.ImageDraw, text: str, font_obj: _FontType, tracking: int = 0
+) -> int:
     if not text:
         return 0
     left, _, right, _ = draw.textbbox((0, 0), text, font=font_obj)
     return int((right - left) + tracking * max(0, len(text) - 1))
 
 
-def center_x(*, draw: ImageDraw.ImageDraw, text: str, font_obj: _FontType, tracking: int = 0) -> int:
+def center_x(
+    *, draw: ImageDraw.ImageDraw, text: str, font_obj: _FontType, tracking: int = 0
+) -> int:
     width = text_width(draw=draw, text=text, font_obj=font_obj, tracking=tracking)
     return int((CARD_SIZE - width) / 2)
 

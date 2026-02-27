@@ -39,12 +39,6 @@ def build_shop_keyboard(*, channel_bonus_claimed: bool = False) -> InlineKeyboar
             channel_bonus_row,
             [
                 InlineKeyboardButton(
-                    text="🏆 Turnier mit Freunden 🔜",
-                    callback_data="friend:challenge:type:tournament",
-                )
-            ],
-            [
-                InlineKeyboardButton(
                     text="👥 Freunde einladen → Belohnung",
                     callback_data="referral:open",
                 )

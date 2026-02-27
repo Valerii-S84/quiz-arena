@@ -105,8 +105,14 @@ async def send_deadline_notifications(
 
             sent_to = 0
             failed_to = 0
-            creator_chat = telegram_targets.get(creator_user_id) if isinstance(creator_user_id, int) else None
-            opponent_chat = telegram_targets.get(opponent_user_id) if isinstance(opponent_user_id, int) else None
+            creator_chat = (
+                telegram_targets.get(creator_user_id) if isinstance(creator_user_id, int) else None
+            )
+            opponent_chat = (
+                telegram_targets.get(opponent_user_id)
+                if isinstance(opponent_user_id, int)
+                else None
+            )
 
             if status == "EXPIRED" and previous_status == "PENDING":
                 sent = await _send_message(
@@ -125,7 +131,9 @@ async def send_deadline_notifications(
                         "⌛ Walkover. Duell beendet.\n"
                         f"Finaler Score: Du {creator_score} | Gegner {opponent_score}."
                     ),
-                    reply_markup=build_friend_challenge_finished_keyboard(challenge_id=challenge_id),
+                    reply_markup=build_friend_challenge_finished_keyboard(
+                        challenge_id=challenge_id
+                    ),
                 )
                 sent_to += int(creator_sent)
                 failed_to += int(not creator_sent)
@@ -137,7 +145,9 @@ async def send_deadline_notifications(
                             "⌛ Walkover. Duell beendet.\n"
                             f"Finaler Score: Du {opponent_score} | Gegner {creator_score}."
                         ),
-                        reply_markup=build_friend_challenge_finished_keyboard(challenge_id=challenge_id),
+                        reply_markup=build_friend_challenge_finished_keyboard(
+                            challenge_id=challenge_id
+                        ),
                     )
                     sent_to += int(opponent_sent)
                     failed_to += int(not opponent_sent)
@@ -149,7 +159,9 @@ async def send_deadline_notifications(
                         "⌛ Dein Duell ist wegen Zeitablauf beendet.\n"
                         f"Finaler Score: Du {creator_score} | Gegner {opponent_score}."
                     ),
-                    reply_markup=build_friend_challenge_finished_keyboard(challenge_id=challenge_id),
+                    reply_markup=build_friend_challenge_finished_keyboard(
+                        challenge_id=challenge_id
+                    ),
                 )
                 sent_to += int(creator_sent)
                 failed_to += int(not creator_sent)
@@ -161,7 +173,9 @@ async def send_deadline_notifications(
                             "⌛ Dein Duell ist wegen Zeitablauf beendet.\n"
                             f"Finaler Score: Du {opponent_score} | Gegner {creator_score}."
                         ),
-                        reply_markup=build_friend_challenge_finished_keyboard(challenge_id=challenge_id),
+                        reply_markup=build_friend_challenge_finished_keyboard(
+                            challenge_id=challenge_id
+                        ),
                     )
                     sent_to += int(opponent_sent)
                     failed_to += int(not opponent_sent)

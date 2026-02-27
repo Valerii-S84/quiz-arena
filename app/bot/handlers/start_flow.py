@@ -3,10 +3,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import CallbackQuery, Message
 
-from app.bot.handlers.start_helpers import _notify_creator_about_join, _resolve_opponent_label
+from app.bot.handlers.start_helpers import (
+    _notify_creator_about_join,
+    _resolve_opponent_label,
+    _send_home_message,
+)
 from app.bot.handlers.start_parsing import (
     _extract_duel_challenge_id,
     _extract_friend_challenge_token,
@@ -42,19 +45,6 @@ from app.game.sessions.service import GameSessionService
 from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
 
-async def _send_home_message(message: Message, *, text: str) -> None:
-    home_header_file_id = get_settings().telegram_home_header_file_id.strip()
-    if not home_header_file_id:
-        await message.answer(text, reply_markup=build_home_keyboard())
-        return
-    try:
-        await message.answer_photo(
-            photo=home_header_file_id,
-            caption=text,
-            reply_markup=build_home_keyboard(),
-        )
-    except TelegramBadRequest:
-        await message.answer(text, reply_markup=build_home_keyboard())
 
 async def handle_start_message(message: Message) -> None:
     if message.from_user is None:
@@ -203,12 +193,17 @@ async def handle_start_message(message: Message) -> None:
         paid_energy=snapshot.paid_energy,
         current_streak=snapshot.current_streak,
     )
-    await _send_home_message(message, text=response_text)
+    await _send_home_message(
+        message,
+        text=response_text,
+        home_header_file_id=get_settings().telegram_home_header_file_id.strip(),
+    )
     if offer_selection is not None:
         await message.answer(
             TEXTS_DE[offer_selection.text_key],
             reply_markup=build_offer_keyboard(offer_selection),
         )
+
 
 async def handle_shop_open(callback: CallbackQuery) -> None:
     if callback.from_user is None or callback.message is None:
@@ -230,6 +225,7 @@ async def handle_shop_open(callback: CallbackQuery) -> None:
     )
     await callback.answer()
 
+
 async def handle_home_open(callback: CallbackQuery) -> None:
     if callback.from_user is None or not isinstance(callback.message, Message):
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
@@ -246,5 +242,9 @@ async def handle_home_open(callback: CallbackQuery) -> None:
         paid_energy=snapshot.paid_energy,
         current_streak=snapshot.current_streak,
     )
-    await _send_home_message(callback.message, text=response_text)
+    await _send_home_message(
+        callback.message,
+        text=response_text,
+        home_header_file_id=get_settings().telegram_home_header_file_id.strip(),
+    )
     await callback.answer()
