@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from aiogram.types import Message
 
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.core.config import get_settings
+from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.session import SessionLocal
+from app.game.sessions.service.constants import DUEL_MAX_PUSH_PER_USER
 from app.game.sessions.types import FriendChallengeSnapshot
 from app.services.user_onboarding import UserOnboardingService
 
@@ -79,26 +83,27 @@ async def _notify_creator_about_join(
         return
 
     async with SessionLocal.begin() as session:
+        challenge_row = await FriendChallengesRepo.get_by_id_for_update(
+            session, challenge.challenge_id
+        )
+        if challenge_row is None:
+            return
+        if challenge_row.creator_push_count >= DUEL_MAX_PUSH_PER_USER:
+            return
+        challenge_row.creator_push_count += 1
+        challenge_row.updated_at = datetime.now(timezone.utc)
         creator = await UserOnboardingService.get_by_id(session, challenge.creator_user_id)
-        joiner = await UserOnboardingService.get_by_id(session, joiner_user_id)
 
-    if creator is None or joiner is None:
+    if creator is None:
         return
 
-    joiner_label = _format_user_label(
-        username=joiner.username,
-        first_name=joiner.first_name,
-        fallback="Freund",
-    )
     bot = message.bot
     if bot is None:
         return
     try:
         await bot.send_message(
             chat_id=creator.telegram_user_id,
-            text=TEXTS_DE["msg.friend.challenge.opponent.joined"].format(
-                opponent_label=joiner_label
-            ),
+            text=TEXTS_DE["msg.friend.challenge.opponent.ready"],
         )
     except Exception:
         return

@@ -233,11 +233,9 @@ async def test_friend_challenge_flow_emits_created_joined_completed_and_rematch_
     opponent_joined = await _list_user_events(
         opponent_user_id, event_type="friend_challenge_joined"
     )
-    opponent_completed = await _list_user_events(
-        opponent_user_id, event_type="friend_challenge_completed"
-    )
+    opponent_completed = await _list_user_events(opponent_user_id, event_type="duel_completed")
     creator_rematch = await _list_user_events(
-        creator_user_id, event_type="friend_challenge_rematch_created"
+        creator_user_id, event_type="duel_revanche_created"
     )
 
     assert len(creator_created) >= 2

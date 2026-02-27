@@ -90,5 +90,10 @@ class DummyCallback:
         self.id = callback_id
         self.answer_calls: list[dict[str, Any]] = []
 
-    async def answer(self, text: str | None = None, show_alert: bool = False) -> None:
-        self.answer_calls.append({"text": text, "show_alert": show_alert})
+    async def answer(
+        self,
+        text: str | None = None,
+        show_alert: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        self.answer_calls.append({"text": text, "show_alert": show_alert, **kwargs})

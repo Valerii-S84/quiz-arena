@@ -89,7 +89,7 @@ async def _emit_friend_challenge_expired_event(
 ) -> None:
     await emit_analytics_event(
         session,
-        event_type="friend_challenge_expired",
+        event_type="duel_expired",
         source=source,
         happened_at=happened_at,
         user_id=None,

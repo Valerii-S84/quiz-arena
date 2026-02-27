@@ -130,16 +130,17 @@ async def _apply_friend_challenge_answer(
         if challenge.status == DUEL_STATUS_COMPLETED and challenge.completed_at == now_utc:
             await emit_analytics_event(
                 session,
-                event_type="friend_challenge_completed",
+                event_type="duel_completed",
                 source=EVENT_SOURCE_BOT,
                 happened_at=now_utc,
                 user_id=user_id,
                 payload={
                     "challenge_id": str(challenge.id),
-                    "creator_user_id": challenge.creator_user_id,
-                    "opponent_user_id": challenge.opponent_user_id,
+                    "winner": challenge.winner_user_id,
                     "creator_score": challenge.creator_score,
                     "opponent_score": challenge.opponent_score,
+                    "creator_user_id": challenge.creator_user_id,
+                    "opponent_user_id": challenge.opponent_user_id,
                     "winner_user_id": challenge.winner_user_id,
                     "total_rounds": challenge.total_rounds,
                     "expires_at": challenge.expires_at.isoformat(),

@@ -102,4 +102,4 @@ async def test_handle_friend_challenge_share_result_sends_share_url_and_emits_ev
     assert len(urls) == 1
     assert "https://t.me/share/url" in (urls[0] or "")
     assert "https%3A%2F%2Ft.me%2Fproofbot" in (urls[0] or "")
-    assert emitted == ["friend_challenge_proof_card_share_clicked"]
+    assert emitted == ["duel_share_clicked"]

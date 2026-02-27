@@ -5,13 +5,38 @@ from typing import Protocol, cast
 
 from aiogram.types import CallbackQuery
 
-from app.bot.keyboards.friend_challenge import build_friend_challenge_finished_keyboard
+from app.bot.keyboards.friend_challenge import (
+    build_friend_challenge_finished_keyboard,
+    build_friend_challenge_share_url,
+)
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 
 
 class _Answerable(Protocol):
     async def answer(self, *args, **kwargs) -> object: ...
+
+
+async def _build_result_share_url(*, callback: CallbackQuery, proof_card_text: str) -> str | None:
+    bot = callback.bot
+    if bot is None:
+        return None
+    try:
+        me = await bot.get_me()
+    except Exception:
+        return None
+    if not me.username:
+        return None
+    return build_friend_challenge_share_url(
+        base_link=f"https://t.me/{me.username}",
+        share_text="\n".join(
+            [
+                proof_card_text,
+                "",
+                TEXTS_DE["msg.friend.challenge.proof.share.cta"],
+            ]
+        ),
+    )
 
 
 async def handle_completed_friend_challenge(
@@ -94,8 +119,13 @@ async def handle_completed_friend_challenge(
         user_id=snapshot_user_id,
         opponent_label=opponent_label,
     )
+    my_share_url = await _build_result_share_url(
+        callback=callback,
+        proof_card_text=my_proof_card_text,
+    )
     finish_keyboard = build_friend_challenge_finished_keyboard(
         challenge_id=str(challenge.challenge_id),
+        share_url=my_share_url,
         show_next_series_game=show_next_series_game,
     )
     my_message_lines = [my_finish_text]
@@ -144,8 +174,13 @@ async def handle_completed_friend_challenge(
             user_id=opponent_user_id,
             opponent_label=opponent_label_for_opponent,
         )
+        opponent_share_url = await _build_result_share_url(
+            callback=callback,
+            proof_card_text=opponent_proof_card_text,
+        )
         opponent_finish_keyboard = build_friend_challenge_finished_keyboard(
             challenge_id=str(challenge.challenge_id),
+            share_url=opponent_share_url,
             show_next_series_game=show_next_series_game,
         )
         opponent_message_lines = [

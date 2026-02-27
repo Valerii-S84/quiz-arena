@@ -106,7 +106,7 @@ async def run_friend_challenge_deadlines_async(
             )
             await emit_analytics_event(
                 session,
-                event_type="friend_challenge_expired",
+                event_type="duel_expired",
                 source=EVENT_SOURCE_WORKER,
                 happened_at=now_utc,
                 user_id=None,

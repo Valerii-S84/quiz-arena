@@ -232,7 +232,7 @@ async def create_friend_challenge_rematch(
     )
     await emit_analytics_event(
         session,
-        event_type="friend_challenge_rematch_created",
+        event_type="duel_revanche_created",
         source=EVENT_SOURCE_BOT,
         happened_at=now_utc,
         user_id=initiator_user_id,
@@ -240,6 +240,7 @@ async def create_friend_challenge_rematch(
             "challenge_id": str(rematch.id),
             "source_challenge_id": str(challenge_id),
             "opponent_user_id": opponent_user_id,
+            "format": rematch.total_rounds,
             "total_rounds": rematch.total_rounds,
             "expires_at": rematch.expires_at.isoformat(),
             "series_id": (str(rematch.series_id) if rematch.series_id is not None else None),
