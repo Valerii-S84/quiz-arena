@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
+from app.core.analytics_events import EVENT_SOURCE_BOT
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.game.friend_challenges.constants import (
     DUEL_STATUS_ACCEPTED,
@@ -20,6 +20,10 @@ from app.game.sessions.errors import (
 from app.game.sessions.types import FriendChallengeSnapshot
 
 from .constants import DUEL_MAX_ACTIVE_PER_USER, DUEL_MAX_NEW_PER_DAY, FRIEND_CHALLENGE_TOTAL_ROUNDS
+from .friend_challenges_analytics import (
+    emit_rematch_duel_created_events,
+    emit_standard_duel_created_events,
+)
 from .friend_challenges_internal import (
     _build_friend_challenge_snapshot,
     _create_friend_challenge_row,
@@ -96,35 +100,12 @@ async def create_friend_challenge(
         now_utc=now_utc,
         question_ids=question_ids,
     )
-    await emit_analytics_event(
+    await emit_standard_duel_created_events(
         session,
-        event_type="friend_challenge_created",
-        source=EVENT_SOURCE_BOT,
+        challenge=challenge,
         happened_at=now_utc,
-        user_id=creator_user_id,
-        payload={
-            "challenge_id": str(challenge.id),
-            "mode_code": challenge.mode_code,
-            "challenge_type": challenge.challenge_type,
-            "access_type": challenge.access_type,
-            "total_rounds": challenge.total_rounds,
-            "entrypoint": "standard",
-            "expires_at": challenge.expires_at.isoformat(),
-            "series_id": None,
-            "series_game_number": challenge.series_game_number,
-            "series_best_of": challenge.series_best_of,
-        },
-    )
-    await emit_analytics_event(
-        session,
-        event_type="duel_created",
         source=EVENT_SOURCE_BOT,
-        happened_at=now_utc,
-        user_id=creator_user_id,
-        payload={
-            "type": challenge.challenge_type,
-            "format": challenge.total_rounds,
-        },
+        creator_user_id=creator_user_id,
     )
     return _build_friend_challenge_snapshot(challenge)
 
@@ -210,42 +191,13 @@ async def create_friend_challenge_rematch(
         series_best_of=series_best_of,
         status=DUEL_STATUS_ACCEPTED,
     )
-    await emit_analytics_event(
+    await emit_rematch_duel_created_events(
         session,
-        event_type="friend_challenge_created",
-        source=EVENT_SOURCE_BOT,
+        rematch=rematch,
+        source_challenge_id=challenge_id,
+        opponent_user_id=opponent_user_id,
         happened_at=now_utc,
-        user_id=initiator_user_id,
-        payload={
-            "challenge_id": str(rematch.id),
-            "mode_code": rematch.mode_code,
-            "challenge_type": rematch.challenge_type,
-            "access_type": rematch.access_type,
-            "total_rounds": rematch.total_rounds,
-            "entrypoint": "rematch",
-            "source_challenge_id": str(challenge_id),
-            "expires_at": rematch.expires_at.isoformat(),
-            "series_id": (str(rematch.series_id) if rematch.series_id is not None else None),
-            "series_game_number": rematch.series_game_number,
-            "series_best_of": rematch.series_best_of,
-        },
-    )
-    await emit_analytics_event(
-        session,
-        event_type="duel_revanche_created",
         source=EVENT_SOURCE_BOT,
-        happened_at=now_utc,
-        user_id=initiator_user_id,
-        payload={
-            "challenge_id": str(rematch.id),
-            "source_challenge_id": str(challenge_id),
-            "opponent_user_id": opponent_user_id,
-            "format": rematch.total_rounds,
-            "total_rounds": rematch.total_rounds,
-            "expires_at": rematch.expires_at.isoformat(),
-            "series_id": (str(rematch.series_id) if rematch.series_id is not None else None),
-            "series_game_number": rematch.series_game_number,
-            "series_best_of": rematch.series_best_of,
-        },
+        initiator_user_id=initiator_user_id,
     )
     return _build_friend_challenge_snapshot(rematch)

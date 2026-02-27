@@ -4,11 +4,10 @@ from datetime import datetime
 
 from aiogram.types import CallbackQuery
 
-from app.db.repo.friend_challenges_repo import FriendChallengesRepo
-from app.game.sessions.service.constants import DUEL_MAX_PUSH_PER_USER
 from app.bot.handlers.gameplay_flows.friend_answer_completion_flow import (
     handle_completed_friend_challenge,
 )
+from app.bot.handlers.gameplay_flows.friend_challenge_push_quota import reserve_duel_push_slot
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
     build_friend_challenge_finished_keyboard,
@@ -24,35 +23,6 @@ from app.game.sessions.errors import (
     FriendChallengeNotFoundError,
 )
 from app.game.sessions.types import AnswerSessionResult
-
-
-async def _reserve_duel_push_slot(
-    *,
-    session_local,
-    challenge_id,
-    target_user_id: int,
-    now_utc: datetime,
-) -> bool:
-    async with session_local.begin() as session:
-        challenge_row = await FriendChallengesRepo.get_by_id_for_update(
-            session,
-            challenge_id,
-        )
-        if challenge_row is None:
-            return False
-        if challenge_row.creator_user_id == target_user_id:
-            if challenge_row.creator_push_count >= DUEL_MAX_PUSH_PER_USER:
-                return False
-            challenge_row.creator_push_count += 1
-            challenge_row.updated_at = now_utc
-            return True
-        if challenge_row.opponent_user_id == target_user_id:
-            if challenge_row.opponent_push_count >= DUEL_MAX_PUSH_PER_USER:
-                return False
-            challenge_row.opponent_push_count += 1
-            challenge_row.updated_at = now_utc
-            return True
-        return False
 
 
 async def handle_friend_answer_branch(
@@ -122,7 +92,7 @@ async def handle_friend_answer_branch(
         and opponent_user_id is not None
         and challenge.status in {"CREATOR_DONE", "OPPONENT_DONE"}
     ):
-        push_reserved = await _reserve_duel_push_slot(
+        push_reserved = await reserve_duel_push_slot(
             session_local=session_local,
             challenge_id=challenge.challenge_id,
             target_user_id=opponent_user_id,

@@ -5,7 +5,6 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.analytics_events import emit_analytics_event
 from app.db.models.friend_challenges import FriendChallenge
 from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
@@ -25,6 +24,9 @@ from app.game.friend_challenges.constants import (
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengePaymentRequiredError
 from app.game.sessions.types import FriendChallengeSnapshot
 
+from .friend_challenges_analytics import (
+    _emit_friend_challenge_expired_event as _emit_friend_challenge_expired_event_analytics,
+)
 from .constants import (
     DUEL_ACCEPTED_TTL_SECONDS,
     DUEL_PENDING_TTL_SECONDS,
@@ -87,21 +89,11 @@ async def _emit_friend_challenge_expired_event(
     happened_at: datetime,
     source: str,
 ) -> None:
-    await emit_analytics_event(
+    await _emit_friend_challenge_expired_event_analytics(
         session,
-        event_type="duel_expired",
-        source=source,
+        challenge=challenge,
         happened_at=happened_at,
-        user_id=None,
-        payload={
-            "challenge_id": str(challenge.id),
-            "creator_user_id": challenge.creator_user_id,
-            "opponent_user_id": challenge.opponent_user_id,
-            "creator_score": challenge.creator_score,
-            "opponent_score": challenge.opponent_score,
-            "total_rounds": challenge.total_rounds,
-            "expires_at": challenge.expires_at.isoformat(),
-        },
+        source=source,
     )
 
 
