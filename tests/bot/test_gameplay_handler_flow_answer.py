@@ -341,6 +341,7 @@ async def test_handle_answer_friend_challenge_completion_sends_proof_card_with_s
             friend_challenge=FriendChallengeSnapshot(
                 challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
                 invite_token="token",
+                challenge_type="DIRECT",
                 mode_code="QUICK_MIX_A1A2",
                 access_type="FREE",
                 status="COMPLETED",
@@ -365,10 +366,16 @@ async def test_handle_answer_friend_challenge_completion_sends_proof_card_with_s
         del callback, opponent_user_id, text, reply_markup
         return
 
+    queued_challenges: list[str] = []
+
+    def _fake_enqueue(*, challenge_id: str) -> None:
+        queued_challenges.append(challenge_id)
+
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(gameplay.GameSessionService, "submit_answer", _fake_submit_answer)
     monkeypatch.setattr(gameplay, "_resolve_opponent_label", _fake_resolve_label)
     monkeypatch.setattr(gameplay, "_notify_opponent", _fake_notify)
+    monkeypatch.setattr(gameplay.gameplay_proof_cards, "enqueue_duel_proof_cards", _fake_enqueue)
 
     callback = DummyCallback(
         data="answer:123e4567-e89b-12d3-a456-426614174000:0",
@@ -391,3 +398,4 @@ async def test_handle_answer_friend_challenge_completion_sends_proof_card_with_s
         if button.callback_data
     ]
     assert "friend:share:result:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
+    assert queued_challenges == ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]

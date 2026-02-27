@@ -1,11 +1,28 @@
-from app.game.friend_challenges.service_facade import FriendChallengeServiceFacade
-from app.game.friend_challenges.ui_contract import (
-    FRIEND_CHALLENGE_LEVEL_SEQUENCE,
-    FriendSeriesScore,
+from app.game.friend_challenges.constants import (
+    DUEL_STATUS_ACCEPTED,
+    DUEL_STATUS_CANCELED,
+    DUEL_STATUS_COMPLETED,
+    DUEL_STATUS_CREATOR_DONE,
+    DUEL_STATUS_EXPIRED,
+    DUEL_STATUS_OPPONENT_DONE,
+    DUEL_STATUS_PENDING,
+    DUEL_STATUS_WALKOVER,
+    DUEL_TYPE_DIRECT,
+    DUEL_TYPE_OPEN,
 )
+from app.game.friend_challenges.ui_contract import FRIEND_CHALLENGE_LEVEL_SEQUENCE, FriendSeriesScore
 
 __all__ = [
+    "DUEL_STATUS_ACCEPTED",
+    "DUEL_STATUS_CANCELED",
+    "DUEL_STATUS_COMPLETED",
+    "DUEL_STATUS_CREATOR_DONE",
+    "DUEL_STATUS_EXPIRED",
+    "DUEL_STATUS_OPPONENT_DONE",
+    "DUEL_STATUS_PENDING",
+    "DUEL_STATUS_WALKOVER",
+    "DUEL_TYPE_DIRECT",
+    "DUEL_TYPE_OPEN",
     "FRIEND_CHALLENGE_LEVEL_SEQUENCE",
-    "FriendChallengeServiceFacade",
     "FriendSeriesScore",
 ]

@@ -10,7 +10,13 @@ from app.bot.handlers import start
 from app.bot.texts.de import TEXTS_DE
 from app.economy.offers.types import OfferSelection
 from app.game.sessions.errors import FriendChallengeExpiredError, FriendChallengeNotFoundError
-from app.game.sessions.types import SessionQuestionView, StartSessionResult
+from app.game.sessions.types import (
+    FriendChallengeJoinResult,
+    FriendChallengeRoundStartResult,
+    FriendChallengeSnapshot,
+    SessionQuestionView,
+    StartSessionResult,
+)
 from tests.bot.helpers import DummyMessage, DummySessionLocal
 
 
@@ -55,6 +61,13 @@ def test_extract_friend_challenge_token() -> None:
     assert start._extract_friend_challenge_token(token) == "0123456789abcdef0123456789abcdef"
     assert start._extract_friend_challenge_token("fc_invalid") is None
     assert start._extract_friend_challenge_token(None) is None
+
+
+def test_extract_duel_challenge_id() -> None:
+    duel_payload = "duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    assert start._extract_duel_challenge_id(duel_payload) == "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    assert start._extract_duel_challenge_id("duel_bad") is None
+    assert start._extract_duel_challenge_id(None) is None
 
 
 def test_build_question_text_contains_theme_counter_and_energy() -> None:
@@ -145,6 +158,90 @@ async def test_handle_start_friend_token_expired(monkeypatch) -> None:
     await start.handle_start(message)
 
     assert message.answers[0].text == TEXTS_DE["msg.friend.challenge.expired"]
+
+
+@pytest.mark.asyncio
+async def test_handle_start_duel_payload_joins_and_shows_challenge_immediately(monkeypatch) -> None:
+    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
+        assert start_payload == "duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        return SimpleNamespace(user_id=9, free_energy=20, paid_energy=1, current_streak=1)
+
+    async def _fake_join_by_id(*args, **kwargs):
+        return FriendChallengeJoinResult(
+            snapshot=FriendChallengeSnapshot(
+                challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                invite_token="token",
+                challenge_type="DIRECT",
+                mode_code="QUICK_MIX_A1A2",
+                access_type="FREE",
+                status="ACCEPTED",
+                creator_user_id=1,
+                opponent_user_id=9,
+                current_round=1,
+                total_rounds=5,
+                creator_score=0,
+                opponent_score=0,
+                winner_user_id=None,
+            ),
+            joined_now=True,
+        )
+
+    async def _fake_start_round(*args, **kwargs):
+        return FriendChallengeRoundStartResult(
+            snapshot=FriendChallengeSnapshot(
+                challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                invite_token="token",
+                challenge_type="DIRECT",
+                mode_code="QUICK_MIX_A1A2",
+                access_type="FREE",
+                status="ACCEPTED",
+                creator_user_id=1,
+                opponent_user_id=9,
+                current_round=1,
+                total_rounds=5,
+                creator_score=0,
+                opponent_score=0,
+                winner_user_id=None,
+            ),
+            start_result=StartSessionResult(
+                session=SessionQuestionView(
+                    session_id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                    question_id="q-1",
+                    text="Frage?",
+                    options=("A", "B", "C", "D"),
+                    mode_code="QUICK_MIX_A1A2",
+                    source="FRIEND_CHALLENGE",
+                    category="Test",
+                    question_number=1,
+                    total_questions=5,
+                ),
+                energy_free=20,
+                energy_paid=1,
+                idempotent_replay=False,
+            ),
+            waiting_for_opponent=False,
+            already_answered_current_round=False,
+        )
+
+    async def _fake_notify_creator(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(start.GameSessionService, "join_friend_challenge_by_id", _fake_join_by_id)
+    monkeypatch.setattr(start.GameSessionService, "start_friend_challenge_round", _fake_start_round)
+    monkeypatch.setattr(start.start_flow, "_notify_creator_about_join", _fake_notify_creator)
+
+    message = _StartMessage(
+        text="/start duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        from_user=SimpleNamespace(id=1, username="alice", first_name="Alice", language_code="de"),
+    )
+    await start.handle_start(message)
+
+    assert len(message.answers) == 2
+    assert TEXTS_DE["msg.friend.challenge.joined"] in (message.answers[0].text or "")
+    assert message.answers[1].kwargs.get("parse_mode") == "HTML"
 
 
 @pytest.mark.asyncio

@@ -44,3 +44,7 @@ class FriendChallengeExpiredError(GameSessionError):
 
 class FriendChallengePaymentRequiredError(GameSessionError):
     pass
+
+
+class FriendChallengeLimitExceededError(GameSessionError):
+    pass

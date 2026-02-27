@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from aiogram.types import CallbackQuery
 
+from app.bot.handlers.gameplay_flows.energy_zero_flow import handle_energy_insufficient
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.keyboards.offers import build_offer_keyboard
 from app.bot.keyboards.quiz import build_quiz_keyboard
@@ -32,21 +33,18 @@ async def start_mode(
     game_session_service,
     offer_service,
     offer_logging_error,
+    channel_bonus_service,
     trg_locked_mode_click: str,
     build_question_text,
 ) -> None:
     if callback.from_user is None or callback.message is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
-
     now_utc = datetime.now(timezone.utc)
-
     async with session_local.begin() as session:
         snapshot = await user_onboarding_service.ensure_home_snapshot(
-            session,
-            telegram_user=callback.from_user,
+            session, telegram_user=callback.from_user
         )
-
         try:
             result = await game_session_service.start_session(
                 session,
@@ -83,28 +81,16 @@ async def start_mode(
             await callback.answer()
             return
         except EnergyInsufficientError:
-            offer_selection = None
-            try:
-                offer_selection = await offer_service.evaluate_and_log_offer(
-                    session,
-                    user_id=snapshot.user_id,
-                    idempotency_key=f"offer:energy:{callback.id}",
-                    now_utc=now_utc,
-                )
-            except offer_logging_error:
-                offer_selection = None
-
-            text = (
-                TEXTS_DE[offer_selection.text_key]
-                if offer_selection is not None
-                else TEXTS_DE["msg.energy.empty.body"]
+            await handle_energy_insufficient(
+                callback,
+                session=session,
+                user_id=snapshot.user_id,
+                now_utc=now_utc,
+                offer_service=offer_service,
+                offer_logging_error=offer_logging_error,
+                offer_idempotency_key=f"offer:energy:{callback.id}",
+                channel_bonus_service=channel_bonus_service,
             )
-            keyboard = (
-                build_offer_keyboard(offer_selection)
-                if offer_selection is not None
-                else build_home_keyboard()
-            )
-            await callback.message.answer(text, reply_markup=keyboard)
             await callback.answer()
             return
         except DailyChallengeAlreadyPlayedError:
@@ -113,7 +99,6 @@ async def start_mode(
             )
             await callback.answer()
             return
-
     question_text = build_question_text(
         source=source,
         snapshot_free_energy=snapshot.free_energy,
@@ -142,7 +127,6 @@ async def send_friend_round_question(
 ) -> None:
     if callback.message is None or round_start.start_result is None:
         return
-
     question_text = build_question_text(
         source="FRIEND_CHALLENGE",
         snapshot_free_energy=snapshot_free_energy,
@@ -169,18 +153,16 @@ async def continue_regular_mode_after_answer(
     game_session_service,
     offer_service,
     offer_logging_error,
+    channel_bonus_service,
     build_question_text,
 ) -> None:
     if callback.from_user is None or callback.message is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
-
     async with session_local.begin() as session:
         snapshot = await user_onboarding_service.ensure_home_snapshot(
-            session,
-            telegram_user=callback.from_user,
+            session, telegram_user=callback.from_user
         )
-
         try:
             next_result = await game_session_service.start_session(
                 session,
@@ -198,31 +180,18 @@ async def continue_regular_mode_after_answer(
             await callback.answer()
             return
         except EnergyInsufficientError:
-            offer_selection = None
-            try:
-                offer_selection = await offer_service.evaluate_and_log_offer(
-                    session,
-                    user_id=snapshot.user_id,
-                    idempotency_key=f"offer:energy:auto:{callback.id}",
-                    now_utc=now_utc,
-                )
-            except offer_logging_error:
-                offer_selection = None
-
-            text = (
-                TEXTS_DE[offer_selection.text_key]
-                if offer_selection is not None
-                else TEXTS_DE["msg.energy.empty.body"]
+            await handle_energy_insufficient(
+                callback,
+                session=session,
+                user_id=snapshot.user_id,
+                now_utc=now_utc,
+                offer_service=offer_service,
+                offer_logging_error=offer_logging_error,
+                offer_idempotency_key=f"offer:energy:auto:{callback.id}",
+                channel_bonus_service=channel_bonus_service,
             )
-            keyboard = (
-                build_offer_keyboard(offer_selection)
-                if offer_selection is not None
-                else build_home_keyboard()
-            )
-            await callback.message.answer(text, reply_markup=keyboard)
             await callback.answer()
             return
-
     question_text = build_question_text(
         source=result.source,
         snapshot_free_energy=snapshot.free_energy,

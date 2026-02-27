@@ -6,9 +6,11 @@ from typing import cast
 from aiogram.types import CallbackQuery, Message
 
 from app.bot.handlers.start_flow import _send_home_message
+from app.bot.keyboards.channel_bonus import build_channel_bonus_keyboard
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.keyboards.referral_prompt import build_referral_prompt_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.economy.energy.constants import FREE_ENERGY_CAP
 from app.game.sessions.errors import InvalidAnswerOptionError, SessionNotFoundError
 
 
@@ -19,6 +21,7 @@ async def handle_answer(
     session_local,
     user_onboarding_service,
     referral_service,
+    channel_bonus_service,
     game_session_service,
     offer_service,
     offer_logging_error,
@@ -36,6 +39,7 @@ async def handle_answer(
     build_friend_finish_text,
     build_public_badge_label,
     build_friend_proof_card_text,
+    enqueue_friend_challenge_proof_cards,
     build_series_progress_text,
     send_friend_round_question,
 ) -> None:
@@ -51,6 +55,7 @@ async def handle_answer(
 
     session_id, selected_option = parsed_answer
     now_utc = datetime.now(timezone.utc)
+    show_channel_bonus_prompt = False
     show_referral_prompt = False
 
     async with session_local.begin() as session:
@@ -81,20 +86,35 @@ async def handle_answer(
             return
 
         if result.source in {"MENU", "DAILY_CHALLENGE"}:
-            show_referral_prompt = await referral_service.reserve_post_game_prompt(
+            show_channel_bonus_prompt = await channel_bonus_service.should_show_post_game_prompt(
                 session,
                 user_id=snapshot.user_id,
-                now_utc=now_utc,
+                idempotent_replay=result.idempotent_replay,
             )
-            if show_referral_prompt:
+            if show_channel_bonus_prompt:
                 await emit_analytics_event(
                     session,
-                    event_type="referral_prompt_shown",
+                    event_type="channel_bonus_shown",
                     source=event_source_bot,
                     happened_at=now_utc,
                     user_id=snapshot.user_id,
-                    payload={"entrypoint": "post_game"},
+                    payload={"source": "post_game"},
                 )
+            else:
+                show_referral_prompt = await referral_service.reserve_post_game_prompt(
+                    session,
+                    user_id=snapshot.user_id,
+                    now_utc=now_utc,
+                )
+                if show_referral_prompt:
+                    await emit_analytics_event(
+                        session,
+                        event_type="referral_prompt_shown",
+                        source=event_source_bot,
+                        happened_at=now_utc,
+                        user_id=snapshot.user_id,
+                        payload={"entrypoint": "post_game"},
+                    )
 
     answer_key = "msg.game.answer.correct" if result.is_correct else "msg.game.answer.incorrect"
     if result.source == "DAILY_CHALLENGE":
@@ -107,7 +127,14 @@ async def handle_answer(
             game_session_service=game_session_service,
             build_question_text=build_question_text,
         )
-        if show_referral_prompt:
+        if show_channel_bonus_prompt:
+            await callback.message.answer(
+                TEXTS_DE["msg.channel.bonus.offer"].format(max_energy=FREE_ENERGY_CAP),
+                reply_markup=build_channel_bonus_keyboard(
+                    channel_url=channel_bonus_service.resolve_channel_url()
+                ),
+            )
+        elif show_referral_prompt:
             await callback.message.answer(
                 TEXTS_DE["msg.referral.prompt.after_game"],
                 reply_markup=build_referral_prompt_keyboard(),
@@ -152,6 +179,7 @@ async def handle_answer(
             build_friend_finish_text=build_friend_finish_text,
             build_public_badge_label=build_public_badge_label,
             build_friend_proof_card_text=build_friend_proof_card_text,
+            enqueue_friend_challenge_proof_cards=enqueue_friend_challenge_proof_cards,
             build_series_progress_text=build_series_progress_text,
             send_friend_round_question=send_friend_round_question,
         )
@@ -166,9 +194,17 @@ async def handle_answer(
         game_session_service=game_session_service,
         offer_service=offer_service,
         offer_logging_error=offer_logging_error,
+        channel_bonus_service=channel_bonus_service,
         build_question_text=build_question_text,
     )
-    if show_referral_prompt:
+    if show_channel_bonus_prompt:
+        await callback.message.answer(
+            TEXTS_DE["msg.channel.bonus.offer"].format(max_energy=FREE_ENERGY_CAP),
+            reply_markup=build_channel_bonus_keyboard(
+                channel_url=channel_bonus_service.resolve_channel_url()
+            ),
+        )
+    elif show_referral_prompt:
         await callback.message.answer(
             TEXTS_DE["msg.referral.prompt.after_game"],
             reply_markup=build_referral_prompt_keyboard(),

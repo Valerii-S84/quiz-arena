@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     telegram_bot_token: str = Field(alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_secret: str = Field(alias="TELEGRAM_WEBHOOK_SECRET")
     telegram_home_header_file_id: str = Field(default="", alias="TELEGRAM_HOME_HEADER_FILE_ID")
+    # Telegram channel target for one-time Kanal-Bonus check (supports @username or chat id).
+    bonus_channel_id: str = Field(default="", alias="BONUS_CHANNEL_ID")
+    # Optional dedicated bot token for get_chat_member subscription checks.
+    bonus_check_bot_token: str = Field(default="", alias="BONUS_CHECK_BOT_TOKEN")
     telegram_webhook_enqueue_timeout_ms: int = Field(
         default=250,
         alias="TELEGRAM_WEBHOOK_ENQUEUE_TIMEOUT_MS",
@@ -55,6 +59,42 @@ class Settings(BaseSettings):
     friend_challenge_deadline_scan_interval_seconds: int = Field(
         default=300,
         alias="FRIEND_CHALLENGE_DEADLINE_SCAN_INTERVAL_SECONDS",
+    )
+    duel_pending_ttl_hours: int = Field(
+        default=6,
+        alias="DUEL_PENDING_TTL_HOURS",
+    )
+    duel_accepted_ttl_hours: int = Field(
+        default=48,
+        alias="DUEL_ACCEPTED_TTL_HOURS",
+    )
+    duel_max_active_per_user: int = Field(
+        default=10,
+        alias="DUEL_MAX_ACTIVE_PER_USER",
+    )
+    duel_max_new_per_day: int = Field(
+        default=20,
+        alias="DUEL_MAX_NEW_PER_DAY",
+    )
+    duel_max_push_per_user: int = Field(
+        default=2,
+        alias="DUEL_MAX_PUSH_PER_USER",
+    )
+    daily_cup_registration_open: str = Field(
+        default="12:00",
+        alias="DAILY_CUP_REGISTRATION_OPEN",
+    )
+    daily_cup_registration_close: str = Field(
+        default="14:00",
+        alias="DAILY_CUP_REGISTRATION_CLOSE",
+    )
+    daily_cup_round_duration_minutes: int = Field(
+        default=120,
+        alias="DAILY_CUP_ROUND_DURATION_MINUTES",
+    )
+    daily_cup_min_participants: int = Field(
+        default=4,
+        alias="DAILY_CUP_MIN_PARTICIPANTS",
     )
     daily_challenge_precompute_hour_berlin: int = Field(
         default=0,

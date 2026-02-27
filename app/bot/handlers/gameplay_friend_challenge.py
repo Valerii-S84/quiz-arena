@@ -6,6 +6,8 @@ from aiogram.types import CallbackQuery
 from app.bot.handlers import gameplay_callbacks
 from app.bot.handlers.gameplay_flows import (
     friend_challenge_flow,
+    friend_lobby_flow,
+    friend_lobby_manage_flow,
     friend_next_flow,
     friend_series_flow,
     proof_card_flow,
@@ -22,9 +24,20 @@ def _gameplay():
 
 def register(router: Router) -> None:
     router.callback_query(F.data == "friend:challenge:create")(handle_friend_challenge_create)
-    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_CREATE_RE))(
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_CREATE_TYPE_RE))(
+        handle_friend_challenge_type_selected
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_CREATE_FORMAT_RE))(
         handle_friend_challenge_create_selected
     )
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_COPY_LINK_RE))(
+        handle_friend_challenge_copy_link
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_OPEN_REPOST_RE))(
+        handle_friend_open_repost
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_DELETE_RE))(handle_friend_delete)
+    router.callback_query(F.data == "friend:my:duels")(handle_friend_my_duels)
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_REMATCH_RE))(
         handle_friend_challenge_rematch
     )
@@ -53,17 +66,75 @@ async def handle_friend_challenge_create(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
+async def handle_friend_challenge_type_selected(callback: CallbackQuery) -> None:
+    await friend_lobby_flow.handle_friend_challenge_type_selected(
+        callback,
+        friend_create_type_re=gameplay_callbacks.FRIEND_CREATE_TYPE_RE,
+    )
+
+
 async def handle_friend_challenge_create_selected(callback: CallbackQuery) -> None:
     gameplay = _gameplay()
-    await friend_challenge_flow.handle_friend_challenge_create_selected(
+    await friend_lobby_flow.handle_friend_challenge_create_selected(
         callback,
         session_local=gameplay.SessionLocal,
         user_onboarding_service=gameplay.UserOnboardingService,
         game_session_service=gameplay.GameSessionService,
-        parse_challenge_rounds=gameplay_callbacks.parse_challenge_rounds,
+        parse_friend_create_format=gameplay_callbacks.parse_friend_create_format,
         build_friend_invite_link=gameplay._build_friend_invite_link,
         build_friend_plan_text=gameplay._build_friend_plan_text,
         build_friend_ttl_text=gameplay._build_friend_ttl_text,
+    )
+
+
+async def handle_friend_challenge_copy_link(callback: CallbackQuery) -> None:
+    gameplay = _gameplay()
+    await friend_lobby_flow.handle_friend_copy_link(
+        callback,
+        friend_copy_link_re=gameplay_callbacks.FRIEND_COPY_LINK_RE,
+        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
+        session_local=gameplay.SessionLocal,
+        user_onboarding_service=gameplay.UserOnboardingService,
+        game_session_service=gameplay.GameSessionService,
+        build_friend_invite_link=gameplay._build_friend_invite_link,
+    )
+
+
+async def handle_friend_my_duels(callback: CallbackQuery) -> None:
+    gameplay = _gameplay()
+    await friend_lobby_flow.handle_friend_my_duels(
+        callback,
+        session_local=gameplay.SessionLocal,
+        user_onboarding_service=gameplay.UserOnboardingService,
+        game_session_service=gameplay.GameSessionService,
+        resolve_opponent_label=gameplay._resolve_opponent_label,
+    )
+
+
+async def handle_friend_open_repost(callback: CallbackQuery) -> None:
+    gameplay = _gameplay()
+    await friend_lobby_manage_flow.handle_friend_open_repost(
+        callback,
+        friend_open_repost_re=gameplay_callbacks.FRIEND_OPEN_REPOST_RE,
+        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
+        session_local=gameplay.SessionLocal,
+        user_onboarding_service=gameplay.UserOnboardingService,
+        game_session_service=gameplay.GameSessionService,
+        build_friend_invite_link=gameplay._build_friend_invite_link,
+        build_friend_plan_text=gameplay._build_friend_plan_text,
+        build_friend_ttl_text=gameplay._build_friend_ttl_text,
+    )
+
+
+async def handle_friend_delete(callback: CallbackQuery) -> None:
+    gameplay = _gameplay()
+    await friend_lobby_manage_flow.handle_friend_delete(
+        callback,
+        friend_delete_re=gameplay_callbacks.FRIEND_DELETE_RE,
+        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
+        session_local=gameplay.SessionLocal,
+        user_onboarding_service=gameplay.UserOnboardingService,
+        game_session_service=gameplay.GameSessionService,
     )
 
 

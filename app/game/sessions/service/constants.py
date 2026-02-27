@@ -5,7 +5,13 @@ from app.core.config import get_settings
 FRIEND_CHALLENGE_TOTAL_ROUNDS = 12
 FRIEND_CHALLENGE_FREE_CREATES = 2
 FRIEND_CHALLENGE_TICKET_PRODUCT_CODE = "FRIEND_CHALLENGE_5"
-FRIEND_CHALLENGE_TTL_SECONDS = max(60, int(get_settings().friend_challenge_ttl_seconds))
+DUEL_PENDING_TTL_SECONDS = max(60, int(get_settings().duel_pending_ttl_hours) * 3600)
+DUEL_ACCEPTED_TTL_SECONDS = max(60, int(get_settings().duel_accepted_ttl_hours) * 3600)
+DUEL_MAX_ACTIVE_PER_USER = max(1, int(get_settings().duel_max_active_per_user))
+DUEL_MAX_NEW_PER_DAY = max(1, int(get_settings().duel_max_new_per_day))
+DUEL_MAX_PUSH_PER_USER = max(1, int(get_settings().duel_max_push_per_user))
+# Backward-compatible alias used in older modules/tests.
+FRIEND_CHALLENGE_TTL_SECONDS = DUEL_ACCEPTED_TTL_SECONDS
 DAILY_CHALLENGE_TOTAL_QUESTIONS = 7
 FRIEND_CHALLENGE_LEVEL_SEQUENCE: tuple[str, ...] = (
     "A1",

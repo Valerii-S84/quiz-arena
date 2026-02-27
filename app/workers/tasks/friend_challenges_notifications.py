@@ -6,11 +6,26 @@ from app.bot.application import build_bot
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_finished_keyboard,
     build_friend_challenge_next_keyboard,
+    build_friend_pending_expired_keyboard,
 )
 from app.workers.tasks.friend_challenges_utils import (
     format_remaining_hhmm,
     resolve_telegram_targets,
 )
+
+
+async def _send_message(*, bot, chat_id: int | None, text: str, reply_markup=None) -> bool:
+    if chat_id is None:
+        return False
+    try:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=reply_markup,
+        )
+        return True
+    except Exception:
+        return False
 
 
 async def send_deadline_notifications(
@@ -28,16 +43,13 @@ async def send_deadline_notifications(
 ]:
     user_ids: set[int] = set()
     for item in reminder_items:
-        creator_user_id = item["creator_user_id"]
-        assert isinstance(creator_user_id, int)
-        user_ids.add(creator_user_id)
-        opponent_user_id = item["opponent_user_id"]
-        if isinstance(opponent_user_id, int):
-            user_ids.add(opponent_user_id)
+        target_user_id = item["target_user_id"]
+        if isinstance(target_user_id, int):
+            user_ids.add(target_user_id)
     for item in expired_items:
         creator_user_id = item["creator_user_id"]
-        assert isinstance(creator_user_id, int)
-        user_ids.add(creator_user_id)
+        if isinstance(creator_user_id, int):
+            user_ids.add(creator_user_id)
         opponent_user_id = item["opponent_user_id"]
         if isinstance(opponent_user_id, int):
             user_ids.add(opponent_user_id)
@@ -54,46 +66,26 @@ async def send_deadline_notifications(
     try:
         for item in reminder_items:
             expires_at = item["expires_at"]
-            if not isinstance(expires_at, datetime):
+            target_user_id = item["target_user_id"]
+            if not isinstance(expires_at, datetime) or not isinstance(target_user_id, int):
                 continue
             hours, minutes = format_remaining_hhmm(now_utc=now_utc, expires_at=expires_at)
-            text = (
-                f"⏳ Dein Duell läuft bald ab ({hours:02d}:{minutes:02d}h). " "Jetzt weiterspielen!"
+            sent = await _send_message(
+                bot=bot,
+                chat_id=telegram_targets.get(target_user_id),
+                text=f"⏳ Gegner hat gespielt. Jetzt bist du dran! ({hours:02d}:{minutes:02d}h)",
+                reply_markup=build_friend_challenge_next_keyboard(
+                    challenge_id=str(item["challenge_id"])
+                ),
             )
-            challenge_id = str(item["challenge_id"])
-            creator_user_id = item["creator_user_id"]
-            assert isinstance(creator_user_id, int)
-            target_user_ids = [creator_user_id]
-            opponent_user_id = item["opponent_user_id"]
-            if isinstance(opponent_user_id, int):
-                target_user_ids.append(opponent_user_id)
-
-            sent_to = 0
-            failed_to = 0
-            for target_user_id in target_user_ids:
-                telegram_user_id = telegram_targets.get(target_user_id)
-                if telegram_user_id is None:
-                    failed_to += 1
-                    continue
-                try:
-                    await bot.send_message(
-                        chat_id=telegram_user_id,
-                        text=text,
-                        reply_markup=build_friend_challenge_next_keyboard(
-                            challenge_id=challenge_id
-                        ),
-                    )
-                    sent_to += 1
-                except Exception:
-                    failed_to += 1
-
-            reminders_sent += sent_to
-            reminders_failed += failed_to
+            reminders_sent += int(sent)
+            reminders_failed += int(not sent)
             reminder_events.append(
                 {
-                    "challenge_id": challenge_id,
-                    "sent_to": sent_to,
-                    "failed_to": failed_to,
+                    "challenge_id": str(item["challenge_id"]),
+                    "target_user_id": target_user_id,
+                    "sent_to": int(sent),
+                    "failed_to": int(not sent),
                     "expires_at": expires_at.isoformat(),
                 }
             )
@@ -101,60 +93,86 @@ async def send_deadline_notifications(
         for item in expired_items:
             challenge_id = str(item["challenge_id"])
             creator_user_id = item["creator_user_id"]
-            assert isinstance(creator_user_id, int)
             opponent_user_id = item["opponent_user_id"]
-            creator_score = item["creator_score"]
-            opponent_score = item["opponent_score"]
-            assert isinstance(creator_score, int)
-            assert isinstance(opponent_score, int)
+            creator_score_raw = item["creator_score"]
+            opponent_score_raw = item["opponent_score"]
+            if not isinstance(creator_score_raw, int) or not isinstance(opponent_score_raw, int):
+                continue
+            creator_score = creator_score_raw
+            opponent_score = opponent_score_raw
+            status = str(item.get("status") or "")
+            previous_status = str(item.get("previous_status") or "")
 
             sent_to = 0
             failed_to = 0
+            creator_chat = telegram_targets.get(creator_user_id) if isinstance(creator_user_id, int) else None
+            opponent_chat = telegram_targets.get(opponent_user_id) if isinstance(opponent_user_id, int) else None
 
-            creator_telegram = telegram_targets.get(creator_user_id)
-            if creator_telegram is None:
-                failed_to += 1
+            if status == "EXPIRED" and previous_status == "PENDING":
+                sent = await _send_message(
+                    bot=bot,
+                    chat_id=creator_chat,
+                    text="⏳ Niemand hat angenommen.",
+                    reply_markup=build_friend_pending_expired_keyboard(challenge_id=challenge_id),
+                )
+                sent_to += int(sent)
+                failed_to += int(not sent)
+            elif status == "WALKOVER":
+                creator_sent = await _send_message(
+                    bot=bot,
+                    chat_id=creator_chat,
+                    text=(
+                        "⌛ Walkover. Duell beendet.\n"
+                        f"Finaler Score: Du {creator_score} | Gegner {opponent_score}."
+                    ),
+                    reply_markup=build_friend_challenge_finished_keyboard(challenge_id=challenge_id),
+                )
+                sent_to += int(creator_sent)
+                failed_to += int(not creator_sent)
+                if isinstance(opponent_user_id, int):
+                    opponent_sent = await _send_message(
+                        bot=bot,
+                        chat_id=opponent_chat,
+                        text=(
+                            "⌛ Walkover. Duell beendet.\n"
+                            f"Finaler Score: Du {opponent_score} | Gegner {creator_score}."
+                        ),
+                        reply_markup=build_friend_challenge_finished_keyboard(challenge_id=challenge_id),
+                    )
+                    sent_to += int(opponent_sent)
+                    failed_to += int(not opponent_sent)
             else:
-                try:
-                    await bot.send_message(
-                        chat_id=creator_telegram,
+                creator_sent = await _send_message(
+                    bot=bot,
+                    chat_id=creator_chat,
+                    text=(
+                        "⌛ Dein Duell ist wegen Zeitablauf beendet.\n"
+                        f"Finaler Score: Du {creator_score} | Gegner {opponent_score}."
+                    ),
+                    reply_markup=build_friend_challenge_finished_keyboard(challenge_id=challenge_id),
+                )
+                sent_to += int(creator_sent)
+                failed_to += int(not creator_sent)
+                if isinstance(opponent_user_id, int):
+                    opponent_sent = await _send_message(
+                        bot=bot,
+                        chat_id=opponent_chat,
                         text=(
                             "⌛ Dein Duell ist wegen Zeitablauf beendet.\n"
-                            f"Finaler Score: Du {creator_score} | Gegner {opponent_score}."
+                            f"Finaler Score: Du {opponent_score} | Gegner {creator_score}."
                         ),
-                        reply_markup=build_friend_challenge_finished_keyboard(
-                            challenge_id=challenge_id
-                        ),
+                        reply_markup=build_friend_challenge_finished_keyboard(challenge_id=challenge_id),
                     )
-                    sent_to += 1
-                except Exception:
-                    failed_to += 1
-
-            if isinstance(opponent_user_id, int):
-                opponent_telegram = telegram_targets.get(opponent_user_id)
-                if opponent_telegram is None:
-                    failed_to += 1
-                else:
-                    try:
-                        await bot.send_message(
-                            chat_id=opponent_telegram,
-                            text=(
-                                "⌛ Dein Duell ist wegen Zeitablauf beendet.\n"
-                                f"Finaler Score: Du {opponent_score} | Gegner {creator_score}."
-                            ),
-                            reply_markup=build_friend_challenge_finished_keyboard(
-                                challenge_id=challenge_id
-                            ),
-                        )
-                        sent_to += 1
-                    except Exception:
-                        failed_to += 1
+                    sent_to += int(opponent_sent)
+                    failed_to += int(not opponent_sent)
 
             expired_notices_sent += sent_to
             expired_notices_failed += failed_to
             expired_notice_events.append(
                 {
                     "challenge_id": challenge_id,
+                    "status": status,
+                    "previous_status": previous_status,
                     "sent_to": sent_to,
                     "failed_to": failed_to,
                     "creator_score": creator_score,

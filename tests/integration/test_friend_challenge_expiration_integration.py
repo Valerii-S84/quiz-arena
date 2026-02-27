@@ -22,7 +22,7 @@ async def test_friend_challenge_start_round_fails_when_expired() -> None:
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=3,
+            total_rounds=5,
         )
         row = await FriendChallengesRepo.get_by_id_for_update(session, challenge.challenge_id)
         assert row is not None
