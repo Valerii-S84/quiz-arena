@@ -44,7 +44,9 @@ async def test_handle_friend_open_repost_creates_new_open_duel_and_shows_share(
         return "https://t.me/testbot?start=duel_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(gameplay.GameSessionService, "repost_friend_challenge_as_open", _fake_repost)
+    monkeypatch.setattr(
+        gameplay.GameSessionService, "repost_friend_challenge_as_open", _fake_repost
+    )
     monkeypatch.setattr(gameplay, "_build_friend_invite_link", _fake_invite_link)
 
     callback = DummyCallback(
@@ -79,7 +81,9 @@ async def test_handle_friend_delete_marks_expired_challenge_deleted(monkeypatch)
         return None
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(gameplay.GameSessionService, "cancel_friend_challenge_by_creator", _fake_delete)
+    monkeypatch.setattr(
+        gameplay.GameSessionService, "cancel_friend_challenge_by_creator", _fake_delete
+    )
 
     callback = DummyCallback(
         data="friend:delete:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",

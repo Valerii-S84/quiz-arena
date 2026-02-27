@@ -52,11 +52,7 @@ def _build_caption(
         prefix = "⌛ DUELL ABGELAUFEN"
     else:
         prefix = "🏆 DUELL ERGEBNIS"
-    return (
-        f"{prefix}\n"
-        f"Score: Du {my_score} : Gegner {other_score}\n"
-        f"ID: {challenge_id}"
-    )
+    return f"{prefix}\n" f"Score: Du {my_score} : Gegner {other_score}\n" f"ID: {challenge_id}"
 
 
 async def run_friend_challenge_proof_cards_async(*, challenge_id: str) -> dict[str, int]:
@@ -89,9 +85,8 @@ async def run_friend_challenge_proof_cards_async(*, challenge_id: str) -> dict[s
         creator_name = _resolve_user_label(user=creator, fallback="Spieler 1")
         opponent_name = _resolve_user_label(user=opponent, fallback="Spieler 2")
 
-    must_render = (
-        (creator_chat is not None and not creator_file_id)
-        or (opponent_chat is not None and not opponent_file_id)
+    must_render = (creator_chat is not None and not creator_file_id) or (
+        opponent_chat is not None and not opponent_file_id
     )
     card_png = (
         render_duel_proof_card_png(
@@ -187,7 +182,10 @@ async def run_friend_challenge_proof_cards_async(*, challenge_id: str) -> dict[s
             if challenge_row is not None:
                 if new_creator_file_id is not None and not challenge_row.creator_proof_card_file_id:
                     challenge_row.creator_proof_card_file_id = new_creator_file_id
-                if new_opponent_file_id is not None and not challenge_row.opponent_proof_card_file_id:
+                if (
+                    new_opponent_file_id is not None
+                    and not challenge_row.opponent_proof_card_file_id
+                ):
                     challenge_row.opponent_proof_card_file_id = new_opponent_file_id
 
     return {"processed": 1, "sent": sent, "cached_reused": cached_reused}
@@ -207,6 +205,8 @@ def enqueue_friend_challenge_proof_cards(*, challenge_id: str) -> None:
         )
 
 
-@celery_app.task(name="app.workers.tasks.friend_challenges_proof_cards.run_friend_challenge_proof_cards")
+@celery_app.task(
+    name="app.workers.tasks.friend_challenges_proof_cards.run_friend_challenge_proof_cards"
+)
 def run_friend_challenge_proof_cards(*, challenge_id: str) -> dict[str, int]:
     return run_async_job(run_friend_challenge_proof_cards_async(challenge_id=challenge_id))

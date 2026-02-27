@@ -9,10 +9,7 @@ from app.core.analytics_events import EVENT_SOURCE_BOT
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.economy.streak.time import berlin_local_date
-from app.game.friend_challenges.constants import (
-    is_duel_playable_status,
-    normalize_duel_status,
-)
+from app.game.friend_challenges.constants import is_duel_playable_status, normalize_duel_status
 from app.game.sessions.errors import (
     FriendChallengeAccessError,
     FriendChallengeCompletedError,
@@ -103,7 +100,9 @@ async def start_friend_challenge_round(
     )
     selection_seed = f"friend:{challenge.id}:{next_round}:{challenge.mode_code}"
     preferred_level = _friend_challenge_level_for_round(round_number=next_round)
-    forced_question_id: str | None = shared_round_session.question_id if shared_round_session else None
+    forced_question_id: str | None = (
+        shared_round_session.question_id if shared_round_session else None
+    )
     if forced_question_id is None and challenge.question_ids:
         try:
             forced_question_id = str(challenge.question_ids[next_round - 1])

@@ -2,10 +2,34 @@ from __future__ import annotations
 
 from aiogram.types import Message
 
+from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.game.sessions.types import FriendChallengeSnapshot
 from app.services.user_onboarding import UserOnboardingService
+
+
+async def _send_home_message(
+    message: Message,
+    *,
+    text: str,
+    home_header_file_id: str | None = None,
+) -> None:
+    resolved_home_header_file_id = home_header_file_id
+    if resolved_home_header_file_id is None:
+        resolved_home_header_file_id = get_settings().telegram_home_header_file_id.strip()
+    if not resolved_home_header_file_id:
+        await message.answer(text, reply_markup=build_home_keyboard())
+        return
+    try:
+        await message.answer_photo(
+            photo=resolved_home_header_file_id,
+            caption=text,
+            reply_markup=build_home_keyboard(),
+        )
+    except Exception:
+        await message.answer(text, reply_markup=build_home_keyboard())
 
 
 def _format_user_label(

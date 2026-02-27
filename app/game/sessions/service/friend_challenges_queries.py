@@ -13,10 +13,10 @@ from app.game.sessions.types import FriendChallengeSnapshot
 
 from .friend_challenges_internal import (
     _build_friend_challenge_snapshot,
-    _count_series_wins,
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
 )
+from .friend_challenges_series_utils import _count_series_wins
 
 
 async def get_friend_challenge_snapshot_for_user(

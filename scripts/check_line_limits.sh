@@ -66,8 +66,20 @@ sys.exit(1)
 PY
 }
 
+has_commit_message_size_exception_marker() {
+  local marker="[APPROVED_SIZE_EXCEPTION]"
+  git log -1 --pretty=%B | grep -Fq "$marker"
+}
+
+is_ci() {
+  if [[ -n "${CI:-}" ]] || [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+    return 0
+  fi
+  return 1
+}
+
 is_ci_pr() {
-  if [[ -z "${CI:-}" ]] && [[ -z "${GITHUB_ACTIONS:-}" ]]; then
+  if ! is_ci; then
     return 1
   fi
   if [[ "${GITHUB_EVENT_NAME:-}" == pull_request* ]]; then
@@ -106,8 +118,12 @@ while IFS= read -r file; do
 done < <(list_changed_files | sort -u)
 
 size_exception_allowed=0
-if is_ci_pr && has_size_exception_marker; then
-  size_exception_allowed=1
+if is_ci; then
+  if has_commit_message_size_exception_marker; then
+    size_exception_allowed=1
+  elif is_ci_pr && has_size_exception_marker; then
+    size_exception_allowed=1
+  fi
 fi
 
 for file in "${changed_files[@]}"; do
