@@ -15,7 +15,11 @@ def build_tournament_format_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="⚡ 5 Fragen", callback_data="friend:tournament:format:5")],
-            [InlineKeyboardButton(text="🧠 12 Fragen", callback_data="friend:tournament:format:12")],
+            [
+                InlineKeyboardButton(
+                    text="🧠 12 Fragen", callback_data="friend:tournament:format:12"
+                )
+            ],
             [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="friend:challenge:create")],
         ]
     )
@@ -54,7 +58,11 @@ def build_tournament_created_keyboard(
             ]
         )
     rows.append(
-        [InlineKeyboardButton(text="🔄 Aktualisieren", callback_data=f"friend:tournament:view:{tournament_id}")]
+        [
+            InlineKeyboardButton(
+                text="🔄 Aktualisieren", callback_data=f"friend:tournament:view:{tournament_id}"
+            )
+        ]
     )
     rows.append([InlineKeyboardButton(text="🏠 Menü", callback_data="home:open")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -107,7 +115,11 @@ def build_tournament_lobby_keyboard(
             ]
         )
     rows.append(
-        [InlineKeyboardButton(text="🔄 Aktualisieren", callback_data=f"friend:tournament:view:{tournament_id}")]
+        [
+            InlineKeyboardButton(
+                text="🔄 Aktualisieren", callback_data=f"friend:tournament:view:{tournament_id}"
+            )
+        ]
     )
     rows.append([InlineKeyboardButton(text="🏠 Menü", callback_data="home:open")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

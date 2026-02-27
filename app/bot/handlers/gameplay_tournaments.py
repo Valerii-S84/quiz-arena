@@ -42,7 +42,9 @@ def register(router: Router) -> None:
     router.callback_query(F.data.regexp(gameplay_callbacks.TOURNAMENT_START_RE))(
         handle_tournament_start
     )
-    router.callback_query(F.data.regexp(gameplay_callbacks.TOURNAMENT_VIEW_RE))(handle_tournament_view)
+    router.callback_query(F.data.regexp(gameplay_callbacks.TOURNAMENT_VIEW_RE))(
+        handle_tournament_view
+    )
     router.callback_query(F.data.regexp(gameplay_callbacks.TOURNAMENT_SHARE_RE))(
         handle_tournament_share
     )

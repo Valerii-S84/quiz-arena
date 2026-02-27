@@ -85,11 +85,7 @@ async def render_tournament_lobby(
     participant_labels = [
         (item.user_id, labels.get(item.user_id, "Spieler")) for item in lobby.participants
     ]
-    header = (
-        f"🏆 {lobby.tournament.name}"
-        if lobby.tournament.name
-        else "🏆 Turnier mit Freunden"
-    )
+    header = f"🏆 {lobby.tournament.name}" if lobby.tournament.name else "🏆 Turnier mit Freunden"
     body_lines = [
         header,
         "",

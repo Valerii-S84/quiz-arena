@@ -116,7 +116,9 @@ async def handle_tournament_copy_link(
             tournament_id=tournament_id,
             viewer_user_id=snapshot.user_id,
         )
-    invite_link = await build_tournament_invite_link(callback, invite_code=lobby.tournament.invite_code)
+    invite_link = await build_tournament_invite_link(
+        callback, invite_code=lobby.tournament.invite_code
+    )
     if invite_link is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return

@@ -49,7 +49,6 @@ EVENT_SOURCE_BOT = "BOT"
 ANSWER_RE, DAILY_RESULT_RE = gameplay_callbacks.ANSWER_RE, gameplay_callbacks.DAILY_RESULT_RE
 gameplay_friend_challenge.register(router)
 gameplay_tournaments.register(router)
-
 _format_user_label = gameplay_views._format_user_label
 _build_friend_plan_text = gameplay_views._build_friend_plan_text
 _build_question_text = gameplay_views._build_question_text
@@ -99,7 +98,9 @@ _start_mode = partial(
     trg_locked_mode_click=TRG_LOCKED_MODE_CLICK,
     build_question_text=_build_question_text,
 )
-_send_friend_round_question = partial(play_flow.send_friend_round_question, build_question_text=_build_question_text)
+_send_friend_round_question = partial(
+    play_flow.send_friend_round_question, build_question_text=_build_question_text
+)
 
 
 @router.callback_query(F.data.startswith("game:stop"))

@@ -5,12 +5,12 @@ from uuid import UUID
 
 from aiogram.types import CallbackQuery
 
+from app.bot.handlers.gameplay_flows.tournament_views import format_points
 from app.bot.keyboards.tournament import (
     build_tournament_created_keyboard,
     build_tournament_share_keyboard,
 )
 from app.bot.texts.de import TEXTS_DE
-from app.bot.handlers.gameplay_flows.tournament_views import format_points
 
 
 async def handle_tournament_create_from_format(

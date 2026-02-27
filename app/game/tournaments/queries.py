@@ -73,7 +73,11 @@ async def _build_lobby_snapshot(
 
     viewer_match_challenge_id: UUID | None = None
     viewer_opponent_user_id: int | None = None
-    if viewer_joined and tournament.status in _ROUND_STATUSES and int(tournament.current_round) >= 1:
+    if (
+        viewer_joined
+        and tournament.status in _ROUND_STATUSES
+        and int(tournament.current_round) >= 1
+    ):
         round_matches = await TournamentMatchesRepo.list_by_tournament_round(
             session,
             tournament_id=tournament.id,
