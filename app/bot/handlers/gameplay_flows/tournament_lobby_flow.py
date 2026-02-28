@@ -5,6 +5,7 @@ from uuid import UUID
 
 from aiogram.types import CallbackQuery
 
+from app.bot.handlers import gameplay_tournament_notifications
 from app.bot.handlers.gameplay_flows.tournament_views import (
     render_tournament_lobby,
     resolve_participant_labels,
@@ -172,4 +173,7 @@ async def handle_tournament_start(
         )
     await callback.message.answer(TEXTS_DE["msg.tournament.started"])
     await render_tournament_lobby(callback, lobby=lobby, user_id=snapshot.user_id, labels=labels)
+    gameplay_tournament_notifications.enqueue_tournament_round_messaging(
+        tournament_id=str(tournament_id)
+    )
     await callback.answer()

@@ -27,6 +27,9 @@ UTC = timezone.utc
 
 async def _ensure_tournament_schema() -> None:
     async with engine.begin() as conn:
+        await conn.run_sync(TournamentMatch.__table__.drop, checkfirst=True)
+        await conn.run_sync(TournamentParticipant.__table__.drop, checkfirst=True)
+        await conn.run_sync(Tournament.__table__.drop, checkfirst=True)
         await conn.run_sync(Tournament.__table__.create, checkfirst=True)
         await conn.run_sync(TournamentParticipant.__table__.create, checkfirst=True)
         await conn.run_sync(TournamentMatch.__table__.create, checkfirst=True)

@@ -4,7 +4,16 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Index, Numeric, text
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -38,3 +47,5 @@ class TournamentParticipant(Base):
         Numeric(6, 2), nullable=False, server_default=text("0")
     )
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    standings_message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    proof_card_file_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
