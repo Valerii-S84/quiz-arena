@@ -183,6 +183,8 @@ def enqueue_private_tournament_proof_cards(*, tournament_id: str) -> None:
         )
 
 
-@celery_app.task(name="app.workers.tasks.tournaments_proof_cards.run_private_tournament_proof_cards")
+@celery_app.task(
+    name="app.workers.tasks.tournaments_proof_cards.run_private_tournament_proof_cards"
+)
 def run_private_tournament_proof_cards(*, tournament_id: str) -> dict[str, int]:
     return run_async_job(run_private_tournament_proof_cards_async(tournament_id=tournament_id))
