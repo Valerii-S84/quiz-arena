@@ -10,6 +10,8 @@ from app.db.session import SessionLocal
 from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED
 from app.game.tournaments.lifecycle import close_expired_registration, settle_round_and_advance
 from app.workers.tasks.tournaments_config import DEADLINE_BATCH_SIZE, ROUND_DURATION_HOURS
+from app.workers.tasks.tournaments_messaging import enqueue_private_tournament_round_messaging
+from app.workers.tasks.tournaments_proof_cards import enqueue_private_tournament_proof_cards
 
 logger = structlog.get_logger("app.workers.tasks.tournaments")
 
@@ -95,6 +97,11 @@ async def run_private_tournament_rounds_async(
         started_tournament_ids=started_ids,
         completed_tournament_ids=completed_ids,
     )
+    for tournament_id in started_ids:
+        enqueue_private_tournament_round_messaging(tournament_id=tournament_id)
+    for tournament_id in completed_ids:
+        enqueue_private_tournament_round_messaging(tournament_id=tournament_id)
+        enqueue_private_tournament_proof_cards(tournament_id=tournament_id)
 
     result = {
         "batch_size": resolved_batch_size,
@@ -103,6 +110,8 @@ async def run_private_tournament_rounds_async(
         "tournaments_completed_total": tournaments_completed_total,
         "matches_settled_total": matches_settled_total,
         "matches_created_total": matches_created_total,
+        "round_messages_enqueued_total": len(started_ids) + len(completed_ids),
+        "proof_cards_enqueued_total": len(completed_ids),
     }
     logger.info("private_tournament_rounds_processed", **result)
     return result

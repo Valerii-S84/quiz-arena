@@ -22,6 +22,8 @@ celery_app = Celery(
         "app.workers.tasks.friend_challenges",
         "app.workers.tasks.friend_challenges_proof_cards",
         "app.workers.tasks.tournaments",
+        "app.workers.tasks.tournaments_messaging",
+        "app.workers.tasks.tournaments_proof_cards",
     ],
 )
 

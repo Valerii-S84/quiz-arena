@@ -28,6 +28,8 @@ class TournamentParticipantsRepo:
                 score=Decimal("0"),
                 tie_break=Decimal("0"),
                 joined_at=joined_at,
+                standings_message_id=None,
+                proof_card_file_id=None,
             )
             .on_conflict_do_nothing(
                 index_elements=[
@@ -100,6 +102,68 @@ class TournamentParticipantsRepo:
                 score=TournamentParticipant.score + score_delta,
                 tie_break=TournamentParticipant.tie_break + tie_break_delta,
             )
+            .returning(TournamentParticipant.user_id)
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one_or_none() is not None)
+
+    @staticmethod
+    async def set_standings_message_id_if_missing(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+        user_id: int,
+        message_id: int,
+    ) -> int:
+        stmt = (
+            update(TournamentParticipant)
+            .where(
+                TournamentParticipant.tournament_id == tournament_id,
+                TournamentParticipant.user_id == user_id,
+                TournamentParticipant.standings_message_id.is_(None),
+            )
+            .values(standings_message_id=message_id)
+            .returning(TournamentParticipant.user_id)
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one_or_none() is not None)
+
+    @staticmethod
+    async def set_standings_message_id(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+        user_id: int,
+        message_id: int,
+    ) -> int:
+        stmt = (
+            update(TournamentParticipant)
+            .where(
+                TournamentParticipant.tournament_id == tournament_id,
+                TournamentParticipant.user_id == user_id,
+            )
+            .values(standings_message_id=message_id)
+            .returning(TournamentParticipant.user_id)
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one_or_none() is not None)
+
+    @staticmethod
+    async def set_proof_card_file_id_if_missing(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+        user_id: int,
+        file_id: str,
+    ) -> int:
+        stmt = (
+            update(TournamentParticipant)
+            .where(
+                TournamentParticipant.tournament_id == tournament_id,
+                TournamentParticipant.user_id == user_id,
+                TournamentParticipant.proof_card_file_id.is_(None),
+            )
+            .values(proof_card_file_id=file_id)
             .returning(TournamentParticipant.user_id)
         )
         result = await session.execute(stmt)
