@@ -7,7 +7,9 @@ from app.bot.handlers.gameplay_flows.tournament_views import format_points
 from app.workers.tasks.tournaments_messaging_text import format_deadline
 
 
-def _build_roster_lines(*, participant_labels: list[tuple[int, str]], viewer_user_id: int) -> list[str]:
+def _build_roster_lines(
+    *, participant_labels: list[tuple[int, str]], viewer_user_id: int
+) -> list[str]:
     lines = [f"Teilnehmer: {len(participant_labels)}", ""]
     for user_id, label in participant_labels:
         suffix = " (Du)" if user_id == viewer_user_id else ""
@@ -50,7 +52,9 @@ async def render_daily_cup_lobby(
         "Format: 5 Fragen • 3 Runden",
     ]
     if lobby.tournament.status == "REGISTRATION":
-        body_lines.extend(_build_roster_lines(participant_labels=participant_labels, viewer_user_id=user_id))
+        body_lines.extend(
+            _build_roster_lines(participant_labels=participant_labels, viewer_user_id=user_id)
+        )
     else:
         round_no = max(1, int(lobby.tournament.current_round))
         body_lines.extend(

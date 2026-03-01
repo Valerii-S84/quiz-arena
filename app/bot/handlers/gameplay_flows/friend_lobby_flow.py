@@ -113,8 +113,7 @@ async def handle_friend_challenge_create_selected(
                 chat_id=callback.from_user.id,
                 photo=welcome_image_file_id,
                 caption=(
-                    "⚔️ Ich fordere dich heraus! Kannst du mich schlagen?\n\n"
-                    f"👉 {invite_link}"
+                    "⚔️ Ich fordere dich heraus! Kannst du mich schlagen?\n\n" f"👉 {invite_link}"
                 ),
             )
         except TelegramAPIError:

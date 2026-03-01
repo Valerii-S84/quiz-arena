@@ -159,7 +159,9 @@ async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str
                 text = _build_round_text(
                     round_no=max(1, int(tournament.current_round)),
                     deadline_text=format_deadline(tournament.round_deadline),
-                    opponent_label=(labels.get(opponent_user_id) if opponent_user_id is not None else None),
+                    opponent_label=(
+                        labels.get(opponent_user_id) if opponent_user_id is not None else None
+                    ),
                     standings_lines=standings_lines,
                 )
             keyboard = build_daily_cup_lobby_keyboard(

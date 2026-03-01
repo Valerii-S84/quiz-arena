@@ -30,6 +30,7 @@ from app.workers.tasks.tournaments_messaging_text import (
 
 logger = structlog.get_logger("app.workers.tasks.tournaments_messaging")
 
+
 def _is_celery_task(task_obj: object) -> bool:
     return type(task_obj).__module__.startswith("celery.")
 

@@ -18,7 +18,10 @@ from app.game.tournaments.settlement import settle_pending_match_from_duel
 from app.game.tournaments.lifecycle import check_and_advance_round
 from app.workers.tasks import daily_cup_async, daily_cup_rounds
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
-from tests.integration.friend_challenge_fixtures import _create_user, _seed_friend_challenge_questions
+from tests.integration.friend_challenge_fixtures import (
+    _create_user,
+    _seed_friend_challenge_questions,
+)
 from tests.integration.test_private_tournament_service_integration import _ensure_tournament_schema
 
 UTC = timezone.utc
@@ -230,7 +233,9 @@ async def test_daily_cup_early_advance(monkeypatch) -> None:
         assert len(matches) == 2
         for idx, match in enumerate(matches, start=1):
             assert match.friend_challenge_id is not None
-            challenge = await FriendChallengesRepo.get_by_id_for_update(session, match.friend_challenge_id)
+            challenge = await FriendChallengesRepo.get_by_id_for_update(
+                session, match.friend_challenge_id
+            )
             assert challenge is not None
             challenge.status = "COMPLETED"
             challenge.winner_user_id = int(match.user_a)

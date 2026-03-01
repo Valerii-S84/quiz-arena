@@ -99,7 +99,9 @@ async def open_daily_cup_registration_async() -> dict[str, int]:
     lookback_start = now_utc - timedelta(days=DAILY_CUP_ACTIVE_LOOKBACK_DAYS)
 
     async with SessionLocal.begin() as session:
-        tournament = await _ensure_daily_cup_registration_tournament(session=session, now_utc=now_utc)
+        tournament = await _ensure_daily_cup_registration_tournament(
+            session=session, now_utc=now_utc
+        )
 
     if tournament.status != TOURNAMENT_STATUS_REGISTRATION:
         return {"processed": 0, "users_scanned_total": 0, "sent_total": 0, "skipped_total": 0}
@@ -163,7 +165,9 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
     started = 0
 
     async with SessionLocal.begin() as session:
-        tournament = await _ensure_daily_cup_registration_tournament(session=session, now_utc=now_utc)
+        tournament = await _ensure_daily_cup_registration_tournament(
+            session=session, now_utc=now_utc
+        )
         if tournament.status != TOURNAMENT_STATUS_REGISTRATION:
             return {"processed": 0, "canceled": 0, "started": 0, "participants_total": 0}
 
@@ -175,7 +179,9 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
         if participants_total < DAILY_CUP_MIN_PARTICIPANTS:
             tournament.status = TOURNAMENT_STATUS_CANCELED
             tournament.round_deadline = None
-            users = await UsersRepo.list_by_ids(session, [int(item.user_id) for item in participants])
+            users = await UsersRepo.list_by_ids(
+                session, [int(item.user_id) for item in participants]
+            )
             canceled_telegram_targets = [int(user.telegram_user_id) for user in users]
             canceled = 1
             events.append(

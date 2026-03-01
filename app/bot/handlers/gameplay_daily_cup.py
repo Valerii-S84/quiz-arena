@@ -11,7 +11,11 @@ from app.bot.keyboards.tournament import build_tournament_share_url
 from app.bot.texts.de import TEXTS_DE
 from app.db.repo.users_repo import UsersRepo
 from app.game.tournaments import TournamentServiceFacade
-from app.game.tournaments.errors import TournamentAccessError, TournamentClosedError, TournamentNotFoundError
+from app.game.tournaments.errors import (
+    TournamentAccessError,
+    TournamentClosedError,
+    TournamentNotFoundError,
+)
 
 
 def _gameplay():
@@ -27,9 +31,15 @@ _build_daily_cup_share_result_url = partial(
 
 
 def register(router: Router) -> None:
-    router.callback_query(F.data.regexp(gameplay_callbacks.DAILY_CUP_JOIN_RE))(handle_daily_cup_join)
-    router.callback_query(F.data.regexp(gameplay_callbacks.DAILY_CUP_VIEW_RE))(handle_daily_cup_view)
-    router.callback_query(F.data.regexp(gameplay_callbacks.DAILY_CUP_SHARE_RE))(handle_daily_cup_share)
+    router.callback_query(F.data.regexp(gameplay_callbacks.DAILY_CUP_JOIN_RE))(
+        handle_daily_cup_join
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.DAILY_CUP_VIEW_RE))(
+        handle_daily_cup_view
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.DAILY_CUP_SHARE_RE))(
+        handle_daily_cup_share
+    )
 
 
 def _daily_cup_error_key(exc: Exception) -> str:
