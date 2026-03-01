@@ -27,6 +27,13 @@ REWARD_CHOICE_RE = re.compile(r"^referral:reward:(MEGA_PACK_15|PREMIUM_STARTER)$
 SHARE_RE = re.compile(r"^referral:(share|prompt:share)$")
 
 
+def _normalize_reward_choice(reward_code: str) -> str:
+    # Legacy callback compatibility: old Mega Pack buttons now grant Premium Starter.
+    if reward_code == "MEGA_PACK_15":
+        return "PREMIUM_STARTER"
+    return reward_code
+
+
 async def _build_invite_link(bot: Bot, *, referral_code: str) -> str | None:
     try:
         me = await bot.get_me()
@@ -109,7 +116,7 @@ async def handle_referral_reward_choice(callback: CallbackQuery) -> None:
     if matched is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
-    reward_code = matched.group(1)
+    reward_code = _normalize_reward_choice(matched.group(1))
 
     now_utc = datetime.now(timezone.utc)
     async with SessionLocal.begin() as session:

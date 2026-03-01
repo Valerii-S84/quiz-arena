@@ -81,6 +81,21 @@ async def test_handle_buy_handles_init_purchase_failure(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_handle_buy_rejects_soft_disabled_product(monkeypatch) -> None:
+    monkeypatch.setattr(payments, "SessionLocal", DummySessionLocal())
+
+    async def _fake_init_purchase(*args, **kwargs):
+        raise AssertionError("init_purchase must not be called for disabled products")
+
+    monkeypatch.setattr(payments.PurchaseService, "init_purchase", _fake_init_purchase)
+
+    callback = DummyCallback(data="buy:MEGA_PACK_15", from_user=SimpleNamespace(id=1))
+    await payments.handle_buy(callback)
+
+    assert callback.answer_calls[0]["text"] == TEXTS_DE["msg.purchase.error.failed"]
+
+
+@pytest.mark.asyncio
 async def test_handle_buy_handles_send_invoice_failure(monkeypatch) -> None:
     monkeypatch.setattr(payments, "SessionLocal", DummySessionLocal())
 

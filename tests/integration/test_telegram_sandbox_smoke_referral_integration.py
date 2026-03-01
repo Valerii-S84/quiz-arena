@@ -6,7 +6,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 
-from app.db.models.energy_state import EnergyState
+from app.db.models.entitlements import Entitlement
 from app.db.models.ledger_entries import LedgerEntry
 from app.db.models.referrals import Referral
 from app.db.session import SessionLocal
@@ -93,15 +93,20 @@ async def test_telegram_webhook_smoke_referral_reward_choice_duplicate_replay(
         )
         assert int(rewarded_count or 0) == 1
 
-        energy_state = await session.get(EnergyState, referrer.id)
-        assert energy_state is not None
-        assert energy_state.paid_energy == 15
+        active_premium = await session.scalar(
+            select(func.count(Entitlement.id)).where(
+                Entitlement.user_id == referrer.id,
+                Entitlement.entitlement_type == "PREMIUM",
+                Entitlement.status == "ACTIVE",
+            )
+        )
+        assert int(active_premium or 0) == 1
 
         reward_credit_count = await session.scalar(
             select(func.count(LedgerEntry.id)).where(
                 LedgerEntry.user_id == referrer.id,
-                LedgerEntry.entry_type == "PURCHASE_CREDIT",
-                LedgerEntry.asset == "PAID_ENERGY",
+                LedgerEntry.entry_type == "REFERRAL_REWARD",
+                LedgerEntry.asset == "PREMIUM",
                 LedgerEntry.source == "REFERRAL",
             )
         )
