@@ -12,7 +12,7 @@ from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
 from app.economy.offers.service import OfferService
-from app.economy.purchases.catalog import get_product
+from app.economy.purchases.catalog import get_product, is_product_available_for_sale
 from app.economy.purchases.errors import (
     PremiumDowngradeNotAllowedError,
     ProductNotFoundError,
@@ -85,8 +85,8 @@ async def handle_buy(callback: CallbackQuery) -> None:
         return
 
     product = get_product(product_code)
-    if product is None:
-        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+    if product is None or not is_product_available_for_sale(product_code):
+        await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)
         return
 
     now_utc = datetime.now(timezone.utc)

@@ -97,6 +97,18 @@ PRODUCTS: dict[str, ProductSpec] = {
     ),
 }
 
+SOFT_DISABLED_PRODUCT_CODES: frozenset[str] = frozenset(
+    {
+        "MEGA_PACK_15",
+        "PREMIUM_SEASON",
+        "PREMIUM_YEAR",
+    }
+)
+
 
 def get_product(product_code: str) -> ProductSpec | None:
     return PRODUCTS.get(product_code)
+
+
+def is_product_available_for_sale(product_code: str) -> bool:
+    return product_code in PRODUCTS and product_code not in SOFT_DISABLED_PRODUCT_CODES

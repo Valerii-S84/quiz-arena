@@ -36,10 +36,6 @@ def build_referral_keyboard(
         rows.append(
             [
                 InlineKeyboardButton(
-                    text="Mega Pack",
-                    callback_data="referral:reward:MEGA_PACK_15",
-                ),
-                InlineKeyboardButton(
                     text="Premium Starter",
                     callback_data="referral:reward:PREMIUM_STARTER",
                 ),

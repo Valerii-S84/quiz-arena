@@ -3,12 +3,14 @@ from __future__ import annotations
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.economy.offers.types import OfferSelection
-from app.economy.purchases.catalog import get_product
+from app.economy.purchases.catalog import get_product, is_product_available_for_sale
 
 
 def build_offer_keyboard(selection: OfferSelection) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     for product_code in selection.cta_product_codes:
+        if not is_product_available_for_sale(product_code):
+            continue
         product = get_product(product_code)
         if product is None:
             continue

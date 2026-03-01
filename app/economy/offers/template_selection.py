@@ -18,6 +18,7 @@ from app.economy.offers.muting import (
 )
 from app.economy.offers.time_utils import berlin_now
 from app.economy.offers.types import OfferTemplate
+from app.economy.purchases.catalog import is_product_available_for_sale
 
 
 async def select_template_with_caps(
@@ -58,6 +59,8 @@ async def select_template_with_caps(
     )
 
     for template in ordered_templates:
+        if not any(is_product_available_for_sale(code) for code in template.cta_product_codes):
+            continue
         if template.blocking_modal and blocking_recently_shown:
             continue
         if was_offer_shown_recently(
