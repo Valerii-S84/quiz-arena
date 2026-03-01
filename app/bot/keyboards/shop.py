@@ -18,22 +18,22 @@ def build_shop_keyboard(*, channel_bonus_claimed: bool = False) -> InlineKeyboar
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="⚡ ENERGIE +10  |  5⭐", callback_data="buy:ENERGY_10")],
+            [InlineKeyboardButton(text="⚡ Energie +10 | 5⭐", callback_data="buy:ENERGY_10")],
             [
                 InlineKeyboardButton(
-                    text="🤝 DUELL TICKET  |  5⭐",
+                    text="⚔️ Duell-Ticket | 5⭐",
                     callback_data="buy:FRIEND_CHALLENGE_5",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="💎 PREMIUM STARTER  |  29⭐",
+                    text="💎 Premium Starter | 29⭐",
                     callback_data="buy:PREMIUM_STARTER",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="💎 PREMIUM MONTH  |  99⭐", callback_data="buy:PREMIUM_MONTH"
+                    text="💎 Premium Monat | 99⭐", callback_data="buy:PREMIUM_MONTH"
                 )
             ],
             channel_bonus_row,
@@ -43,7 +43,7 @@ def build_shop_keyboard(*, channel_bonus_claimed: bool = False) -> InlineKeyboar
                     callback_data="referral:open",
                 )
             ],
-            [InlineKeyboardButton(text="🎟 PROMO-CODE", callback_data="promo:open")],
-            [InlineKeyboardButton(text="⬅️ ZURÜCK", callback_data="home:open")],
+            [InlineKeyboardButton(text="🎟️ Promo-Code eingeben", callback_data="promo:open")],
+            [InlineKeyboardButton(text="⬅️ Zurück", callback_data="home:open")],
         ]
     )
