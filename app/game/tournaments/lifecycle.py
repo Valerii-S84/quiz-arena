@@ -12,18 +12,22 @@ from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.tournaments.constants import (
     TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS,
     TOURNAMENT_MATCH_STATUS_PENDING,
-    TOURNAMENT_MIN_PARTICIPANTS,
     TOURNAMENT_MAX_ROUNDS,
-    TOURNAMENT_STATUS_ROUND_1,
-    TOURNAMENT_STATUS_ROUND_2,
-    TOURNAMENT_STATUS_ROUND_3,
+    TOURNAMENT_MIN_PARTICIPANTS,
     TOURNAMENT_STATUS_CANCELED,
     TOURNAMENT_STATUS_COMPLETED,
     TOURNAMENT_STATUS_REGISTRATION,
+    TOURNAMENT_STATUS_ROUND_1,
+    TOURNAMENT_STATUS_ROUND_2,
+    TOURNAMENT_STATUS_ROUND_3,
     status_for_round,
 )
 from app.game.tournaments.internal import resolve_round_deadline
-from app.game.tournaments.rounds import collect_bye_history, collect_previous_pairs, create_round_matches
+from app.game.tournaments.rounds import (
+    collect_bye_history,
+    collect_previous_pairs,
+    create_round_matches,
+)
 from app.game.tournaments.settlement import settle_pending_match_from_duel
 
 _ACTIVE_ROUND_STATUSES = frozenset(

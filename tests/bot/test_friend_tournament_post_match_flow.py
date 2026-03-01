@@ -11,7 +11,9 @@ from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessio
 
 
 @pytest.mark.asyncio
-async def test_completed_tournament_match_uses_tournament_keyboard_without_rematch(monkeypatch) -> None:
+async def test_completed_tournament_match_uses_tournament_keyboard_without_rematch(
+    monkeypatch,
+) -> None:
     tournament_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     enqueued: list[str] = []
 

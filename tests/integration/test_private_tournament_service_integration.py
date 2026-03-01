@@ -12,12 +12,12 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal, engine
+from app.game.tournaments.lifecycle import check_and_advance_round
 from app.game.tournaments.service import (
     create_private_tournament,
     join_private_tournament_by_code,
     start_private_tournament,
 )
-from app.game.tournaments.lifecycle import check_and_advance_round
 from app.game.tournaments.settlement import settle_pending_match_from_duel
 from tests.integration.friend_challenge_fixtures import (
     _create_user,
@@ -214,7 +214,9 @@ async def test_round_advances_early_when_all_matches_completed_before_deadline()
         match = matches[0]
         assert match.friend_challenge_id is not None
 
-        challenge = await FriendChallengesRepo.get_by_id_for_update(session, match.friend_challenge_id)
+        challenge = await FriendChallengesRepo.get_by_id_for_update(
+            session, match.friend_challenge_id
+        )
         assert challenge is not None
         challenge.status = "COMPLETED"
         challenge.winner_user_id = creator_user_id
