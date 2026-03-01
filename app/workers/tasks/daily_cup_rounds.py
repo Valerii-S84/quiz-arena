@@ -13,8 +13,12 @@ from app.workers.tasks.daily_cup_proof_cards import enqueue_daily_cup_proof_card
 logger = structlog.get_logger("app.workers.tasks.daily_cup")
 
 
+def _now_utc():
+    return now_utc()
+
+
 async def advance_daily_cup_rounds_async() -> dict[str, int]:
-    now_utc_value = now_utc()
+    now_utc_value = _now_utc()
     rounds_started_total = 0
     tournaments_completed_total = 0
     matches_settled_total = 0

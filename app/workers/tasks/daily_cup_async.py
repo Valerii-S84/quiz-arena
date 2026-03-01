@@ -35,8 +35,12 @@ from app.workers.tasks.daily_cup_time import format_close_time_local
 logger = structlog.get_logger("app.workers.tasks.daily_cup")
 
 
+def _now_utc():
+    return now_utc()
+
+
 async def open_daily_cup_registration_async() -> dict[str, int]:
-    now_utc_value = now_utc()
+    now_utc_value = _now_utc()
     lookback_start = now_utc_value - timedelta(days=DAILY_CUP_ACTIVE_LOOKBACK_DAYS)
 
     async with SessionLocal.begin() as session:
@@ -95,7 +99,7 @@ async def open_daily_cup_registration_async() -> dict[str, int]:
 
 
 async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
-    now_utc_value = now_utc()
+    now_utc_value = _now_utc()
     canceled_telegram_targets: list[int] = []
     started_tournament_id: str | None = None
     events: list[dict[str, object]] = []
@@ -164,7 +168,6 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
             )
 
     await emit_daily_cup_events(now_utc_value=now_utc_value, events=events)
-
     await send_daily_cup_canceled_messages(telegram_targets=canceled_telegram_targets)
 
     if started_tournament_id is not None:
