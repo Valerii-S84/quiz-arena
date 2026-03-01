@@ -50,6 +50,13 @@ def _load_font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont | Ima
     return ImageFont.load_default()
 
 
+def _truncate_tournament_name(name: str | None) -> str:
+    resolved = (name or "Privates Turnier").strip() or "Privates Turnier"
+    if len(resolved) <= 30:
+        return resolved
+    return f"{resolved[:27].rstrip()}..."
+
+
 def _draw_gradient_background(
     *,
     image: Image.Image,
@@ -87,6 +94,8 @@ def render_tournament_proof_card_png(
     points: str,
     format_label: str,
     completed_at: datetime | None,
+    tournament_name: str | None = None,
+    rounds_played: int | None = None,
 ) -> bytes:
     image = Image.new("RGB", _CARD_SIZE, color=(0, 0, 0))
     top_color, bottom_color = _resolve_colors(place)
@@ -116,29 +125,43 @@ def render_tournament_proof_card_png(
     )
     _draw_centered(
         draw,
+        text=_truncate_tournament_name(tournament_name),
+        y=420,
+        font_obj=subtitle_font,
+        fill=(245, 245, 245),
+    )
+    _draw_centered(
+        draw,
         text=player_label,
-        y=470,
+        y=520,
         font_obj=player_font,
         fill=(255, 255, 255),
     )
     _draw_centered(
         draw,
         text=f"Punkte: {points}",
-        y=626,
+        y=670,
         font_obj=score_font,
         fill=(255, 255, 255),
     )
     _draw_centered(
         draw,
         text=f"Format: {format_label}",
-        y=748,
+        y=780,
+        font_obj=meta_font,
+        fill=(242, 242, 242),
+    )
+    _draw_centered(
+        draw,
+        text=f"{max(1, int(rounds_played or 0))} Runden gespielt",
+        y=840,
         font_obj=meta_font,
         fill=(242, 242, 242),
     )
     _draw_centered(
         draw,
         text=f"Datum: {_format_date(completed_at)}",
-        y=806,
+        y=900,
         font_obj=meta_font,
         fill=(242, 242, 242),
     )

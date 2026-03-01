@@ -34,6 +34,27 @@ async def test_handle_friend_challenge_type_tournament_shows_format_picker(monke
 
 
 @pytest.mark.asyncio
+async def test_handle_create_tournament_start_shortcut_shows_format_picker() -> None:
+    callback = DummyCallback(
+        data="create_tournament_start",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+    await gameplay_friend_challenge.handle_create_tournament_start(callback)
+
+    response = callback.message.answers[0]
+    assert response.text == TEXTS_DE["msg.friend.challenge.tournament.format"]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "friend:tournament:format:5" in callbacks
+    assert "friend:tournament:format:12" in callbacks
+
+
+@pytest.mark.asyncio
 async def test_handle_friend_my_duels_groups_sections_with_my_turn_first(monkeypatch) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 

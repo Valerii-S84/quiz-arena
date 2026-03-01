@@ -1,24 +1,42 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
+from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.tournaments.constants import (
     TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS,
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_MAX_ROUNDS,
+    TOURNAMENT_MIN_PARTICIPANTS,
     TOURNAMENT_STATUS_CANCELED,
     TOURNAMENT_STATUS_COMPLETED,
     TOURNAMENT_STATUS_REGISTRATION,
+    TOURNAMENT_STATUS_ROUND_1,
+    TOURNAMENT_STATUS_ROUND_2,
+    TOURNAMENT_STATUS_ROUND_3,
     status_for_round,
 )
 from app.game.tournaments.internal import resolve_round_deadline
-from app.game.tournaments.rounds import collect_previous_pairs, create_round_matches
+from app.game.tournaments.rounds import (
+    collect_bye_history,
+    collect_previous_pairs,
+    create_round_matches,
+)
 from app.game.tournaments.settlement import settle_pending_match_from_duel
+
+_ACTIVE_ROUND_STATUSES = frozenset(
+    {
+        TOURNAMENT_STATUS_ROUND_1,
+        TOURNAMENT_STATUS_ROUND_2,
+        TOURNAMENT_STATUS_ROUND_3,
+    }
+)
 
 
 async def close_expired_registration(
@@ -32,7 +50,7 @@ async def close_expired_registration(
         session,
         tournament_id=tournament.id,
     )
-    if participants_total >= 2:
+    if participants_total >= TOURNAMENT_MIN_PARTICIPANTS:
         return False
     tournament.status = TOURNAMENT_STATUS_CANCELED
     tournament.round_deadline = None
@@ -96,6 +114,7 @@ async def settle_round_and_advance(
         round_no=next_round,
         participants=participants,
         previous_pairs=collect_previous_pairs(matches=all_matches),
+        bye_history=collect_bye_history(matches=all_matches),
         deadline=next_deadline,
         now_utc=now_utc,
     )
@@ -108,3 +127,38 @@ async def settle_round_and_advance(
         "round_started": 1,
         "tournament_completed": 0,
     }
+
+
+async def check_and_advance_round(
+    session: AsyncSession,
+    *,
+    tournament_id: UUID,
+    now_utc: datetime,
+    round_duration_hours: int = TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS,
+) -> dict[str, int]:
+    tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
+    if tournament is None or tournament.status not in _ACTIVE_ROUND_STATUSES:
+        return {
+            "matches_settled": 0,
+            "matches_created": 0,
+            "round_started": 0,
+            "tournament_completed": 0,
+        }
+    pending_matches = await TournamentMatchesRepo.count_pending_for_tournament_round(
+        session,
+        tournament_id=tournament.id,
+        round_no=max(1, int(tournament.current_round)),
+    )
+    if pending_matches != 0:
+        return {
+            "matches_settled": 0,
+            "matches_created": 0,
+            "round_started": 0,
+            "tournament_completed": 0,
+        }
+    return await settle_round_and_advance(
+        session,
+        tournament=tournament,
+        now_utc=now_utc,
+        round_duration_hours=round_duration_hours,
+    )

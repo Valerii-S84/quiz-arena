@@ -12,6 +12,7 @@ from app.game.tournaments.constants import (
     TOURNAMENT_DEFAULT_MAX_PARTICIPANTS,
     TOURNAMENT_FORMAT_QUICK_5,
     TOURNAMENT_FORMAT_QUICK_12,
+    TOURNAMENT_MIN_PARTICIPANTS,
     TOURNAMENT_STATUS_REGISTRATION,
     TOURNAMENT_TYPE_PRIVATE,
 )
@@ -52,7 +53,8 @@ async def create_private_tournament(
             status=TOURNAMENT_STATUS_REGISTRATION,
             format=format_code,
             max_participants=max(
-                2, min(int(max_participants), TOURNAMENT_DEFAULT_MAX_PARTICIPANTS)
+                TOURNAMENT_MIN_PARTICIPANTS,
+                min(int(max_participants), TOURNAMENT_DEFAULT_MAX_PARTICIPANTS),
             ),
             current_round=0,
             registration_deadline=resolve_registration_deadline(

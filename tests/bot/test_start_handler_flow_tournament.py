@@ -6,6 +6,8 @@ from uuid import UUID
 import pytest
 
 from app.bot.handlers import start
+from app.bot.texts.de import TEXTS_DE
+from app.game.tournaments.errors import TournamentClosedError
 from tests.bot.helpers import DummyMessage, DummySessionLocal
 
 
@@ -89,3 +91,33 @@ async def test_handle_start_tournament_payload_shows_lobby_and_join_button(monke
         if button.callback_data
     ]
     assert "friend:tournament:join:abcdefabcdef" in callbacks
+
+
+@pytest.mark.asyncio
+async def test_handle_start_tournament_payload_for_started_tournament_shows_closed_message(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
+        del session, telegram_user, start_payload
+        return SimpleNamespace(user_id=9, free_energy=20, paid_energy=1, current_streak=1)
+
+    async def _fake_lobby_by_code(*args, **kwargs):
+        del args, kwargs
+        raise TournamentClosedError
+
+    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(
+        start.start_flow.TournamentServiceFacade,
+        "get_private_tournament_lobby_by_invite_code",
+        _fake_lobby_by_code,
+    )
+
+    message = _StartMessage(
+        text="/start tournament_abcdefabcdef",
+        from_user=SimpleNamespace(id=1, username="alice", first_name="Alice", language_code="de"),
+    )
+    await start.handle_start(message)
+
+    assert message.answers[0].text == TEXTS_DE["msg.tournament.closed"]

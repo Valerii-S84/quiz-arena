@@ -127,6 +127,8 @@ async def run_private_tournament_proof_cards_async(*, tournament_id: str) -> dic
                     points=points,
                     format_label=tournament_format,
                     completed_at=now_utc,
+                    tournament_name=tournament.name,
+                    rounds_played=tournament.current_round,
                 )
                 message = await bot.send_photo(
                     chat_id=chat_id,

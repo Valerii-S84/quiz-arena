@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import uuid4
 
+import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.tournament_matches import TournamentMatch
@@ -21,6 +22,8 @@ from app.game.tournaments.constants import (
 from app.game.tournaments.internal import participants_to_swiss
 from app.game.tournaments.pairing import build_swiss_pairs
 
+logger = structlog.get_logger("app.game.tournaments.rounds")
+
 
 def collect_previous_pairs(*, matches: list[TournamentMatch]) -> set[frozenset[int]]:
     previous_pairs: set[frozenset[int]] = set()
@@ -31,6 +34,14 @@ def collect_previous_pairs(*, matches: list[TournamentMatch]) -> set[frozenset[i
     return previous_pairs
 
 
+def collect_bye_history(*, matches: list[TournamentMatch]) -> set[int]:
+    return {
+        int(match.user_a)
+        for match in matches
+        if match.user_b is None and match.status == TOURNAMENT_MATCH_STATUS_WALKOVER
+    }
+
+
 async def create_round_matches(
     session: AsyncSession,
     *,
@@ -38,12 +49,23 @@ async def create_round_matches(
     round_no: int,
     participants: list[TournamentParticipant],
     previous_pairs: set[frozenset[int]],
+    bye_history: set[int],
     deadline: datetime,
     now_utc: datetime,
 ) -> int:
     swiss_pairs = build_swiss_pairs(
         participants=participants_to_swiss(participants),
         previous_pairs=previous_pairs,
+        bye_history=bye_history,
+    )
+    logger.info(
+        "tournament_pairings_generated",
+        tournament_id=str(tournament.id),
+        round_no=int(round_no),
+        pairings=[
+            (int(pair.user_a), int(pair.user_b) if pair.user_b is not None else "BYE")
+            for pair in swiss_pairs
+        ],
     )
     duel_rounds = rounds_for_tournament_format(format_code=tournament.format)
     matches: list[TournamentMatch] = []

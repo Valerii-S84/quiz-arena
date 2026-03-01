@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.tournament_matches import TournamentMatch
@@ -91,6 +91,21 @@ class TournamentMatchesRepo:
         )
         result = await session.execute(stmt)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def count_pending_for_tournament_round(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+        round_no: int,
+    ) -> int:
+        stmt = select(func.count(TournamentMatch.id)).where(
+            TournamentMatch.tournament_id == tournament_id,
+            TournamentMatch.round_no == round_no,
+            TournamentMatch.status == "PENDING",
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
 
     @staticmethod
     async def list_pending_due_for_update(

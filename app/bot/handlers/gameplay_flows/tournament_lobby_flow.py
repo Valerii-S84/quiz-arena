@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from aiogram.types import CallbackQuery
+from aiogram.exceptions import TelegramAPIError
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.handlers import gameplay_tournament_notifications
 from app.bot.handlers.gameplay_flows.tournament_views import (
@@ -11,6 +12,19 @@ from app.bot.handlers.gameplay_flows.tournament_views import (
     resolve_participant_labels,
 )
 from app.bot.texts.de import TEXTS_DE
+
+
+def _build_creator_start_markup(*, tournament_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="▶️ Turnier starten",
+                    callback_data=f"friend:tournament:start:{tournament_id}",
+                )
+            ]
+        ]
+    )
 
 
 async def handle_tournament_join_by_invite(
@@ -49,6 +63,9 @@ async def handle_tournament_join_by_invite(
             users_repo=users_repo,
             session=session,
         )
+        creator = None
+        if lobby.tournament.created_by is not None:
+            creator = await users_repo.get_by_id(session, lobby.tournament.created_by)
         if join_result.joined_now:
             await emit_analytics_event(
                 session,
@@ -60,6 +77,35 @@ async def handle_tournament_join_by_invite(
             )
     if join_result.joined_now:
         await callback.message.answer(TEXTS_DE["msg.tournament.joined"])
+        bot = callback.bot
+        assert bot is not None
+        if (
+            creator is not None
+            and int(creator.telegram_user_id) != int(callback.from_user.id)
+            and int(creator.telegram_user_id) != int(snapshot.user_id)
+        ):
+            participant_count = len(lobby.participants)
+            start_markup = (
+                _build_creator_start_markup(tournament_id=str(lobby.tournament.tournament_id))
+                if participant_count >= 2
+                else None
+            )
+            try:
+                await bot.send_message(
+                    chat_id=int(creator.telegram_user_id),
+                    text=(
+                        f"✅ {(callback.from_user.first_name or 'Ein Spieler')} hat dein Turnier betreten!\n"
+                        f"Teilnehmer: {participant_count}/{lobby.tournament.max_participants}\n\n"
+                        + (
+                            "[▶️ Turnier starten]"
+                            if participant_count >= 2
+                            else "Warte auf mehr Spieler..."
+                        )
+                    ),
+                    reply_markup=start_markup,
+                )
+            except TelegramAPIError:
+                creator = None
     await render_tournament_lobby(callback, lobby=lobby, user_id=snapshot.user_id, labels=labels)
     await callback.answer()
 

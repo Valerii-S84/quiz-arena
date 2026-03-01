@@ -58,6 +58,7 @@ def test_tournament_lobby_keyboard_contains_join_play_and_share_when_enabled() -
     assert "friend:tournament:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
     assert "friend:next:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" in callbacks
     assert "friend:tournament:share:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
+    assert "create_tournament_start" in callbacks
 
 
 def test_tournament_share_keyboard_contains_url_and_refresh() -> None:
