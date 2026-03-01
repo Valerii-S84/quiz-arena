@@ -5,7 +5,7 @@ TEXTS_DE: dict[str, str] = {
     "msg.home.stats.no_streak": "⚡ {free_energy}/20 + {paid_energy} Bonus",
     "msg.home.energy": "Energie: {free_energy}/20 + {paid_energy} Bonus.",
     "msg.home.streak": "Serie: {streak} Tage.",
-    "msg.shop.title": "Shop: Wähle ein Paket.",
+    "msg.shop.title": "Marktplatz: Was brauchst du?",
     "msg.channel.bonus.offer": "📺 Lerne täglich kostenlos Deutsch\n\nAbonniere unseren Kanal und hol dir\neinmalig volle Energie - sofort!\n\n⚡ Belohnung: volle Energie ({max_energy}/{max_energy})",
     "msg.channel.bonus.success": "⚡ Energie aufgeladen!\nDu hast jetzt volle Energie. Viel Erfolg!",
     "msg.channel.bonus.not_subscribed": "📺 Du bist noch nicht dabei.\nAbonniere den Kanal und komm zurück!",

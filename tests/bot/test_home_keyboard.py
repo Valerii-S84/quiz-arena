@@ -6,17 +6,17 @@ def test_home_keyboard_has_exact_5_buttons_in_canonical_order() -> None:
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert len(buttons) == 5
     assert [button.text for button in buttons] == [
-        "⚡ MIX SPRINT",
-        "⚡ TÄGLICHE CHALLENGE",
-        "🧠 ARTIKEL SPRINT",
-        "🥊 DUELL",
-        "🛒 SHOP",
+        "🔥 Tägliche Challenge",
+        "⚔️ Duell",
+        "🎯 Schnell-Runde",
+        "📚 Artikel-Training",
+        "🏪 Marktplatz",
     ]
     assert [button.callback_data for button in buttons] == [
-        "play",
         "daily_challenge",
-        "mode:ARTIKEL_SPRINT",
         "friend:challenge:create",
+        "play",
+        "mode:ARTIKEL_SPRINT",
         "shop:open",
     ]
 
