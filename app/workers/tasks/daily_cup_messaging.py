@@ -14,6 +14,12 @@ from app.db.session import SessionLocal
 from app.game.tournaments.constants import TOURNAMENT_TYPE_DAILY_ARENA
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
+from app.workers.tasks.daily_cup_core import persist_daily_cup_standings_message_ids
+from app.workers.tasks.daily_cup_messaging_text import (
+    build_completed_text,
+    build_round_text,
+    build_standings_lines,
+)
 from app.workers.tasks.tournaments_messaging_text import (
     ROUND_STATUSES,
     format_deadline,
@@ -28,58 +34,6 @@ logger = structlog.get_logger("app.workers.tasks.daily_cup_messaging")
 
 def _is_celery_task(task_obj: object) -> bool:
     return type(task_obj).__module__.startswith("celery.")
-
-
-def _build_standings_lines(
-    *,
-    standings_user_ids: list[int],
-    labels: dict[int, str],
-    points_by_user: dict[int, str],
-    viewer_user_id: int,
-) -> list[str]:
-    lines: list[str] = []
-    for place, user_id in enumerate(standings_user_ids, start=1):
-        medal = "🥇" if place == 1 else "🥈" if place == 2 else "🥉" if place == 3 else " "
-        suffix = " (Du)" if user_id == viewer_user_id else ""
-        lines.append(
-            f"{place}. {medal} {labels.get(user_id, 'Spieler')}{suffix}"
-            f" - {points_by_user.get(user_id, '0')} Pkt"
-        )
-    return lines
-
-
-def _build_round_text(
-    *,
-    round_no: int,
-    deadline_text: str,
-    opponent_label: str | None,
-    standings_lines: list[str],
-) -> str:
-    lines = [
-        "🏆 Daily Arena Cup",
-        "",
-        f"⚔️ Runde {round_no}/3 gestartet",
-        "Format: 5 Fragen",
-        f"Deadline: {deadline_text} (Berlin)",
-    ]
-    lines.append("Gegner: Freilos" if opponent_label is None else f"Gegner: {opponent_label}")
-    lines.extend(["", "📊 Tabelle", *standings_lines])
-    return "\n".join(lines)
-
-
-def _build_completed_text(*, place: int, my_points: str, standings_lines: list[str]) -> str:
-    lines = [
-        "🏆 Daily Arena Cup",
-        "",
-        "🏁 Cup beendet!",
-        f"Dein Ergebnis: Platz #{place} • {my_points} Pkt",
-        "",
-        "📊 Endtabelle",
-        *standings_lines,
-        "",
-        "📤 Nutze 'Ergebnis teilen' fuer deinen Share-Link.",
-    ]
-    return "\n".join(lines)
 
 
 async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str, int]:
@@ -104,12 +58,11 @@ async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str
             return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
 
         users = await UsersRepo.list_by_ids(session, [int(item.user_id) for item in participants])
-        labels: dict[int, str] = {}
-        telegram_targets: dict[int, int] = {}
-        for user in users:
-            user_id = int(user.id)
-            labels[user_id] = format_user_label(username=user.username, first_name=user.first_name)
-            telegram_targets[user_id] = int(user.telegram_user_id)
+        labels = {
+            int(user.id): format_user_label(username=user.username, first_name=user.first_name)
+            for user in users
+        }
+        telegram_targets = {int(user.id): int(user.telegram_user_id) for user in users}
 
         round_matches = []
         if tournament.status in ROUND_STATUSES:
@@ -125,9 +78,7 @@ async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str
     participant_rows = {int(item.user_id): item for item in participants}
     participants_total = len(standings_user_ids)
 
-    sent = 0
-    edited = 0
-    failed = 0
+    sent = edited = failed = 0
     new_message_ids: dict[int, int] = {}
     replaced_message_ids: dict[int, int] = {}
 
@@ -140,23 +91,22 @@ async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str
                 continue
 
             play_challenge_id, opponent_user_id = resolve_match_context(
-                round_matches=round_matches,
-                viewer_user_id=user_id,
+                round_matches=round_matches, viewer_user_id=user_id
             )
-            standings_lines = _build_standings_lines(
+            standings_lines = build_standings_lines(
                 standings_user_ids=standings_user_ids,
                 labels=labels,
                 points_by_user=points_by_user,
                 viewer_user_id=user_id,
             )
             if tournament.status == "COMPLETED":
-                text = _build_completed_text(
+                text = build_completed_text(
                     place=place_by_user[user_id],
                     my_points=points_by_user.get(user_id, "0"),
                     standings_lines=standings_lines,
                 )
             else:
-                text = _build_round_text(
+                text = build_round_text(
                     round_no=max(1, int(tournament.current_round)),
                     deadline_text=format_deadline(tournament.round_deadline),
                     opponent_label=(
@@ -195,22 +145,11 @@ async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str
     finally:
         await bot.session.close()
 
-    if new_message_ids or replaced_message_ids:
-        async with SessionLocal.begin() as session:
-            for user_id, message_id in new_message_ids.items():
-                await TournamentParticipantsRepo.set_standings_message_id_if_missing(
-                    session,
-                    tournament_id=parsed_tournament_id,
-                    user_id=user_id,
-                    message_id=message_id,
-                )
-            for user_id, message_id in replaced_message_ids.items():
-                await TournamentParticipantsRepo.set_standings_message_id(
-                    session,
-                    tournament_id=parsed_tournament_id,
-                    user_id=user_id,
-                    message_id=message_id,
-                )
+    await persist_daily_cup_standings_message_ids(
+        tournament_id=parsed_tournament_id,
+        new_message_ids=new_message_ids,
+        replaced_message_ids=replaced_message_ids,
+    )
 
     return {
         "processed": 1,

@@ -105,9 +105,7 @@ async def run_private_tournament_round_messaging_async(*, tournament_id: str) ->
     participant_rows = {int(item.user_id): item for item in participants}
     participants_total = len(standings_user_ids)
 
-    sent = 0
-    edited = 0
-    failed = 0
+    sent = edited = failed = 0
     new_message_ids: dict[int, int] = {}
     replaced_message_ids: dict[int, int] = {}
 

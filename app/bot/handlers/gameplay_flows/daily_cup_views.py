@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from aiogram.types import CallbackQuery
 
-from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard
 from app.bot.handlers.gameplay_flows.tournament_views import format_points
+from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard
 from app.workers.tasks.tournaments_messaging_text import format_deadline
 
 

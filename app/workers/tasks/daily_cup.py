@@ -8,11 +8,11 @@ from app.workers.tasks.daily_cup_async import (
 from app.workers.tasks.daily_cup_async import (
     open_daily_cup_registration_async as _open_daily_cup_registration_async,
 )
+from app.workers.tasks.daily_cup_messaging import run_daily_cup_round_messaging
+from app.workers.tasks.daily_cup_proof_cards import run_daily_cup_proof_cards
 from app.workers.tasks.daily_cup_rounds import (
     advance_daily_cup_rounds_async as _advance_daily_cup_rounds_async,
 )
-from app.workers.tasks.daily_cup_messaging import run_daily_cup_round_messaging
-from app.workers.tasks.daily_cup_proof_cards import run_daily_cup_proof_cards
 from app.workers.tasks.daily_cup_schedule import configure_daily_cup_schedule
 
 open_daily_cup_registration_async = _open_daily_cup_registration_async

@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.daily_push_logs import DailyPushLog
 from app.db.models.daily_runs import DailyRun
-from app.db.models.tournament_participants import TournamentParticipant
 from app.db.models.streak_state import StreakState
+from app.db.models.tournament_participants import TournamentParticipant
 from app.db.models.users import User
 
 
