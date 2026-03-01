@@ -64,9 +64,11 @@ async def resolve_tournament_id_for_match(
 
 def enqueue_tournament_post_match_updates(*, tournament_id: str) -> None:
     from app.bot.handlers import gameplay_tournament_notifications
+    from app.workers.tasks.daily_cup_proof_cards import enqueue_daily_cup_proof_cards
     from app.workers.tasks.tournaments_proof_cards import enqueue_private_tournament_proof_cards
 
     gameplay_tournament_notifications.enqueue_tournament_round_messaging(
         tournament_id=tournament_id
     )
     enqueue_private_tournament_proof_cards(tournament_id=tournament_id)
+    enqueue_daily_cup_proof_cards(tournament_id=tournament_id)

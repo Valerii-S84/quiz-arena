@@ -13,6 +13,7 @@ from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.tournaments.constants import (
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_STATUS_REGISTRATION,
+    TOURNAMENT_TYPE_DAILY_ARENA,
     TOURNAMENT_TYPE_PRIVATE,
 )
 from app.game.tournaments.errors import TournamentAccessError, TournamentNotFoundError
@@ -127,6 +128,24 @@ async def get_private_tournament_lobby_by_invite_code(
     if tournament is None:
         raise TournamentNotFoundError
     if tournament.type != TOURNAMENT_TYPE_PRIVATE:
+        raise TournamentAccessError
+    return await _build_lobby_snapshot(
+        session=session,
+        tournament=tournament,
+        viewer_user_id=viewer_user_id,
+    )
+
+
+async def get_daily_cup_lobby_by_id(
+    session: AsyncSession,
+    *,
+    tournament_id: UUID,
+    viewer_user_id: int,
+) -> TournamentLobbySnapshot:
+    tournament = await TournamentsRepo.get_by_id(session, tournament_id)
+    if tournament is None:
+        raise TournamentNotFoundError
+    if tournament.type != TOURNAMENT_TYPE_DAILY_ARENA:
         raise TournamentAccessError
     return await _build_lobby_snapshot(
         session=session,
