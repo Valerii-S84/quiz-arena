@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
-from aiogram.types import Message
+from aiogram.types import InlineKeyboardMarkup
 
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
@@ -19,26 +20,42 @@ from app.game.sessions.errors import (
     FriendChallengeFullError,
     FriendChallengeNotFoundError,
 )
+from app.game.sessions.types import FriendChallengeSnapshot
+
+
+@dataclass(slots=True)
+class OutgoingStartMessage:
+    text: str
+    reply_markup: InlineKeyboardMarkup
+    parse_mode: str | None = None
+
+
+@dataclass(slots=True)
+class StartFriendChallengeHandlingResult:
+    handled: bool
+    messages: list[OutgoingStartMessage] = field(default_factory=list)
+    notify_creator: bool = False
+    notify_challenge: FriendChallengeSnapshot | None = None
+    notify_joiner_user_id: int | None = None
 
 
 async def handle_start_friend_challenge_payload(
-    message: Message,
     *,
     session,
     now_utc: datetime,
     snapshot,
     friend_invite_token: str | None,
     duel_challenge_id: str | None,
+    start_message_id: int,
     game_session_service,
-    notify_creator_about_join,
     resolve_opponent_label,
     build_friend_plan_text,
     build_friend_score_text,
     build_friend_ttl_text,
     build_question_text,
-) -> bool:
+) -> StartFriendChallengeHandlingResult | None:
     if friend_invite_token is None and duel_challenge_id is None:
-        return False
+        return None
 
     challenge_start = None
     challenge_joined_now = False
@@ -73,7 +90,7 @@ async def handle_start_friend_challenge_payload(
             session,
             user_id=snapshot.user_id,
             challenge_id=challenge.challenge_id,
-            idempotency_key=f"start:friend:join:{challenge.challenge_id}:{message.message_id}",
+            idempotency_key=f"start:friend:join:{challenge.challenge_id}:{start_message_id}",
             now_utc=now_utc,
         )
     except (
@@ -97,17 +114,14 @@ async def handle_start_friend_challenge_payload(
             if challenge_error_key == "msg.friend.challenge.open.taken"
             else build_home_keyboard()
         )
-        await message.answer(
-            TEXTS_DE[challenge_error_key or "msg.friend.challenge.invalid"],
-            reply_markup=reply_markup,
-        )
-        return True
-
-    if challenge_joined_now:
-        await notify_creator_about_join(
-            message,
-            challenge=challenge_start.snapshot,
-            joiner_user_id=snapshot.user_id,
+        return StartFriendChallengeHandlingResult(
+            handled=True,
+            messages=[
+                OutgoingStartMessage(
+                    text=TEXTS_DE[challenge_error_key or "msg.friend.challenge.invalid"],
+                    reply_markup=reply_markup,
+                )
+            ],
         )
 
     opponent_label = await resolve_opponent_label(
@@ -134,10 +148,12 @@ async def handle_start_friend_challenge_payload(
         summary_lines.append(TEXTS_DE["msg.friend.challenge.waiting"])
     if challenge_start.already_answered_current_round:
         summary_lines.append(TEXTS_DE["msg.friend.challenge.round.already.answered"])
-    await message.answer(
-        "\n".join(summary_lines),
-        reply_markup=build_friend_challenge_back_keyboard(),
-    )
+    outgoing_messages = [
+        OutgoingStartMessage(
+            text="\n".join(summary_lines),
+            reply_markup=build_friend_challenge_back_keyboard(),
+        )
+    ]
     if challenge_start.start_result is not None:
         question_text = build_question_text(
             source="FRIEND_CHALLENGE",
@@ -145,12 +161,20 @@ async def handle_start_friend_challenge_payload(
             snapshot_paid_energy=snapshot.paid_energy,
             start_result=challenge_start.start_result,
         )
-        await message.answer(
-            question_text,
-            reply_markup=build_quiz_keyboard(
-                session_id=str(challenge_start.start_result.session.session_id),
-                options=challenge_start.start_result.session.options,
-            ),
-            parse_mode="HTML",
+        outgoing_messages.append(
+            OutgoingStartMessage(
+                text=question_text,
+                reply_markup=build_quiz_keyboard(
+                    session_id=str(challenge_start.start_result.session.session_id),
+                    options=challenge_start.start_result.session.options,
+                ),
+                parse_mode="HTML",
+            )
         )
-    return True
+    return StartFriendChallengeHandlingResult(
+        handled=True,
+        messages=outgoing_messages,
+        notify_creator=challenge_joined_now,
+        notify_challenge=challenge_start.snapshot if challenge_joined_now else None,
+        notify_joiner_user_id=snapshot.user_id if challenge_joined_now else None,
+    )
