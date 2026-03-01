@@ -14,6 +14,15 @@ from app.game.sessions.types import FriendChallengeSnapshot
 from app.services.user_onboarding import UserOnboardingService
 
 
+def _resolve_welcome_image_file_id(*, current_settings) -> str:
+    resolved_file_id = getattr(current_settings, "resolved_welcome_image_file_id", "")
+    if isinstance(resolved_file_id, str) and resolved_file_id.strip():
+        return resolved_file_id.strip()
+    welcome_image_file_id = getattr(current_settings, "welcome_image_file_id", "")
+    home_header_file_id = getattr(current_settings, "telegram_home_header_file_id", "")
+    return str(welcome_image_file_id).strip() or str(home_header_file_id).strip()
+
+
 async def _send_home_message(
     message: Message,
     *,
@@ -22,7 +31,9 @@ async def _send_home_message(
 ) -> None:
     resolved_home_header_file_id = home_header_file_id
     if resolved_home_header_file_id is None:
-        resolved_home_header_file_id = get_settings().telegram_home_header_file_id.strip()
+        resolved_home_header_file_id = _resolve_welcome_image_file_id(
+            current_settings=get_settings()
+        )
     if not resolved_home_header_file_id:
         await message.answer(text, reply_markup=build_home_keyboard())
         return

@@ -87,7 +87,7 @@ def test_friend_challenge_share_keyboard_contains_share_url_and_back() -> None:
     assert len(share_buttons) == 1
     assert "https://t.me/share/url" in (share_buttons[0].url or "")
     assert "https%3A%2F%2Ft.me%2Fquizarena_bot%3Fstart%3Dfc_token" in (share_buttons[0].url or "")
-    assert "5+Fragen" in (share_buttons[0].url or "")
+    assert "Kannst+du+mich+schlagen%3F" in (share_buttons[0].url or "")
     assert any(
         button.callback_data == "friend:copy:00000000-0000-0000-0000-000000000001"
         for button in buttons

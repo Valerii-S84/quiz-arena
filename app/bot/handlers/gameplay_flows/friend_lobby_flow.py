@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery
 
 from app.bot.keyboards.friend_challenge import (
@@ -12,6 +13,7 @@ from app.bot.keyboards.friend_challenge import (
 )
 from app.bot.keyboards.tournament import build_tournament_format_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.core.config import get_settings
 from app.game.friend_challenges.constants import DUEL_TYPE_DIRECT, DUEL_TYPE_OPEN
 from app.game.sessions.errors import (
     FriendChallengeAccessError,
@@ -102,6 +104,21 @@ async def handle_friend_challenge_create_selected(
         )
         await callback.answer()
         return
+    welcome_image_file_id = get_settings().resolved_welcome_image_file_id
+    if welcome_image_file_id:
+        bot = callback.bot
+        assert bot is not None
+        try:
+            await bot.send_photo(
+                chat_id=callback.from_user.id,
+                photo=welcome_image_file_id,
+                caption=(
+                    "⚔️ Ich fordere dich heraus! Kannst du mich schlagen?\n\n"
+                    f"👉 {invite_link}"
+                ),
+            )
+        except TelegramAPIError:
+            welcome_image_file_id = ""
     body_lines = [
         TEXTS_DE["msg.friend.challenge.created"],
         build_friend_plan_text(total_rounds=challenge.total_rounds),

@@ -8,6 +8,7 @@ from app.bot.handlers.start_friend_challenge_flow import handle_start_friend_cha
 from app.bot.handlers.start_helpers import (
     _notify_creator_about_join,
     _resolve_opponent_label,
+    _resolve_welcome_image_file_id,
     _send_home_message,
 )
 from app.bot.handlers.start_parsing import (
@@ -107,11 +108,19 @@ async def handle_start_message(message: Message) -> None:
                 joiner_user_id=friend_challenge_result.notify_joiner_user_id,
             )
         for outgoing_message in friend_challenge_result.messages:
-            await message.answer(
-                outgoing_message.text,
-                reply_markup=outgoing_message.reply_markup,
-                parse_mode=outgoing_message.parse_mode,
-            )
+            if outgoing_message.photo is not None:
+                await message.answer_photo(
+                    photo=outgoing_message.photo,
+                    caption=outgoing_message.text,
+                    reply_markup=outgoing_message.reply_markup,
+                    parse_mode=outgoing_message.parse_mode,
+                )
+            else:
+                await message.answer(
+                    outgoing_message.text,
+                    reply_markup=outgoing_message.reply_markup,
+                    parse_mode=outgoing_message.parse_mode,
+                )
         return
 
     response_text = _build_home_text(
@@ -122,7 +131,7 @@ async def handle_start_message(message: Message) -> None:
     await _send_home_message(
         message,
         text=response_text,
-        home_header_file_id=get_settings().telegram_home_header_file_id.strip(),
+        home_header_file_id=_resolve_welcome_image_file_id(current_settings=get_settings()),
     )
     if offer_selection is not None:
         await message.answer(
@@ -171,6 +180,6 @@ async def handle_home_open(callback: CallbackQuery) -> None:
     await _send_home_message(
         callback.message,
         text=response_text,
-        home_header_file_id=get_settings().telegram_home_header_file_id.strip(),
+        home_header_file_id=_resolve_welcome_image_file_id(current_settings=get_settings()),
     )
     await callback.answer()

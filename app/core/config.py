@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = Field(alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_secret: str = Field(alias="TELEGRAM_WEBHOOK_SECRET")
+    welcome_image_file_id: str = Field(default="", alias="WELCOME_IMAGE_FILE_ID")
     telegram_home_header_file_id: str = Field(default="", alias="TELEGRAM_HOME_HEADER_FILE_ID")
     # Telegram channel target for one-time Kanal-Bonus check (supports @username or chat id).
     bonus_channel_id: str = Field(default="", alias="BONUS_CHANNEL_ID")
@@ -233,6 +234,10 @@ class Settings(BaseSettings):
 
     celery_broker_url: str = Field(alias="CELERY_BROKER_URL")
     celery_result_backend: str = Field(alias="CELERY_RESULT_BACKEND")
+
+    @property
+    def resolved_welcome_image_file_id(self) -> str:
+        return self.welcome_image_file_id.strip() or self.telegram_home_header_file_id.strip()
 
 
 @lru_cache(maxsize=1)
