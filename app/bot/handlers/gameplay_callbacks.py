@@ -22,6 +22,9 @@ TOURNAMENT_COPY_LINK_RE = re.compile(r"^friend:tournament:copy:([0-9a-f\-]{36})$
 TOURNAMENT_START_RE = re.compile(r"^friend:tournament:start:([0-9a-f\-]{36})$")
 TOURNAMENT_VIEW_RE = re.compile(r"^friend:tournament:view:([0-9a-f\-]{36})$")
 TOURNAMENT_SHARE_RE = re.compile(r"^friend:tournament:share:([0-9a-f\-]{36})$")
+DAILY_CUP_JOIN_RE = re.compile(r"^daily:cup:join:([0-9a-f\-]{36})$")
+DAILY_CUP_VIEW_RE = re.compile(r"^daily:cup:view:([0-9a-f\-]{36})$")
+DAILY_CUP_SHARE_RE = re.compile(r"^daily:cup:share:([0-9a-f\-]{36})$")
 DAILY_RESULT_RE = re.compile(r"^daily:result:([0-9a-f\-]{36})$")
 
 

@@ -24,6 +24,7 @@ celery_app = Celery(
         "app.workers.tasks.tournaments",
         "app.workers.tasks.tournaments_messaging",
         "app.workers.tasks.tournaments_proof_cards",
+        "app.workers.tasks.daily_cup",
     ],
 )
 
@@ -34,7 +35,7 @@ celery_app.conf.update(
     task_serializer="json",
     result_serializer="json",
     accept_content=["json"],
-    timezone="Europe/Berlin",
+    timezone=settings.daily_cup_timezone,
     enable_utc=True,
 )
 

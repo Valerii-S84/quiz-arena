@@ -8,6 +8,7 @@ from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
+from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.friend_challenges.constants import (
     DUEL_STATUS_ACCEPTED,
     DUEL_STATUS_COMPLETED,
@@ -25,6 +26,8 @@ from .friend_challenges_internal import (
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
 )
+
+TOURNAMENT_TYPE_DAILY_ARENA = "DAILY_ARENA"
 
 
 async def _apply_friend_challenge_answer(
@@ -138,11 +141,39 @@ async def _apply_friend_challenge_answer(
                     now_utc=now_utc,
                 )
                 if match_settled:
-                    await check_and_advance_round(
+                    transition = await check_and_advance_round(
                         session,
                         tournament_id=tournament_match.tournament_id,
                         now_utc=now_utc,
                     )
+                    tournament = await TournamentsRepo.get_by_id(
+                        session,
+                        tournament_match.tournament_id,
+                    )
+                    if tournament is not None and tournament.type == TOURNAMENT_TYPE_DAILY_ARENA:
+                        await emit_analytics_event(
+                            session,
+                            event_type="daily_cup_match_completed",
+                            source=EVENT_SOURCE_BOT,
+                            happened_at=now_utc,
+                            user_id=user_id,
+                            payload={
+                                "tournament_id": str(tournament_match.tournament_id),
+                                "round_no": int(tournament_match.round_no),
+                            },
+                        )
+                        if int(transition["round_started"]) > 0:
+                            await emit_analytics_event(
+                                session,
+                                event_type="daily_cup_round_started",
+                                source=EVENT_SOURCE_BOT,
+                                happened_at=now_utc,
+                                user_id=user_id,
+                                payload={
+                                    "tournament_id": str(tournament_match.tournament_id),
+                                    "round_no": int(tournament.current_round),
+                                },
+                            )
         friend_snapshot = _build_friend_challenge_snapshot(challenge)
         friend_waiting_for_opponent = is_duel_playable_status(challenge.status) and (
             challenge.opponent_user_id is None

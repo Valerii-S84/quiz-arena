@@ -42,11 +42,30 @@ class TournamentsRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_type_and_registration_deadline_for_update(
+        session: AsyncSession,
+        *,
+        tournament_type: str,
+        registration_deadline: datetime,
+    ) -> Tournament | None:
+        stmt = (
+            select(Tournament)
+            .where(
+                Tournament.type == tournament_type,
+                Tournament.registration_deadline == registration_deadline,
+            )
+            .with_for_update()
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def list_due_registration_close_for_update(
         session: AsyncSession,
         *,
         now_utc: datetime,
         limit: int,
+        tournament_type: str | None = None,
     ) -> list[Tournament]:
         resolved_limit = max(1, int(limit))
         stmt = (
@@ -59,6 +78,8 @@ class TournamentsRepo:
             .limit(resolved_limit)
             .with_for_update(skip_locked=True)
         )
+        if tournament_type is not None:
+            stmt = stmt.where(Tournament.type == tournament_type)
         result = await session.execute(stmt)
         return list(result.scalars().all())
 
@@ -68,6 +89,7 @@ class TournamentsRepo:
         *,
         now_utc: datetime,
         limit: int,
+        tournament_type: str | None = None,
     ) -> list[Tournament]:
         resolved_limit = max(1, int(limit))
         stmt = (
@@ -81,5 +103,7 @@ class TournamentsRepo:
             .limit(resolved_limit)
             .with_for_update(skip_locked=True)
         )
+        if tournament_type is not None:
+            stmt = stmt.where(Tournament.type == tournament_type)
         result = await session.execute(stmt)
         return list(result.scalars().all())

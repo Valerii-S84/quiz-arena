@@ -33,6 +33,7 @@ def _render_champion(
     completed_at: datetime | None,
     tournament_name: str | None,
     rounds_played: int | None,
+    is_daily_arena: bool,
 ) -> Image.Image:
     label, accent_hex = PLACE_LABELS.get(place, (f"PLATZ #{place}", "#FFFFFF"))
     accent = rgb(accent_hex)
@@ -52,13 +53,12 @@ def _render_champion(
     draw.line([(x0, 132), (x0 + 200, 132)], fill=accent, width=2)
     draw_centered(draw, text=f"#{place}", y=168, font_obj=load_font(120, bold=True), fill=accent)
     draw_centered(draw, text=label, y=334, font_obj=load_font(42, bold=True), fill=accent)
-    draw_centered(
-        draw,
-        text=truncate(tournament_name, fallback="Privates Turnier", limit=34),
-        y=430,
-        font_obj=load_font(32),
-        fill=(255, 255, 255),
+    subtitle = (
+        "Daily Arena Champion"
+        if is_daily_arena
+        else truncate(tournament_name, fallback="Privates Turnier", limit=34)
     )
+    draw_centered(draw, text=subtitle, y=430, font_obj=load_font(32), fill=(255, 255, 255))
     draw_centered(
         draw,
         text=truncate(player_label, fallback="Spieler", limit=20),
@@ -95,6 +95,7 @@ def _render_arena(
     completed_at: datetime | None,
     tournament_name: str | None,
     rounds_played: int | None,
+    is_daily_arena: bool,
 ) -> Image.Image:
     image = Image.new("RGB", CARD_SIZE, color=rgb(ARENA_BG[0]))
     draw_gradient(image, top_hex=ARENA_BG[0], bottom_hex=ARENA_BG[1])
@@ -107,7 +108,11 @@ def _render_arena(
             draw.point((x, y), fill=(42, 42, 42))
 
     accent = rgb(ARENA_ACCENT)
-    subtitle = truncate(tournament_name, fallback="IM DAILY ARENA CUP", limit=32)
+    subtitle = (
+        f"Heute #{place} im Daily Arena Cup"
+        if is_daily_arena
+        else truncate(tournament_name, fallback="IM DAILY ARENA CUP", limit=32)
+    )
     place_fill = accent if place <= 5 else (255, 255, 255)
     draw_centered(draw, text="QUIZ ARENA", y=66, font_obj=load_font(46, bold=True), fill=accent)
     draw_centered(draw, text="HEUTE", y=130, font_obj=load_font(28), fill=(150, 150, 150))
@@ -146,6 +151,7 @@ def _render_participant(
     place: int,
     completed_at: datetime | None,
     tournament_name: str | None,
+    is_daily_arena: bool,
 ) -> Image.Image:
     image = Image.new("RGB", CARD_SIZE, color=rgb(PARTICIPANT_BG[0]))
     draw_gradient(image, top_hex=PARTICIPANT_BG[0], bottom_hex=PARTICIPANT_BG[1])
@@ -155,13 +161,12 @@ def _render_participant(
     draw_centered(
         draw, text="ICH WAR DABEI!", y=184, font_obj=load_font(56, bold=True), fill=accent
     )
-    draw_centered(
-        draw,
-        text=truncate(tournament_name, fallback="Privates Turnier", limit=34),
-        y=338,
-        font_obj=load_font(36),
-        fill=(255, 255, 255),
+    subtitle = (
+        "Ich war dabei! · Daily Arena Cup"
+        if is_daily_arena
+        else truncate(tournament_name, fallback="Privates Turnier", limit=34)
     )
+    draw_centered(draw, text=subtitle, y=338, font_obj=load_font(36), fill=(255, 255, 255))
     draw_centered(
         draw,
         text=truncate(player_label, fallback="Spieler", limit=20),
@@ -185,6 +190,7 @@ def render_tournament_proof_card_png(
     completed_at: datetime | None,
     tournament_name: str | None = None,
     rounds_played: int | None = None,
+    is_daily_arena: bool = False,
 ) -> bytes:
     if place <= 3:
         image = _render_champion(
@@ -195,6 +201,7 @@ def render_tournament_proof_card_png(
             completed_at=completed_at,
             tournament_name=tournament_name,
             rounds_played=rounds_played,
+            is_daily_arena=is_daily_arena,
         )
     elif place <= 10:
         image = _render_arena(
@@ -205,6 +212,7 @@ def render_tournament_proof_card_png(
             completed_at=completed_at,
             tournament_name=tournament_name,
             rounds_played=rounds_played,
+            is_daily_arena=is_daily_arena,
         )
     else:
         image = _render_participant(
@@ -212,6 +220,7 @@ def render_tournament_proof_card_png(
             place=place,
             completed_at=completed_at,
             tournament_name=tournament_name,
+            is_daily_arena=is_daily_arena,
         )
 
     buffer = BytesIO()

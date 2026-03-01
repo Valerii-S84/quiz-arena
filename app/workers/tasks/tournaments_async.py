@@ -7,7 +7,7 @@ import structlog
 from app.core.analytics_events import EVENT_SOURCE_WORKER, emit_analytics_event
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
-from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED
+from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED, TOURNAMENT_TYPE_PRIVATE
 from app.game.tournaments.lifecycle import close_expired_registration, settle_round_and_advance
 from app.workers.tasks.tournaments_config import DEADLINE_BATCH_SIZE, ROUND_DURATION_HOURS
 from app.workers.tasks.tournaments_messaging import enqueue_private_tournament_round_messaging
@@ -66,6 +66,7 @@ async def run_private_tournament_rounds_async(
             session,
             now_utc=now_utc,
             limit=resolved_batch_size,
+            tournament_type=TOURNAMENT_TYPE_PRIVATE,
         )
         for tournament in due_registration:
             if await close_expired_registration(session, tournament=tournament):
@@ -75,6 +76,7 @@ async def run_private_tournament_rounds_async(
             session,
             now_utc=now_utc,
             limit=resolved_batch_size,
+            tournament_type=TOURNAMENT_TYPE_PRIVATE,
         )
         for tournament in due_rounds:
             transition = await settle_round_and_advance(

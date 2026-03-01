@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +15,7 @@ from app.game.tournaments.constants import (
     TOURNAMENT_FORMAT_QUICK_12,
     TOURNAMENT_MIN_PARTICIPANTS,
     TOURNAMENT_STATUS_REGISTRATION,
+    TOURNAMENT_TYPE_DAILY_ARENA,
     TOURNAMENT_TYPE_PRIVATE,
 )
 from app.game.tournaments.errors import (
@@ -105,6 +107,49 @@ async def join_private_tournament_by_code(
         )
     if len(existing_user_ids) >= int(tournament.max_participants):
         raise TournamentFullError
+
+    joined_now = await TournamentParticipantsRepo.create_once(
+        session,
+        tournament_id=tournament.id,
+        user_id=user_id,
+        joined_at=now_utc,
+    )
+    participants_total = len(existing_user_ids) + int(joined_now)
+    return TournamentJoinResult(
+        snapshot=build_tournament_snapshot(tournament),
+        joined_now=joined_now,
+        participants_total=participants_total,
+    )
+
+
+async def join_daily_cup_by_id(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    tournament_id: UUID,
+    now_utc: datetime,
+) -> TournamentJoinResult:
+    tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
+    if tournament is None:
+        raise TournamentNotFoundError
+    if tournament.type != TOURNAMENT_TYPE_DAILY_ARENA:
+        raise TournamentAccessError
+    if tournament.status != TOURNAMENT_STATUS_REGISTRATION:
+        raise TournamentClosedError
+    if tournament.registration_deadline <= now_utc:
+        raise TournamentClosedError
+
+    participants = await TournamentParticipantsRepo.list_for_tournament_for_update(
+        session,
+        tournament_id=tournament.id,
+    )
+    existing_user_ids = {int(item.user_id) for item in participants}
+    if user_id in existing_user_ids:
+        return TournamentJoinResult(
+            snapshot=build_tournament_snapshot(tournament),
+            joined_now=False,
+            participants_total=len(existing_user_ids),
+        )
 
     joined_now = await TournamentParticipantsRepo.create_once(
         session,
