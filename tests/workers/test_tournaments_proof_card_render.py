@@ -26,3 +26,26 @@ def test_render_tournament_proof_card_top3_variant_differs_from_regular() -> Non
     assert top1_png != regular_png
     image = Image.open(BytesIO(top1_png))
     assert image.size == (1080, 1080)
+
+
+def test_render_tournament_proof_card_daily_variant_differs_from_private() -> None:
+    daily_png = render_tournament_proof_card_png(
+        player_label="Spieler Eins",
+        place=4,
+        points="2",
+        format_label="5 Fragen",
+        completed_at=None,
+        tournament_name="Daily Arena Cup",
+        is_daily_arena=True,
+    )
+    private_png = render_tournament_proof_card_png(
+        player_label="Spieler Eins",
+        place=4,
+        points="2",
+        format_label="5 Fragen",
+        completed_at=None,
+        tournament_name="Privates Turnier",
+        is_daily_arena=False,
+    )
+
+    assert daily_png != private_png

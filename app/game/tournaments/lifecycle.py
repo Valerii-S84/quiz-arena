@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
@@ -20,6 +21,7 @@ from app.game.tournaments.constants import (
     TOURNAMENT_STATUS_ROUND_1,
     TOURNAMENT_STATUS_ROUND_2,
     TOURNAMENT_STATUS_ROUND_3,
+    TOURNAMENT_TYPE_DAILY_ARENA,
     status_for_round,
 )
 from app.game.tournaments.internal import resolve_round_deadline
@@ -37,6 +39,20 @@ _ACTIVE_ROUND_STATUSES = frozenset(
         TOURNAMENT_STATUS_ROUND_3,
     }
 )
+
+
+def _resolve_deadline_for_tournament(
+    *,
+    tournament: Tournament,
+    now_utc: datetime,
+    round_duration_hours: int,
+) -> datetime:
+    if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA:
+        return now_utc + timedelta(minutes=max(1, int(settings.daily_cup_round_duration_minutes)))
+    return resolve_round_deadline(
+        now_utc=now_utc,
+        round_duration_hours=round_duration_hours,
+    )
 
 
 async def close_expired_registration(
@@ -104,7 +120,8 @@ async def settle_round_and_advance(
         tournament_id=tournament.id,
     )
     next_round = current_round + 1
-    next_deadline = resolve_round_deadline(
+    next_deadline = _resolve_deadline_for_tournament(
+        tournament=tournament,
         now_utc=now_utc,
         round_duration_hours=round_duration_hours,
     )

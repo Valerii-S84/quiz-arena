@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models.daily_push_logs import DailyPushLog
 from app.db.models.daily_runs import DailyRun
 from app.db.models.streak_state import StreakState
+from app.db.models.tournament_participants import TournamentParticipant
 from app.db.models.users import User
 
 
@@ -129,4 +130,42 @@ class UsersRepo:
                     int(streak_raw),
                 )
             )
+        return rows
+
+    @staticmethod
+    async def list_daily_cup_push_targets(
+        session: AsyncSession,
+        *,
+        tournament_id,
+        active_since_utc: datetime,
+        after_user_id: int | None,
+        limit: int,
+    ) -> list[tuple[int, int]]:
+        resolved_limit = max(1, min(1000, int(limit)))
+        registered_exists = (
+            select(TournamentParticipant.user_id)
+            .where(
+                TournamentParticipant.tournament_id == tournament_id,
+                TournamentParticipant.user_id == User.id,
+            )
+            .exists()
+        )
+        stmt = (
+            select(User.id, User.telegram_user_id)
+            .where(
+                User.status == "ACTIVE",
+                User.last_seen_at.is_not(None),
+                User.last_seen_at >= active_since_utc,
+                ~registered_exists,
+            )
+            .order_by(User.id.asc())
+            .limit(resolved_limit)
+        )
+        if after_user_id is not None:
+            stmt = stmt.where(User.id > after_user_id)
+
+        result = await session.execute(stmt)
+        rows: list[tuple[int, int]] = []
+        for user_id_raw, telegram_user_id_raw in result.all():
+            rows.append((int(user_id_raw), int(telegram_user_id_raw)))
         return rows

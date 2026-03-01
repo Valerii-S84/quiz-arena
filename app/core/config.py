@@ -84,22 +84,13 @@ class Settings(BaseSettings):
     tournament_max_participants: int = Field(default=8, alias="TOURNAMENT_MAX_PARTICIPANTS")
     tournament_min_participants: int = Field(default=2, alias="TOURNAMENT_MIN_PARTICIPANTS")
     tournament_rounds: int = Field(default=3, alias="TOURNAMENT_ROUNDS")
-    daily_cup_registration_open: str = Field(
-        default="12:00",
-        alias="DAILY_CUP_REGISTRATION_OPEN",
-    )
-    daily_cup_registration_close: str = Field(
-        default="14:00",
-        alias="DAILY_CUP_REGISTRATION_CLOSE",
-    )
+    daily_cup_registration_open: str = Field(default="12:00", alias="DAILY_CUP_REGISTRATION_OPEN")
+    daily_cup_registration_close: str = Field(default="14:00", alias="DAILY_CUP_REGISTRATION_CLOSE")
     daily_cup_round_duration_minutes: int = Field(
-        default=120,
-        alias="DAILY_CUP_ROUND_DURATION_MINUTES",
+        default=120, alias="DAILY_CUP_ROUND_DURATION_MINUTES"
     )
-    daily_cup_min_participants: int = Field(
-        default=4,
-        alias="DAILY_CUP_MIN_PARTICIPANTS",
-    )
+    daily_cup_min_participants: int = Field(default=4, alias="DAILY_CUP_MIN_PARTICIPANTS")
+    daily_cup_timezone: str = Field(default="Europe/Berlin", alias="DAILY_CUP_TIMEZONE")
     daily_challenge_precompute_hour_berlin: int = Field(
         default=0,
         alias="DAILY_CHALLENGE_PRECOMPUTE_HOUR_BERLIN",

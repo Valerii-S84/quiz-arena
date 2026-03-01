@@ -9,6 +9,7 @@ from aiogram.types import CallbackQuery, Message
 
 from app.bot.handlers import (
     gameplay_callbacks,
+    gameplay_daily_cup,
     gameplay_friend_challenge,
     gameplay_helpers,
     gameplay_proof_cards,
@@ -49,6 +50,7 @@ EVENT_SOURCE_BOT = "BOT"
 ANSWER_RE, DAILY_RESULT_RE = gameplay_callbacks.ANSWER_RE, gameplay_callbacks.DAILY_RESULT_RE
 gameplay_friend_challenge.register(router)
 gameplay_tournaments.register(router)
+gameplay_daily_cup.register(router)
 _format_user_label = gameplay_views._format_user_label
 _build_friend_plan_text = gameplay_views._build_friend_plan_text
 _build_question_text = gameplay_views._build_question_text
