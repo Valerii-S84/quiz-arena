@@ -1,5 +1,8 @@
 # First Deploy And Rollback (VPS)
 
+For ongoing production releases after initial setup, use:
+- `docs/runbooks/github_to_prod_safe_deploy.md`
+
 ## 1) DNS and host prep
 1. Buy/prepare VPS with Docker Engine + Compose plugin.
 2. Point DNS `A` record:
