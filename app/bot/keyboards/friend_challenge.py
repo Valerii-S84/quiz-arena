@@ -10,8 +10,7 @@ def _build_share_url(*, invite_link: str, share_text: str) -> str:
 
 
 def _build_share_template(*, total_rounds: int) -> str:
-    rounds = max(1, int(total_rounds))
-    return f"⚔️ Ich fordere dich heraus! Kannst du mich schlagen? ({rounds} Fragen)"
+    return "⚔️ Ich fordere dich heraus! Kannst du mich schlagen?"
 
 
 def build_friend_challenge_share_url(*, base_link: str, share_text: str) -> str:

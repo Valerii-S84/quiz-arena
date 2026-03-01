@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
+from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery
 
 from app.bot.handlers.gameplay_flows.tournament_views import format_points
@@ -11,6 +12,7 @@ from app.bot.keyboards.tournament import (
     build_tournament_share_keyboard,
 )
 from app.bot.texts.de import TEXTS_DE
+from app.core.config import get_settings
 
 
 async def handle_tournament_create_from_format(
@@ -53,6 +55,18 @@ async def handle_tournament_create_from_format(
         await callback.message.answer(TEXTS_DE["msg.system.error"])
         await callback.answer()
         return
+    welcome_image_file_id = get_settings().resolved_welcome_image_file_id
+    if welcome_image_file_id:
+        bot = callback.bot
+        assert bot is not None
+        try:
+            await bot.send_photo(
+                chat_id=callback.from_user.id,
+                photo=welcome_image_file_id,
+                caption=f"🏆 Tritt meinem Deutsch-Turnier bei!\n\n👉 {invite_link}",
+            )
+        except TelegramAPIError:
+            welcome_image_file_id = ""
     await callback.message.answer(
         TEXTS_DE["msg.tournament.created"],
         reply_markup=build_tournament_created_keyboard(

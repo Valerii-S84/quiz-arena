@@ -5,6 +5,7 @@ from aiogram.types import Message
 from app.bot.handlers.gameplay_flows.tournament_views import format_points, format_user_label
 from app.bot.keyboards.tournament import build_tournament_lobby_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.core.config import get_settings
 from app.game.tournaments.errors import (
     TournamentAccessError,
     TournamentAlreadyStartedError,
@@ -73,15 +74,37 @@ async def handle_start_tournament_payload(
         if lobby.viewer_current_match_challenge_id is not None
         else None
     )
-    await message.answer(
-        "\n".join(body_lines),
-        reply_markup=build_tournament_lobby_keyboard(
-            invite_code=lobby.tournament.invite_code,
-            tournament_id=str(lobby.tournament.tournament_id),
-            can_join=lobby.tournament.status == "REGISTRATION" and not lobby.viewer_joined,
-            can_start=lobby.can_start,
-            play_challenge_id=play_challenge_id,
-            show_share_result=lobby.tournament.status == "COMPLETED" and lobby.viewer_joined,
-        ),
+    keyboard = build_tournament_lobby_keyboard(
+        invite_code=lobby.tournament.invite_code,
+        tournament_id=str(lobby.tournament.tournament_id),
+        can_join=lobby.tournament.status == "REGISTRATION" and not lobby.viewer_joined,
+        can_start=lobby.can_start,
+        play_challenge_id=play_challenge_id,
+        show_share_result=lobby.tournament.status == "COMPLETED" and lobby.viewer_joined,
     )
+    welcome_image_file_id = get_settings().resolved_welcome_image_file_id
+    should_show_join_photo = (
+        bool(welcome_image_file_id)
+        and lobby.tournament.status == "REGISTRATION"
+        and not lobby.viewer_joined
+    )
+    if should_show_join_photo:
+        creator_label = labels.get(
+            int(lobby.tournament.created_by) if lobby.tournament.created_by is not None else -1,
+            "Freund",
+        )
+        format_label = "12 Fragen" if lobby.tournament.format == "QUICK_12" else "5 Fragen"
+        await message.answer_photo(
+            photo=welcome_image_file_id,
+            caption=(
+                f"🏆 {creator_label}'s Turnier\n"
+                f"Format: {format_label} • 3 Runden\n"
+                f"Teilnehmer: {len(lobby.participants)}/{lobby.tournament.max_participants}"
+            ),
+            reply_markup=keyboard,
+        )
+        await message.answer("\n".join(body_lines))
+        return True
+
+    await message.answer("\n".join(body_lines), reply_markup=keyboard)
     return True

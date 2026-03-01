@@ -8,11 +8,13 @@ from aiogram.types import InlineKeyboardMarkup
 
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
+    build_friend_challenge_next_keyboard,
     build_friend_open_taken_keyboard,
 )
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.keyboards.quiz import build_quiz_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.core.config import get_settings
 from app.game.sessions.errors import (
     FriendChallengeAccessError,
     FriendChallengeCompletedError,
@@ -28,6 +30,7 @@ class OutgoingStartMessage:
     text: str
     reply_markup: InlineKeyboardMarkup
     parse_mode: str | None = None
+    photo: str | None = None
 
 
 @dataclass(slots=True)
@@ -148,12 +151,27 @@ async def handle_start_friend_challenge_payload(
         summary_lines.append(TEXTS_DE["msg.friend.challenge.waiting"])
     if challenge_start.already_answered_current_round:
         summary_lines.append(TEXTS_DE["msg.friend.challenge.round.already.answered"])
-    outgoing_messages = [
+    outgoing_messages: list[OutgoingStartMessage] = []
+    welcome_image_file_id = get_settings().resolved_welcome_image_file_id
+    if welcome_image_file_id:
+        outgoing_messages.append(
+            OutgoingStartMessage(
+                text=(
+                    f"⚔️ {opponent_label} fordert dich heraus!\n"
+                    f"Format: {challenge_start.snapshot.total_rounds} Fragen • Deutsch lernen"
+                ),
+                reply_markup=build_friend_challenge_next_keyboard(
+                    challenge_id=str(challenge_start.snapshot.challenge_id)
+                ),
+                photo=welcome_image_file_id,
+            )
+        )
+    outgoing_messages.append(
         OutgoingStartMessage(
             text="\n".join(summary_lines),
             reply_markup=build_friend_challenge_back_keyboard(),
         )
-    ]
+    )
     if challenge_start.start_result is not None:
         question_text = build_question_text(
             source="FRIEND_CHALLENGE",
