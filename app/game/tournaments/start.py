@@ -9,6 +9,7 @@ from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.tournaments.constants import (
     TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS,
+    TOURNAMENT_MIN_PARTICIPANTS,
     TOURNAMENT_STATUS_REGISTRATION,
     TOURNAMENT_STATUS_ROUND_1,
     TOURNAMENT_TYPE_PRIVATE,
@@ -46,7 +47,7 @@ async def start_private_tournament(
         session,
         tournament_id=tournament.id,
     )
-    if len(participants) < 2:
+    if len(participants) < TOURNAMENT_MIN_PARTICIPANTS:
         raise TournamentInsufficientParticipantsError
 
     round_deadline = resolve_round_deadline(
@@ -59,6 +60,7 @@ async def start_private_tournament(
         round_no=1,
         participants=participants,
         previous_pairs=set(),
+        bye_history=set(),
         deadline=round_deadline,
         now_utc=now_utc,
     )

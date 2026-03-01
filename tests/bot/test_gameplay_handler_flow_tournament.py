@@ -200,3 +200,87 @@ async def test_handle_tournament_start_enqueues_round_messaging(monkeypatch) -> 
     assert callback.message.answers[0].text == TEXTS_DE["msg.tournament.started"]
     assert emitted == ["private_tournament_started"]
     assert enqueued == ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
+
+
+@pytest.mark.asyncio
+async def test_handle_tournament_join_notifies_creator_about_new_participant(monkeypatch) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        del session, telegram_user
+        return SimpleNamespace(user_id=77)
+
+    async def _fake_join(*args, **kwargs):
+        del args, kwargs
+        return SimpleNamespace(joined_now=True)
+
+    async def _fake_lobby(*args, **kwargs):
+        del args, kwargs
+        return SimpleNamespace(
+            tournament=SimpleNamespace(
+                tournament_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                invite_code="abcdefabcdef",
+                created_by=17,
+                name="Freunde",
+                format="QUICK_5",
+                max_participants=8,
+                current_round=0,
+                status="REGISTRATION",
+            ),
+            participants=(
+                SimpleNamespace(user_id=17, score=Decimal("0")),
+                SimpleNamespace(user_id=77, score=Decimal("0")),
+            ),
+            viewer_joined=True,
+            viewer_is_creator=False,
+            can_start=False,
+            viewer_current_match_challenge_id=None,
+            viewer_current_opponent_user_id=None,
+        )
+
+    async def _fake_list_by_ids(*args, **kwargs):
+        del args, kwargs
+        return [
+            SimpleNamespace(id=17, username="alice", first_name="Alice"),
+            SimpleNamespace(id=77, username="bob", first_name="Bob"),
+        ]
+
+    async def _fake_get_by_id(*args, **kwargs):
+        del args, kwargs
+        return SimpleNamespace(id=17, telegram_user_id=555)
+
+    async def _fake_emit(*args, **kwargs):
+        del args, kwargs
+        return None
+
+    monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(
+        gameplay_tournaments,
+        "TournamentServiceFacade",
+        SimpleNamespace(
+            join_private_tournament_by_code=_fake_join,
+            get_private_tournament_lobby_by_invite_code=_fake_lobby,
+        ),
+    )
+    monkeypatch.setattr(
+        gameplay_tournaments,
+        "UsersRepo",
+        SimpleNamespace(list_by_ids=_fake_list_by_ids, get_by_id=_fake_get_by_id),
+    )
+    monkeypatch.setattr(gameplay, "emit_analytics_event", _fake_emit)
+
+    callback = DummyCallback(
+        data="friend:tournament:join:abcdefabcdef",
+        from_user=SimpleNamespace(id=77, first_name="Tom"),
+        message=DummyMessage(),
+    )
+    await gameplay_tournaments.handle_tournament_join(callback)
+
+    assert callback.message.answers[0].text == TEXTS_DE["msg.tournament.joined"]
+    assert len(callback.bot.sent_messages) == 1
+    creator_notice = callback.bot.sent_messages[0]
+    assert "hat dein Turnier betreten" in str(creator_notice.get("text"))
+    markup = creator_notice.get("reply_markup")
+    assert markup is not None
+    callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
+    assert "friend:tournament:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks

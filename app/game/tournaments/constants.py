@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.core.config import settings
+
 TOURNAMENT_TYPE_PRIVATE = "PRIVATE"
 
 TOURNAMENT_STATUS_REGISTRATION = "REGISTRATION"
@@ -17,10 +19,11 @@ TOURNAMENT_FORMAT_QUICK_5 = "QUICK_5"
 TOURNAMENT_FORMAT_QUICK_12 = "QUICK_12"
 
 TOURNAMENT_MODE_CODE = "QUICK_MIX_A1A2"
-TOURNAMENT_MAX_ROUNDS = 3
-TOURNAMENT_DEFAULT_MAX_PARTICIPANTS = 8
-TOURNAMENT_DEFAULT_REGISTRATION_HOURS = 24
-TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS = 24
+TOURNAMENT_MAX_ROUNDS = max(1, int(settings.tournament_rounds))
+TOURNAMENT_DEFAULT_MAX_PARTICIPANTS = max(2, int(settings.tournament_max_participants))
+TOURNAMENT_MIN_PARTICIPANTS = max(2, int(settings.tournament_min_participants))
+TOURNAMENT_DEFAULT_REGISTRATION_HOURS = max(1, int(settings.tournament_round_ttl_hours))
+TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS = max(1, int(settings.tournament_round_ttl_hours))
 
 
 def rounds_for_tournament_format(*, format_code: str) -> int:

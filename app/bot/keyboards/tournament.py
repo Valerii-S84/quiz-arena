@@ -114,6 +114,14 @@ def build_tournament_lobby_keyboard(
                 )
             ]
         )
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="🔄 Neues Turnier erstellen",
+                    callback_data="create_tournament_start",
+                )
+            ]
+        )
     rows.append(
         [
             InlineKeyboardButton(

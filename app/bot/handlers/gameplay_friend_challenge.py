@@ -13,6 +13,7 @@ from app.bot.handlers.gameplay_flows import (
     proof_card_flow,
 )
 from app.bot.keyboards.friend_challenge import build_friend_challenge_create_keyboard
+from app.bot.keyboards.tournament import build_tournament_format_keyboard
 from app.bot.texts.de import TEXTS_DE
 
 
@@ -24,6 +25,7 @@ def _gameplay():
 
 def register(router: Router) -> None:
     router.callback_query(F.data == "friend:challenge:create")(handle_friend_challenge_create)
+    router.callback_query(F.data == "create_tournament_start")(handle_create_tournament_start)
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_CREATE_TYPE_RE))(
         handle_friend_challenge_type_selected
     )
@@ -62,6 +64,17 @@ async def handle_friend_challenge_create(callback: CallbackQuery) -> None:
     await callback.message.answer(
         TEXTS_DE["msg.friend.challenge.create.choose"],
         reply_markup=build_friend_challenge_create_keyboard(),
+    )
+    await callback.answer()
+
+
+async def handle_create_tournament_start(callback: CallbackQuery) -> None:
+    if callback.message is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    await callback.message.answer(
+        TEXTS_DE["msg.friend.challenge.tournament.format"],
+        reply_markup=build_tournament_format_keyboard(),
     )
     await callback.answer()
 

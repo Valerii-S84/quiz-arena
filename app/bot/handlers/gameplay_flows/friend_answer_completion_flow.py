@@ -6,6 +6,12 @@ from typing import Protocol, cast
 from aiogram.types import CallbackQuery
 
 from app.bot.handlers.gameplay_flows.friend_challenge_result_share import build_result_share_url
+from app.bot.handlers.gameplay_flows.tournament_match_post_flow import (
+    build_tournament_post_match_keyboard,
+    build_tournament_post_match_text,
+    enqueue_tournament_post_match_updates,
+    resolve_tournament_id_for_match,
+)
 from app.bot.keyboards.friend_challenge import build_friend_challenge_finished_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
@@ -79,6 +85,44 @@ async def handle_completed_friend_challenge(
     else:
         champion_label = "Unentschieden"
 
+    message = callback.message
+    assert message is not None
+    assert hasattr(message, "answer")
+    answerable = cast(_Answerable, message)
+
+    if challenge.tournament_match_id is not None:
+        tournament_id = await resolve_tournament_id_for_match(
+            session_local=session_local,
+            tournament_match_id=challenge.tournament_match_id,
+        )
+        tournament_keyboard = build_tournament_post_match_keyboard(tournament_id=tournament_id)
+        await answerable.answer(
+            build_tournament_post_match_text(
+                challenge=challenge,
+                user_id=snapshot_user_id,
+                opponent_label=opponent_label,
+            ),
+            reply_markup=tournament_keyboard,
+        )
+        if not idempotent_replay and opponent_user_id is not None:
+            opponent_label_for_opponent = await resolve_opponent_label(
+                challenge=challenge,
+                user_id=opponent_user_id,
+            )
+            await notify_opponent(
+                callback,
+                opponent_user_id=opponent_user_id,
+                text=build_tournament_post_match_text(
+                    challenge=challenge,
+                    user_id=opponent_user_id,
+                    opponent_label=opponent_label_for_opponent,
+                ),
+                reply_markup=tournament_keyboard,
+            )
+        if not idempotent_replay and tournament_id is not None:
+            enqueue_tournament_post_match_updates(tournament_id=tournament_id)
+        return
+
     my_finish_text = build_friend_finish_text(
         challenge=challenge,
         user_id=snapshot_user_id,
@@ -126,10 +170,6 @@ async def handle_completed_friend_challenge(
     )
     my_message_lines.append("")
     my_message_lines.append(my_proof_card_text)
-    message = callback.message
-    assert message is not None
-    assert hasattr(message, "answer")
-    answerable = cast(_Answerable, message)
     await answerable.answer(
         "\n".join(my_message_lines),
         reply_markup=finish_keyboard,

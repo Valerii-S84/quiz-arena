@@ -5,6 +5,12 @@ from aiogram.types import Message
 from app.bot.handlers.gameplay_flows.tournament_views import format_points, format_user_label
 from app.bot.keyboards.tournament import build_tournament_lobby_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.game.tournaments.errors import (
+    TournamentAccessError,
+    TournamentAlreadyStartedError,
+    TournamentClosedError,
+    TournamentNotFoundError,
+)
 
 
 async def handle_start_tournament_payload(
@@ -24,8 +30,11 @@ async def handle_start_tournament_payload(
             invite_code=tournament_invite_code,
             viewer_user_id=viewer_user_id,
         )
-    except Exception:
+    except (TournamentNotFoundError, TournamentAccessError):
         await message.answer(TEXTS_DE["msg.tournament.not_found"])
+        return True
+    except (TournamentClosedError, TournamentAlreadyStartedError):
+        await message.answer(TEXTS_DE["msg.tournament.closed"])
         return True
 
     users = await users_repo.list_by_ids(session, [item.user_id for item in lobby.participants])

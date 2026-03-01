@@ -217,4 +217,5 @@ def _build_friend_challenge_snapshot(challenge: FriendChallenge) -> FriendChalle
         opponent_score=challenge.opponent_score,
         winner_user_id=challenge.winner_user_id,
         expires_at=challenge.expires_at,
+        tournament_match_id=challenge.tournament_match_id,
     )

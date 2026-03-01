@@ -52,6 +52,9 @@ class _DummyWorkerBot:
         self._message_id = 1000
         self._file_id = 0
 
+    async def get_me(self):
+        return type("BotMe", (), {"username": "quizarenabot"})()
+
     async def send_message(self, **kwargs) -> _DummyMessage:
         self.send_messages.append(kwargs)
         self._message_id += 1
@@ -320,7 +323,14 @@ async def test_round_messaging_sends_once_then_updates_by_edit(monkeypatch) -> N
         for button in row
         if button.callback_data
     ]
+    urls = [
+        button.url
+        for row in bot.send_messages[0]["reply_markup"].inline_keyboard
+        for button in row
+        if button.url
+    ]
     assert any(callback.startswith("friend:next:") for callback in callbacks)
+    assert any(url and "https://t.me/share/url" in url for url in urls)
 
     second = await tournaments_messaging.run_private_tournament_round_messaging_async(
         tournament_id=tournament_id

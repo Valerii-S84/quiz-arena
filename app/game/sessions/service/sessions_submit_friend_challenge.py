@@ -7,11 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
+from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.game.friend_challenges.constants import (
     DUEL_STATUS_ACCEPTED,
     DUEL_STATUS_COMPLETED,
     DUEL_STATUS_CREATOR_DONE,
     DUEL_STATUS_OPPONENT_DONE,
+    DUEL_STATUS_WALKOVER,
     is_duel_playable_status,
     normalize_duel_status,
 )
@@ -118,6 +120,29 @@ async def _apply_friend_challenge_answer(
                 challenge.status = DUEL_STATUS_ACCEPTED
 
         challenge.updated_at = now_utc
+        if challenge.tournament_match_id is not None and challenge.status in {
+            DUEL_STATUS_COMPLETED,
+            DUEL_STATUS_WALKOVER,
+        }:
+            from app.game.tournaments.lifecycle import check_and_advance_round
+            from app.game.tournaments.settlement import settle_pending_match_from_duel
+
+            tournament_match = await TournamentMatchesRepo.get_by_id_for_update(
+                session,
+                challenge.tournament_match_id,
+            )
+            if tournament_match is not None:
+                match_settled = await settle_pending_match_from_duel(
+                    session,
+                    match=tournament_match,
+                    now_utc=now_utc,
+                )
+                if match_settled:
+                    await check_and_advance_round(
+                        session,
+                        tournament_id=tournament_match.tournament_id,
+                        now_utc=now_utc,
+                    )
         friend_snapshot = _build_friend_challenge_snapshot(challenge)
         friend_waiting_for_opponent = is_duel_playable_status(challenge.status) and (
             challenge.opponent_user_id is None

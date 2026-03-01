@@ -80,6 +80,10 @@ class Settings(BaseSettings):
         default=2,
         alias="DUEL_MAX_PUSH_PER_USER",
     )
+    tournament_round_ttl_hours: int = Field(default=24, alias="TOURNAMENT_ROUND_TTL_HOURS")
+    tournament_max_participants: int = Field(default=8, alias="TOURNAMENT_MAX_PARTICIPANTS")
+    tournament_min_participants: int = Field(default=2, alias="TOURNAMENT_MIN_PARTICIPANTS")
+    tournament_rounds: int = Field(default=3, alias="TOURNAMENT_ROUNDS")
     daily_cup_registration_open: str = Field(
         default="12:00",
         alias="DAILY_CUP_REGISTRATION_OPEN",
@@ -241,3 +245,6 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
+
+
+settings = get_settings()
