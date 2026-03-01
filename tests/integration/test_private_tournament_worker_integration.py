@@ -54,7 +54,6 @@ class _DummyWorkerBot:
 
     async def get_me(self):
         return type("BotMe", (), {"username": "quizarenabot"})()
-
     async def send_message(self, **kwargs) -> _DummyMessage:
         self.send_messages.append(kwargs)
         self._message_id += 1
