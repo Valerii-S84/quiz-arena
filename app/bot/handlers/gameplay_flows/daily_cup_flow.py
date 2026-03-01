@@ -6,7 +6,10 @@ from uuid import UUID
 from aiogram.types import CallbackQuery
 
 from app.bot.handlers.gameplay_flows.daily_cup_views import render_daily_cup_lobby
-from app.bot.handlers.gameplay_flows.tournament_views import format_points, resolve_participant_labels
+from app.bot.handlers.gameplay_flows.tournament_views import (
+    format_points,
+    resolve_participant_labels,
+)
 from app.bot.keyboards.daily_cup import build_daily_cup_share_keyboard
 from app.bot.texts.de import TEXTS_DE
 

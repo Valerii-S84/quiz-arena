@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
@@ -30,7 +31,6 @@ from app.game.tournaments.rounds import (
     create_round_matches,
 )
 from app.game.tournaments.settlement import settle_pending_match_from_duel
-from app.core.config import settings
 
 _ACTIVE_ROUND_STATUSES = frozenset(
     {

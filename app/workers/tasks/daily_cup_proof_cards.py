@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from decimal import Decimal
 from uuid import UUID
 
 import structlog
@@ -15,6 +14,11 @@ from app.db.session import SessionLocal
 from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED, TOURNAMENT_TYPE_DAILY_ARENA
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
+from app.workers.tasks.daily_cup_proof_cards_text import (
+    build_caption,
+    format_points,
+    format_user_label,
+)
 from app.workers.tasks.tournaments_proof_card_render import render_tournament_proof_card_png
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_proof_cards")
@@ -22,29 +26,6 @@ logger = structlog.get_logger("app.workers.tasks.daily_cup_proof_cards")
 
 def _is_celery_task(task_obj: object) -> bool:
     return type(task_obj).__module__.startswith("celery.")
-
-
-def _format_user_label(*, username: str | None, first_name: str | None) -> str:
-    if username:
-        cleaned = username.strip()
-        if cleaned:
-            return f"@{cleaned}"
-    if first_name:
-        cleaned = first_name.strip()
-        if cleaned:
-            return cleaned
-    return "Spieler"
-
-
-def _format_points(value: Decimal) -> str:
-    normalized = value.normalize()
-    if normalized == normalized.to_integral():
-        return str(int(normalized))
-    return format(normalized, "f").rstrip("0").rstrip(".")
-
-
-def _build_caption(*, place: int, points: str) -> str:
-    return f"🏆 Daily Arena Cup\nPlatz #{place}\nPunkte: {points}"
 
 
 async def run_daily_cup_proof_cards_async(*, tournament_id: str) -> dict[str, int]:
@@ -87,14 +68,14 @@ async def run_daily_cup_proof_cards_async(*, tournament_id: str) -> dict[str, in
             }
         users = await UsersRepo.list_by_ids(session, [int(item.user_id) for item in participants])
         user_labels = {
-            int(user.id): _format_user_label(username=user.username, first_name=user.first_name)
+            int(user.id): format_user_label(username=user.username, first_name=user.first_name)
             for user in users
         }
         telegram_targets = {int(user.id): int(user.telegram_user_id) for user in users}
 
     participant_rows = {int(item.user_id): item for item in participants}
     standings_user_ids = [int(item.user_id) for item in participants]
-    points_by_user = {int(item.user_id): _format_points(item.score) for item in participants}
+    points_by_user = {int(item.user_id): format_points(item.score) for item in participants}
     participants_total = len(standings_user_ids)
     now_utc = datetime.now(timezone.utc)
 
@@ -111,7 +92,7 @@ async def run_daily_cup_proof_cards_async(*, tournament_id: str) -> dict[str, in
                 failed += 1
                 continue
             points = points_by_user.get(user_id, "0")
-            caption = _build_caption(place=place, points=points)
+            caption = build_caption(place=place, points=points)
             cached_file_id = participant_rows[user_id].proof_card_file_id
             try:
                 if cached_file_id:

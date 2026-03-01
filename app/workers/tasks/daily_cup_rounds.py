@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import structlog
 
-from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED, TOURNAMENT_TYPE_DAILY_ARENA
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
+from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED, TOURNAMENT_TYPE_DAILY_ARENA
 from app.game.tournaments.lifecycle import settle_round_and_advance
-from app.workers.tasks.daily_cup_async import _emit_daily_cup_events, _now_utc
+from app.workers.tasks.daily_cup_core import emit_daily_cup_events, now_utc
 from app.workers.tasks.daily_cup_messaging import enqueue_daily_cup_round_messaging
 from app.workers.tasks.daily_cup_proof_cards import enqueue_daily_cup_proof_cards
 
@@ -14,7 +14,7 @@ logger = structlog.get_logger("app.workers.tasks.daily_cup")
 
 
 async def advance_daily_cup_rounds_async() -> dict[str, int]:
-    now_utc = _now_utc()
+    now_utc_value = now_utc()
     rounds_started_total = 0
     tournaments_completed_total = 0
     matches_settled_total = 0
@@ -26,7 +26,7 @@ async def advance_daily_cup_rounds_async() -> dict[str, int]:
     async with SessionLocal.begin() as session:
         due_rounds = await TournamentsRepo.list_due_round_deadline_for_update(
             session,
-            now_utc=now_utc,
+            now_utc=now_utc_value,
             limit=50,
             tournament_type=TOURNAMENT_TYPE_DAILY_ARENA,
         )
@@ -35,7 +35,7 @@ async def advance_daily_cup_rounds_async() -> dict[str, int]:
             transition = await settle_round_and_advance(
                 session,
                 tournament=tournament,
-                now_utc=now_utc,
+                now_utc=now_utc_value,
             )
             settled_count = int(transition["matches_settled"])
             started_count = int(transition["round_started"])
@@ -66,7 +66,7 @@ async def advance_daily_cup_rounds_async() -> dict[str, int]:
             if completed_count > 0 or tournament.status == TOURNAMENT_STATUS_COMPLETED:
                 completed_ids.append(str(tournament.id))
 
-    await _emit_daily_cup_events(now_utc=now_utc, events=events)
+    await emit_daily_cup_events(now_utc_value=now_utc_value, events=events)
     for tournament_id, _round_no in started_ids:
         enqueue_daily_cup_round_messaging(tournament_id=tournament_id)
     for tournament_id in completed_ids:
