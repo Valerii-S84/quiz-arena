@@ -44,6 +44,7 @@ async def handle_start_message(message: Message) -> None:
 
     now_utc = datetime.now(timezone.utc)
     offer_selection = None
+    friend_challenge_result = None
     start_payload = _extract_start_payload(message.text)
     friend_invite_token = _extract_friend_challenge_token(start_payload)
     duel_challenge_id = _extract_duel_challenge_id(start_payload)
@@ -56,44 +57,62 @@ async def handle_start_message(message: Message) -> None:
             start_payload=start_payload,
         )
 
-        handled_friend_challenge = await handle_start_friend_challenge_payload(
-            message,
+        friend_challenge_result = await handle_start_friend_challenge_payload(
             session=session,
             now_utc=now_utc,
             snapshot=snapshot,
             friend_invite_token=friend_invite_token,
             duel_challenge_id=duel_challenge_id,
+            start_message_id=message.message_id,
             game_session_service=GameSessionService,
-            notify_creator_about_join=_notify_creator_about_join,
             resolve_opponent_label=_resolve_opponent_label,
             build_friend_plan_text=_build_friend_plan_text,
             build_friend_score_text=_build_friend_score_text,
             build_friend_ttl_text=_build_friend_ttl_text,
             build_question_text=_build_question_text,
         )
-        if handled_friend_challenge:
-            return
-
-        handled_tournament = await handle_start_tournament_payload(
-            message,
-            session=session,
-            tournament_invite_code=tournament_invite_code,
-            viewer_user_id=snapshot.user_id,
-            tournament_service=TournamentServiceFacade,
-            users_repo=UsersRepo,
-        )
-        if handled_tournament:
-            return
-
-        try:
-            offer_selection = await OfferService.evaluate_and_log_offer(
-                session,
-                user_id=snapshot.user_id,
-                idempotency_key=f"offer:start:{message.from_user.id}:{message.message_id}",
-                now_utc=now_utc,
+        if friend_challenge_result is not None:
+            pass
+        else:
+            handled_tournament = await handle_start_tournament_payload(
+                message,
+                session=session,
+                tournament_invite_code=tournament_invite_code,
+                viewer_user_id=snapshot.user_id,
+                tournament_service=TournamentServiceFacade,
+                users_repo=UsersRepo,
             )
-        except OfferLoggingError:
-            offer_selection = None
+            if handled_tournament:
+                return
+
+            try:
+                offer_selection = await OfferService.evaluate_and_log_offer(
+                    session,
+                    user_id=snapshot.user_id,
+                    idempotency_key=f"offer:start:{message.from_user.id}:{message.message_id}",
+                    now_utc=now_utc,
+                )
+            except OfferLoggingError:
+                offer_selection = None
+
+    if friend_challenge_result is not None:
+        if (
+            friend_challenge_result.notify_creator
+            and friend_challenge_result.notify_challenge is not None
+            and friend_challenge_result.notify_joiner_user_id is not None
+        ):
+            await _notify_creator_about_join(
+                message,
+                challenge=friend_challenge_result.notify_challenge,
+                joiner_user_id=friend_challenge_result.notify_joiner_user_id,
+            )
+        for outgoing_message in friend_challenge_result.messages:
+            await message.answer(
+                outgoing_message.text,
+                reply_markup=outgoing_message.reply_markup,
+                parse_mode=outgoing_message.parse_mode,
+            )
+        return
 
     response_text = _build_home_text(
         free_energy=snapshot.free_energy,

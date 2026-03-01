@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import structlog
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import Update
 
 from app.db.repo.processed_updates_repo import ProcessedUpdatesRepo
@@ -93,6 +94,22 @@ async def process_update_async(
     try:
         update = Update.model_validate(update_payload)
         await dispatcher.feed_update(bot, update)
+    except (TelegramBadRequest, TelegramForbiddenError) as exc:
+        # Non-retryable Telegram API errors (stale callback query, blocked chat, etc.)
+        # should not trigger Celery retries that can spam users with duplicated messages.
+        async with SessionLocal.begin() as session:
+            await ProcessedUpdatesRepo.set_status(
+                session,
+                update_id=update_id,
+                status="PROCESSED",
+                processing_task_id=None,
+            )
+        logger.warning(
+            "telegram_update_non_retryable_error",
+            update_id=update_id,
+            error=str(exc),
+        )
+        return "processed"
     except Exception:
         async with SessionLocal.begin() as session:
             await ProcessedUpdatesRepo.set_status(
