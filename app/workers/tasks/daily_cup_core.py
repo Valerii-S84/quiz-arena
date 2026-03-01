@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from uuid import UUID, uuid4
 
 from aiogram.exceptions import TelegramForbiddenError
@@ -82,10 +84,15 @@ async def emit_daily_cup_events(
             )
 
 
-async def send_daily_cup_canceled_messages(*, telegram_targets: list[int]) -> None:
+async def send_daily_cup_canceled_messages(
+    *,
+    telegram_targets: list[int],
+    bot_factory: Callable[[], Any] | None = None,
+) -> None:
     if not telegram_targets:
         return
-    bot = build_bot()
+    resolved_bot_factory = bot_factory if bot_factory is not None else build_bot
+    bot = resolved_bot_factory()
     try:
         for chat_id in telegram_targets:
             try:
