@@ -25,6 +25,12 @@ make lock-check
 docker compose up -d
 ```
 
+Optional full-stack mode (API + frontend dashboard):
+
+```bash
+docker compose --profile frontend up -d
+```
+
 Default local credentials (`docker-compose.yml`):
 - Postgres user/password: `quiz` / `quiz`
 - Databases:
