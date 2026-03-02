@@ -75,6 +75,18 @@ services:
     expose:
       - "8000"
 
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=https://${DOMAIN}/api
+    depends_on:
+      api:
+        condition: service_healthy
+    expose:
+      - "3000"
+
   worker:
     build:
       context: .
@@ -131,6 +143,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      frontend:
+        condition: service_started
     ports:
       - "80:80"
       - "443:443"

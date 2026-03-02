@@ -31,8 +31,10 @@ asyncpg==0.31.0
     # via quiz-arena-bot (pyproject.toml)
 attrs==25.4.0
     # via aiohttp
-bcrypt==5.0.0
-    # via passlib
+bcrypt==4.3.0
+    # via
+    #   passlib
+    #   quiz-arena-bot (pyproject.toml)
 billiard==4.2.4
     # via celery
 celery==5.6.2
