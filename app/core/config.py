@@ -188,6 +188,36 @@ class Settings(BaseSettings):
         default="127.0.0.1/32,::1/128",
         alias="INTERNAL_API_TRUSTED_PROXIES",
     )
+    admin_frontend_origin: str = Field(
+        default="http://localhost:3000",
+        alias="ADMIN_FRONTEND_ORIGIN",
+    )
+    admin_email: str = Field(default="admin@example.com", alias="ADMIN_EMAIL")
+    admin_password_hash: str = Field(default="", alias="ADMIN_PASSWORD_HASH")
+    admin_password_plain: str = Field(default="admin12345", alias="ADMIN_PASSWORD_PLAIN")
+    admin_jwt_secret: str = Field(
+        default="dev_admin_jwt_secret_change_me",
+        alias="ADMIN_JWT_SECRET",
+    )
+    admin_refresh_secret: str = Field(
+        default="dev_admin_refresh_secret_change_me",
+        alias="ADMIN_REFRESH_SECRET",
+    )
+    admin_totp_secret: str = Field(default="", alias="ADMIN_TOTP_SECRET")
+    admin_totp_issuer: str = Field(default="Quiz Arena Admin", alias="ADMIN_TOTP_ISSUER")
+    admin_access_token_ttl_minutes: int = Field(
+        default=15,
+        alias="ADMIN_ACCESS_TOKEN_TTL_MINUTES",
+    )
+    admin_refresh_token_ttl_days: int = Field(default=7, alias="ADMIN_REFRESH_TOKEN_TTL_DAYS")
+    admin_login_rate_limit_attempts: int = Field(
+        default=5,
+        alias="ADMIN_LOGIN_RATE_LIMIT_ATTEMPTS",
+    )
+    admin_login_rate_limit_window_minutes: int = Field(
+        default=15,
+        alias="ADMIN_LOGIN_RATE_LIMIT_WINDOW_MINUTES",
+    )
     ops_alert_webhook_url: str = Field(default="", alias="OPS_ALERT_WEBHOOK_URL")
     ops_alert_slack_webhook_url: str = Field(default="", alias="OPS_ALERT_SLACK_WEBHOOK_URL")
     ops_alert_pagerduty_events_url: str = Field(default="", alias="OPS_ALERT_PAGERDUTY_EVENTS_URL")
