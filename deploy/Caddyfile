@@ -1,13 +1,16 @@
-{$DOMAIN} {
+deutschquizarena.de, deutchquizarena.de {
   encode zstd gzip
 
-  @health path /health
-  handle @health {
+  handle /webhook* {
+    reverse_proxy api:8000
+  }
+
+  handle_path /api/* {
     reverse_proxy api:8000
   }
 
   handle {
-    reverse_proxy api:8000
+    reverse_proxy frontend:3000
   }
 
   tls {$CADDY_EMAIL}
