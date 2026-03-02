@@ -1,5 +1,9 @@
+from app.db.models.admin_audit_log import AdminAuditLog
+from app.db.models.admin_promo_code_usages import AdminPromoCodeUsage
+from app.db.models.admin_promo_codes import AdminPromoCode
 from app.db.models.analytics_daily import AnalyticsDaily
 from app.db.models.analytics_events import AnalyticsEvent
+from app.db.models.daily_metrics import DailyMetrics
 from app.db.models.daily_push_logs import DailyPushLog
 from app.db.models.daily_question_sets import DailyQuestionSet
 from app.db.models.daily_runs import DailyRun
@@ -26,14 +30,19 @@ from app.db.models.streak_state import StreakState
 from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournament_participants import TournamentParticipant
 from app.db.models.tournaments import Tournament
+from app.db.models.user_events import UserEvent
 from app.db.models.users import User
 
 __all__ = [
+    "AdminAuditLog",
+    "AdminPromoCode",
+    "AdminPromoCodeUsage",
     "AnalyticsDaily",
     "AnalyticsEvent",
     "DailyPushLog",
     "DailyQuestionSet",
     "DailyRun",
+    "DailyMetrics",
     "EnergyState",
     "FriendChallenge",
     "Entitlement",
@@ -57,5 +66,6 @@ __all__ = [
     "Tournament",
     "TournamentMatch",
     "TournamentParticipant",
+    "UserEvent",
     "User",
 ]

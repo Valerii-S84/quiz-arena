@@ -31,6 +31,8 @@ asyncpg==0.31.0
     # via quiz-arena-bot (pyproject.toml)
 attrs==25.4.0
     # via aiohttp
+bcrypt==5.0.0
+    # via passlib
 billiard==4.2.4
     # via celery
 celery==5.6.2
@@ -40,6 +42,8 @@ certifi==2026.1.4
     #   aiogram
     #   httpcore
     #   httpx
+cffi==2.0.0
+    # via cryptography
 click==8.3.1
     # via
     #   celery
@@ -53,6 +57,10 @@ click-plugins==1.1.1.2
     # via celery
 click-repl==0.3.0
     # via celery
+cryptography==46.0.5
+    # via python-jose
+ecdsa==0.19.1
+    # via python-jose
 fastapi==0.131.0
     # via quiz-arena-bot (pyproject.toml)
 frozenlist==1.8.0
@@ -92,6 +100,8 @@ orjson==3.11.7
     # via quiz-arena-bot (pyproject.toml)
 packaging==26.0
     # via kombu
+passlib==1.7.4
+    # via quiz-arena-bot (pyproject.toml)
 pillow==11.3.0
     # via quiz-arena-bot (pyproject.toml)
 prompt-toolkit==3.0.52
@@ -100,6 +110,12 @@ propcache==0.4.1
     # via
     #   aiohttp
     #   yarl
+pyasn1==0.6.2
+    # via
+    #   python-jose
+    #   rsa
+pycparser==3.0
+    # via cffi
 pydantic==2.12.5
     # via
     #   aiogram
@@ -112,6 +128,8 @@ pydantic-settings==2.13.1
     # via quiz-arena-bot (pyproject.toml)
 pyjwt==2.11.0
     # via redis
+pyotp==2.9.0
+    # via quiz-arena-bot (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via celery
 python-dotenv==1.2.1
@@ -119,14 +137,20 @@ python-dotenv==1.2.1
     #   pydantic-settings
     #   quiz-arena-bot (pyproject.toml)
     #   uvicorn
+python-jose==3.5.0
+    # via quiz-arena-bot (pyproject.toml)
 pyyaml==6.0.3
     # via uvicorn
 redis==5.3.1
     # via
     #   kombu
     #   quiz-arena-bot (pyproject.toml)
+rsa==4.9.1
+    # via python-jose
 six==1.17.0
-    # via python-dateutil
+    # via
+    #   ecdsa
+    #   python-dateutil
 sqlalchemy==2.0.46
     # via
     #   alembic

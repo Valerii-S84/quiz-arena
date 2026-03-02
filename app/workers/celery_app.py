@@ -13,6 +13,7 @@ celery_app = Celery(
         "app.workers.tasks.payments_reliability",
         "app.workers.tasks.offers_observability",
         "app.workers.tasks.analytics_daily",
+        "app.workers.tasks.admin_daily_metrics",
         "app.workers.tasks.daily_challenge",
         "app.workers.tasks.promo_maintenance",
         "app.workers.tasks.retention_cleanup",
