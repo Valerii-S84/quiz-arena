@@ -203,6 +203,7 @@ class Settings(BaseSettings):
         default="dev_admin_refresh_secret_change_me",
         alias="ADMIN_REFRESH_SECRET",
     )
+    admin_2fa_required: bool = Field(default=True, alias="ADMIN_2FA_REQUIRED")
     admin_totp_secret: str = Field(default="", alias="ADMIN_TOTP_SECRET")
     admin_totp_issuer: str = Field(default="Quiz Arena Admin", alias="ADMIN_TOTP_ISSUER")
     admin_access_token_ttl_minutes: int = Field(

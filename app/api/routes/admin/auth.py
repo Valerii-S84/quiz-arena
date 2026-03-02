@@ -88,6 +88,28 @@ async def login_admin(
         raise HTTPException(status_code=401, detail={"code": "E_INVALID_CREDENTIALS"})
 
     clear_failures(bucket=bucket)
+    if not settings.admin_2fa_required:
+        full_access_token = build_access_token(
+            settings=settings,
+            email=payload.email.lower(),
+            role="admin",
+            two_factor_verified=True,
+        )
+        full_refresh_token = build_refresh_token(
+            settings=settings,
+            email=payload.email.lower(),
+            role="admin",
+        )
+        full_response = JSONResponse(content={"requires_2fa": False})
+        add_admin_noindex_header(full_response)
+        apply_auth_cookies(
+            settings=settings,
+            response=full_response,
+            access_token=full_access_token,
+            refresh_token=full_refresh_token,
+        )
+        return full_response
+
     access_token = build_access_token(
         settings=settings,
         email=payload.email.lower(),
@@ -117,7 +139,10 @@ async def verify_2fa(
     ):
         raise HTTPException(status_code=429, detail={"code": "E_RATE_LIMITED"})
 
-    if not await verify_totp_code(settings=settings, code=payload.code):
+    if settings.admin_2fa_required and not await verify_totp_code(
+        settings=settings,
+        code=payload.code,
+    ):
         record_failure(bucket=bucket, window_seconds=window_seconds)
         raise HTTPException(status_code=401, detail={"code": "E_INVALID_TOTP"})
 
@@ -168,7 +193,9 @@ async def refresh_session(
     add_admin_noindex_header(response)
     token = (request.cookies.get("qa_admin_refresh") or "").strip()
     payload = decode_refresh_token(settings=settings, token=token)
-    if payload is None or payload.role != "admin" or not payload.two_factor_verified:
+    if payload is None or payload.role != "admin":
+        raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
+    if settings.admin_2fa_required and not payload.two_factor_verified:
         raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
 
     access_token = build_access_token(
@@ -208,9 +235,12 @@ async def logout(response: Response) -> Response:
 async def get_session(
     response: Response,
     principal: AdminPrincipal = Depends(get_pending_admin),
+    settings: Settings = Depends(get_settings),
 ) -> SessionResponse:
     add_admin_noindex_header(response)
-    if principal.role != "admin" or not principal.two_factor_verified:
+    if principal.role != "admin":
+        raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
+    if settings.admin_2fa_required and not principal.two_factor_verified:
         raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
     return SessionResponse(
         email=principal.email,

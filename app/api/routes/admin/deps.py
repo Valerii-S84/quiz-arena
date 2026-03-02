@@ -59,7 +59,10 @@ async def get_pending_admin(
 
 async def get_current_admin(
     principal: AdminPrincipal = Depends(get_pending_admin),
+    settings: Settings = Depends(get_settings),
 ) -> AdminPrincipal:
-    if principal.role != "admin" or not principal.two_factor_verified:
+    if principal.role != "admin":
+        raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
+    if settings.admin_2fa_required and not principal.two_factor_verified:
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
     return principal

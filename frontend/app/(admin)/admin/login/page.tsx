@@ -13,6 +13,9 @@ const loginSchema = z.object({
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
+type LoginResponse = {
+  requires_2fa: boolean;
+};
 
 export default function AdminLoginPage() {
   const [requires2FA, setRequires2FA] = useState(false);
@@ -27,8 +30,12 @@ export default function AdminLoginPage() {
   async function onSubmit(values: LoginForm) {
     setErrorMessage(null);
     try {
-      await api.post("/admin/auth/login", values);
-      setRequires2FA(true);
+      const response = await api.post<LoginResponse>("/admin/auth/login", values);
+      if (response.data.requires_2fa) {
+        setRequires2FA(true);
+        return;
+      }
+      window.location.href = "/admin/dashboard";
     } catch (error) {
       setErrorMessage("Не вдалося увійти. Перевір email/password.");
       setRequires2FA(false);
