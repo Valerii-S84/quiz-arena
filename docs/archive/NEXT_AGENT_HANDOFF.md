@@ -1,3 +1,6 @@
+[HISTORICAL] Архівний handoff-документ.
+[HISTORICAL] Не використовувати як source-of-truth для поточного runtime.
+
 # Next Agent Handoff (2026-02-19)
 
 ## Update (2026-02-27, Phase 2 UX + deep-link shipped; concrete remaining scope)
@@ -148,7 +151,7 @@
 1. Locked active branch for DUELL+Turnier execution:
    - active branch: `duel`
 2. Updated DUELL+Turnier priority doc:
-   - `docs/duel_turnier_v2_priority.md`
+   - `docs/archive/duel_turnier_v2_priority.md`
    - Phase 1 marked as `DONE` (baseline accepted).
    - Added execution plan for Phase 2 (items 14-22 in fixed order).
 
