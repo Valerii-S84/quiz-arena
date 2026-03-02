@@ -1,5 +1,8 @@
 # Quiz Arena Backend Bootstrap
 
+Canonical repository entrypoint is `README.md`.
+This file stays as backend-oriented quick reference.
+
 ## 1. Install
 
 ```bash
@@ -16,38 +19,38 @@ make lock
 make lock-check
 ```
 
-## 2. Start infrastructure
+## 2. Start local infrastructure
 
 ```bash
 docker compose up -d
 ```
 
-Local infra expected credentials (default `docker-compose.yml`):
+Default local credentials (`docker-compose.yml`):
 - Postgres user/password: `quiz` / `quiz`
 - Databases:
   - app: `quiz_arena`
-  - tests: `quiz_arena_test` (create via `scripts.ensure_test_db`)
+  - tests: `quiz_arena_test`
 
 If an old local Postgres volume has different credentials, recreate local containers/volumes instead of manual `ALTER USER`.
 
-## 3. Run API
+## 3. Run app stack locally
 
 ```bash
+# DB schema + content
 .venv/bin/python -m alembic upgrade head
 .venv/bin/python -m scripts.quizbank_import_tool --replace-all
+
+# API
 .venv/bin/python -m app.main
-```
 
-## 4. Run bot in polling mode (dev)
-
-```bash
-.venv/bin/python scripts/run_bot_polling.py
-```
-
-## 5. Run worker
-
-```bash
+# Worker
 .venv/bin/python -m celery -A app.workers.celery_app worker -Q q_high,q_normal,q_low --loglevel=INFO
+
+# Beat
+.venv/bin/python -m celery -A app.workers.celery_app beat --loglevel=INFO
+
+# Optional Telegram polling mode for dev
+.venv/bin/python scripts/run_bot_polling.py
 ```
 
 Retention cleanup defaults:
@@ -56,92 +59,55 @@ Retention cleanup defaults:
 - `analytics_events`: 90 days
 - Scheduled task: `app.workers.tasks.retention_cleanup.run_retention_cleanup` (hourly, queue `q_low`)
 
-Tuning env vars:
-- `QUIZ_QUESTION_POOL_CACHE_TTL_SECONDS`
-- `RETENTION_PROCESSED_UPDATES_DAYS`
-- `RETENTION_OUTBOX_EVENTS_DAYS`
-- `RETENTION_ANALYTICS_EVENTS_DAYS`
-- `RETENTION_CLEANUP_BATCH_SIZE`
-- `RETENTION_CLEANUP_MAX_BATCHES_PER_TABLE`
-- `RETENTION_CLEANUP_MAX_RUNTIME_SECONDS`
-- `RETENTION_CLEANUP_BATCH_SLEEP_MIN_MS`
-- `RETENTION_CLEANUP_BATCH_SLEEP_MAX_MS`
-- `RETENTION_CLEANUP_SCHEDULE_SECONDS`
-- `RETENTION_CLEANUP_SCHEDULE_HOUR_BERLIN`
-- `RETENTION_CLEANUP_SCHEDULE_MINUTE_BERLIN`
-
-## 6. Run tests
+## 4. Mandatory quality gate
 
 ```bash
-DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test \
-TMPDIR=/tmp .venv/bin/python -m pytest -q -s
+.venv/bin/ruff check .
+.venv/bin/mypy .
+DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q
 ```
 
-Important:
-- Integration tests execute destructive `TRUNCATE` in test fixtures.
-- Use only an isolated local test database whose name contains `test` (for example `quiz_arena_test`).
-
-Recommended safe flow:
-```bash
-DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test \
-.venv/bin/python -m scripts.ensure_test_db
-DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test \
-.venv/bin/python -m alembic upgrade head
-DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test \
-TMPDIR=/tmp .venv/bin/python -m pytest -q -s tests/integration
-```
-
-Or via Makefile:
-```bash
-make test
-make test-integration
-```
-
-## 7. Architecture guard (pre-commit)
-
-Install and enable pre-commit hooks:
+Safe integration-only flow:
 
 ```bash
-pip install pre-commit
-pre-commit install
-pre-commit run -a
+DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test .venv/bin/python -m scripts.ensure_test_db
+DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test .venv/bin/python -m alembic upgrade head
+DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q tests/integration
 ```
 
-Limits enforced (CI + pre-commit):
-- `app/**/*.py` max 250 lines
-- `tests/**/*.py` max 400 lines
-- `tools/**/*.py` max 300 lines
+## 5. Architecture and CI guards
 
-Soft thresholds:
-- `app/**/*.py` >200 lines → warning
-- `app/**/*.py` >220 lines → CI fail unless PR contains `[APPROVED_SIZE_EXCEPTION]`
-
-Additional guards (CI + pre-commit unless noted):
 - `print(` is forbidden in `app/`
-- `except Exception: pass` is forbidden anywhere in the repo
+- `except Exception: pass` is forbidden in repo
 - `domains -> app.bot` imports are forbidden
-- New files in `app/bot/handlers/` >180 lines → fail
-- Growth delta guard (CI only): if a PR adds >50 lines to a file in `app/` and the file ends up >180 lines → fail
-- Monolith warning (CI): file >=180 lines, >5 top-level `def`, >5 top-level `if` → warning
+- New files in `app/bot/handlers/` over 180 lines fail CI
+- Growth delta guard and monolith warning are enabled in CI
 
-## 8. Production skeleton
+Full rules:
+- `CODE_STYLE.md`
+- `ENGINEERING_RULES.md`
+- `REPO_STRUCTURE.md`
 
-- Compose stack: `docker-compose.prod.yml`
+## 6. Production references
+
+- Runtime stack: `docker-compose.prod.yml`
 - Production env template: `.env.production.example`
 - Reverse proxy config: `deploy/Caddyfile`
 - Deploy helper: `scripts/deploy.sh`
-- Runbook: `docs/runbooks/first_deploy_and_rollback.md`
-- Post-deploy gate: `python -m scripts.post_deploy_gate` (checks `Code + Runtime + Data = head`)
+- Main deploy runbook: `docs/runbooks/github_to_prod_safe_deploy.md`
+- First deploy/rollback baseline: `docs/runbooks/first_deploy_and_rollback.md`
+- Post-deploy gate command:
+  - `docker compose -f docker-compose.prod.yml run --rm api python -m scripts.post_deploy_gate`
 
-## 9. QuizBank report refresh flow
+## 7. QuizBank reports
 
-Refresh all factual QuizBank reports:
+Refresh reports:
 
 ```bash
 make refresh-quizbank-reports
 ```
 
-Verify reports are fresh (used by CI):
+Verify freshness (CI uses this):
 
 ```bash
 make check-quizbank-reports

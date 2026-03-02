@@ -1,38 +1,64 @@
 # Referrals Fraud Review Runbook
 
-## Purpose
-- Provide a repeatable manual-review flow for suspicious referral activity.
-- Use internal APIs to inspect queue candidates and apply review decisions safely.
+## Scope
 
-## Prerequisites
-- Internal API token (`X-Internal-Token`).
-- Source IP included in `INTERNAL_API_ALLOWLIST`.
-- Reverse proxy/LB egress IP included in `INTERNAL_API_TRUSTED_PROXIES` (otherwise `X-Forwarded-For` is ignored).
-- API service running and reachable.
+Manual review flow for suspicious referral activity via internal APIs.
 
-## 1) Fetch review queue
-- Default queue focuses on fraud-rejected referrals in last 72h.
+## Preconditions
+
+- `INTERNAL_API_TOKEN` available.
+- Source IP is allowed by `INTERNAL_API_ALLOWLIST`.
+- If behind proxy/LB, proxy CIDRs are configured in `INTERNAL_API_TRUSTED_PROXIES`.
+- API is reachable.
+
+Recommended shell setup:
+
+```bash
+export INTERNAL_API_BASE_URL="https://deutchquizarena.de"
+export INTERNAL_API_TOKEN="<secret>"
+```
+
+## 1) Fetch queue and baseline
+
+### 1.1 Fraud-focused review queue (last 72h)
 
 ```bash
 curl -sS \
   -H "X-Internal-Token: ${INTERNAL_API_TOKEN}" \
-  "http://localhost:8000/internal/referrals/review-queue?window_hours=72&status=REJECTED_FRAUD&limit=100"
+  "${INTERNAL_API_BASE_URL}/internal/referrals/review-queue?window_hours=72&status=REJECTED_FRAUD&limit=100"
 ```
 
-- Optional status filters: `STARTED`, `QUALIFIED`, `REWARDED`, `REJECTED_FRAUD`, `CANCELED`, `DEFERRED_LIMIT`.
+### 1.2 Dashboard snapshot for context
 
-## 2) Apply review decision
-- Endpoint: `POST /internal/referrals/{referral_id}/review`.
-- Decisions:
-  - `CONFIRM_FRAUD`: keeps/sets status to `REJECTED_FRAUD` and enforces minimum fraud score.
-  - `REOPEN`: moves `REJECTED_FRAUD` or `CANCELED` back to `STARTED`.
-  - `CANCEL`: moves `STARTED`/`REJECTED_FRAUD` to `CANCELED`.
+```bash
+curl -sS \
+  -H "X-Internal-Token: ${INTERNAL_API_TOKEN}" \
+  "${INTERNAL_API_BASE_URL}/internal/referrals/dashboard?window_hours=24"
+```
+
+Expected:
+- queue payload contains candidates with status/details,
+- dashboard metrics are internally consistent with current alert context.
+
+## 2) Apply review decisions
+
+Endpoint:
+- `POST /internal/referrals/{referral_id}/review`
+
+Supported decisions:
+- `CONFIRM_FRAUD`
+- `REOPEN`
+- `CANCEL`
+
+Always pass `expected_current_status` to avoid race-condition transitions.
+
+### 2.1 Reopen false positive
 
 ```bash
 curl -sS -X POST \
   -H "Content-Type: application/json" \
   -H "X-Internal-Token: ${INTERNAL_API_TOKEN}" \
-  "http://localhost:8000/internal/referrals/123/review" \
+  "${INTERNAL_API_BASE_URL}/internal/referrals/123/review" \
   -d '{
     "decision": "REOPEN",
     "reason": "false positive after manual verification",
@@ -40,18 +66,70 @@ curl -sS -X POST \
   }'
 ```
 
-## 3) Verify result
-- Check response payload:
-  - `referral.status` is expected target status.
-  - `idempotent_replay=false` for a real state change.
-- Re-run queue query to confirm the case moved out/in expected segment.
+### 2.2 Confirm fraud
+
+```bash
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  -H "X-Internal-Token: ${INTERNAL_API_TOKEN}" \
+  "${INTERNAL_API_BASE_URL}/internal/referrals/123/review" \
+  -d '{
+    "decision": "CONFIRM_FRAUD",
+    "reason": "confirmed abuse pattern",
+    "expected_current_status": "REJECTED_FRAUD"
+  }'
+```
+
+### 2.3 Cancel case
+
+```bash
+curl -sS -X POST \
+  -H "Content-Type: application/json" \
+  -H "X-Internal-Token: ${INTERNAL_API_TOKEN}" \
+  "${INTERNAL_API_BASE_URL}/internal/referrals/123/review" \
+  -d '{
+    "decision": "CANCEL",
+    "reason": "invalid referral chain",
+    "expected_current_status": "STARTED"
+  }'
+```
+
+Expected:
+- HTTP `200`,
+- response contains updated `referral.status`,
+- `idempotent_replay=false` for actual state change.
+
+## 3) Verify outcomes
+
+### 3.1 Re-query review queue
+
+```bash
+curl -sS \
+  -H "X-Internal-Token: ${INTERNAL_API_TOKEN}" \
+  "${INTERNAL_API_BASE_URL}/internal/referrals/review-queue?window_hours=72&status=REJECTED_FRAUD&limit=100"
+```
+
+### 3.2 Check referral notification events (optional)
+
+```bash
+curl -sS \
+  -H "X-Internal-Token: ${INTERNAL_API_TOKEN}" \
+  "${INTERNAL_API_BASE_URL}/internal/referrals/events?window_hours=168&limit=200"
+```
+
+Expected:
+- case moved to expected segment/status,
+- no contradictory transitions.
 
 ## 4) Tuning guidance
-- If many valid users are marked as fraud:
-  - increase thresholds (`REFERRALS_ALERT_MAX_*`) conservatively.
-- If obvious abuse slips through:
-  - lower thresholds stepwise and monitor for 24h before next change.
 
-## Safety notes
-- Always pass `expected_current_status` to avoid race-induced wrong transitions.
-- Do not mutate `REWARDED` cases through manual review endpoints.
+- If many valid users are flagged:
+  - raise `REFERRALS_ALERT_MAX_*` thresholds conservatively.
+- If abuse passes through:
+  - lower thresholds stepwise and observe at least 24h.
+
+## 5) Safety rules
+
+- Do not manually mutate `REWARDED` cases via review endpoint.
+- Always include explicit reason for auditability.
+- Apply changes in small batches, then re-check queue and dashboard.

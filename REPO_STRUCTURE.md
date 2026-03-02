@@ -30,11 +30,13 @@ Diese Struktur verhindert Chaos, trennt UI von Domänenlogik und hält Module kl
     /modes
     /questions
     /sessions
+    /tournaments
   /ops_ui
     /site
   /services
   /workers
     /tasks
+/alembic
 /tests
 /docs
 ```
@@ -51,7 +53,7 @@ Diese Struktur verhindert Chaos, trennt UI von Domänenlogik und hält Module kl
 
   * Models in `app/db/models/`
   * Repositories/Queries in `app/db/repo/`
-  * Migrationen in `app/db/migrations/`
+  * Migrationen in `alembic/versions/`
 * Services (Integration/Infra) nur in `app/services/`.
 * Konfiguration zentral in `app/core/`.
 

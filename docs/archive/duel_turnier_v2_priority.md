@@ -1,3 +1,6 @@
+[HISTORICAL] Архівний фазний план.
+[HISTORICAL] Не використовувати як source-of-truth для поточного runtime.
+
 # DUELL + Turnier (v2) — Пріоритет виконання
 
 ## 1) Scope lock (обов'язково)
