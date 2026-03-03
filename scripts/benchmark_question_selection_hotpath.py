@@ -20,7 +20,9 @@ def _old_select_question_id(
 ) -> str | None:
     if not pool_ids:
         return None
-    filtered_ids = [question_id for question_id in pool_ids if question_id not in set(recent_question_ids)]
+    filtered_ids = [
+        question_id for question_id in pool_ids if question_id not in set(recent_question_ids)
+    ]
     candidate_ids = filtered_ids if filtered_ids else list(pool_ids)
     return candidate_ids[_stable_index(selection_seed, len(candidate_ids))]
 
@@ -111,12 +113,8 @@ def main() -> int:
     speedup = old_result.elapsed_ms / new_result.elapsed_ms if new_result.elapsed_ms > 0 else 0.0
     print("Question Selection Hot Path Benchmark")
     print(f"pool_size={pool_size} recent_size={recent_size} iterations={iterations}")
-    print(
-        f"old: total_ms={old_result.elapsed_ms:.2f} avg_ms={old_result.avg_ms:.6f}"
-    )
-    print(
-        f"new: total_ms={new_result.elapsed_ms:.2f} avg_ms={new_result.avg_ms:.6f}"
-    )
+    print(f"old: total_ms={old_result.elapsed_ms:.2f} avg_ms={old_result.avg_ms:.6f}")
+    print(f"new: total_ms={new_result.elapsed_ms:.2f} avg_ms={new_result.avg_ms:.6f}")
     print(f"speedup_x={speedup:.2f}")
     return 0
 

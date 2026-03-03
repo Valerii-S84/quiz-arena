@@ -69,17 +69,17 @@ def _local_daily_cup_anchor(*, now_utc: datetime, hour: int, minute: int) -> dat
 def _invite_open_at_utc(*, now_utc: datetime) -> datetime:
     invite_time_value = os.getenv("DAILY_CUP_INVITE_TIME", "16:00")
     invite_hour, invite_minute = _parse_hhmm(invite_time_value, default_hour=16, default_minute=0)
-    return _local_daily_cup_anchor(now_utc=now_utc, hour=invite_hour, minute=invite_minute).astimezone(
-        timezone.utc
-    )
+    return _local_daily_cup_anchor(
+        now_utc=now_utc, hour=invite_hour, minute=invite_minute
+    ).astimezone(timezone.utc)
 
 
 def _close_at_utc(*, now_utc: datetime) -> datetime:
     close_time_value = os.getenv("DAILY_CUP_CLOSE_TIME", settings.daily_cup_registration_close)
     close_hour, close_minute = _parse_hhmm(close_time_value, default_hour=18, default_minute=0)
-    return _local_daily_cup_anchor(now_utc=now_utc, hour=close_hour, minute=close_minute).astimezone(
-        timezone.utc
-    )
+    return _local_daily_cup_anchor(
+        now_utc=now_utc, hour=close_hour, minute=close_minute
+    ).astimezone(timezone.utc)
 
 
 def _has_pending_round_match_for_user(*, user_id: int, matches: list) -> bool:
@@ -121,7 +121,9 @@ async def get_daily_cup_status_for_user(
                 status=DailyCupUserStatus.REGISTERED_WAITING,
                 tournament=tournament,
             )
-        return DailyCupUserStatusSnapshot(status=DailyCupUserStatus.INVITE_OPEN, tournament=tournament)
+        return DailyCupUserStatusSnapshot(
+            status=DailyCupUserStatus.INVITE_OPEN, tournament=tournament
+        )
 
     if tournament.status in _ROUND_STATUSES:
         if not viewer_joined:
@@ -139,7 +141,9 @@ async def get_daily_cup_status_for_user(
                 status=DailyCupUserStatus.ROUND_ACTIVE,
                 tournament=tournament,
             )
-        return DailyCupUserStatusSnapshot(status=DailyCupUserStatus.ROUND_WAITING, tournament=tournament)
+        return DailyCupUserStatusSnapshot(
+            status=DailyCupUserStatus.ROUND_WAITING, tournament=tournament
+        )
 
     if tournament.status == TOURNAMENT_STATUS_COMPLETED:
         return DailyCupUserStatusSnapshot(

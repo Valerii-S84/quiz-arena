@@ -20,6 +20,7 @@ def _gameplay():
 
     return gameplay
 
+
 def register(router: Router) -> None:
     router.callback_query(F.data == "daily:cup:menu")(handle_daily_cup_menu)
     router.callback_query(F.data.regexp(gameplay_callbacks.DAILY_CUP_JOIN_RE))(

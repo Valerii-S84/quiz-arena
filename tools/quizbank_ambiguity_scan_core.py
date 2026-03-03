@@ -6,11 +6,10 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from rapidfuzz import fuzz
-
 from quizbank_ambiguity_constants import OPTION_COLUMNS
 from quizbank_ambiguity_io import read_table
 from quizbank_ambiguity_text import key_family, norm, question_signature
+from rapidfuzz import fuzz
 
 
 def scan_file(path: Path) -> dict[str, Any]:

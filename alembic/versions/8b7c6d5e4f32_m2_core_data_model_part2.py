@@ -4,11 +4,13 @@ Revision ID: 8b7c6d5e4f32
 Revises: 4e5f6a7b8c90
 Create Date: 2026-02-18 01:07:00.000000
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "8b7c6d5e4f32"
 down_revision: str | None = "4e5f6a7b8c90"
@@ -29,9 +31,17 @@ def upgrade() -> None:
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("local_date_berlin", sa.Date(), nullable=False),
         sa.Column("idempotency_key", sa.String(96), nullable=False),
-        sa.CheckConstraint("source IN ('MENU','DAILY_CHALLENGE','FRIEND_CHALLENGE','TOURNAMENT')", name="ck_quiz_sessions_source"),
-        sa.CheckConstraint("status IN ('STARTED','COMPLETED','ABANDONED','CANCELED')", name="ck_quiz_sessions_status"),
-        sa.CheckConstraint("energy_cost_total >= 0", name="ck_quiz_sessions_energy_cost_non_negative"),
+        sa.CheckConstraint(
+            "source IN ('MENU','DAILY_CHALLENGE','FRIEND_CHALLENGE','TOURNAMENT')",
+            name="ck_quiz_sessions_source",
+        ),
+        sa.CheckConstraint(
+            "status IN ('STARTED','COMPLETED','ABANDONED','CANCELED')",
+            name="ck_quiz_sessions_status",
+        ),
+        sa.CheckConstraint(
+            "energy_cost_total >= 0", name="ck_quiz_sessions_energy_cost_non_negative"
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.UniqueConstraint("idempotency_key", name="uq_quiz_sessions_idempotency_key"),
     )
@@ -94,32 +104,63 @@ def upgrade() -> None:
         sa.Column("valid_until", sa.DateTime(timezone=True), nullable=False),
         sa.Column("max_total_uses", sa.Integer(), nullable=True),
         sa.Column("used_total", sa.Integer(), nullable=False, server_default=sa.text("0")),
-        sa.Column("max_uses_per_user", sa.SmallInteger(), nullable=False, server_default=sa.text("1")),
+        sa.Column(
+            "max_uses_per_user", sa.SmallInteger(), nullable=False, server_default=sa.text("1")
+        ),
         sa.Column("new_users_only", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("first_purchase_only", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "first_purchase_only", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
         sa.Column("created_by", sa.String(64), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("promo_type IN ('PREMIUM_GRANT','PERCENT_DISCOUNT')", name="ck_promo_codes_type"),
-        sa.CheckConstraint("grant_premium_days IS NULL OR grant_premium_days IN (7,30,90)", name="ck_promo_codes_grant_days"),
-        sa.CheckConstraint("discount_percent IS NULL OR (discount_percent BETWEEN 1 AND 90)", name="ck_promo_codes_discount_percent"),
-        sa.CheckConstraint("status IN ('ACTIVE','PAUSED','EXPIRED','DEPLETED')", name="ck_promo_codes_status"),
-        sa.CheckConstraint("max_total_uses IS NULL OR max_total_uses > 0", name="ck_promo_codes_max_total_uses_positive"),
+        sa.CheckConstraint(
+            "promo_type IN ('PREMIUM_GRANT','PERCENT_DISCOUNT')", name="ck_promo_codes_type"
+        ),
+        sa.CheckConstraint(
+            "grant_premium_days IS NULL OR grant_premium_days IN (7,30,90)",
+            name="ck_promo_codes_grant_days",
+        ),
+        sa.CheckConstraint(
+            "discount_percent IS NULL OR (discount_percent BETWEEN 1 AND 90)",
+            name="ck_promo_codes_discount_percent",
+        ),
+        sa.CheckConstraint(
+            "status IN ('ACTIVE','PAUSED','EXPIRED','DEPLETED')", name="ck_promo_codes_status"
+        ),
+        sa.CheckConstraint(
+            "max_total_uses IS NULL OR max_total_uses > 0",
+            name="ck_promo_codes_max_total_uses_positive",
+        ),
         sa.CheckConstraint("used_total >= 0", name="ck_promo_codes_used_total_non_negative"),
         sa.CheckConstraint("max_uses_per_user = 1", name="ck_promo_codes_max_uses_per_user_is_one"),
-        sa.CheckConstraint("((promo_type = 'PREMIUM_GRANT' AND grant_premium_days IS NOT NULL AND discount_percent IS NULL) OR (promo_type = 'PERCENT_DISCOUNT' AND discount_percent IS NOT NULL AND grant_premium_days IS NULL))", name="ck_promo_codes_type_payload_consistency"),
-        sa.CheckConstraint("max_total_uses IS NULL OR used_total <= max_total_uses", name="ck_promo_codes_used_total_le_max"),
+        sa.CheckConstraint(
+            "((promo_type = 'PREMIUM_GRANT' AND grant_premium_days IS NOT NULL AND discount_percent IS NULL) OR (promo_type = 'PERCENT_DISCOUNT' AND discount_percent IS NOT NULL AND grant_premium_days IS NULL))",
+            name="ck_promo_codes_type_payload_consistency",
+        ),
+        sa.CheckConstraint(
+            "max_total_uses IS NULL OR used_total <= max_total_uses",
+            name="ck_promo_codes_used_total_le_max",
+        ),
         sa.UniqueConstraint("code_hash", name="uq_promo_codes_code_hash"),
     )
     op.create_index("idx_promo_codes_prefix", "promo_codes", ["code_prefix"])
     op.create_index("idx_promo_codes_target", "promo_codes", ["target_scope"])
     op.create_index("idx_promo_codes_valid_from", "promo_codes", ["valid_from"])
     op.create_index("idx_promo_codes_valid_until", "promo_codes", ["valid_until"])
-    op.create_foreign_key("fk_purchases_applied_promo_code_id_promo_codes", "purchases", "promo_codes", ["applied_promo_code_id"], ["id"])
+    op.create_foreign_key(
+        "fk_purchases_applied_promo_code_id_promo_codes",
+        "purchases",
+        "promo_codes",
+        ["applied_promo_code_id"],
+        ["id"],
+    )
 
 
 def downgrade() -> None:
-    op.drop_constraint("fk_purchases_applied_promo_code_id_promo_codes", "purchases", type_="foreignkey")
+    op.drop_constraint(
+        "fk_purchases_applied_promo_code_id_promo_codes", "purchases", type_="foreignkey"
+    )
     op.drop_index("idx_promo_codes_valid_until", table_name="promo_codes")
     op.drop_index("idx_promo_codes_valid_from", table_name="promo_codes")
     op.drop_index("idx_promo_codes_target", table_name="promo_codes")

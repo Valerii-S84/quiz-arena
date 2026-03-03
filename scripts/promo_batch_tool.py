@@ -45,7 +45,9 @@ def _load_raw_codes_from_csv(path: Path) -> list[str]:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Promo code batch generation/import tool")
     parser.add_argument("--campaign-name", required=True)
-    parser.add_argument("--promo-type", choices=("PREMIUM_GRANT", "PERCENT_DISCOUNT"), required=True)
+    parser.add_argument(
+        "--promo-type", choices=("PREMIUM_GRANT", "PERCENT_DISCOUNT"), required=True
+    )
     parser.add_argument("--grant-premium-days", type=int)
     parser.add_argument("--discount-percent", type=int)
     parser.add_argument("--target-scope", required=True)

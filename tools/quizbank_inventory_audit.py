@@ -84,7 +84,9 @@ def build_markdown(report: dict[str, Any]) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate QuizBank inventory audit.")
-    parser.add_argument("--input-dir", default="QuizBank", help="Directory with QuizBank CSV files.")
+    parser.add_argument(
+        "--input-dir", default="QuizBank", help="Directory with QuizBank CSV files."
+    )
     parser.add_argument(
         "--output-json",
         default="reports/quizbank_inventory_audit.json",

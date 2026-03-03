@@ -8,8 +8,9 @@ Create Date: 2026-02-27 23:10:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "d9e0f1a2b3c4"
 down_revision: str | None = "c8d9e0f1a2b3"
@@ -66,7 +67,9 @@ def upgrade() -> None:
         "challenge_type IN ('DIRECT','OPEN')",
     )
 
-    op.execute("UPDATE friend_challenges SET challenge_type = 'DIRECT' WHERE challenge_type IS NULL")
+    op.execute(
+        "UPDATE friend_challenges SET challenge_type = 'DIRECT' WHERE challenge_type IS NULL"
+    )
 
     op.execute(
         """

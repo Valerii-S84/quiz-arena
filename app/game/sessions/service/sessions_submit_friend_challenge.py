@@ -129,7 +129,9 @@ async def _apply_friend_challenge_answer(
         }:
             from app.game.tournaments.lifecycle import check_and_advance_round
             from app.game.tournaments.settlement import settle_pending_match_from_duel
-            from app.workers.tasks.daily_cup_match_results import send_daily_cup_match_result_messages
+            from app.workers.tasks.daily_cup_match_results import (
+                send_daily_cup_match_result_messages,
+            )
 
             tournament_match = await TournamentMatchesRepo.get_by_id_for_update(
                 session,
@@ -187,7 +189,10 @@ async def _apply_friend_challenge_answer(
                                 tournament_id=str(tournament_match.tournament_id),
                                 enqueue_completion_followups=True,
                             )
-                        if challenge.opponent_user_id is not None and tournament_match.user_b is not None:
+                        if (
+                            challenge.opponent_user_id is not None
+                            and tournament_match.user_b is not None
+                        ):
                             await send_daily_cup_match_result_messages(
                                 session,
                                 tournament_id=tournament_match.tournament_id,

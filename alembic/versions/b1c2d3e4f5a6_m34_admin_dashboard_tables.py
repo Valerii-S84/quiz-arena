@@ -8,8 +8,9 @@ Create Date: 2026-03-02 18:45:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "b1c2d3e4f5a6"
 down_revision: str | None = "a3b4c5d6e7f8"
@@ -29,12 +30,16 @@ def upgrade() -> None:
         sa.Column("revenue_eur", sa.Numeric(10, 2), nullable=False, server_default=sa.text("0")),
         sa.Column("quizzes_played", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column("purchases_count", sa.Integer(), nullable=False, server_default=sa.text("0")),
-        sa.Column("active_subscriptions", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column(
+            "active_subscriptions", sa.Integer(), nullable=False, server_default=sa.text("0")
+        ),
         sa.CheckConstraint("dau >= 0", name="ck_daily_metrics_dau_non_negative"),
         sa.CheckConstraint("wau >= 0", name="ck_daily_metrics_wau_non_negative"),
         sa.CheckConstraint("mau >= 0", name="ck_daily_metrics_mau_non_negative"),
         sa.CheckConstraint("new_users >= 0", name="ck_daily_metrics_new_users_non_negative"),
-        sa.CheckConstraint("revenue_stars >= 0", name="ck_daily_metrics_revenue_stars_non_negative"),
+        sa.CheckConstraint(
+            "revenue_stars >= 0", name="ck_daily_metrics_revenue_stars_non_negative"
+        ),
         sa.CheckConstraint("revenue_eur >= 0", name="ck_daily_metrics_revenue_eur_non_negative"),
         sa.CheckConstraint("quizzes_played >= 0", name="ck_daily_metrics_quizzes_non_negative"),
         sa.CheckConstraint("purchases_count >= 0", name="ck_daily_metrics_purchases_non_negative"),

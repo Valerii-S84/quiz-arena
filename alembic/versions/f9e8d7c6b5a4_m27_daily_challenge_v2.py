@@ -8,8 +8,9 @@ Create Date: 2026-02-26 12:40:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "f9e8d7c6b5a4"
 down_revision: str | None = "f1a2b3c4d5e7"
@@ -59,7 +60,9 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("uq_daily_runs_user_date", "daily_runs", ["user_id", "berlin_date"], unique=True)
+    op.create_index(
+        "uq_daily_runs_user_date", "daily_runs", ["user_id", "berlin_date"], unique=True
+    )
     op.create_index(
         "idx_daily_runs_berlin_date_status",
         "daily_runs",

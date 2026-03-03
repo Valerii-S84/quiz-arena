@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy import delete
-from sqlalchemy.engine import make_url
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import make_url
 
 from app.core.config import get_settings
 from app.db.models.quiz_questions import QuizQuestion
@@ -81,7 +81,9 @@ def _read_csv(path: Path) -> list[dict[str, str]]:
         return [dict(row) for row in reader]
 
 
-def _build_records(args: argparse.Namespace) -> tuple[list[dict[str, Any]], ImportSummary, Counter[str]]:
+def _build_records(
+    args: argparse.Namespace,
+) -> tuple[list[dict[str, Any]], ImportSummary, Counter[str]]:
     if not args.input_dir.exists():
         raise ValueError(f"input directory does not exist: {args.input_dir}")
 
@@ -90,7 +92,9 @@ def _build_records(args: argparse.Namespace) -> tuple[list[dict[str, Any]], Impo
     records: list[dict[str, Any]] = []
     seen_question_ids: set[str] = set()
 
-    files = sorted(p for p in args.input_dir.iterdir() if p.is_file() and p.suffix.lower() == ".csv")
+    files = sorted(
+        p for p in args.input_dir.iterdir() if p.is_file() and p.suffix.lower() == ".csv"
+    )
     for path in files:
         if path.name in SKIP_FILES:
             continue
@@ -118,7 +122,9 @@ def _build_records(args: argparse.Namespace) -> tuple[list[dict[str, Any]], Impo
             if len(question_id) > 64:
                 raise ValueError(f"{path.name}:{row_index}: quiz_id exceeds 64 characters")
             if question_id in seen_question_ids:
-                raise ValueError(f"{path.name}:{row_index}: duplicate quiz_id in import set: {question_id}")
+                raise ValueError(
+                    f"{path.name}:{row_index}: duplicate quiz_id in import set: {question_id}"
+                )
             seen_question_ids.add(question_id)
 
             options = [
@@ -206,7 +212,9 @@ def _validate_replace_all_safety(
 
     resolved_db_name = (make_url(database_url).database or "").strip()
     if not resolved_db_name:
-        raise RuntimeError("Refusing --replace-all in production: DATABASE_URL has empty database name.")
+        raise RuntimeError(
+            "Refusing --replace-all in production: DATABASE_URL has empty database name."
+        )
 
     if confirmation_value != PROD_REPLACE_CONFIRM_VALUE:
         raise RuntimeError(

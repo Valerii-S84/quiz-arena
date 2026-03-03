@@ -10,7 +10,9 @@ from app.db.session import SessionLocal
 
 async def _run() -> int:
     async with SessionLocal() as session:
-        total = int((await session.execute(select(func.count()).select_from(QuizQuestion))).scalar_one())
+        total = int(
+            (await session.execute(select(func.count()).select_from(QuizQuestion))).scalar_one()
+        )
 
     print(f"quizbank_assert_non_empty total={total}")  # noqa: T201
     if total <= 0:

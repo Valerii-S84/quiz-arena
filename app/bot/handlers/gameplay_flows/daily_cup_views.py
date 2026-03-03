@@ -7,7 +7,10 @@ from aiogram.types import CallbackQuery, Message
 from app.bot.handlers.gameplay_flows.tournament_views import format_points
 from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard, build_daily_cup_share_url
 from app.bot.texts.de import TEXTS_DE
-from app.workers.tasks.tournaments_messaging_text import format_deadline, is_message_not_modified_error
+from app.workers.tasks.tournaments_messaging_text import (
+    format_deadline,
+    is_message_not_modified_error,
+)
 
 _BERLIN_TZ = ZoneInfo("Europe/Berlin")
 
@@ -73,7 +76,9 @@ async def render_daily_cup_lobby(
         round_no = max(1, int(lobby.tournament.current_round))
         if lobby.tournament.status == "COMPLETED":
             points_map = {item.user_id: format_points(item.score) for item in lobby.participants}
-            tie_break_map = {item.user_id: format_points(item.tie_break) for item in lobby.participants}
+            tie_break_map = {
+                item.user_id: format_points(item.tie_break) for item in lobby.participants
+            }
             standings_lines = _build_standings_lines(
                 participant_labels=participant_labels,
                 participant_points=points_map,
@@ -122,7 +127,9 @@ async def render_daily_cup_lobby(
                         TEXTS_DE["msg.daily_cup.waiting_next_round"].format(
                             round_no=round_no,
                             next_round_time=(
-                                lobby.tournament.round_deadline.astimezone(_BERLIN_TZ).strftime("%H:%M")
+                                lobby.tournament.round_deadline.astimezone(_BERLIN_TZ).strftime(
+                                    "%H:%M"
+                                )
                                 if lobby.tournament.round_deadline is not None
                                 else "-"
                             ),

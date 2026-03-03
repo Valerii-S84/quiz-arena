@@ -125,7 +125,9 @@ def build_daily_cup_share_keyboard(
 
 
 def build_daily_cup_share_url(*, base_link: str, share_text: str) -> str:
-    return "https://t.me/share/url" f"?url={quote_plus(base_link)}" f"&text={quote_plus(share_text)}"
+    return (
+        "https://t.me/share/url" f"?url={quote_plus(base_link)}" f"&text={quote_plus(share_text)}"
+    )
 
 
 def build_daily_cup_menu_keyboard() -> InlineKeyboardMarkup:

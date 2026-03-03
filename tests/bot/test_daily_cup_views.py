@@ -118,11 +118,7 @@ async def test_render_daily_cup_lobby_round_active_shows_active_hint() -> None:
     text = response.text or ""
     assert "Dein Duell ist bereit." in text
     assert "Gegner: Max" in text
-    buttons = [
-        button
-        for row in response.kwargs["reply_markup"].inline_keyboard
-        for button in row
-    ]
+    buttons = [button for row in response.kwargs["reply_markup"].inline_keyboard for button in row]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert "friend:next:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" in callbacks
 
@@ -163,7 +159,9 @@ async def test_render_daily_cup_lobby_round_waiting_shows_next_round_time() -> N
 
 
 @pytest.mark.asyncio
-async def test_render_daily_cup_lobby_round_waiting_final_round_shows_completion_wait_hint() -> None:
+async def test_render_daily_cup_lobby_round_waiting_final_round_shows_completion_wait_hint() -> (
+    None
+):
     callback = DummyCallback(
         data="daily:cup:view:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         from_user=SimpleNamespace(id=101),
@@ -234,11 +232,7 @@ async def test_render_daily_cup_lobby_completed_shows_completed_marker() -> None
     assert "Deadline: -" not in text
     assert "TB 9" in text
     assert "TB 4.5" in text
-    buttons = [
-        button
-        for row in response.kwargs["reply_markup"].inline_keyboard
-        for button in row
-    ]
+    buttons = [button for row in response.kwargs["reply_markup"].inline_keyboard for button in row]
     urls = [button.url for button in buttons if button.url]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert any(url and "https://t.me/share/url" in url for url in urls)

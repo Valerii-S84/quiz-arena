@@ -4,9 +4,11 @@ Revision ID: e1f2a3b4c5d6
 Revises: f0e1d2c3b4a5
 Create Date: 2026-02-20 16:10:00.000000
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "e1f2a3b4c5d6"
@@ -18,7 +20,9 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column(
         "analytics_daily",
-        sa.Column("purchase_init_events_total", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column(
+            "purchase_init_events_total", sa.Integer(), nullable=False, server_default=sa.text("0")
+        ),
     )
     op.add_column(
         "analytics_daily",

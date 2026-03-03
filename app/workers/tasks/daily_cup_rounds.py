@@ -17,8 +17,8 @@ from app.game.tournaments.constants import (
     TOURNAMENT_TYPE_DAILY_ARENA,
 )
 from app.game.tournaments.lifecycle import settle_round_and_advance
-from app.workers.tasks.daily_cup_match_results import send_daily_cup_match_result_messages
 from app.workers.tasks.daily_cup_core import emit_daily_cup_events, now_utc
+from app.workers.tasks.daily_cup_match_results import send_daily_cup_match_result_messages
 from app.workers.tasks.daily_cup_messaging import enqueue_daily_cup_round_messaging
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup")
@@ -127,10 +127,12 @@ async def advance_daily_cup_rounds_async() -> dict[str, int]:
             if completed_count > 0 or tournament.status == TOURNAMENT_STATUS_COMPLETED:
                 completed_ids.append(str(tournament.id))
             if settled_count > 0 and pending_match_ids:
-                settled_round_matches = await TournamentMatchesRepo.list_by_tournament_round_for_update(
-                    session,
-                    tournament_id=tournament.id,
-                    round_no=round_before,
+                settled_round_matches = (
+                    await TournamentMatchesRepo.list_by_tournament_round_for_update(
+                        session,
+                        tournament_id=tournament.id,
+                        round_no=round_before,
+                    )
                 )
                 for match in settled_round_matches:
                     if (
@@ -141,7 +143,9 @@ async def advance_daily_cup_rounds_async() -> dict[str, int]:
                         or match.friend_challenge_id is None
                     ):
                         continue
-                    challenge = await FriendChallengesRepo.get_by_id(session, match.friend_challenge_id)
+                    challenge = await FriendChallengesRepo.get_by_id(
+                        session, match.friend_challenge_id
+                    )
                     if challenge is None:
                         continue
                     user_a_points, user_b_points = _match_scores_from_challenge(

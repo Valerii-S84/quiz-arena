@@ -4,11 +4,11 @@ import asyncio
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from alembic.config import Config
-from alembic.script import ScriptDirectory
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.streak.time import berlin_local_date
