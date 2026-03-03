@@ -90,6 +90,26 @@ def test_eight_player_no_rematch() -> None:
             by_user_id[pair.user_a].score += Decimal("1")
 
 
+def test_six_player_no_rematch_with_flat_scores() -> None:
+    participants = [
+        _participant(user_id=user_id, score="0", tie_break="0", joined_offset_minutes=user_id)
+        for user_id in range(1, 7)
+    ]
+    history: set[frozenset[int]] = set()
+
+    for round_no in range(1, 4):
+        round_pairs = build_swiss_pairs(
+            participants=participants,
+            previous_pairs=history,
+        )
+        assert len(round_pairs) == 3
+        for pair in round_pairs:
+            assert pair.user_b is not None
+            pair_key = frozenset((pair.user_a, int(pair.user_b)))
+            assert pair_key not in history, f"Rematch im Runde {round_no}: {pair_key}"
+            history.add(pair_key)
+
+
 def test_build_swiss_pairs_does_not_repeat_bye_when_alternative_exists() -> None:
     participants = [
         _participant(user_id=10, score="2", tie_break="1", joined_offset_minutes=1),
