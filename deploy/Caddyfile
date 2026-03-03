@@ -1,4 +1,8 @@
-deutschquizarena.de, deutchquizarena.de {
+www.deutchquizarena.de {
+  redir https://deutchquizarena.de{uri} 308
+}
+
+deutchquizarena.de {
   encode zstd gzip
 
   handle /webhook* {
