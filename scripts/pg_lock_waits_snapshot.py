@@ -44,7 +44,9 @@ async def _collect(database_url: str) -> dict[str, int]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Snapshot current PostgreSQL lock waits/deadlocks.")
+    parser = argparse.ArgumentParser(
+        description="Snapshot current PostgreSQL lock waits/deadlocks."
+    )
     parser.add_argument("--database-url", required=True)
     args = parser.parse_args()
 

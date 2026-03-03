@@ -7,7 +7,10 @@ import pytest
 
 from app.bot.handlers.gameplay_flows import daily_cup_menu_flow
 from app.bot.texts.de import TEXTS_DE
-from app.game.tournaments.daily_cup_user_status import DailyCupUserStatus, DailyCupUserStatusSnapshot
+from app.game.tournaments.daily_cup_user_status import (
+    DailyCupUserStatus,
+    DailyCupUserStatusSnapshot,
+)
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
 

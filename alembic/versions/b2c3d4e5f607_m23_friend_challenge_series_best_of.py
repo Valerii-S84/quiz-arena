@@ -8,8 +8,9 @@ Create Date: 2026-02-23 01:40:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "b2c3d4e5f607"
 down_revision: str | None = "a1b2c3d4e5f6"
@@ -52,8 +53,12 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("idx_friend_challenges_series_game", table_name="friend_challenges")
-    op.drop_constraint("ck_friend_challenges_series_best_of_positive", "friend_challenges", type_="check")
-    op.drop_constraint("ck_friend_challenges_series_game_positive", "friend_challenges", type_="check")
+    op.drop_constraint(
+        "ck_friend_challenges_series_best_of_positive", "friend_challenges", type_="check"
+    )
+    op.drop_constraint(
+        "ck_friend_challenges_series_game_positive", "friend_challenges", type_="check"
+    )
     op.drop_column("friend_challenges", "series_best_of")
     op.drop_column("friend_challenges", "series_game_number")
     op.drop_column("friend_challenges", "series_id")

@@ -24,7 +24,9 @@ DAILY_CUP_INVITE_TIME = os.getenv("DAILY_CUP_INVITE_TIME", "16:00")
 DAILY_CUP_LAST_CALL_REMINDER_TIME = os.getenv("DAILY_CUP_LAST_CALL_REMINDER_TIME", "17:30")
 DAILY_CUP_PRESTART_REMINDER_TIME = os.getenv("DAILY_CUP_PRESTART_REMINDER_TIME", "17:45")
 DAILY_CUP_REGISTRATION_OPEN = os.getenv("DAILY_CUP_OPEN_TIME", settings.daily_cup_registration_open)
-DAILY_CUP_REGISTRATION_CLOSE = os.getenv("DAILY_CUP_CLOSE_TIME", settings.daily_cup_registration_close)
+DAILY_CUP_REGISTRATION_CLOSE = os.getenv(
+    "DAILY_CUP_CLOSE_TIME", settings.daily_cup_registration_close
+)
 _round_minutes_raw = os.getenv("DAILY_CUP_ROUND_MINUTES")
 DAILY_CUP_ROUND_DURATION_MINUTES = max(
     1,

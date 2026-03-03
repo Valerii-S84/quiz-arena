@@ -14,7 +14,10 @@ from app.game.tournaments.lifecycle import check_and_advance_round
 from app.game.tournaments.service import join_daily_cup_by_id
 from app.workers.tasks import daily_cup_async, daily_cup_rounds
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
-from tests.integration.friend_challenge_fixtures import _create_user, _seed_friend_challenge_questions
+from tests.integration.friend_challenge_fixtures import (
+    _create_user,
+    _seed_friend_challenge_questions,
+)
 from tests.integration.test_private_tournament_service_integration import _ensure_tournament_schema
 
 UTC = timezone.utc

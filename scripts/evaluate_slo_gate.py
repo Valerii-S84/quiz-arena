@@ -49,7 +49,9 @@ def _metric_values(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Evaluate SLO gate from k6 summary + DB lock waits.")
+    parser = argparse.ArgumentParser(
+        description="Evaluate SLO gate from k6 summary + DB lock waits."
+    )
     parser.add_argument("--summary-file", required=True)
     parser.add_argument("--flow-tag", default="webhook_start")
     parser.add_argument("--max-p95-ms", type=float, required=True)
@@ -65,7 +67,9 @@ def main() -> int:
     if not isinstance(metrics, dict):
         raise SystemExit("SLO_FAIL: summary file does not contain metrics payload")
 
-    duration_values = _metric_values(metrics, metric_name="http_req_duration", flow_tag=args.flow_tag)
+    duration_values = _metric_values(
+        metrics, metric_name="http_req_duration", flow_tag=args.flow_tag
+    )
     failed_values = _metric_values(metrics, metric_name="http_req_failed", flow_tag=args.flow_tag)
     if duration_values is None or failed_values is None:
         raise SystemExit("SLO_FAIL: required metrics not found in k6 summary")

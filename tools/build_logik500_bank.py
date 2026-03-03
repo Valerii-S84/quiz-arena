@@ -9,7 +9,6 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-
 SOURCE_FILES = [
     ("s1", Path("QuizBank/LOGIK_LUECKE_Denken_auf_Deutsch_Bank_400.csv")),
     ("s2", Path("QuizBank/LOGIK_LUECKE_Denken_auf_Deutsch_Bank_Season2_A2_B1_400.csv")),
@@ -50,7 +49,10 @@ CURATED_EXTRAS: dict[tuple[str, int], str] = {
     ("s1", 88): "An der Haltestelle warte ich ___ den Bus.",
     ("s1", 90): "Ich spreche heute ___ meiner Lehrerin über die Hausaufgabe.",
     ("s1", 92): "Das kleine Kind hat Angst ___ dem großen Hund.",
-    ("s1", 129): "Der Wecker ist nicht gestellt und wir müssen um sechs los. Nächster Schritt: ___.",
+    (
+        "s1",
+        129,
+    ): "Der Wecker ist nicht gestellt und wir müssen um sechs los. Nächster Schritt: ___.",
     ("s1", 130): "Mein Handy zeigt nur noch zwei Prozent Akku. Was ist jetzt logisch? ___.",
     ("s1", 131): "Es ist mitten in der Nacht und alle wollen schlafen. Nächster Schritt: ___.",
     ("s1", 132): "Die Tonne quillt über und morgen ist Abholung. Was ist jetzt logisch? ___.",

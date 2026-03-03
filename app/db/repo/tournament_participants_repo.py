@@ -8,8 +8,8 @@ from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.tournaments import Tournament
 from app.db.models.tournament_participants import TournamentParticipant
+from app.db.models.tournaments import Tournament
 
 
 class TournamentParticipantsRepo:

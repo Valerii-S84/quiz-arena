@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import lru_cache
+
 from app.game.tournaments.types import SwissPair, SwissParticipant
 
 
@@ -16,16 +18,47 @@ def _pair_key(*, user_a: int, user_b: int) -> frozenset[int]:
     return frozenset((user_a, user_b))
 
 
-def _pick_opponent_index(
+def _build_pairs_backtracking(
     *,
-    user_id: int,
-    candidates: list[SwissParticipant],
+    participants: list[SwissParticipant],
     previous_pairs: set[frozenset[int]],
-) -> int:
-    for index, candidate in enumerate(candidates):
-        if _pair_key(user_a=user_id, user_b=candidate.user_id) not in previous_pairs:
-            return index
-    return 0
+) -> list[SwissPair]:
+    user_ids = tuple(participant.user_id for participant in participants)
+
+    @lru_cache(maxsize=None)
+    def _search(
+        remaining_ids: tuple[int, ...],
+        *,
+        allow_rematch: bool,
+    ) -> tuple[tuple[int, int], ...] | None:
+        if not remaining_ids:
+            return ()
+
+        user_a = remaining_ids[0]
+        tail = remaining_ids[1:]
+        candidate_ids = [
+            candidate_id
+            for candidate_id in tail
+            if allow_rematch or _pair_key(user_a=user_a, user_b=candidate_id) not in previous_pairs
+        ]
+        if not candidate_ids:
+            return None
+
+        for candidate_id in candidate_ids:
+            next_remaining = tuple(user_id for user_id in tail if user_id != candidate_id)
+            nested = _search(next_remaining, allow_rematch=allow_rematch)
+            if nested is None:
+                continue
+            return ((user_a, candidate_id),) + nested
+        return None
+
+    pairs = _search(user_ids, allow_rematch=False)
+    if pairs is None:
+        pairs = _search(user_ids, allow_rematch=True)
+    if pairs is None:
+        return []
+
+    return [SwissPair(user_a=user_a, user_b=user_b) for user_a, user_b in pairs]
 
 
 def _pick_bye_participant(
@@ -72,16 +105,12 @@ def build_swiss_pairs(
         ]
         bye_pair = SwissPair(user_a=bye_participant.user_id, user_b=None)
 
-    while remaining:
-        participant = remaining.pop(0)
-
-        opponent_index = _pick_opponent_index(
-            user_id=participant.user_id,
-            candidates=remaining,
+    pairs.extend(
+        _build_pairs_backtracking(
+            participants=remaining,
             previous_pairs=previous_pairs,
         )
-        opponent = remaining.pop(opponent_index)
-        pairs.append(SwissPair(user_a=participant.user_id, user_b=opponent.user_id))
+    )
 
     if bye_pair is not None:
         pairs.append(bye_pair)

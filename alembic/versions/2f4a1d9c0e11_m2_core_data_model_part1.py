@@ -4,11 +4,13 @@ Revision ID: 2f4a1d9c0e11
 Revises: 1c7257851be3
 Create Date: 2026-02-18 01:05:00.000000
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "2f4a1d9c0e11"
 down_revision: str | None = "1c7257851be3"
@@ -24,11 +26,18 @@ def upgrade() -> None:
         sa.Column("username", sa.Text(), nullable=True),
         sa.Column("first_name", sa.Text(), nullable=True),
         sa.Column("language_code", sa.String(8), nullable=False, server_default=sa.text("'de'")),
-        sa.Column("timezone", sa.String(64), nullable=False, server_default=sa.text("'Europe/Berlin'")),
+        sa.Column(
+            "timezone", sa.String(64), nullable=False, server_default=sa.text("'Europe/Berlin'")
+        ),
         sa.Column("referral_code", sa.String(16), nullable=False),
         sa.Column("referred_by_user_id", sa.BigInteger(), nullable=True),
         sa.Column("status", sa.String(16), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.Column("last_seen_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint("status IN ('ACTIVE','BLOCKED','DELETED')", name="ck_users_status"),
         sa.ForeignKeyConstraint(["referred_by_user_id"], ["users.id"]),
@@ -46,12 +55,16 @@ def upgrade() -> None:
         sa.Column("free_energy", sa.SmallInteger(), nullable=False),
         sa.Column("paid_energy", sa.Integer(), nullable=False),
         sa.Column("free_cap", sa.SmallInteger(), nullable=False, server_default=sa.text("20")),
-        sa.Column("regen_interval_sec", sa.Integer(), nullable=False, server_default=sa.text("1800")),
+        sa.Column(
+            "regen_interval_sec", sa.Integer(), nullable=False, server_default=sa.text("1800")
+        ),
         sa.Column("last_regen_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("last_daily_topup_local_date", sa.Date(), nullable=False),
         sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("free_energy >= 0 AND free_energy <= 20", name="ck_energy_state_free_energy_range"),
+        sa.CheckConstraint(
+            "free_energy >= 0 AND free_energy <= 20", name="ck_energy_state_free_energy_range"
+        ),
         sa.CheckConstraint("paid_energy >= 0", name="ck_energy_state_paid_energy_non_negative"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("user_id"),
@@ -68,14 +81,23 @@ def upgrade() -> None:
         sa.Column("today_status", sa.String(16), nullable=False),
         sa.Column("streak_saver_tokens", sa.SmallInteger(), nullable=False),
         sa.Column("streak_saver_last_purchase_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("premium_freezes_used_week", sa.SmallInteger(), nullable=False, server_default=sa.text("0")),
+        sa.Column(
+            "premium_freezes_used_week",
+            sa.SmallInteger(),
+            nullable=False,
+            server_default=sa.text("0"),
+        ),
         sa.Column("premium_freeze_week_start_local_date", sa.Date(), nullable=True),
         sa.Column("version", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("current_streak >= 0", name="ck_streak_state_current_streak_non_negative"),
+        sa.CheckConstraint(
+            "current_streak >= 0", name="ck_streak_state_current_streak_non_negative"
+        ),
         sa.CheckConstraint("best_streak >= 0", name="ck_streak_state_best_streak_non_negative"),
         sa.CheckConstraint("streak_saver_tokens >= 0", name="ck_streak_state_tokens_non_negative"),
-        sa.CheckConstraint("today_status IN ('NO_ACTIVITY','PLAYED','FROZEN')", name="ck_streak_state_today_status"),
+        sa.CheckConstraint(
+            "today_status IN ('NO_ACTIVITY','PLAYED','FROZEN')", name="ck_streak_state_today_status"
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("user_id"),
     )
@@ -89,7 +111,9 @@ def upgrade() -> None:
         sa.Column("product_code", sa.String(32), nullable=False),
         sa.Column("product_type", sa.String(16), nullable=False),
         sa.Column("base_stars_amount", sa.Integer(), nullable=False),
-        sa.Column("discount_stars_amount", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column(
+            "discount_stars_amount", sa.Integer(), nullable=False, server_default=sa.text("0")
+        ),
         sa.Column("stars_amount", sa.Integer(), nullable=False),
         sa.Column("currency", sa.String(3), nullable=False, server_default=sa.text("'XTR'")),
         sa.Column("status", sa.String(32), nullable=False),
@@ -103,17 +127,30 @@ def upgrade() -> None:
         sa.Column("paid_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("credited_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("refunded_at", sa.DateTime(timezone=True), nullable=True),
-        sa.CheckConstraint("product_type IN ('MICRO','PREMIUM','OFFER','REFERRAL_REWARD')", name="ck_purchases_product_type"),
+        sa.CheckConstraint(
+            "product_type IN ('MICRO','PREMIUM','OFFER','REFERRAL_REWARD')",
+            name="ck_purchases_product_type",
+        ),
         sa.CheckConstraint("base_stars_amount > 0", name="ck_purchases_base_amount_positive"),
         sa.CheckConstraint("discount_stars_amount >= 0", name="ck_purchases_discount_non_negative"),
         sa.CheckConstraint("stars_amount > 0", name="ck_purchases_stars_amount_positive"),
-        sa.CheckConstraint("status IN ('CREATED','INVOICE_SENT','PRECHECKOUT_OK','PAID_UNCREDITED','CREDITED','FAILED','FAILED_CREDIT_PENDING_REVIEW','REFUNDED')", name="ck_purchases_status"),
-        sa.CheckConstraint("stars_amount = GREATEST(1, base_stars_amount - discount_stars_amount)", name="ck_purchases_final_amount"),
+        sa.CheckConstraint(
+            "status IN ('CREATED','INVOICE_SENT','PRECHECKOUT_OK','PAID_UNCREDITED','CREDITED','FAILED','FAILED_CREDIT_PENDING_REVIEW','REFUNDED')",
+            name="ck_purchases_status",
+        ),
+        sa.CheckConstraint(
+            "stars_amount = GREATEST(1, base_stars_amount - discount_stars_amount)",
+            name="ck_purchases_final_amount",
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.UniqueConstraint("idempotency_key", name="uq_purchases_idempotency_key"),
         sa.UniqueConstraint("invoice_payload", name="uq_purchases_invoice_payload"),
-        sa.UniqueConstraint("telegram_payment_charge_id", name="uq_purchases_telegram_payment_charge_id"),
-        sa.UniqueConstraint("telegram_pre_checkout_query_id", name="uq_purchases_telegram_pre_checkout_query_id"),
+        sa.UniqueConstraint(
+            "telegram_payment_charge_id", name="uq_purchases_telegram_payment_charge_id"
+        ),
+        sa.UniqueConstraint(
+            "telegram_pre_checkout_query_id", name="uq_purchases_telegram_pre_checkout_query_id"
+        ),
     )
     op.create_index("idx_purchases_user_created", "purchases", ["user_id", "created_at"])
     op.create_index("idx_purchases_product", "purchases", ["product_code"])

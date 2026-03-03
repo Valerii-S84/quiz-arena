@@ -8,7 +8,10 @@ from app.bot.handlers.gameplay_flows.daily_cup_views import render_daily_cup_lob
 from app.bot.handlers.gameplay_flows.tournament_views import resolve_participant_labels
 from app.bot.keyboards.daily_cup import build_daily_cup_menu_keyboard
 from app.bot.texts.de import TEXTS_DE
-from app.game.tournaments.daily_cup_user_status import DailyCupUserStatus, get_daily_cup_status_for_user
+from app.game.tournaments.daily_cup_user_status import (
+    DailyCupUserStatus,
+    get_daily_cup_status_for_user,
+)
 
 _MENU_SPAM_COOLDOWN = timedelta(seconds=2)
 _last_opened_at_by_user_id: dict[int, datetime] = {}
@@ -53,10 +56,9 @@ async def handle_daily_cup_menu(
             user_id=snapshot.user_id,
             now_utc=now_utc,
         )
-        if (
-            status_snapshot.tournament is not None
-            and status_snapshot.status not in {DailyCupUserStatus.NO_TOURNAMENT}
-        ):
+        if status_snapshot.tournament is not None and status_snapshot.status not in {
+            DailyCupUserStatus.NO_TOURNAMENT
+        }:
             if status_snapshot.status == DailyCupUserStatus.NOT_PARTICIPANT:
                 text_key = "msg.daily_cup.not_participant"
             else:

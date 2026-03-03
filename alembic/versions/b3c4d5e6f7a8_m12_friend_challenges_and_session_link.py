@@ -8,8 +8,9 @@ Create Date: 2026-02-19 19:40:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "b3c4d5e6f7a8"
 down_revision: str | None = "a7b8c9d0e1f2"
@@ -40,10 +41,16 @@ def upgrade() -> None:
             "status IN ('ACTIVE','COMPLETED','CANCELED')",
             name="ck_friend_challenges_status",
         ),
-        sa.CheckConstraint("current_round >= 1", name="ck_friend_challenges_current_round_positive"),
+        sa.CheckConstraint(
+            "current_round >= 1", name="ck_friend_challenges_current_round_positive"
+        ),
         sa.CheckConstraint("total_rounds >= 1", name="ck_friend_challenges_total_rounds_positive"),
-        sa.CheckConstraint("creator_score >= 0", name="ck_friend_challenges_creator_score_non_negative"),
-        sa.CheckConstraint("opponent_score >= 0", name="ck_friend_challenges_opponent_score_non_negative"),
+        sa.CheckConstraint(
+            "creator_score >= 0", name="ck_friend_challenges_creator_score_non_negative"
+        ),
+        sa.CheckConstraint(
+            "opponent_score >= 0", name="ck_friend_challenges_opponent_score_non_negative"
+        ),
         sa.CheckConstraint(
             "creator_answered_round >= 0",
             name="ck_friend_challenges_creator_answered_non_negative",
@@ -74,7 +81,10 @@ def upgrade() -> None:
         ["status", "created_at"],
     )
 
-    op.add_column("quiz_sessions", sa.Column("friend_challenge_id", postgresql.UUID(as_uuid=True), nullable=True))
+    op.add_column(
+        "quiz_sessions",
+        sa.Column("friend_challenge_id", postgresql.UUID(as_uuid=True), nullable=True),
+    )
     op.add_column("quiz_sessions", sa.Column("friend_challenge_round", sa.Integer(), nullable=True))
     op.create_foreign_key(
         "fk_quiz_sessions_friend_challenge_id",

@@ -4,11 +4,13 @@ Revision ID: 9a0b1c2d3e4f
 Revises: 8b7c6d5e4f32
 Create Date: 2026-02-18 01:07:30.000000
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "9a0b1c2d3e4f"
 down_revision: str | None = "8b7c6d5e4f32"
@@ -28,17 +30,27 @@ def upgrade() -> None:
         sa.Column("applied_purchase_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("grant_entitlement_id", sa.BigInteger(), nullable=True),
         sa.Column("idempotency_key", sa.String(96), nullable=False),
-        sa.Column("validation_snapshot", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "validation_snapshot",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default=sa.text("'{}'::jsonb"),
+        ),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("applied_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("status IN ('CREATED','VALIDATED','RESERVED','APPLIED','EXPIRED','REJECTED','REVOKED')", name="ck_promo_redemptions_status"),
+        sa.CheckConstraint(
+            "status IN ('CREATED','VALIDATED','RESERVED','APPLIED','EXPIRED','REJECTED','REVOKED')",
+            name="ck_promo_redemptions_status",
+        ),
         sa.ForeignKeyConstraint(["promo_code_id"], ["promo_codes.id"]),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.ForeignKeyConstraint(["applied_purchase_id"], ["purchases.id"]),
         sa.ForeignKeyConstraint(["grant_entitlement_id"], ["entitlements.id"]),
         sa.UniqueConstraint("applied_purchase_id", name="uq_promo_redemptions_applied_purchase_id"),
-        sa.UniqueConstraint("grant_entitlement_id", name="uq_promo_redemptions_grant_entitlement_id"),
+        sa.UniqueConstraint(
+            "grant_entitlement_id", name="uq_promo_redemptions_grant_entitlement_id"
+        ),
         sa.UniqueConstraint("idempotency_key", name="uq_promo_redemptions_idempotency_key"),
         sa.UniqueConstraint("promo_code_id", "user_id", name="uq_promo_redemptions_code_user"),
     )
@@ -54,13 +66,23 @@ def upgrade() -> None:
         sa.Column("result", sa.String(24), nullable=False),
         sa.Column("source", sa.String(16), nullable=False),
         sa.Column("attempted_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default=sa.text("'{}'::jsonb")),
-        sa.CheckConstraint("result IN ('ACCEPTED','INVALID','EXPIRED','NOT_APPLICABLE','RATE_LIMITED')", name="ck_promo_attempts_result"),
+        sa.Column(
+            "metadata",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default=sa.text("'{}'::jsonb"),
+        ),
+        sa.CheckConstraint(
+            "result IN ('ACCEPTED','INVALID','EXPIRED','NOT_APPLICABLE','RATE_LIMITED')",
+            name="ck_promo_attempts_result",
+        ),
         sa.CheckConstraint("source IN ('COMMAND','BUTTON','API')", name="ck_promo_attempts_source"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
     )
     op.create_index("idx_promo_attempts_user_time", "promo_attempts", ["user_id", "attempted_at"])
-    op.create_index("idx_promo_attempts_code_time", "promo_attempts", ["normalized_code_hash", "attempted_at"])
+    op.create_index(
+        "idx_promo_attempts_code_time", "promo_attempts", ["normalized_code_hash", "attempted_at"]
+    )
 
     op.create_table(
         "referrals",
@@ -73,12 +95,19 @@ def upgrade() -> None:
         sa.Column("rewarded_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("fraud_score", sa.Numeric(5, 2), nullable=False, server_default=sa.text("0")),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("status IN ('STARTED','QUALIFIED','REWARDED','REJECTED_FRAUD','CANCELED','DEFERRED_LIMIT')", name="ck_referrals_status"),
-        sa.CheckConstraint("referrer_user_id <> referred_user_id", name="ck_referrals_no_self_referral"),
+        sa.CheckConstraint(
+            "status IN ('STARTED','QUALIFIED','REWARDED','REJECTED_FRAUD','CANCELED','DEFERRED_LIMIT')",
+            name="ck_referrals_status",
+        ),
+        sa.CheckConstraint(
+            "referrer_user_id <> referred_user_id", name="ck_referrals_no_self_referral"
+        ),
         sa.ForeignKeyConstraint(["referrer_user_id"], ["users.id"]),
         sa.ForeignKeyConstraint(["referred_user_id"], ["users.id"]),
         sa.UniqueConstraint("referred_user_id", name="uq_referrals_referred_user_id"),
-        sa.UniqueConstraint("referrer_user_id", "referred_user_id", name="uq_referrals_referrer_referred"),
+        sa.UniqueConstraint(
+            "referrer_user_id", "referred_user_id", name="uq_referrals_referrer_referred"
+        ),
     )
     op.create_index("idx_referrals_referrer", "referrals", ["referrer_user_id"])
     op.create_index("idx_referrals_code", "referrals", ["referral_code"])

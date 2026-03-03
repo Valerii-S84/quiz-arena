@@ -178,10 +178,12 @@ async def check_2_no_revanche_button() -> None:
     )
     callbacks = _flatten_callbacks(keyboard)
     assert not any(
-        ("revanche" in callback.lower() or "rematch" in callback.lower())
+        ("revanche" in callback.lower() or "rematch" in callback.lower()) for callback in callbacks
+    )
+    assert any(
+        ("standings" in callback.lower() or "tournament" in callback.lower())
         for callback in callbacks
     )
-    assert any(("standings" in callback.lower() or "tournament" in callback.lower()) for callback in callbacks)
     RESULTS["CHECK 2"] = "✅"
     print("   PASSED")
 

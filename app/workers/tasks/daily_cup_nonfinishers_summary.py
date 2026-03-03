@@ -26,15 +26,27 @@ def _is_celery_task(task_obj: object) -> bool:
 
 
 def _empty_result() -> dict[str, int]:
-    return {"processed": 0, "participants_total": 0, "nonfinishers_total": 0, "sent": 0, "failed": 0}
+    return {
+        "processed": 0,
+        "participants_total": 0,
+        "nonfinishers_total": 0,
+        "sent": 0,
+        "failed": 0,
+    }
 
 
 def _user_did_not_finish_challenge(*, challenge: FriendChallenge, user_id: int) -> bool:
     total_rounds = max(1, int(challenge.total_rounds))
     if int(challenge.creator_user_id) == user_id:
-        return challenge.creator_finished_at is None and int(challenge.creator_answered_round) < total_rounds
+        return (
+            challenge.creator_finished_at is None
+            and int(challenge.creator_answered_round) < total_rounds
+        )
     if challenge.opponent_user_id is not None and int(challenge.opponent_user_id) == user_id:
-        return challenge.opponent_finished_at is None and int(challenge.opponent_answered_round) < total_rounds
+        return (
+            challenge.opponent_finished_at is None
+            and int(challenge.opponent_answered_round) < total_rounds
+        )
     return False
 
 
@@ -95,7 +107,9 @@ async def run_daily_cup_nonfinishers_summary_async(*, tournament_id: str) -> dic
             )
             matches.extend(round_matches)
 
-        challenge_ids = {match.friend_challenge_id for match in matches if match.friend_challenge_id is not None}
+        challenge_ids = {
+            match.friend_challenge_id for match in matches if match.friend_challenge_id is not None
+        }
         challenges: list[FriendChallenge] = []
         if challenge_ids:
             result = await session.execute(

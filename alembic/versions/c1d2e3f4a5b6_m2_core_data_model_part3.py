@@ -4,11 +4,13 @@ Revision ID: c1d2e3f4a5b6
 Revises: 9a0b1c2d3e4f
 Create Date: 2026-02-18 01:08:00.000000
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision: str = "c1d2e3f4a5b6"
 down_revision: str | None = "9a0b1c2d3e4f"
@@ -29,7 +31,12 @@ def upgrade() -> None:
         sa.Column("event_type", sa.String(length=64), nullable=False),
         sa.Column("payload", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("status", sa.String(length=32), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
     )
     op.create_table(
         "reconciliation_runs",
@@ -46,7 +53,12 @@ def upgrade() -> None:
         sa.Column("created_by", sa.String(length=64), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("total_codes", sa.Integer(), nullable=False),
-        sa.Column("metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "metadata",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default=sa.text("'{}'::jsonb"),
+        ),
     )
 
 

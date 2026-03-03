@@ -26,7 +26,9 @@ from app.workers.tasks.tournaments_proof_card_style import (
 DAILY_ARENA_LINK = "t.me/QuizArenaBot"
 
 
-def _draw_daily_link(*, draw: ImageDraw.ImageDraw, y: int, fill: tuple[int, int, int], size: int = 24) -> None:
+def _draw_daily_link(
+    *, draw: ImageDraw.ImageDraw, y: int, fill: tuple[int, int, int], size: int = 24
+) -> None:
     draw_centered(draw, text=DAILY_ARENA_LINK, y=y, font_obj=load_font(size, bold=True), fill=fill)
 
 
@@ -185,7 +187,13 @@ def _render_participant(
         font_obj=load_font(68, bold=True),
         fill=(255, 255, 255),
     )
-    draw_centered(draw, text=f"Punkte: {points}", y=604, font_obj=load_font(36, bold=True), fill=(222, 222, 222))
+    draw_centered(
+        draw,
+        text=f"Punkte: {points}",
+        y=604,
+        font_obj=load_font(36, bold=True),
+        fill=(222, 222, 222),
+    )
     draw_centered(draw, text=f"Platz #{place}", y=668, font_obj=load_font(34), fill=(222, 222, 222))
     draw_centered(
         draw, text=format_date(completed_at), y=740, font_obj=load_font(28), fill=(190, 190, 190)

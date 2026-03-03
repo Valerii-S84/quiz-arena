@@ -5,7 +5,12 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from quizbank_audit_constants import DATE_COLUMNS, OPTION_COLUMNS, REQUIRED_COLUMNS, TEXT_CHECK_COLUMNS
+from quizbank_audit_constants import (
+    DATE_COLUMNS,
+    OPTION_COLUMNS,
+    REQUIRED_COLUMNS,
+    TEXT_CHECK_COLUMNS,
+)
 from quizbank_audit_io import TableData, normalize, parse_date
 
 
@@ -111,9 +116,7 @@ def audit_table(path: Path, data: TableData) -> dict[str, Any]:
                     )
             if normalize(correct_answer) not in [normalize(option) for option in options]:
                 if len(answer_not_in_options) < 50:
-                    answer_not_in_options.append(
-                        {"row": row_id, "correct_answer": correct_answer}
-                    )
+                    answer_not_in_options.append({"row": row_id, "correct_answer": correct_answer})
 
     duplicate_question_groups: list[dict[str, Any]] = []
     ambiguous_question_groups: list[dict[str, Any]] = []
@@ -145,9 +148,7 @@ def audit_table(path: Path, data: TableData) -> dict[str, Any]:
     ]
 
     non_ready_count = sum(
-        count
-        for status, count in status_distribution.items()
-        if status not in {"ready", "(empty)"}
+        count for status, count in status_distribution.items() if status not in {"ready", "(empty)"}
     )
 
     critical_count = (

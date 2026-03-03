@@ -17,7 +17,11 @@ from app.db.session import SessionLocal
 from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED, TOURNAMENT_TYPE_DAILY_ARENA
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
-from app.workers.tasks.daily_cup_proof_cards_text import build_caption, format_points, format_user_label
+from app.workers.tasks.daily_cup_proof_cards_text import (
+    build_caption,
+    format_points,
+    format_user_label,
+)
 from app.workers.tasks.tournaments_proof_card_render import render_tournament_proof_card_png
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_proof_cards")
@@ -64,9 +68,17 @@ async def run_daily_cup_proof_cards_async(
             else all_participants
         )
         if not participants:
-            return {"processed": 1, "participants_total": 0, "sent": 0, "cached_reused": 0, "failed": 0}
+            return {
+                "processed": 1,
+                "participants_total": 0,
+                "sent": 0,
+                "cached_reused": 0,
+                "failed": 0,
+            }
 
-        users = await UsersRepo.list_by_ids(session, [int(item.user_id) for item in all_participants])
+        users = await UsersRepo.list_by_ids(
+            session, [int(item.user_id) for item in all_participants]
+        )
         user_labels = {
             int(user.id): format_user_label(username=user.username, first_name=user.first_name)
             for user in users
