@@ -17,8 +17,10 @@ from app.game.tournaments.constants import (
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_MATCH_STATUS_WALKOVER,
     TOURNAMENT_MODE_CODE,
+    TOURNAMENT_TYPE_DAILY_ARENA,
     rounds_for_tournament_format,
 )
+from app.game.tournaments.daily_cup_question_levels import resolve_daily_cup_preferred_levels
 from app.game.tournaments.internal import participants_to_swiss
 from app.game.tournaments.pairing import build_swiss_pairs
 
@@ -68,6 +70,11 @@ async def create_round_matches(
         ],
     )
     duel_rounds = rounds_for_tournament_format(format_code=tournament.format)
+    daily_cup_preferred_levels = (
+        resolve_daily_cup_preferred_levels(round_no=round_no, duel_rounds=duel_rounds)
+        if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA
+        else None
+    )
     matches: list[TournamentMatch] = []
 
     for pair in swiss_pairs:
@@ -104,6 +111,7 @@ async def create_round_matches(
             tournament_match_id=match_id,
             now_utc=now_utc,
             expires_at=deadline,
+            preferred_levels_by_round=daily_cup_preferred_levels,
         )
         matches.append(
             TournamentMatch(

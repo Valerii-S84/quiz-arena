@@ -12,6 +12,7 @@ from app.db.repo.users_repo import UsersRepo
 from app.economy.energy.service import EnergyService
 from app.economy.referrals.service import ReferralService
 from app.economy.streak.service import StreakService
+from app.game.tournaments.daily_cup_badge import has_daily_cup_5_day_badge
 
 
 @dataclass(slots=True)
@@ -20,6 +21,7 @@ class HomeSnapshot:
     free_energy: int
     paid_energy: int
     current_streak: int
+    daily_cup_badge_unlocked: bool
 
 
 class UserOnboardingService:
@@ -83,10 +85,12 @@ class UserOnboardingService:
         streak_snapshot = await StreakService.sync_rollover(
             session, user_id=user.id, now_utc=now_utc
         )
+        daily_cup_badge_unlocked = await has_daily_cup_5_day_badge(session, user_id=user.id)
 
         return HomeSnapshot(
             user_id=user.id,
             free_energy=energy_snapshot.free_energy,
             paid_energy=energy_snapshot.paid_energy,
             current_streak=streak_snapshot.current_streak,
+            daily_cup_badge_unlocked=daily_cup_badge_unlocked,
         )

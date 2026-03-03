@@ -30,6 +30,10 @@ from app.workers.tasks.daily_cup_core import (
     send_daily_cup_canceled_messages,
 )
 from app.workers.tasks.daily_cup_messaging import enqueue_daily_cup_round_messaging
+from app.workers.tasks.daily_cup_push_events import (
+    list_already_pushed_user_ids,
+    store_push_sent_events,
+)
 from app.workers.tasks.daily_cup_time import format_close_time_local
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup")
@@ -38,7 +42,12 @@ logger = structlog.get_logger("app.workers.tasks.daily_cup")
 _now_utc = now_utc
 
 
-async def open_daily_cup_registration_async() -> dict[str, int]:
+async def _send_daily_cup_registration_push_async(
+    *,
+    text_key: str,
+    log_event: str,
+    sent_event_type: str,
+) -> dict[str, int]:
     now_utc_value = _now_utc()
     lookback_start = now_utc_value - timedelta(days=DAILY_CUP_ACTIVE_LOOKBACK_DAYS)
 
@@ -52,8 +61,9 @@ async def open_daily_cup_registration_async() -> dict[str, int]:
 
     scanned_total = sent_total = skipped_total = 0
     last_user_id: int | None = None
+    tournament_id_text = str(tournament.id)
     close_time_label = format_close_time_local(close_at_utc=tournament.registration_deadline)
-    text = TEXTS_DE["msg.daily_cup.push.registration"].format(close_time=close_time_label)
+    text = TEXTS_DE[text_key].format(close_time=close_time_label)
 
     bot = build_bot()
     try:
@@ -68,9 +78,19 @@ async def open_daily_cup_registration_async() -> dict[str, int]:
                 )
             if not targets:
                 break
+            target_user_ids = [user_id for user_id, _telegram_user_id in targets]
+            already_pushed_user_ids = await list_already_pushed_user_ids(
+                event_type=sent_event_type,
+                tournament_id=tournament_id_text,
+                user_ids=target_user_ids,
+            )
+            sent_user_ids: list[int] = []
             for user_id, telegram_user_id in targets:
                 scanned_total += 1
                 last_user_id = user_id
+                if user_id in already_pushed_user_ids:
+                    skipped_total += 1
+                    continue
                 try:
                     await bot.send_message(
                         chat_id=telegram_user_id,
@@ -80,10 +100,26 @@ async def open_daily_cup_registration_async() -> dict[str, int]:
                         ),
                     )
                     sent_total += 1
+                    sent_user_ids.append(user_id)
                 except TelegramForbiddenError:
                     skipped_total += 1
                 except Exception:
                     skipped_total += 1
+            try:
+                await store_push_sent_events(
+                    event_type=sent_event_type,
+                    tournament_id=tournament.id,
+                    user_ids=sent_user_ids,
+                    happened_at=now_utc_value,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "daily_cup_push_sent_event_store_failed",
+                    event_type=sent_event_type,
+                    tournament_id=tournament_id_text,
+                    sent_total=len(sent_user_ids),
+                    error_type=type(exc).__name__,
+                )
     finally:
         await bot.session.close()
 
@@ -93,8 +129,32 @@ async def open_daily_cup_registration_async() -> dict[str, int]:
         "sent_total": sent_total,
         "skipped_total": skipped_total,
     }
-    logger.info("daily_cup_registration_push_processed", **result)
+    logger.info(log_event, **result)
     return result
+
+
+async def send_daily_cup_invite_async() -> dict[str, int]:
+    return await _send_daily_cup_registration_push_async(
+        text_key="msg.daily_cup.invite_push",
+        log_event="daily_cup_invite_push_processed",
+        sent_event_type="daily_cup_invite_push_sent",
+    )
+
+
+async def open_daily_cup_registration_async() -> dict[str, int]:
+    return await _send_daily_cup_registration_push_async(
+        text_key="msg.daily_cup.push.registration",
+        log_event="daily_cup_registration_push_processed",
+        sent_event_type="daily_cup_registration_push_sent",
+    )
+
+
+async def send_daily_cup_last_call_reminder_async() -> dict[str, int]:
+    return await _send_daily_cup_registration_push_async(
+        text_key="msg.daily_cup.last_call_reminder",
+        log_event="daily_cup_last_call_reminder_processed",
+        sent_event_type="daily_cup_last_call_reminder_sent",
+    )
 
 
 async def close_daily_cup_registration_and_start_async() -> dict[str, int]:

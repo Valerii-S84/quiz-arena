@@ -5,7 +5,8 @@ from uuid import UUID
 import structlog
 
 from app.bot.application import build_bot
-from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard
+from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard, build_daily_cup_share_url
+from app.bot.texts.de import TEXTS_DE
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
@@ -37,11 +38,23 @@ def _is_celery_task(task_obj: object) -> bool:
 
 
 async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str, int]:
+    return await run_daily_cup_round_messaging_async_with_followups(
+        tournament_id=tournament_id,
+        enqueue_completion_followups=False,
+    )
+
+
+async def run_daily_cup_round_messaging_async_with_followups(
+    *,
+    tournament_id: str,
+    enqueue_completion_followups: bool,
+) -> dict[str, int]:
     try:
         parsed_tournament_id = UUID(tournament_id)
     except ValueError:
         return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
 
+    is_completed = False
     async with SessionLocal.begin() as session:
         tournament = await TournamentsRepo.get_by_id(session, parsed_tournament_id)
         if (
@@ -71,9 +84,11 @@ async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str
                 tournament_id=parsed_tournament_id,
                 round_no=int(tournament.current_round),
             )
+        is_completed = tournament.status == "COMPLETED"
 
     standings_user_ids = [int(item.user_id) for item in participants]
     points_by_user = {int(item.user_id): format_points(item.score) for item in participants}
+    tie_breaks_by_user = {int(item.user_id): format_points(item.tie_break) for item in participants}
     place_by_user = {user_id: place for place, user_id in enumerate(standings_user_ids, start=1)}
     participant_rows = {int(item.user_id): item for item in participants}
     participants_total = len(standings_user_ids)
@@ -98,6 +113,9 @@ async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str
                 labels=labels,
                 points_by_user=points_by_user,
                 viewer_user_id=user_id,
+                tie_breaks_by_user=(
+                    tie_breaks_by_user if tournament.status == "COMPLETED" else None
+                ),
             )
             if tournament.status == "COMPLETED":
                 text = build_completed_text(
@@ -119,6 +137,19 @@ async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str
                 can_join=False,
                 play_challenge_id=play_challenge_id,
                 show_share_result=tournament.status == "COMPLETED",
+                show_proof_card=tournament.status == "COMPLETED",
+                share_url=(
+                    build_daily_cup_share_url(
+                        base_link="t.me/QuizArenaBot",
+                        share_text=TEXTS_DE["msg.daily_cup.share_template"].format(
+                            place=place_by_user[user_id],
+                            total=participants_total,
+                            points=points_by_user.get(user_id, "0"),
+                        ),
+                    )
+                    if tournament.status == "COMPLETED"
+                    else None
+                ),
             )
             existing_message_id = participant_rows[user_id].standings_message_id
             if existing_message_id is None:
@@ -150,6 +181,14 @@ async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str
         new_message_ids=new_message_ids,
         replaced_message_ids=replaced_message_ids,
     )
+    if is_completed and enqueue_completion_followups:
+        from app.workers.tasks.daily_cup_nonfinishers_summary import (
+            enqueue_daily_cup_nonfinishers_summary,
+        )
+        from app.workers.tasks.daily_cup_proof_cards import enqueue_daily_cup_proof_cards
+
+        enqueue_daily_cup_proof_cards(tournament_id=tournament_id, delay_seconds=2)
+        enqueue_daily_cup_nonfinishers_summary(tournament_id=tournament_id)
 
     return {
         "processed": 1,
@@ -160,12 +199,24 @@ async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str
     }
 
 
-def enqueue_daily_cup_round_messaging(*, tournament_id: str) -> None:
+def enqueue_daily_cup_round_messaging(
+    *,
+    tournament_id: str,
+    enqueue_completion_followups: bool = False,
+) -> None:
     try:
         if _is_celery_task(run_daily_cup_round_messaging):
-            run_daily_cup_round_messaging.delay(tournament_id=tournament_id)
+            run_daily_cup_round_messaging.delay(
+                tournament_id=tournament_id,
+                enqueue_completion_followups=enqueue_completion_followups,
+            )
         else:
-            run_async_job(run_daily_cup_round_messaging_async(tournament_id=tournament_id))
+            run_async_job(
+                run_daily_cup_round_messaging_async_with_followups(
+                    tournament_id=tournament_id,
+                    enqueue_completion_followups=enqueue_completion_followups,
+                )
+            )
     except Exception as exc:
         logger.warning(
             "daily_cup_round_message_enqueue_failed",
@@ -175,5 +226,14 @@ def enqueue_daily_cup_round_messaging(*, tournament_id: str) -> None:
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.run_daily_cup_round_messaging")
-def run_daily_cup_round_messaging(*, tournament_id: str) -> dict[str, int]:
-    return run_async_job(run_daily_cup_round_messaging_async(tournament_id=tournament_id))
+def run_daily_cup_round_messaging(
+    *,
+    tournament_id: str,
+    enqueue_completion_followups: bool = False,
+) -> dict[str, int]:
+    return run_async_job(
+        run_daily_cup_round_messaging_async_with_followups(
+            tournament_id=tournament_id,
+            enqueue_completion_followups=enqueue_completion_followups,
+        )
+    )

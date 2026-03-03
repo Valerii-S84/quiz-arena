@@ -46,7 +46,13 @@ def _build_friend_ttl_text(*, challenge: FriendChallengeSnapshot, now_utc: datet
     return TEXTS_DE["msg.friend.challenge.ttl"].format(hours=hours, minutes=minutes)
 
 
-def _build_home_text(*, free_energy: int, paid_energy: int, current_streak: int) -> str:
+def _build_home_text(
+    *,
+    free_energy: int,
+    paid_energy: int,
+    current_streak: int,
+    daily_cup_badge_unlocked: bool = False,
+) -> str:
     if current_streak > 0:
         stats_line = TEXTS_DE["msg.home.stats.with_streak"].format(
             streak=current_streak,
@@ -58,13 +64,11 @@ def _build_home_text(*, free_energy: int, paid_energy: int, current_streak: int)
             free_energy=free_energy,
             paid_energy=paid_energy,
         )
-    return "\n".join(
-        [
-            TEXTS_DE["msg.home.title"],
-            stats_line,
-            TEXTS_DE["msg.home.hint"],
-        ]
-    )
+    lines = [TEXTS_DE["msg.home.title"], stats_line]
+    if daily_cup_badge_unlocked:
+        lines.append(TEXTS_DE["msg.home.badge.daily_cup_5"])
+    lines.append(TEXTS_DE["msg.home.hint"])
+    return "\n".join(lines)
 
 
 def _build_question_text(

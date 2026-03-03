@@ -23,4 +23,4 @@ def format_points(value: Decimal) -> str:
 
 
 def build_caption(*, place: int, points: str) -> str:
-    return f"🏆 Daily Arena Cup\nPlatz #{place}\nPunkte: {points}"
+    return f"🏆 Daily Arena Cup\nPlatz #{place}\nPunkte: {points}\n📱 t.me/QuizArenaBot"

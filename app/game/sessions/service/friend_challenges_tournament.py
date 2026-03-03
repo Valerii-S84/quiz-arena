@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Sequence
 from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,7 @@ async def create_tournament_match_friend_challenge(
     tournament_match_id: UUID,
     now_utc: datetime,
     expires_at: datetime | None = None,
+    preferred_levels_by_round: Sequence[str] | None = None,
 ) -> FriendChallengeSnapshot:
     resolved_rounds = resolve_duel_rounds(total_rounds=total_rounds)
     challenge_id = uuid4()
@@ -34,6 +36,7 @@ async def create_tournament_match_friend_challenge(
         total_rounds=resolved_rounds,
         now_utc=now_utc,
         challenge_seed=str(challenge_id),
+        preferred_levels_by_round=preferred_levels_by_round,
     )
     challenge = await _create_friend_challenge_row(
         session,

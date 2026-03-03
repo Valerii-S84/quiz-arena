@@ -5,7 +5,7 @@ import asyncio
 import json
 from urllib.parse import urlparse
 
-import asyncpg  # type: ignore[import-untyped]
+import asyncpg  # type: ignore[import-not-found,import-untyped]
 
 
 def _to_asyncpg_dsn(database_url: str) -> str:

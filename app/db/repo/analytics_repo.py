@@ -17,7 +17,10 @@ from app.db.repo.analytics_mutations import (  # noqa: F401
     delete_events_created_before,
     upsert_daily,
 )
-from app.db.repo.analytics_queries import list_daily  # noqa: F401
+from app.db.repo.analytics_queries import (  # noqa: F401
+    list_daily,
+    list_user_ids_by_event_type_and_tournament,
+)
 
 
 class AnalyticsRepo:
@@ -35,6 +38,9 @@ class AnalyticsRepo:
     count_events_by_type_between = staticmethod(count_events_by_type_between)
     upsert_daily = staticmethod(upsert_daily)
     list_daily = staticmethod(list_daily)
+    list_user_ids_by_event_type_and_tournament = staticmethod(
+        list_user_ids_by_event_type_and_tournament
+    )
     delete_events_created_before = staticmethod(delete_events_created_before)
 
 

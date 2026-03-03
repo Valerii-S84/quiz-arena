@@ -25,6 +25,7 @@ TOURNAMENT_SHARE_RE = re.compile(r"^friend:tournament:share:([0-9a-f\-]{36})$")
 DAILY_CUP_JOIN_RE = re.compile(r"^daily:cup:join:([0-9a-f\-]{36})$")
 DAILY_CUP_VIEW_RE = re.compile(r"^daily:cup:view:([0-9a-f\-]{36})$")
 DAILY_CUP_SHARE_RE = re.compile(r"^daily:cup:share:([0-9a-f\-]{36})$")
+DAILY_CUP_PROOF_RE = re.compile(r"^daily:cup:proof:([0-9a-f\-]{36})$")
 DAILY_RESULT_RE = re.compile(r"^daily:result:([0-9a-f\-]{36})$")
 
 

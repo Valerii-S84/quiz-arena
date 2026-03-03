@@ -60,6 +60,20 @@ class TournamentsRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_type_and_registration_deadline(
+        session: AsyncSession,
+        *,
+        tournament_type: str,
+        registration_deadline: datetime,
+    ) -> Tournament | None:
+        stmt = select(Tournament).where(
+            Tournament.type == tournament_type,
+            Tournament.registration_deadline == registration_deadline,
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def list_due_registration_close_for_update(
         session: AsyncSession,
         *,

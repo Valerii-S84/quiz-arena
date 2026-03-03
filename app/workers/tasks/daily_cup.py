@@ -6,9 +6,17 @@ from app.workers.tasks.daily_cup_async import (
     close_daily_cup_registration_and_start_async as _close_daily_cup_registration_and_start_async,
 )
 from app.workers.tasks.daily_cup_async import (
+    send_daily_cup_last_call_reminder_async as _send_daily_cup_last_call_reminder_async,
+)
+from app.workers.tasks.daily_cup_async import (
     open_daily_cup_registration_async as _open_daily_cup_registration_async,
 )
+from app.workers.tasks.daily_cup_async import send_daily_cup_invite_async as _send_daily_cup_invite_async
 from app.workers.tasks.daily_cup_messaging import run_daily_cup_round_messaging
+from app.workers.tasks.daily_cup_nonfinishers_summary import run_daily_cup_nonfinishers_summary
+from app.workers.tasks.daily_cup_prestart_reminder import (
+    send_daily_cup_prestart_reminder_async as _send_daily_cup_prestart_reminder_async,
+)
 from app.workers.tasks.daily_cup_proof_cards import run_daily_cup_proof_cards
 from app.workers.tasks.daily_cup_rounds import (
     advance_daily_cup_rounds_async as _advance_daily_cup_rounds_async,
@@ -18,6 +26,9 @@ from app.workers.tasks.daily_cup_schedule import configure_daily_cup_schedule
 open_daily_cup_registration_async = _open_daily_cup_registration_async
 close_daily_cup_registration_and_start_async = _close_daily_cup_registration_and_start_async
 advance_daily_cup_rounds_async = _advance_daily_cup_rounds_async
+send_daily_cup_invite_async = _send_daily_cup_invite_async
+send_daily_cup_last_call_reminder_async = _send_daily_cup_last_call_reminder_async
+send_daily_cup_prestart_reminder_async = _send_daily_cup_prestart_reminder_async
 
 __all__ = [
     "advance_rounds",
@@ -28,12 +39,41 @@ __all__ = [
     "open_registration",
     "run_daily_cup_proof_cards",
     "run_daily_cup_round_messaging",
+    "run_daily_cup_nonfinishers_summary",
+    "send_daily_cup_invite_async",
+    "send_daily_cup_last_call_reminder_async",
+    "send_daily_cup_prestart_reminder_async",
+    "send_last_call_reminder",
+    "send_prestart_reminder",
+    "send_invite",
 ]
+
+
+@celery_app.task(
+    name="app.workers.tasks.daily_cup.send_invite",
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    retry_jitter=True,
+    retry_kwargs={"max_retries": 5},
+)
+def send_invite() -> dict[str, int]:
+    return run_async_job(send_daily_cup_invite_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.open_registration")
 def open_registration() -> dict[str, int]:
     return run_async_job(open_daily_cup_registration_async())
+
+
+@celery_app.task(name="app.workers.tasks.daily_cup.send_last_call_reminder")
+def send_last_call_reminder() -> dict[str, int]:
+    return run_async_job(send_daily_cup_last_call_reminder_async())
+
+
+@celery_app.task(name="app.workers.tasks.daily_cup.send_prestart_reminder")
+def send_prestart_reminder() -> dict[str, int]:
+    return run_async_job(send_daily_cup_prestart_reminder_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.close_registration_and_start")

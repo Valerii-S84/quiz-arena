@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.bot.texts.de import TEXTS_DE
+
 
 def build_standings_lines(
     *,
@@ -7,14 +9,18 @@ def build_standings_lines(
     labels: dict[int, str],
     points_by_user: dict[int, str],
     viewer_user_id: int,
+    tie_breaks_by_user: dict[int, str] | None = None,
 ) -> list[str]:
     lines: list[str] = []
     for place, user_id in enumerate(standings_user_ids, start=1):
         medal = "🥇" if place == 1 else "🥈" if place == 2 else "🥉" if place == 3 else " "
         suffix = " (Du)" if user_id == viewer_user_id else ""
+        tie_break_suffix = ""
+        if tie_breaks_by_user is not None:
+            tie_break_suffix = f" · TB {tie_breaks_by_user.get(user_id, '0')}"
         lines.append(
             f"{place}. {medal} {labels.get(user_id, 'Spieler')}{suffix}"
-            f" - {points_by_user.get(user_id, '0')} Pkt"
+            f" - {points_by_user.get(user_id, '0')} Pkt{tie_break_suffix}"
         )
     return lines
 
@@ -33,17 +39,30 @@ def build_round_text(
         "Format: 5 Fragen",
         f"Deadline: {deadline_text} (Berlin)",
     ]
-    lines.append("Gegner: Freilos" if opponent_label is None else f"Gegner: {opponent_label}")
+    if opponent_label is None:
+        lines.append("Gegner: Freilos")
+        lines.append("✅ BYE in dieser Runde: dein Duell gilt als Auto-Sieg.")
+    else:
+        lines.append(f"Gegner: {opponent_label}")
     lines.extend(["", "📊 Tabelle", *standings_lines])
     return "\n".join(lines)
 
 
 def build_completed_text(*, place: int, my_points: str, standings_lines: list[str]) -> str:
+    top_3 = standings_lines[:3]
+    while len(top_3) < 3:
+        top_3.append("—")
+    final_summary = TEXTS_DE["msg.daily_cup.final_results"].format(
+        top_1=top_3[0],
+        top_2=top_3[1],
+        top_3=top_3[2],
+        place=place,
+        score=my_points,
+    )
     lines = [
         "🏆 Daily Arena Cup",
         "",
-        "🏁 Cup beendet!",
-        f"Dein Ergebnis: Platz #{place} • {my_points} Pkt",
+        final_summary,
         "",
         "📊 Endtabelle",
         *standings_lines,
