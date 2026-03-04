@@ -119,6 +119,10 @@ def _validate_partner_payload(payload: ContactPayload) -> None:
         )
 
 
+# Keep both paths for compatibility:
+# - direct API calls use /api/contact
+# - reverse-proxy setups with stripped /api prefix use /contact
+@router.post("/contact", status_code=status.HTTP_202_ACCEPTED)
 @router.post("/api/contact", status_code=status.HTTP_202_ACCEPTED)
 async def submit_contact(payload: ContactPayload) -> dict[str, bool]:
     if payload.request_type == "student":

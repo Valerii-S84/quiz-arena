@@ -47,6 +47,16 @@ def test_api_stats_maps_public_metrics(monkeypatch) -> None:
     assert response.json() == {"users": 1234, "quizzes": 5678}
 
 
+def test_stats_alias_maps_public_metrics(monkeypatch) -> None:
+    monkeypatch.setattr(public_site_routes, "_collect_public_metrics", _metrics_stub)
+
+    client = TestClient(app)
+    response = client.get("/stats")
+
+    assert response.status_code == 200
+    assert response.json() == {"users": 1234, "quizzes": 5678}
+
+
 def test_contact_student_request_is_accepted(monkeypatch) -> None:
     session_stub = _SessionLocalStub()
     monkeypatch.setattr(public_contact_routes, "SessionLocal", session_stub)
@@ -66,6 +76,31 @@ def test_contact_student_request_is_accepted(monkeypatch) -> None:
             "frequency": "2x pro Woche",
             "budget": "50-100",
             "message": "Hallo",
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.json() == {"ok": True}
+    assert len(session_stub.added_rows) == 1
+
+
+def test_contact_alias_student_request_is_accepted(monkeypatch) -> None:
+    session_stub = _SessionLocalStub()
+    monkeypatch.setattr(public_contact_routes, "SessionLocal", session_stub)
+    client = TestClient(app)
+
+    response = client.post(
+        "/contact",
+        json={
+            "type": "student",
+            "name": "Max",
+            "contact": "@max",
+            "ageGroup": "16-25",
+            "level": "A2",
+            "goals": ["Alltagssprache"],
+            "format": "Individuell mit Lehrkraft",
+            "timeSlots": ["Abend"],
+            "frequency": "2x pro Woche",
         },
     )
 
