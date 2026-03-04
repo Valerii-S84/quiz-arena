@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.api.routes import public_contact as public_contact_routes
 from app.api.routes import public_site as public_site_routes
 from app.main import app
 
@@ -48,7 +49,7 @@ def test_api_stats_maps_public_metrics(monkeypatch) -> None:
 
 def test_contact_student_request_is_accepted(monkeypatch) -> None:
     session_stub = _SessionLocalStub()
-    monkeypatch.setattr(public_site_routes, "SessionLocal", session_stub)
+    monkeypatch.setattr(public_contact_routes, "SessionLocal", session_stub)
     client = TestClient(app)
 
     response = client.post(
@@ -75,7 +76,7 @@ def test_contact_student_request_is_accepted(monkeypatch) -> None:
 
 def test_contact_student_requires_goals(monkeypatch) -> None:
     session_stub = _SessionLocalStub()
-    monkeypatch.setattr(public_site_routes, "SessionLocal", session_stub)
+    monkeypatch.setattr(public_contact_routes, "SessionLocal", session_stub)
     client = TestClient(app)
 
     response = client.post(
@@ -100,7 +101,7 @@ def test_contact_student_requires_goals(monkeypatch) -> None:
 
 def test_contact_partner_request_is_accepted(monkeypatch) -> None:
     session_stub = _SessionLocalStub()
-    monkeypatch.setattr(public_site_routes, "SessionLocal", session_stub)
+    monkeypatch.setattr(public_contact_routes, "SessionLocal", session_stub)
     client = TestClient(app)
 
     response = client.post(
@@ -126,7 +127,7 @@ def test_contact_partner_request_is_accepted(monkeypatch) -> None:
 
 def test_contact_partner_requires_idea(monkeypatch) -> None:
     session_stub = _SessionLocalStub()
-    monkeypatch.setattr(public_site_routes, "SessionLocal", session_stub)
+    monkeypatch.setattr(public_contact_routes, "SessionLocal", session_stub)
     client = TestClient(app)
 
     response = client.post(

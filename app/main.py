@@ -11,6 +11,7 @@ from app.api.routes.internal_promo import router as internal_promo_router
 from app.api.routes.internal_referrals import router as internal_referrals_router
 from app.api.routes.ops_ui import OPS_UI_STATIC_DIR
 from app.api.routes.ops_ui import router as ops_ui_router
+from app.api.routes.public_contact import router as public_contact_router
 from app.api.routes.public_site import router as public_site_router
 from app.api.routes.telegram_webhook import router as telegram_webhook_router
 from app.core.config import get_settings
@@ -53,6 +54,7 @@ def create_app() -> FastAPI:
     app.include_router(internal_referrals_router)
     app.include_router(internal_analytics_router)
     app.include_router(public_site_router)
+    app.include_router(public_contact_router)
     app.include_router(ops_ui_router)
     app.include_router(admin_router)
     app.mount("/ops/static", StaticFiles(directory=str(OPS_UI_STATIC_DIR)), name="ops-static")

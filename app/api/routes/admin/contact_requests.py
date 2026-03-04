@@ -67,14 +67,12 @@ async def list_contact_requests(
             total_stmt = total_stmt.where(where_clause)
         total = int((await session.execute(total_stmt)).scalar_one() or 0)
 
-        data_stmt = select(ContactRequest).order_by(ContactRequest.created_at.desc(), ContactRequest.id.desc())
+        data_stmt = select(ContactRequest).order_by(
+            ContactRequest.created_at.desc(), ContactRequest.id.desc()
+        )
         if where_clause is not None:
             data_stmt = data_stmt.where(where_clause)
-        rows = (
-            await session.execute(
-                data_stmt.offset((page - 1) * limit).limit(limit)
-            )
-        ).scalars()
+        rows = (await session.execute(data_stmt.offset((page - 1) * limit).limit(limit))).scalars()
         items = list(rows)
 
     pagination = build_pagination(total=total, page=page, limit=limit)
