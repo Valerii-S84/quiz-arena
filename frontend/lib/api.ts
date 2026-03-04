@@ -42,3 +42,17 @@ export async function fetchSystemHealth() {
   const { data } = await api.get("/admin/system");
   return data;
 }
+
+export async function fetchContactRequests() {
+  const { data } = await api.get("/admin/contact-requests", {
+    params: { page: 1, limit: 20 },
+  });
+  return data;
+}
+
+export async function updateContactRequestStatus(requestId: number, status: string) {
+  const { data } = await api.post(`/admin/contact-requests/${requestId}/status`, {
+    status,
+  });
+  return data;
+}
