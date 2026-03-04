@@ -3,6 +3,7 @@ from app.db.models.admin_promo_code_usages import AdminPromoCodeUsage
 from app.db.models.admin_promo_codes import AdminPromoCode
 from app.db.models.analytics_daily import AnalyticsDaily
 from app.db.models.analytics_events import AnalyticsEvent
+from app.db.models.contact_requests import ContactRequest
 from app.db.models.daily_metrics import DailyMetrics
 from app.db.models.daily_push_logs import DailyPushLog
 from app.db.models.daily_question_sets import DailyQuestionSet
@@ -39,6 +40,7 @@ __all__ = [
     "AdminPromoCodeUsage",
     "AnalyticsDaily",
     "AnalyticsEvent",
+    "ContactRequest",
     "DailyPushLog",
     "DailyQuestionSet",
     "DailyRun",
