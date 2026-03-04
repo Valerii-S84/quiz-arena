@@ -40,6 +40,7 @@ rsync -az --delete \
 
 ssh "$REMOTE" "cd ${REMOTE_DIR} && \
   if [[ ! -f .env ]]; then cp .env.production.example .env; fi && \
+  bash scripts/check_compose_runtime_consistency.sh --expected-compose-file ${REMOTE_DIR}/docker-compose.prod.yml && \
   docker compose -f docker-compose.prod.yml up -d postgres redis && \
   docker compose -f docker-compose.prod.yml build api worker beat && \
   docker compose -f docker-compose.prod.yml run --rm api alembic upgrade head && \
@@ -47,7 +48,8 @@ ssh "$REMOTE" "cd ${REMOTE_DIR} && \
   docker compose -f docker-compose.prod.yml run --rm api python -m scripts.quizbank_assert_non_empty && \
   docker compose -f docker-compose.prod.yml up -d --build api worker beat caddy && \
   docker compose -f docker-compose.prod.yml run --rm api python -m scripts.post_deploy_gate && \
-  docker compose -f docker-compose.prod.yml ps"
+  docker compose -f docker-compose.prod.yml ps && \
+  bash scripts/check_compose_runtime_consistency.sh --expected-compose-file ${REMOTE_DIR}/docker-compose.prod.yml"
 
 echo "Deploy finished."
 echo "Remember to configure .env secrets on server: ${REMOTE}:${REMOTE_DIR}/.env"

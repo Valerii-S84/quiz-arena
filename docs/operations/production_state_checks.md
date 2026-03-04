@@ -14,6 +14,7 @@ source /opt/quiz-arena/.env
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env ps
+bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/quiz-arena/docker-compose.prod.yml
 curl -sS https://deutchquizarena.de/health
 ```
 

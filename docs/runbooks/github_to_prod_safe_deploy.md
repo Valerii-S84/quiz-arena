@@ -77,6 +77,7 @@ ls -lh /opt/quiz-arena/backup_pre_deploy_*.sql | tail -1
 ## 5. Build + deploy runtime
 ```bash
 cd /opt/quiz-arena
+bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/quiz-arena/docker-compose.prod.yml
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d --build
 ```
 
@@ -94,6 +95,7 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env \
 1. Контейнери:
 ```bash
 docker compose -f docker-compose.prod.yml ps
+bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/quiz-arena/docker-compose.prod.yml
 ```
 2. Health endpoint:
 ```bash
@@ -164,4 +166,3 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d 
 3. Міграції без backup.
 4. Деплой "поверх" дуже dirty git-дерева без backup/reclone.
 5. Вважати "health ok" достатнім без перевірки webhook/черг/active задач.
-

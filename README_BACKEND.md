@@ -102,6 +102,7 @@ Full rules:
 - Deploy helper: `scripts/deploy.sh`
 - Main deploy runbook: `docs/runbooks/github_to_prod_safe_deploy.md`
 - First deploy/rollback baseline: `docs/runbooks/first_deploy_and_rollback.md`
+- Runtime consistency check: `bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/quiz-arena/docker-compose.prod.yml`
 - Post-deploy gate command:
   - `docker compose -f docker-compose.prod.yml run --rm api python -m scripts.post_deploy_gate`
 
