@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { Inter } from "next/font/google";
+import Image from "next/image";
 
 import { api } from "@/lib/api";
 import { ContactWizardModal } from "./_components/contact-wizards";
@@ -16,9 +17,14 @@ const TELEGRAM_BOT_URL =
 const TELEGRAM_CHANNEL_URL =
   process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_URL || "https://t.me/doechkurse";
 const NOTIZBUCH_APK_URL = process.env.NEXT_PUBLIC_NOTIZBUCH_APK_URL || "#";
+const BOT_LOGO_PATH = "/logo/bot-logo.jpg";
+const CHANNEL_LOGO_PATH = "/logo/channel-logo.jpg";
 
 const GLASS_CARD_CLASS =
-  "rounded-2xl border border-white/40 bg-white/60 shadow-[0_4px_24px_rgba(0,0,0,0.06)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(0,0,0,0.10)]";
+  "rounded-2xl border border-white/70 bg-white/74 shadow-[0_10px_30px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(15,23,42,0.16)]";
+
+const ORANGE_BUTTON_CLASS =
+  "inline-flex items-center justify-center rounded-full bg-[#E8734A] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(232,115,74,0.33)] transition hover:bg-[#d7653f]";
 
 const INPUT_CLASS =
   "w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200";
@@ -171,19 +177,25 @@ export default function PublicHomePage() {
   return (
     <main
       lang="de"
-      className={`${inter.className} min-h-screen bg-[linear-gradient(135deg,#e8f4f8_0%,#f0f7ee_50%,#fef9f0_100%)] text-slate-800`}
+      className={`${inter.className} min-h-screen bg-[linear-gradient(135deg,#d7ebf5_0%,#e4f1e0_50%,#f8ecd8_100%)] text-slate-900`}
     >
-      <header className="sticky top-0 z-40 border-b border-white/50 bg-white/65 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-white/60 bg-white/82 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <a href="/" className="flex items-center gap-3">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[linear-gradient(140deg,#37AEE2,#1A89C9)] text-xs font-bold text-white">
-              QA
+            <span className="relative h-8 w-8 overflow-hidden rounded-full ring-1 ring-white/80 shadow-[0_6px_14px_rgba(15,23,42,0.25)]">
+              <Image
+                src={BOT_LOGO_PATH}
+                alt="Deutsch Quiz Arena Logo"
+                fill
+                sizes="32px"
+                className="object-cover"
+              />
             </span>
             <span className="text-sm font-bold sm:text-base">Quiz Arena Deutsch</span>
           </a>
           <button
             type="button"
-            className="rounded-full p-2 text-slate-700 transition hover:bg-white/70"
+            className="rounded-full p-2 text-slate-800 transition hover:bg-white/80"
             aria-label="Admin Login öffnen"
             onClick={() => {
               setLoginFeedback(null);
@@ -198,12 +210,12 @@ export default function PublicHomePage() {
 
       <div className="mx-auto max-w-6xl px-4 pb-16 pt-10 sm:px-6">
         <section
-          className={`${GLASS_CARD_CLASS} relative overflow-hidden bg-[linear-gradient(135deg,#dff2fa_0%,#e8f6eb_50%,#fdf5e8_100%)] px-6 py-16 text-center`}
+          className={`${GLASS_CARD_CLASS} relative overflow-hidden bg-[linear-gradient(135deg,#cfe7f3_0%,#dcedd7_50%,#f7e6c8_100%)] px-6 py-16 text-center`}
         >
           {STAR_POSITIONS.map((star, index) => (
             <span
               key={`${star.top}-${star.left}`}
-              className="pointer-events-none absolute text-lg text-sky-500/80"
+              className="pointer-events-none absolute text-lg text-sky-700/85"
               style={{
                 top: star.top,
                 left: star.left,
@@ -219,13 +231,31 @@ export default function PublicHomePage() {
         </section>
 
         <section className="mt-8">
-          <div className={`${GLASS_CARD_CLASS} flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between`}>
+          <div
+            className={`${GLASS_CARD_CLASS} flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between`}
+          >
             <div className="flex items-start gap-4">
-              <TelegramIcon />
+              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full ring-1 ring-white/80">
+                <Image
+                  src={CHANNEL_LOGO_PATH}
+                  alt="Deutsch ist einfach Kanal Logo"
+                  fill
+                  sizes="40px"
+                  className="object-cover"
+                />
+              </div>
               <div>
-                <h3 className="text-xl font-semibold">Telegram-Kanal</h3>
-                <p className="mt-1 text-sm text-slate-600">
-                  Tipps, Übungen und News zum Deutschlernen.
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-800">
+                  Telegram-Kanal
+                </p>
+                <h3 className="mt-1 text-xl font-semibold">Deutsch ist einfach! · Täglich & Praxis 🇩🇪</h3>
+                <p className="mt-2 text-sm text-slate-700">
+                  📚 Deutsch — dein täglicher Begleiter 🇩🇪 Kurze, klare Lernposts: Wortschatz mit
+                  Artikeln, einfache Grammatik, Dialoge zum Mitmachen.
+                </p>
+                <p className="mt-1 text-sm text-slate-700">
+                  Dazu bekommst du Mini-Übungen, alltagstaugliche Redemittel und kompakte Tipps für
+                  Prüfungen, Arbeit und sichere Kommunikation im echten Leben.
                 </p>
               </div>
             </div>
@@ -233,7 +263,7 @@ export default function PublicHomePage() {
               href={TELEGRAM_CHANNEL_URL}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white/80 px-5 py-2 text-sm font-medium text-slate-800 transition hover:bg-white"
+              className={ORANGE_BUTTON_CLASS}
             >
               Kanal öffnen
             </a>
@@ -244,9 +274,21 @@ export default function PublicHomePage() {
           <div className={`${GLASS_CARD_CLASS} grid gap-6 p-6 lg:grid-cols-5`}>
             <div className="lg:col-span-3">
               <div className="flex items-start gap-4">
-                <BotIcon />
+                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full ring-1 ring-white/80">
+                  <Image
+                    src={BOT_LOGO_PATH}
+                    alt="Deutsch Quiz Arena Bot Logo"
+                    fill
+                    sizes="40px"
+                    className="object-cover"
+                  />
+                </div>
                 <div>
-                  <h3 className="text-2xl font-semibold">Quiz Arena Bot</h3>
+                  <h3 className="text-2xl font-semibold">Deutsch Quiz Arena</h3>
+                  <p className="mt-2 text-sm text-slate-700">
+                    Interaktives Lernen mit klaren Lernpfaden, täglicher Motivation und messbarem
+                    Fortschritt.
+                  </p>
                   <ul className="mt-4 space-y-2 text-sm text-slate-700">
                     <li className="flex gap-2">
                       <span className="text-emerald-600">✓</span>
@@ -275,26 +317,26 @@ export default function PublicHomePage() {
                 href={TELEGRAM_BOT_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-6 inline-flex rounded-full bg-[#E8734A] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#db6740]"
+                className={`mt-6 ${ORANGE_BUTTON_CLASS}`}
               >
                 Bot öffnen
               </a>
             </div>
 
             <div className="lg:col-span-2">
-              <div className="grid grid-cols-2 gap-3">
-                <article className="rounded-xl border border-white/50 bg-white/75 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Users</p>
+              <div className="grid grid-cols-1 gap-3">
+                <article className="rounded-xl border border-white/60 bg-white/82 p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
+                  <p className="text-xs uppercase tracking-wide text-slate-600">Nutzer</p>
                   <p className="mt-2 text-2xl font-semibold">{formatStatValue(stats.users)}</p>
                   {stats.isUnavailable ? (
-                    <p className="mt-1 text-xs text-slate-500">temporarily unavailable</p>
+                    <p className="mt-1 text-xs text-slate-500">vorübergehend nicht verfügbar</p>
                   ) : null}
                 </article>
-                <article className="rounded-xl border border-white/50 bg-white/75 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Quizzes played</p>
+                <article className="rounded-xl border border-white/60 bg-white/82 p-4 shadow-[0_8px_20px_rgba(15,23,42,0.08)]">
+                  <p className="text-xs uppercase tracking-wide text-slate-600">Gespielte Quizze</p>
                   <p className="mt-2 text-2xl font-semibold">{formatStatValue(stats.quizzes)}</p>
                   {stats.isUnavailable ? (
-                    <p className="mt-1 text-xs text-slate-500">temporarily unavailable</p>
+                    <p className="mt-1 text-xs text-slate-500">vorübergehend nicht verfügbar</p>
                   ) : null}
                 </article>
               </div>
@@ -303,15 +345,15 @@ export default function PublicHomePage() {
         </section>
 
         <section className="mt-10">
-          <h2 className="text-3xl font-semibold">Produkte</h2>
+          <h2 className="text-3xl font-semibold text-slate-900">Produkte</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <article className={`${GLASS_CARD_CLASS} flex h-full flex-col p-5`}>
               <div className="text-3xl">📓</div>
               <h4 className="mt-2 text-xl font-semibold">Notizbuch</h4>
-              <p className="mt-1 text-sm text-slate-600">Leicht · Offline · 10 MB</p>
+              <p className="mt-1 text-sm text-slate-700">Leicht · Offline · 10 MB</p>
               <a
                 href={NOTIZBUCH_APK_URL}
-                className="mt-auto inline-flex rounded-full border border-slate-300 bg-white/80 px-4 py-2 text-sm font-medium"
+                className="mt-auto inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-[0_8px_18px_rgba(15,23,42,0.22)] transition hover:bg-slate-800"
               >
                 Download / Android APK
               </a>
@@ -319,12 +361,12 @@ export default function PublicHomePage() {
 
             <article className={`${GLASS_CARD_CLASS} flex h-full flex-col p-5`}>
               <div className="text-3xl">🔜</div>
-              <h4 className="mt-2 text-xl font-semibold">Coming soon</h4>
-              <p className="mt-1 text-sm text-slate-600">Neues Tool in Arbeit</p>
+              <h4 className="mt-2 text-xl font-semibold">Bald verfügbar</h4>
+              <p className="mt-1 text-sm text-slate-700">Neues Tool in Arbeit</p>
               <button
                 type="button"
                 disabled
-                className="mt-auto cursor-not-allowed rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-sm text-slate-500"
+                className="mt-auto cursor-not-allowed rounded-full border border-slate-300 bg-slate-200 px-4 py-2 text-sm text-slate-600"
               >
                 Bald verfügbar
               </button>
@@ -332,12 +374,12 @@ export default function PublicHomePage() {
 
             <article className={`${GLASS_CARD_CLASS} flex h-full flex-col p-5`}>
               <div className="text-3xl">✨</div>
-              <h4 className="mt-2 text-xl font-semibold">Coming soon</h4>
-              <p className="mt-1 text-sm text-slate-600">Weitere Projekte geplant</p>
+              <h4 className="mt-2 text-xl font-semibold">Bald verfügbar</h4>
+              <p className="mt-1 text-sm text-slate-700">Weitere Projekte geplant</p>
               <button
                 type="button"
                 disabled
-                className="mt-auto cursor-not-allowed rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-sm text-slate-500"
+                className="mt-auto cursor-not-allowed rounded-full border border-slate-300 bg-slate-200 px-4 py-2 text-sm text-slate-600"
               >
                 Bald verfügbar
               </button>
@@ -349,7 +391,7 @@ export default function PublicHomePage() {
           <article className={`${GLASS_CARD_CLASS} p-6`}>
             <p className="text-2xl">📚</p>
             <h3 className="mt-2 text-2xl font-semibold">Zum Unterricht anmelden</h3>
-            <p className="mt-2 text-sm text-slate-600">
+            <p className="mt-2 text-sm text-slate-700">
               Melde dich für unseren Deutschunterricht an. Wir stellen dir ein kurzes Formular mit
               persönlicher Empfehlung zusammen.
             </p>
@@ -364,7 +406,7 @@ export default function PublicHomePage() {
                 setIsLoginOpen(false);
                 setActiveWizard("student");
               }}
-              className="mt-6 rounded-full bg-slate-800 px-5 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+              className={`mt-6 ${ORANGE_BUTTON_CLASS}`}
             >
               Anfrage senden
             </button>
@@ -373,7 +415,7 @@ export default function PublicHomePage() {
           <article className={`${GLASS_CARD_CLASS} p-6`}>
             <p className="text-2xl">🤝</p>
             <h3 className="mt-2 text-2xl font-semibold">Kooperation / Partnerschaft</h3>
-            <p className="mt-2 text-sm text-slate-600">Kooperiere mit uns für gemeinsame Projekte.</p>
+            <p className="mt-2 text-sm text-slate-700">Kooperiere mit uns für gemeinsame Projekte.</p>
             <ul className="mt-4 space-y-2 text-sm text-slate-700">
               <li>• 2 Schritte für schnelle B2B-Anfrage</li>
               <li>• Fokus auf Angebot, Erwartung und Timing</li>
@@ -385,7 +427,7 @@ export default function PublicHomePage() {
                 setIsLoginOpen(false);
                 setActiveWizard("partner");
               }}
-              className="mt-6 rounded-full bg-slate-800 px-5 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+              className="mt-6 inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(15,23,42,0.28)] transition hover:bg-slate-800"
             >
               Kontakt aufnehmen
             </button>
@@ -399,16 +441,16 @@ export default function PublicHomePage() {
               <a
                 key={article.slug}
                 href={`/artikel/${article.slug}`}
-                className={`${GLASS_CARD_CLASS} flex items-center justify-between px-5 py-4 text-sm sm:text-base`}
+                className={`${GLASS_CARD_CLASS} flex items-center justify-between px-5 py-4 text-sm transition hover:border-sky-200 sm:text-base`}
               >
                 <span>{article.title}</span>
-                <span className="text-xl text-slate-500">›</span>
+                <span className="text-xl text-slate-700">›</span>
               </a>
             ))}
           </div>
         </section>
 
-        <footer className="mt-12 border-t border-white/60 pt-6 text-center text-sm text-slate-600">
+        <footer className="mt-12 border-t border-white/70 pt-6 text-center text-sm text-slate-700">
           <p>
             <a href={TELEGRAM_CHANNEL_URL} target="_blank" rel="noreferrer" className="hover:underline">
               Telegram-Kanal
@@ -466,7 +508,7 @@ export default function PublicHomePage() {
               <input
                 type="password"
                 className={INPUT_CLASS}
-                placeholder="Password"
+                placeholder="Passwort"
                 value={passwordValue}
                 onChange={(event) => setPasswordValue(event.target.value)}
                 autoComplete="current-password"
@@ -512,30 +554,6 @@ function LockIcon() {
         strokeWidth="1.8"
         strokeLinecap="round"
       />
-    </svg>
-  );
-}
-
-function TelegramIcon() {
-  return (
-    <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
-      <circle cx="20" cy="20" r="20" fill="#27A6E5" />
-      <path
-        d="M9 19.6L30.2 11.4c1-.4 1.8.2 1.5 1.6l-3.6 16.9c-.2 1-1 1.3-1.8.8l-5.4-4-2.6 2.5c-.3.3-.5.5-1 .5l.4-5.5L27.8 15c.4-.4-.1-.7-.6-.3l-12.4 7.8-5.3-1.6c-1.1-.4-1.1-1.1.2-1.3z"
-        fill="#fff"
-      />
-    </svg>
-  );
-}
-
-function BotIcon() {
-  return (
-    <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
-      <rect x="8" y="10" width="24" height="22" rx="8" fill="#26A69A" />
-      <rect x="17" y="5" width="6" height="7" rx="3" fill="#26A69A" />
-      <circle cx="16" cy="20" r="2.2" fill="#fff" />
-      <circle cx="24" cy="20" r="2.2" fill="#fff" />
-      <rect x="14" y="25" width="12" height="2.5" rx="1.25" fill="#fff" />
     </svg>
   );
 }
