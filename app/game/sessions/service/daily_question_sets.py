@@ -17,7 +17,7 @@ DAILY_POSITION_PREFERRED_LEVELS: tuple[str, ...] = (
     "A1",
     "A2",
     "A2",
-    "B1",
+    "A2",
     "B1",
     "B1",
 )
@@ -27,11 +27,19 @@ def _daily_selection_seed(*, berlin_date: date, position: int) -> str:
     return f"daily:{berlin_date.isoformat()}:{DAILY_CHALLENGE_SOURCE_MODE}:{position}"
 
 
-def _daily_level_window_for_position(position: int) -> tuple[str, tuple[str, ...]]:
+def daily_level_window_for_position(position: int) -> tuple[str, tuple[str, ...]]:
     index = min(max(position - 1, 0), len(DAILY_POSITION_PREFERRED_LEVELS) - 1)
     preferred_level = DAILY_POSITION_PREFERRED_LEVELS[index]
     max_chain_index = DAILY_LEVEL_CHAIN.index(preferred_level)
     return preferred_level, DAILY_LEVEL_CHAIN[: max_chain_index + 1]
+
+
+def is_daily_level_allowed_for_position(*, position: int, level: str | None) -> bool:
+    normalized_level = (level or "").strip().upper()
+    if not normalized_level:
+        return False
+    _, allowed_levels = daily_level_window_for_position(position)
+    return normalized_level in allowed_levels
 
 
 async def _build_daily_question_ids(
@@ -55,7 +63,7 @@ async def _build_daily_question_ids(
     selected_question_ids: list[str] = []
     for position in range(1, DAILY_CHALLENGE_TOTAL_QUESTIONS + 1):
         seed = _daily_selection_seed(berlin_date=berlin_date, position=position)
-        preferred_level, allowed_levels = _daily_level_window_for_position(position)
+        preferred_level, allowed_levels = daily_level_window_for_position(position)
         candidate_ids = await _cached_candidate_ids((preferred_level,))
         if not candidate_ids:
             candidate_ids = await _cached_candidate_ids(allowed_levels)
