@@ -9,6 +9,11 @@ deutchquizarena.de {
     reverse_proxy api:8000
   }
 
+  # Backward-compatible health endpoint for legacy checks.
+  handle /health {
+    reverse_proxy api:8000
+  }
+
   handle_path /api/* {
     reverse_proxy api:8000
   }

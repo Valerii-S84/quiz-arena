@@ -137,7 +137,7 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env exec -
 ### 5.2 Validate runtime health
 
 ```bash
-curl -sS https://deutchquizarena.de/health
+curl -sS https://deutchquizarena.de/api/health
 ```
 
 Expected:

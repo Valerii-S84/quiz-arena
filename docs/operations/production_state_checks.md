@@ -15,12 +15,12 @@ source /opt/quiz-arena/.env
 ```bash
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env ps
 bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/quiz-arena/docker-compose.prod.yml
-curl -sS https://deutchquizarena.de/health
+curl -sS https://deutchquizarena.de/api/health
 ```
 
 Expected:
 - `api`, `worker`, `beat`, `postgres`, `redis`, `caddy` are `Up`.
-- health payload is `status=ok` and `database/redis/celery=status=ok`.
+- health payload from `/api/health` is `status=ok` and `database/redis/celery=status=ok`.
 
 ## 2) Telegram webhook status
 
@@ -31,7 +31,7 @@ curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"
 Expected:
 - `url=https://deutchquizarena.de/webhook/telegram`
 - `pending_update_count=0` (or low and not growing)
-- no `last_error_message`
+- if `last_error_message` exists, `last_error_date` must be older than current incident window/deploy
 
 ## 3) Queue and worker pressure
 

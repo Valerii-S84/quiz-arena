@@ -63,7 +63,7 @@ curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"
 
 Expected:
 - webhook URL points to `${PUBLIC_WEBHOOK_BASE}/webhook/telegram`,
-- no `last_error_message`.
+- `pending_update_count` не росте; якщо є `last_error_message`, тоді `last_error_date` має бути до початку поточного smoke.
 
 ## 3) Scenario A: promo discount -> Stars purchase
 

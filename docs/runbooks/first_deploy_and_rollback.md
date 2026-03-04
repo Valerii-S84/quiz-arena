@@ -74,7 +74,7 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d 
 cd /opt/quiz-arena
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env ps
 bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/quiz-arena/docker-compose.prod.yml
-curl -sS https://deutchquizarena.de/health
+curl -sS https://deutchquizarena.de/api/health
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env run --rm api python -m scripts.post_deploy_gate
 ```
 
@@ -97,7 +97,7 @@ curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"
 
 Expected:
 - URL is `https://deutchquizarena.de/webhook/telegram`,
-- no `last_error_message`.
+- `pending_update_count` не росте; якщо є `last_error_message`, тоді `last_error_date` має бути до останнього деплою.
 
 ## 6) Backup baseline (minimum)
 
@@ -139,7 +139,7 @@ After rollback:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env ps
-curl -sS https://deutchquizarena.de/health
+curl -sS https://deutchquizarena.de/api/health
 ```
 
 ## 8) Operational references
