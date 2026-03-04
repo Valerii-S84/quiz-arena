@@ -99,7 +99,7 @@ bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/q
 ```
 2. Health endpoint:
 ```bash
-curl -sS https://deutchquizarena.de/health
+curl -sS https://deutchquizarena.de/api/health
 ```
 Очікування: `status=ok`, `database=ok`, `redis=ok`, `celery=ok`.
 
@@ -123,7 +123,7 @@ docker compose -f docker-compose.prod.yml exec -T redis redis-cli LLEN q_low
 source /opt/quiz-arena/.env
 curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"
 ```
-Очікування: URL = `https://deutchquizarena.de/webhook/telegram`, `pending_update_count=0`, без `last_error_message`.
+Очікування: URL = `https://deutchquizarena.de/webhook/telegram`, `pending_update_count=0`; якщо присутній `last_error_message`, тоді `last_error_date` має бути до поточного деплою (старі помилки допустимі).
 
 ## 8. Duel-specific smoke (після інциденту обов'язково)
 1. Перевірити worker-логи по ретраях:
