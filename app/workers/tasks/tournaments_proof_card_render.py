@@ -23,6 +23,7 @@ from app.workers.tasks.tournaments_proof_card_style import (
     truncate,
 )
 
+
 def _render_champion(
     *,
     player_label: str,
