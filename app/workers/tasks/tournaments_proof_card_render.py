@@ -23,15 +23,6 @@ from app.workers.tasks.tournaments_proof_card_style import (
     truncate,
 )
 
-DAILY_ARENA_LINK = "t.me/QuizArenaBot"
-
-
-def _draw_daily_link(
-    *, draw: ImageDraw.ImageDraw, y: int, fill: tuple[int, int, int], size: int = 24
-) -> None:
-    draw_centered(draw, text=DAILY_ARENA_LINK, y=y, font_obj=load_font(size, bold=True), fill=fill)
-
-
 def _render_champion(
     *,
     player_label: str,
@@ -91,8 +82,6 @@ def _render_champion(
         font_obj=load_font(24),
         fill=(168, 176, 188),
     )
-    if is_daily_arena:
-        _draw_daily_link(draw=draw, y=942, fill=(205, 213, 223))
     return image.convert("RGB")
 
 
@@ -152,8 +141,6 @@ def _render_arena(
         font_obj=load_font(24),
         fill=(170, 170, 170),
     )
-    if is_daily_arena:
-        _draw_daily_link(draw=draw, y=946, fill=(198, 198, 198))
     return image
 
 
@@ -161,7 +148,6 @@ def _render_participant(
     *,
     player_label: str,
     place: int,
-    points: str,
     completed_at: datetime | None,
     tournament_name: str | None,
     is_daily_arena: bool,
@@ -187,19 +173,10 @@ def _render_participant(
         font_obj=load_font(68, bold=True),
         fill=(255, 255, 255),
     )
+    draw_centered(draw, text=f"Platz #{place}", y=624, font_obj=load_font(34), fill=(222, 222, 222))
     draw_centered(
-        draw,
-        text=f"Punkte: {points}",
-        y=604,
-        font_obj=load_font(36, bold=True),
-        fill=(222, 222, 222),
+        draw, text=format_date(completed_at), y=700, font_obj=load_font(28), fill=(190, 190, 190)
     )
-    draw_centered(draw, text=f"Platz #{place}", y=668, font_obj=load_font(34), fill=(222, 222, 222))
-    draw_centered(
-        draw, text=format_date(completed_at), y=740, font_obj=load_font(28), fill=(190, 190, 190)
-    )
-    if is_daily_arena:
-        _draw_daily_link(draw=draw, y=796, size=26, fill=(205, 213, 223))
     return image
 
 
@@ -240,7 +217,6 @@ def render_tournament_proof_card_png(
         image = _render_participant(
             player_label=player_label,
             place=place,
-            points=points,
             completed_at=completed_at,
             tournament_name=tournament_name,
             is_daily_arena=is_daily_arena,
