@@ -53,6 +53,10 @@ async def get_public_metrics() -> dict[str, object]:
     return await _collect_public_metrics()
 
 
+# Keep both paths for compatibility:
+# - direct API calls use /api/stats
+# - reverse-proxy setups with stripped /api prefix use /stats
+@router.get("/stats")
 @router.get("/api/stats")
 async def get_stats() -> dict[str, int]:
     metrics = await _collect_public_metrics()
