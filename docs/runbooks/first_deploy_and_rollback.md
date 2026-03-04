@@ -73,6 +73,7 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d 
 ```bash
 cd /opt/quiz-arena
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env ps
+bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/quiz-arena/docker-compose.prod.yml
 curl -sS https://deutchquizarena.de/health
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env run --rm api python -m scripts.post_deploy_gate
 ```

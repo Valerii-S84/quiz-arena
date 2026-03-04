@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:16
     container_name: quiz_arena_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: quiz_arena
       POSTGRES_USER: quiz
@@ -19,6 +20,7 @@ services:
   redis:
     image: redis:7
     container_name: quiz_arena_redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     command: ["redis-server", "--appendonly", "yes"]
