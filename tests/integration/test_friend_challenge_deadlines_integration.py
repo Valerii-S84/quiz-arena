@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from uuid import uuid4
 
 import pytest
 
@@ -135,3 +136,42 @@ async def test_deadline_worker_sets_walkover_with_technical_win_or_draw(
         assert draw_row.opponent_score == 0
 
     assert any(item.get("status") == "WALKOVER" for item in captured_expired_items)
+
+
+@pytest.mark.asyncio
+async def test_deadline_worker_skips_tournament_duels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now_utc = datetime(2026, 2, 20, 15, 0, tzinfo=UTC)
+    creator_user_id = await _create_user("fc_tournament_skip_creator")
+    opponent_user_id = await _create_user("fc_tournament_skip_opponent")
+    captured_expired_items: list[dict[str, object]] = []
+    _notifications_stub(monkeypatch, captured_expired_items)
+
+    async with SessionLocal.begin() as session:
+        challenge = await GameSessionService.create_tournament_match_friend_challenge(
+            session,
+            creator_user_id=creator_user_id,
+            opponent_user_id=opponent_user_id,
+            mode_code="QUICK_MIX_A1A2",
+            total_rounds=5,
+            tournament_match_id=uuid4(),
+            now_utc=now_utc,
+            expires_at=now_utc - timedelta(minutes=1),
+            preferred_levels_by_round=None,
+        )
+        row = await FriendChallengesRepo.get_by_id_for_update(session, challenge.challenge_id)
+        assert row is not None
+        assert row.tournament_match_id is not None
+        assert row.status == "ACCEPTED"
+
+    await run_friend_challenge_deadlines_async(batch_size=10)
+
+    async with SessionLocal.begin() as session:
+        row = await FriendChallengesRepo.get_by_id_for_update(session, challenge.challenge_id)
+        assert row is not None
+        assert row.status == "ACCEPTED"
+
+    assert not any(
+        item.get("challenge_id") == str(challenge.challenge_id) for item in captured_expired_items
+    )

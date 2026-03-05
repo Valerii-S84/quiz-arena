@@ -148,6 +148,7 @@ class FriendChallengesRepo:
         stmt = (
             select(FriendChallenge)
             .where(
+                FriendChallenge.tournament_match_id.is_(None),
                 FriendChallenge.status.in_(("ACCEPTED", "CREATOR_DONE", "OPPONENT_DONE", "ACTIVE")),
                 FriendChallenge.expires_at > now_utc,
                 FriendChallenge.expires_at <= expires_before_utc,
@@ -171,6 +172,7 @@ class FriendChallengesRepo:
         stmt = (
             select(FriendChallenge)
             .where(
+                FriendChallenge.tournament_match_id.is_(None),
                 FriendChallenge.status.in_(_DUEL_LIVE_STATUSES),
                 FriendChallenge.expires_at <= now_utc,
             )
@@ -192,6 +194,7 @@ class FriendChallengesRepo:
         stmt = (
             select(FriendChallenge)
             .where(
+                FriendChallenge.tournament_match_id.is_(None),
                 FriendChallenge.status == "PENDING",
                 FriendChallenge.expires_at <= now_utc,
             )
@@ -213,6 +216,7 @@ class FriendChallengesRepo:
         stmt = (
             select(FriendChallenge)
             .where(
+                FriendChallenge.tournament_match_id.is_(None),
                 FriendChallenge.status.in_(("ACCEPTED", "CREATOR_DONE", "OPPONENT_DONE", "ACTIVE")),
                 FriendChallenge.opponent_user_id.is_not(None),
                 FriendChallenge.expires_at <= now_utc,
