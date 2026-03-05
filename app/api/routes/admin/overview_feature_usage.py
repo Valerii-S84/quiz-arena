@@ -128,4 +128,3 @@ async def build_feature_usage_payload(
             previous=float(daily_cup_registered_prev),
         ),
     }
-

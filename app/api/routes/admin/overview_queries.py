@@ -6,6 +6,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.routes.admin.overview_feature_usage import build_feature_usage_payload
 from app.api.routes.admin.overview_metrics import (
     STAR_TO_EUR_RATE,
     build_kpi,
@@ -15,7 +16,6 @@ from app.api.routes.admin.overview_metrics import (
     retention_day_rate,
     sum_revenue_stars,
 )
-from app.api.routes.admin.overview_feature_usage import build_feature_usage_payload
 from app.api.routes.admin.overview_series import (
     count_new_users,
     count_quiz_users,
