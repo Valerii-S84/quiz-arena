@@ -7,4 +7,4 @@ def test_build_caption_includes_bot_link() -> None:
     assert "Daily Arena Cup" in caption
     assert "Platz #3" in caption
     assert "Punkte: 2.5" in caption
-    assert "t.me/QuizArenaBot" in caption
+    assert "https://t.me/Deine_Deutsch_Quiz_bot" in caption

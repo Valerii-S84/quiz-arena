@@ -9,6 +9,7 @@ import structlog
 from app.bot.application import build_bot
 from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard, build_daily_cup_share_url
 from app.bot.texts.de import TEXTS_DE
+from app.core.telegram_links import public_bot_link
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
@@ -157,7 +158,7 @@ async def run_daily_cup_round_messaging_async_with_followups(
                 show_proof_card=tournament.status == "COMPLETED",
                 share_url=(
                     build_daily_cup_share_url(
-                        base_link="t.me/QuizArenaBot",
+                        base_link=public_bot_link(),
                         share_text=TEXTS_DE["msg.daily_cup.share_template"].format(
                             place=place_by_user[user_id],
                             total=participants_total,

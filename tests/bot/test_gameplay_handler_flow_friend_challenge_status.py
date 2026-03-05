@@ -71,9 +71,13 @@ async def test_handle_friend_challenge_share_result_sends_share_url_and_emits_ev
         return "Bob" if user_id == 10 else "Alice"
 
     emitted: list[str] = []
+    enqueued: list[tuple[str, int | None]] = []
 
     async def _fake_emit(*args, **kwargs):
         emitted.append(kwargs["event_type"])
+
+    def _fake_enqueue(*, challenge_id: str, user_id: int | None = None) -> None:
+        enqueued.append((challenge_id, user_id))
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(
@@ -83,6 +87,7 @@ async def test_handle_friend_challenge_share_result_sends_share_url_and_emits_ev
     )
     monkeypatch.setattr(gameplay, "_resolve_opponent_label", _fake_resolve_label)
     monkeypatch.setattr(gameplay, "emit_analytics_event", _fake_emit)
+    monkeypatch.setattr(gameplay.gameplay_proof_cards, "enqueue_duel_proof_cards", _fake_enqueue)
 
     callback = DummyCallback(
         data="friend:share:result:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
@@ -101,5 +106,6 @@ async def test_handle_friend_challenge_share_result_sends_share_url_and_emits_ev
     ]
     assert len(urls) == 1
     assert "https://t.me/share/url" in (urls[0] or "")
-    assert "https%3A%2F%2Ft.me%2Fproofbot" in (urls[0] or "")
+    assert "https%3A%2F%2Ft.me%2FDeine_Deutsch_Quiz_bot" in (urls[0] or "")
     assert emitted == ["duel_share_clicked"]
+    assert enqueued == [("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", 10)]

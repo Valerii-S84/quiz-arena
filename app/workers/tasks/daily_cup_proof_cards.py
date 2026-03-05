@@ -15,6 +15,7 @@ from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
+from app.core.telegram_links import public_bot_link
 from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES, TOURNAMENT_STATUS_COMPLETED
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
@@ -127,7 +128,7 @@ async def run_daily_cup_proof_cards_async(
             points = points_by_user.get(current_user_id, "0")
             caption = build_caption(place=place, points=points)
             share_url = build_daily_cup_share_url(
-                base_link="t.me/QuizArenaBot",
+                base_link=public_bot_link(),
                 share_text=TEXTS_DE["msg.daily_cup.share_template"].format(
                     place=place,
                     total=participants_total,

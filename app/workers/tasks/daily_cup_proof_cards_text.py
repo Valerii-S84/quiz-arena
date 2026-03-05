@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from app.core.telegram_links import public_bot_link
+
 
 def format_user_label(*, username: str | None, first_name: str | None) -> str:
     if username:
@@ -23,4 +25,4 @@ def format_points(value: Decimal) -> str:
 
 
 def build_caption(*, place: int, points: str) -> str:
-    return f"🏆 Daily Arena Cup\nPlatz #{place}\nPunkte: {points}\n📱 t.me/QuizArenaBot"
+    return f"🏆 Daily Arena Cup\nPlatz #{place}\nPunkte: {points}\n📱 {public_bot_link()}"

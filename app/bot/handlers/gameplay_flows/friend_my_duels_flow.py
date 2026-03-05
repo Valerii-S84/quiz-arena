@@ -4,6 +4,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 
 from app.bot.keyboards.friend_challenge import build_friend_challenge_share_url
 from app.bot.texts.de import TEXTS_DE
+from app.core.telegram_links import public_bot_start_link
 from app.game.friend_challenges.constants import DUEL_TYPE_OPEN
 from app.game.sessions.types import FriendChallengeSnapshot
 
@@ -29,12 +30,10 @@ async def _build_open_repost_share_url(
     if bot is None:
         return None
     try:
-        me = await bot.get_me()
+        await bot.get_me()
     except Exception:
         return None
-    if not me.username:
-        return None
-    invite_link = f"https://t.me/{me.username}?start=duel_{challenge_id}"
+    invite_link = public_bot_start_link(start_param=f"duel_{challenge_id}")
     return build_friend_challenge_share_url(
         base_link=invite_link,
         share_text=_build_repost_share_text(total_rounds=total_rounds),

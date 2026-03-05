@@ -78,10 +78,10 @@ async def test_daily_cup_proof_cards_reuse_cached_file_ids_on_second_run(monkeyp
     assert int(first["failed"]) == 0
     assert all(not isinstance(item["photo"], str) for item in bot.send_photos)
     assert [str(item.get("caption")) for item in bot.send_photos[:4]] == [
-        "🏆 Daily Arena Cup\nPlatz #1\nPunkte: 4\n📱 t.me/QuizArenaBot",
-        "🏆 Daily Arena Cup\nPlatz #2\nPunkte: 3\n📱 t.me/QuizArenaBot",
-        "🏆 Daily Arena Cup\nPlatz #3\nPunkte: 2\n📱 t.me/QuizArenaBot",
-        "🏆 Daily Arena Cup\nPlatz #4\nPunkte: 1\n📱 t.me/QuizArenaBot",
+        "🏆 Daily Arena Cup\nPlatz #1\nPunkte: 4\n📱 https://t.me/Deine_Deutsch_Quiz_bot",
+        "🏆 Daily Arena Cup\nPlatz #2\nPunkte: 3\n📱 https://t.me/Deine_Deutsch_Quiz_bot",
+        "🏆 Daily Arena Cup\nPlatz #3\nPunkte: 2\n📱 https://t.me/Deine_Deutsch_Quiz_bot",
+        "🏆 Daily Arena Cup\nPlatz #4\nPunkte: 1\n📱 https://t.me/Deine_Deutsch_Quiz_bot",
     ]
 
     first_batch = len(bot.send_photos)

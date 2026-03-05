@@ -51,7 +51,11 @@ def _build_caption(*, place: int, points: str) -> str:
     return f"🏆 Turnier abgeschlossen\nPlatz #{place}\nPunkte: {points}"
 
 
-async def run_private_tournament_proof_cards_async(*, tournament_id: str) -> dict[str, int]:
+async def run_private_tournament_proof_cards_async(
+    *,
+    tournament_id: str,
+    user_id: int | None = None,
+) -> dict[str, int]:
     try:
         parsed_tournament_id = UUID(tournament_id)
     except ValueError:
@@ -77,11 +81,11 @@ async def run_private_tournament_proof_cards_async(*, tournament_id: str) -> dic
                 "cached_reused": 0,
                 "failed": 0,
             }
-        participants = await TournamentParticipantsRepo.list_for_tournament(
+        all_participants = await TournamentParticipantsRepo.list_for_tournament(
             session,
             tournament_id=parsed_tournament_id,
         )
-        if not participants:
+        if not all_participants:
             return {
                 "processed": 0,
                 "participants_total": 0,
@@ -89,7 +93,20 @@ async def run_private_tournament_proof_cards_async(*, tournament_id: str) -> dic
                 "cached_reused": 0,
                 "failed": 0,
             }
-        users = await UsersRepo.list_by_ids(session, [int(item.user_id) for item in participants])
+        participants = (
+            [item for item in all_participants if int(item.user_id) == user_id]
+            if user_id is not None
+            else all_participants
+        )
+        if not participants:
+            return {
+                "processed": 1,
+                "participants_total": 0,
+                "sent": 0,
+                "cached_reused": 0,
+                "failed": 0,
+            }
+        users = await UsersRepo.list_by_ids(session, [int(item.user_id) for item in all_participants])
         user_labels = {
             int(user.id): _format_user_label(username=user.username, first_name=user.first_name)
             for user in users
@@ -98,8 +115,8 @@ async def run_private_tournament_proof_cards_async(*, tournament_id: str) -> dic
         tournament_format = _format_tournament_format(tournament.format)
 
     participant_rows = {int(item.user_id): item for item in participants}
-    standings_user_ids = [int(item.user_id) for item in participants]
-    points_by_user = {int(item.user_id): _format_points(item.score) for item in participants}
+    standings_user_ids = [int(item.user_id) for item in all_participants]
+    points_by_user = {int(item.user_id): _format_points(item.score) for item in all_participants}
     participants_total = len(standings_user_ids)
     now_utc = datetime.now(timezone.utc)
 
@@ -110,14 +127,16 @@ async def run_private_tournament_proof_cards_async(*, tournament_id: str) -> dic
 
     bot = build_bot()
     try:
-        for place, user_id in enumerate(standings_user_ids, start=1):
-            chat_id = telegram_targets.get(user_id)
+        for row in participants:
+            current_user_id = int(row.user_id)
+            chat_id = telegram_targets.get(current_user_id)
             if chat_id is None:
                 failed += 1
                 continue
-            points = points_by_user.get(user_id, "0")
+            place = standings_user_ids.index(current_user_id) + 1
+            points = points_by_user.get(current_user_id, "0")
             caption = _build_caption(place=place, points=points)
-            cached_file_id = participant_rows[user_id].proof_card_file_id
+            cached_file_id = participant_rows[current_user_id].proof_card_file_id
             try:
                 if cached_file_id:
                     await bot.send_photo(chat_id=chat_id, photo=cached_file_id, caption=caption)
@@ -126,7 +145,7 @@ async def run_private_tournament_proof_cards_async(*, tournament_id: str) -> dic
                     continue
 
                 card_png = render_tournament_proof_card_png(
-                    player_label=user_labels.get(user_id, "Spieler"),
+                    player_label=user_labels.get(current_user_id, "Spieler"),
                     place=place,
                     points=points,
                     format_label=tournament_format,
@@ -138,18 +157,18 @@ async def run_private_tournament_proof_cards_async(*, tournament_id: str) -> dic
                     chat_id=chat_id,
                     photo=BufferedInputFile(
                         card_png,
-                        filename=f"tournament_{tournament_id}_{user_id}.png",
+                        filename=f"tournament_{tournament_id}_{current_user_id}.png",
                     ),
                     caption=caption,
                 )
                 sent += 1
                 if message.photo:
-                    new_file_ids[user_id] = message.photo[-1].file_id
+                    new_file_ids[current_user_id] = message.photo[-1].file_id
             except Exception as exc:
                 logger.warning(
                     "private_tournament_proof_card_send_failed",
                     tournament_id=tournament_id,
-                    user_id=user_id,
+                    user_id=current_user_id,
                     error_type=type(exc).__name__,
                 )
                 failed += 1
@@ -175,12 +194,24 @@ async def run_private_tournament_proof_cards_async(*, tournament_id: str) -> dic
     }
 
 
-def enqueue_private_tournament_proof_cards(*, tournament_id: str) -> None:
+def enqueue_private_tournament_proof_cards(
+    *,
+    tournament_id: str,
+    user_id: int | None = None,
+) -> None:
     try:
         if _is_celery_task(run_private_tournament_proof_cards):
-            run_private_tournament_proof_cards.delay(tournament_id=tournament_id)
+            run_private_tournament_proof_cards.delay(
+                tournament_id=tournament_id,
+                user_id=user_id,
+            )
         else:
-            run_async_job(run_private_tournament_proof_cards_async(tournament_id=tournament_id))
+            run_async_job(
+                run_private_tournament_proof_cards_async(
+                    tournament_id=tournament_id,
+                    user_id=user_id,
+                )
+            )
     except Exception as exc:
         logger.warning(
             "private_tournament_proof_card_enqueue_failed",
@@ -192,5 +223,14 @@ def enqueue_private_tournament_proof_cards(*, tournament_id: str) -> None:
 @celery_app.task(
     name="app.workers.tasks.tournaments_proof_cards.run_private_tournament_proof_cards"
 )
-def run_private_tournament_proof_cards(*, tournament_id: str) -> dict[str, int]:
-    return run_async_job(run_private_tournament_proof_cards_async(tournament_id=tournament_id))
+def run_private_tournament_proof_cards(
+    *,
+    tournament_id: str,
+    user_id: int | None = None,
+) -> dict[str, int]:
+    return run_async_job(
+        run_private_tournament_proof_cards_async(
+            tournament_id=tournament_id,
+            user_id=user_id,
+        )
+    )

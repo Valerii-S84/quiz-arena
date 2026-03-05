@@ -207,7 +207,6 @@ async def check_3_tabelle_teilen() -> None:
         show_share_result=True,
     )
     share_url = _build_standings_share_url(
-        bot_username="quizarenabot",
         invite_code="abcdefabcdef",
         tournament_name="Test Turnier",
     )

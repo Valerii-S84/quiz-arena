@@ -100,3 +100,35 @@ async def test_build_friend_result_share_url_returns_none_on_bot_error() -> None
         proof_card_text="proof card",
     )
     assert share_url is None
+
+
+@pytest.mark.asyncio
+async def test_build_friend_invite_link_uses_public_bot_username() -> None:
+    callback = DummyCallback(
+        data="x",
+        from_user=SimpleNamespace(id=1),
+        message=DummyMessage(),
+    )
+    invite_link = await gameplay._build_friend_invite_link(
+        callback,
+        challenge_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    )
+    assert invite_link == (
+        "https://t.me/Deine_Deutsch_Quiz_bot?start=duel_"
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    )
+
+
+@pytest.mark.asyncio
+async def test_build_friend_result_share_url_uses_public_bot_link() -> None:
+    callback = DummyCallback(
+        data="x",
+        from_user=SimpleNamespace(id=1),
+        message=DummyMessage(),
+    )
+    share_url = await gameplay._build_friend_result_share_url(
+        callback,
+        proof_card_text="proof card",
+    )
+    assert share_url is not None
+    assert "https%3A%2F%2Ft.me%2FDeine_Deutsch_Quiz_bot" in share_url

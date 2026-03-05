@@ -7,6 +7,7 @@ from aiogram.types import CallbackQuery, Message
 from app.bot.handlers.gameplay_flows.tournament_views import format_points
 from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard, build_daily_cup_share_url
 from app.bot.texts.de import TEXTS_DE
+from app.core.telegram_links import public_bot_link
 from app.workers.tasks.tournaments_messaging_text import (
     format_deadline,
     is_message_not_modified_error,
@@ -165,7 +166,7 @@ async def render_daily_cup_lobby(
         place = standings_user_ids.index(user_id) + 1
         points_map = {item.user_id: format_points(item.score) for item in lobby.participants}
         share_url = build_daily_cup_share_url(
-            base_link="t.me/QuizArenaBot",
+            base_link=public_bot_link(),
             share_text=TEXTS_DE["msg.daily_cup.share_template"].format(
                 place=place,
                 total=len(standings_user_ids),
