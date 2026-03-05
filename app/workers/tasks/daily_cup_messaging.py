@@ -12,7 +12,7 @@ from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
-from app.game.tournaments.constants import TOURNAMENT_TYPE_DAILY_ARENA
+from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.tasks.daily_cup_core import persist_daily_cup_standings_message_ids
@@ -59,7 +59,7 @@ async def run_daily_cup_round_messaging_async_with_followups(
         tournament = await TournamentsRepo.get_by_id(session, parsed_tournament_id)
         if (
             tournament is None
-            or tournament.type != TOURNAMENT_TYPE_DAILY_ARENA
+            or tournament.type not in DAILY_CUP_TOURNAMENT_TYPES
             or tournament.status in {"REGISTRATION", "CANCELED"}
         ):
             return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}

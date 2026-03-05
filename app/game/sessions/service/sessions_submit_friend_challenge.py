@@ -7,14 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
-from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
-from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.friend_challenges.constants import (
     DUEL_STATUS_ACCEPTED,
     DUEL_STATUS_COMPLETED,
     DUEL_STATUS_CREATOR_DONE,
     DUEL_STATUS_OPPONENT_DONE,
-    DUEL_STATUS_WALKOVER,
     is_duel_playable_status,
     normalize_duel_status,
 )
@@ -26,8 +23,7 @@ from .friend_challenges_internal import (
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
 )
-
-TOURNAMENT_TYPE_DAILY_ARENA = "DAILY_ARENA"
+from .friend_challenges_tournament_progress import handle_tournament_duel_progress
 
 
 async def _apply_friend_challenge_answer(
@@ -123,87 +119,13 @@ async def _apply_friend_challenge_answer(
                 challenge.status = DUEL_STATUS_ACCEPTED
 
         challenge.updated_at = now_utc
-        if challenge.tournament_match_id is not None and challenge.status in {
-            DUEL_STATUS_COMPLETED,
-            DUEL_STATUS_WALKOVER,
-        }:
-            from app.game.tournaments.lifecycle import check_and_advance_round
-            from app.game.tournaments.settlement import settle_pending_match_from_duel
-            from app.workers.tasks.daily_cup_match_results import (
-                send_daily_cup_match_result_messages,
-            )
-
-            tournament_match = await TournamentMatchesRepo.get_by_id_for_update(
+        if challenge.tournament_match_id is not None:
+            await handle_tournament_duel_progress(
                 session,
-                challenge.tournament_match_id,
+                challenge=challenge,
+                user_id=user_id,
+                now_utc=now_utc,
             )
-            if tournament_match is not None:
-                match_settled = await settle_pending_match_from_duel(
-                    session,
-                    match=tournament_match,
-                    now_utc=now_utc,
-                )
-                if match_settled:
-                    transition = await check_and_advance_round(
-                        session,
-                        tournament_id=tournament_match.tournament_id,
-                        now_utc=now_utc,
-                    )
-                    tournament = await TournamentsRepo.get_by_id(
-                        session,
-                        tournament_match.tournament_id,
-                    )
-                    if tournament is not None and tournament.type == TOURNAMENT_TYPE_DAILY_ARENA:
-                        from app.workers.tasks.daily_cup_messaging import (
-                            enqueue_daily_cup_round_messaging,
-                        )
-
-                        await emit_analytics_event(
-                            session,
-                            event_type="daily_cup_match_completed",
-                            source=EVENT_SOURCE_BOT,
-                            happened_at=now_utc,
-                            user_id=user_id,
-                            payload={
-                                "tournament_id": str(tournament_match.tournament_id),
-                                "round_no": int(tournament_match.round_no),
-                            },
-                        )
-                        if int(transition["round_started"]) > 0:
-                            await emit_analytics_event(
-                                session,
-                                event_type="daily_cup_round_started",
-                                source=EVENT_SOURCE_BOT,
-                                happened_at=now_utc,
-                                user_id=user_id,
-                                payload={
-                                    "tournament_id": str(tournament_match.tournament_id),
-                                    "round_no": int(tournament.current_round),
-                                },
-                            )
-                            enqueue_daily_cup_round_messaging(
-                                tournament_id=str(tournament_match.tournament_id)
-                            )
-                        if int(transition["tournament_completed"]) > 0:
-                            enqueue_daily_cup_round_messaging(
-                                tournament_id=str(tournament_match.tournament_id),
-                                enqueue_completion_followups=True,
-                            )
-                        if (
-                            challenge.opponent_user_id is not None
-                            and tournament_match.user_b is not None
-                        ):
-                            await send_daily_cup_match_result_messages(
-                                session,
-                                tournament_id=tournament_match.tournament_id,
-                                round_no=int(tournament_match.round_no),
-                                user_a=int(tournament_match.user_a),
-                                user_b=int(tournament_match.user_b),
-                                user_a_points=int(challenge.creator_score),
-                                user_b_points=int(challenge.opponent_score),
-                                rounds_total=max(1, int(challenge.total_rounds)),
-                                next_round_deadline=tournament.round_deadline,
-                            )
         friend_snapshot = _build_friend_challenge_snapshot(challenge)
         friend_waiting_for_opponent = is_duel_playable_status(challenge.status) and (
             challenge.opponent_user_id is None

@@ -14,7 +14,7 @@ class TournamentMatch(Base):
     __tablename__ = "tournament_matches"
     __table_args__ = (
         CheckConstraint(
-            "round_no >= 1 AND round_no <= 3",
+            "round_no >= 1 AND round_no <= 16",
             name="ck_tournament_matches_round_no_range",
         ),
         CheckConstraint(
@@ -44,13 +44,23 @@ class TournamentMatch(Base):
         PG_UUID(as_uuid=True), ForeignKey("tournaments.id"), nullable=False
     )
     round_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    round_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     user_a: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
     user_b: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
+    bracket_slot_a: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bracket_slot_b: Mapped[int | None] = mapped_column(Integer, nullable=True)
     friend_challenge_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("friend_challenges.id"),
         unique=True,
         nullable=True,
+    )
+    match_timeout_task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    player_a_finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    player_b_finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     winner_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)

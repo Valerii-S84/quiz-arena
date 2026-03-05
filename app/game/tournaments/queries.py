@@ -11,16 +11,16 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.tournaments.constants import (
+    DAILY_CUP_TOURNAMENT_TYPES,
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_STATUS_REGISTRATION,
-    TOURNAMENT_TYPE_DAILY_ARENA,
     TOURNAMENT_TYPE_PRIVATE,
 )
 from app.game.tournaments.errors import TournamentAccessError, TournamentNotFoundError
 from app.game.tournaments.internal import build_tournament_snapshot
 from app.game.tournaments.types import TournamentLobbySnapshot, TournamentParticipantSnapshot
 
-_ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3"})
+_ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3", "BRACKET_LIVE"})
 
 
 def _participant_snapshot(row: TournamentParticipant) -> TournamentParticipantSnapshot:
@@ -145,7 +145,7 @@ async def get_daily_cup_lobby_by_id(
     tournament = await TournamentsRepo.get_by_id(session, tournament_id)
     if tournament is None:
         raise TournamentNotFoundError
-    if tournament.type != TOURNAMENT_TYPE_DAILY_ARENA:
+    if tournament.type not in DAILY_CUP_TOURNAMENT_TYPES:
         raise TournamentAccessError
     return await _build_lobby_snapshot(
         session=session,

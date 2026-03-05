@@ -24,6 +24,12 @@ from app.game.tournaments.constants import (
     TOURNAMENT_TYPE_DAILY_ARENA,
     status_for_round,
 )
+from app.game.tournaments.elimination_lifecycle import (
+    complete_elimination_tournament as _complete_elimination_tournament,
+)
+from app.game.tournaments.elimination_lifecycle import (
+    on_elimination_match_complete as _on_elimination_match_complete,
+)
 from app.game.tournaments.internal import resolve_round_deadline
 from app.game.tournaments.rounds import (
     collect_bye_history,
@@ -178,4 +184,44 @@ async def check_and_advance_round(
         tournament=tournament,
         now_utc=now_utc,
         round_duration_hours=round_duration_hours,
+    )
+
+
+async def on_elimination_match_complete(
+    session: AsyncSession,
+    *,
+    match_id: UUID,
+    winner_id: int,
+    loser_id: int | None,
+    now_utc: datetime,
+) -> dict[str, int]:
+    return await _on_elimination_match_complete(
+        session,
+        match_id=match_id,
+        winner_id=winner_id,
+        loser_id=loser_id,
+        now_utc=now_utc,
+    )
+
+
+async def complete_elimination_tournament(
+    session: AsyncSession,
+    *,
+    tournament_id: UUID,
+    champion_id: int,
+    finalist_id: int | None = None,
+) -> dict[str, int]:
+    tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
+    if tournament is None:
+        return {
+            "processed": 0,
+            "next_match_created": 0,
+            "waiting": 0,
+            "tournament_completed": 0,
+        }
+    return await _complete_elimination_tournament(
+        session,
+        tournament=tournament,
+        champion_id=champion_id,
+        finalist_id=finalist_id,
     )

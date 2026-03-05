@@ -14,19 +14,19 @@ from app.db.session import SessionLocal
 from app.game.tournaments.constants import (
     TOURNAMENT_STATUS_CANCELED,
     TOURNAMENT_STATUS_REGISTRATION,
-    TOURNAMENT_STATUS_ROUND_1,
+    TOURNAMENT_TYPE_DAILY_ELIMINATION,
 )
-from app.game.tournaments.rounds import create_round_matches
 from app.workers.tasks.daily_cup_config import (
     DAILY_CUP_ACTIVE_LOOKBACK_DAYS,
     DAILY_CUP_MIN_PARTICIPANTS,
     DAILY_CUP_PUSH_BATCH_SIZE,
+    DAILY_CUP_TOURNAMENT_TYPE,
+    DAILY_ELIMINATION_MIN_PLAYERS,
 )
 from app.workers.tasks.daily_cup_core import (
     emit_daily_cup_events,
     ensure_daily_cup_registration_tournament,
     now_utc,
-    round_deadline,
     send_daily_cup_canceled_messages,
 )
 from app.workers.tasks.daily_cup_messaging import enqueue_daily_cup_round_messaging
@@ -34,10 +34,11 @@ from app.workers.tasks.daily_cup_push_events import (
     list_already_pushed_user_ids,
     store_push_sent_events,
 )
+from app.workers.tasks.daily_cup_start import start_daily_arena_round_one
 from app.workers.tasks.daily_cup_time import format_close_time_local
+from app.workers.tasks.daily_elimination_start import start_daily_elimination_bracket
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup")
-
 
 _now_utc = now_utc
 
@@ -135,7 +136,11 @@ async def _send_daily_cup_registration_push_async(
 
 async def send_daily_cup_invite_async() -> dict[str, int]:
     return await _send_daily_cup_registration_push_async(
-        text_key="msg.daily_cup.invite_push",
+        text_key=(
+            "msg.elimination.invite_push"
+            if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ELIMINATION
+            else "msg.daily_cup.invite_push"
+        ),
         log_event="daily_cup_invite_push_processed",
         sent_event_type="daily_cup_invite_push_sent",
     )
@@ -143,7 +148,11 @@ async def send_daily_cup_invite_async() -> dict[str, int]:
 
 async def open_daily_cup_registration_async() -> dict[str, int]:
     return await _send_daily_cup_registration_push_async(
-        text_key="msg.daily_cup.push.registration",
+        text_key=(
+            "msg.elimination.invite_push"
+            if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ELIMINATION
+            else "msg.daily_cup.push.registration"
+        ),
         log_event="daily_cup_registration_push_processed",
         sent_event_type="daily_cup_registration_push_sent",
     )
@@ -161,6 +170,7 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
     now_utc_value = _now_utc()
     canceled_telegram_targets: list[int] = []
     started_tournament_id: str | None = None
+    enqueue_legacy_round_messaging = False
     events: list[dict[str, object]] = []
     participants_total = canceled = started = 0
 
@@ -176,7 +186,12 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
             tournament_id=tournament.id,
         )
         participants_total = len(participants)
-        if participants_total < DAILY_CUP_MIN_PARTICIPANTS:
+        required_min_players = (
+            DAILY_ELIMINATION_MIN_PLAYERS
+            if tournament.type == TOURNAMENT_TYPE_DAILY_ELIMINATION
+            else DAILY_CUP_MIN_PARTICIPANTS
+        )
+        if participants_total < required_min_players:
             tournament.status = TOURNAMENT_STATUS_CANCELED
             tournament.round_deadline = None
             users = await UsersRepo.list_by_ids(
@@ -194,20 +209,21 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
                 }
             )
         else:
-            next_round_deadline = round_deadline(now_utc_value=now_utc_value)
-            await create_round_matches(
-                session,
-                tournament=tournament,
-                round_no=1,
-                participants=participants,
-                previous_pairs=set(),
-                bye_history=set(),
-                deadline=next_round_deadline,
-                now_utc=now_utc_value,
-            )
-            tournament.current_round = 1
-            tournament.status = TOURNAMENT_STATUS_ROUND_1
-            tournament.round_deadline = next_round_deadline
+            if tournament.type == TOURNAMENT_TYPE_DAILY_ELIMINATION:
+                await start_daily_elimination_bracket(
+                    session,
+                    tournament=tournament,
+                    participants=participants,
+                    now_utc=now_utc_value,
+                )
+            else:
+                await start_daily_arena_round_one(
+                    session,
+                    tournament=tournament,
+                    participants=participants,
+                    now_utc=now_utc_value,
+                )
+                enqueue_legacy_round_messaging = True
             started_tournament_id = str(tournament.id)
             started = 1
             events.extend(
@@ -220,7 +236,11 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
                         },
                     },
                     {
-                        "event_type": "daily_cup_round_started",
+                        "event_type": (
+                            "daily_elimination_round_started"
+                            if tournament.type == TOURNAMENT_TYPE_DAILY_ELIMINATION
+                            else "daily_cup_round_started"
+                        ),
                         "payload": {"tournament_id": started_tournament_id, "round_no": 1},
                     },
                 ]
@@ -230,7 +250,7 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
     await send_daily_cup_canceled_messages(
         telegram_targets=canceled_telegram_targets, bot_factory=build_bot
     )
-    if started_tournament_id is not None:
+    if started_tournament_id is not None and enqueue_legacy_round_messaging:
         enqueue_daily_cup_round_messaging(tournament_id=started_tournament_id)
     return {
         "processed": 1,

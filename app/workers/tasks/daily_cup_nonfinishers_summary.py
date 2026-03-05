@@ -14,7 +14,7 @@ from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
-from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED, TOURNAMENT_TYPE_DAILY_ARENA
+from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES, TOURNAMENT_STATUS_COMPLETED
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 
@@ -81,7 +81,7 @@ async def run_daily_cup_nonfinishers_summary_async(*, tournament_id: str) -> dic
         tournament = await TournamentsRepo.get_by_id(session, parsed_tournament_id)
         if (
             tournament is None
-            or tournament.type != TOURNAMENT_TYPE_DAILY_ARENA
+            or tournament.type not in DAILY_CUP_TOURNAMENT_TYPES
             or tournament.status != TOURNAMENT_STATUS_COMPLETED
         ):
             return _empty_result()
