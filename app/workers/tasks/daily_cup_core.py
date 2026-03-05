@@ -33,7 +33,10 @@ def now_utc() -> datetime:
 
 
 def round_deadline(*, now_utc_value: datetime) -> datetime:
-    return now_utc_value + timedelta(minutes=max(1, int(DAILY_CUP_ROUND_DURATION_MINUTES)))
+    # Normalize to second precision so cron-based round advancement at HH:MM:00
+    # does not miss deadlines by sub-second drift (e.g. HH:MM:00.005).
+    deadline = now_utc_value + timedelta(minutes=max(1, int(DAILY_CUP_ROUND_DURATION_MINUTES)))
+    return deadline.replace(microsecond=0)
 
 
 async def ensure_daily_cup_registration_tournament(

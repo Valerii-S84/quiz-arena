@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import structlog
 from aiogram.types import BufferedInputFile
@@ -22,6 +23,7 @@ from app.workers.tasks.daily_cup_proof_cards_text import (
     format_points,
     format_user_label,
 )
+from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
 from app.workers.tasks.tournaments_proof_card_render import render_tournament_proof_card_png
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_proof_cards")
@@ -35,6 +37,11 @@ def _empty_result() -> dict[str, int]:
     return {"processed": 0, "participants_total": 0, "sent": 0, "cached_reused": 0, "failed": 0}
 
 
+def _is_today_tournament(*, registration_deadline: datetime, now_utc: datetime) -> bool:
+    tz = ZoneInfo(DAILY_CUP_TIMEZONE)
+    return registration_deadline.astimezone(tz).date() == now_utc.astimezone(tz).date()
+
+
 async def run_daily_cup_proof_cards_async(
     *,
     tournament_id: str,
@@ -46,6 +53,7 @@ async def run_daily_cup_proof_cards_async(
     except ValueError:
         return _empty_result()
 
+    now_utc = datetime.now(timezone.utc)
     async with SessionLocal.begin() as session:
         tournament = await TournamentsRepo.get_by_id(session, parsed_tournament_id)
         if (
@@ -53,6 +61,16 @@ async def run_daily_cup_proof_cards_async(
             or tournament.type not in DAILY_CUP_TOURNAMENT_TYPES
             or tournament.status != TOURNAMENT_STATUS_COMPLETED
         ):
+            return _empty_result()
+        if not _is_today_tournament(
+            registration_deadline=tournament.registration_deadline,
+            now_utc=now_utc,
+        ):
+            logger.info(
+                "daily_cup_proof_cards_skipped_stale_tournament",
+                tournament_id=tournament_id,
+                registration_deadline=tournament.registration_deadline.isoformat(),
+            )
             return _empty_result()
 
         all_participants = await TournamentParticipantsRepo.list_for_tournament(
@@ -92,8 +110,6 @@ async def run_daily_cup_proof_cards_async(
     participant_rows = {int(item.user_id): item for item in participants}
     points_by_user = {int(item.user_id): format_points(item.score) for item in all_participants}
     participants_total = len(standings_user_ids)
-    now_utc = datetime.now(timezone.utc)
-
     sent = 0
     cached_reused = 0
     failed = 0
