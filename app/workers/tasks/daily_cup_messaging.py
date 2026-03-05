@@ -17,8 +17,8 @@ from app.db.session import SessionLocal
 from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
-from app.workers.tasks.daily_cup_core import persist_daily_cup_standings_message_ids
 from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
+from app.workers.tasks.daily_cup_core import persist_daily_cup_standings_message_ids
 from app.workers.tasks.daily_cup_messaging_text import (
     build_completed_text,
     build_round_text,

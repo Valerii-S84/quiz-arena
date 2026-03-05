@@ -54,7 +54,9 @@ def _build_turn_reminder_text(*, opponent_label: str, deadline_text: str) -> str
     )
 
 
-async def run_daily_cup_turn_reminders_async(*, batch_size: int = DAILY_CUP_PUSH_BATCH_SIZE) -> dict[str, int]:
+async def run_daily_cup_turn_reminders_async(
+    *, batch_size: int = DAILY_CUP_PUSH_BATCH_SIZE
+) -> dict[str, int]:
     now_utc_value = now_utc()
     remind_before_utc = now_utc_value - timedelta(minutes=DAILY_CUP_TURN_REMINDER_INTERVAL_MINUTES)
     resolved_batch_size = max(1, int(batch_size))
