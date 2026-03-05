@@ -11,6 +11,7 @@ from app.db.models.outbox_events import OutboxEvent
 from app.db.models.promo_attempts import PromoAttempt
 from app.db.models.purchases import Purchase
 from app.db.models.quiz_sessions import QuizSession
+from app.db.models.referrals import Referral
 from app.db.models.users import User
 
 
@@ -23,6 +24,19 @@ async def count_quiz_users(session: AsyncSession, *, from_utc: datetime, to_utc:
     stmt = select(func.count(distinct(QuizSession.user_id))).where(
         QuizSession.started_at >= from_utc,
         QuizSession.started_at < to_utc,
+    )
+    return int((await session.execute(stmt)).scalar_one() or 0)
+
+
+async def count_referral_referrers(
+    session: AsyncSession,
+    *,
+    from_utc: datetime,
+    to_utc: datetime,
+) -> int:
+    stmt = select(func.count(distinct(Referral.referrer_user_id))).where(
+        Referral.created_at >= from_utc,
+        Referral.created_at < to_utc,
     )
     return int((await session.execute(stmt)).scalar_one() or 0)
 

@@ -23,28 +23,28 @@ export default function UsersPage() {
   return (
     <main className="space-y-6 py-2">
       <header className="surface rounded-2xl p-5">
-        <h1 className="text-3xl">Users</h1>
-        <p className="mt-2 text-sm text-ember/70">Пошук, статуси, streak і базові операції.</p>
+        <h1 className="text-3xl">Nutzer</h1>
+        <p className="mt-2 text-sm text-ember/70">Suche, Status, Streak und Basis-Aktionen.</p>
       </header>
 
       <section className="surface rounded-2xl p-4">
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Пошук user_id, telegram_id, username..."
+          placeholder="Suche nach user_id, telegram_id, username..."
           className="w-full rounded-xl border border-ember/20 bg-white px-3 py-2"
         />
       </section>
 
       <section className="surface overflow-x-auto rounded-2xl p-4">
-        {isLoading || !data ? <p className="text-sm">Завантаження...</p> : null}
+        {isLoading || !data ? <p className="text-sm">Daten werden geladen...</p> : null}
         {data ? (
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-ember/20 text-left">
                 <th className="py-2">ID</th>
                 <th className="py-2">Username</th>
-                <th className="py-2">Language</th>
+                <th className="py-2">Sprache</th>
                 <th className="py-2">Streak</th>
                 <th className="py-2">Status</th>
               </tr>

@@ -30,6 +30,7 @@ class OverviewResponse(BaseModel):
     users_series: list[dict[str, object]]
     funnel: list[dict[str, object]]
     top_products: list[dict[str, object]]
+    feature_usage: dict[str, KpiCard] = Field(default_factory=dict)
     alerts: list[dict[str, object]]
 
 
