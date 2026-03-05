@@ -47,13 +47,13 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   return (
     <main
       lang="de"
-      className="min-h-screen bg-[#0f0f13] text-slate-100"
+      className="min-h-screen bg-[linear-gradient(135deg,#d7ebf5_0%,#e4f1e0_50%,#f8ecd8_100%)] text-slate-900"
     >
-      <div className="sticky top-0 z-20 border-b border-white/10 bg-[#0f0f13]/95 px-4 py-3 backdrop-blur sm:px-6">
+      <div className="sticky top-0 z-20 border-b border-white/60 bg-white/82 px-4 py-3 backdrop-blur sm:px-6">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-start">
           <a
             href="/"
-            className="inline-flex items-center rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20"
+            className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50"
           >
             ← Zur Startseite
           </a>
