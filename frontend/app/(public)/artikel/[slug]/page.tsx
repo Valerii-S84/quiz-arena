@@ -14,6 +14,47 @@ const ARTICLE_EMBEDS: Record<string, { title: string; fileName: string }> = {
   },
 };
 
+function applyEmbeddedTheme(html: string): string {
+  const embedThemeOverride = `
+<style id="embedded-article-theme-override">
+  :root {
+    --bg: #f5f9fc;
+    --surface: #ffffff;
+    --border: #d6e3eb;
+    --text: #203043;
+    --muted: #5c6f82;
+    --accent: #e8734a;
+    --a0-bg: rgba(155,155,155,0.14);
+    --a1-bg: rgba(110,198,224,0.14);
+    --a2-bg: rgba(77,184,168,0.14);
+    --b1-bg: rgba(126,200,110,0.14);
+    --b2-bg: rgba(200,184,78,0.14);
+    --c1-bg: rgba(224,120,72,0.14);
+    --c2-bg: rgba(208,72,112,0.14);
+  }
+  body {
+    background: linear-gradient(135deg, #d7ebf5 0%, #e4f1e0 50%, #f8ecd8 100%) !important;
+    color: var(--text) !important;
+  }
+  .card-block,
+  .tip-card,
+  .ag-cell,
+  .cefr-group,
+  .notice,
+  .time-badge,
+  .exams-table th {
+    background: rgba(255, 255, 255, 0.9) !important;
+  }
+  .exams-table tr:hover td {
+    background: rgba(15, 23, 42, 0.03) !important;
+  }
+</style>`;
+  if (html.includes("</head>")) {
+    return html.replace("</head>", `${embedThemeOverride}</head>`);
+  }
+  return `${embedThemeOverride}${html}`;
+}
+
 export default async function ArticlePage({ params }: ArticlePageProps) {
   const article = ARTICLE_EMBEDS[params.slug];
 
@@ -33,6 +74,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   let articleHtml = "";
   try {
     articleHtml = await readFile(path.join(process.cwd(), "public", "artikel", article.fileName), "utf-8");
+    articleHtml = applyEmbeddedTheme(articleHtml);
   } catch {
     return (
       <main className="min-h-screen bg-[linear-gradient(135deg,#e8f4f8_0%,#f0f7ee_50%,#fef9f0_100%)] px-4 py-16 text-slate-800 sm:px-6">
