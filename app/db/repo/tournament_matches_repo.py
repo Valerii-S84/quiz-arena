@@ -93,6 +93,28 @@ class TournamentMatchesRepo:
         return list(result.scalars().all())
 
     @staticmethod
+    async def get_by_tournament_round_slots_for_update(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+        round_number: int,
+        bracket_slot_a: int,
+        bracket_slot_b: int,
+    ) -> TournamentMatch | None:
+        stmt = (
+            select(TournamentMatch)
+            .where(
+                TournamentMatch.tournament_id == tournament_id,
+                TournamentMatch.round_number == round_number,
+                TournamentMatch.bracket_slot_a == bracket_slot_a,
+                TournamentMatch.bracket_slot_b == bracket_slot_b,
+            )
+            .with_for_update()
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def count_pending_for_tournament_round(
         session: AsyncSession,
         *,
@@ -124,6 +146,24 @@ class TournamentMatchesRepo:
             .order_by(TournamentMatch.deadline.asc())
             .limit(resolved_limit)
             .with_for_update(skip_locked=True)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def list_pending_for_tournament_for_update(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+    ) -> list[TournamentMatch]:
+        stmt = (
+            select(TournamentMatch)
+            .where(
+                TournamentMatch.tournament_id == tournament_id,
+                TournamentMatch.status == "PENDING",
+            )
+            .order_by(TournamentMatch.round_no.asc(), TournamentMatch.id.asc())
+            .with_for_update()
         )
         result = await session.execute(stmt)
         return list(result.scalars().all())

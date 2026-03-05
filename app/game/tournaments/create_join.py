@@ -9,12 +9,12 @@ from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.tournaments.constants import (
+    DAILY_CUP_TOURNAMENT_TYPES,
     TOURNAMENT_DEFAULT_MAX_PARTICIPANTS,
     TOURNAMENT_FORMAT_QUICK_5,
     TOURNAMENT_FORMAT_QUICK_12,
     TOURNAMENT_MIN_PARTICIPANTS,
     TOURNAMENT_STATUS_REGISTRATION,
-    TOURNAMENT_TYPE_DAILY_ARENA,
     TOURNAMENT_TYPE_PRIVATE,
 )
 from app.game.tournaments.errors import (
@@ -131,7 +131,7 @@ async def join_daily_cup_by_id(
     tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
     if tournament is None:
         raise TournamentNotFoundError
-    if tournament.type != TOURNAMENT_TYPE_DAILY_ARENA:
+    if tournament.type not in DAILY_CUP_TOURNAMENT_TYPES:
         raise TournamentAccessError
     if tournament.status != TOURNAMENT_STATUS_REGISTRATION:
         raise TournamentClosedError

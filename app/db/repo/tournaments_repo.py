@@ -109,7 +109,7 @@ class TournamentsRepo:
         stmt = (
             select(Tournament)
             .where(
-                Tournament.status.in_(("ROUND_1", "ROUND_2", "ROUND_3")),
+                Tournament.status.in_(("ROUND_1", "ROUND_2", "ROUND_3", "BRACKET_LIVE")),
                 Tournament.round_deadline.is_not(None),
                 Tournament.round_deadline <= now_utc,
             )

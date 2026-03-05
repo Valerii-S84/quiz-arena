@@ -9,6 +9,12 @@ from app.workers.tasks.daily_cup_config import (
     DAILY_CUP_CLOSE_MINUTE,
     DAILY_CUP_OPEN_HOUR,
     DAILY_CUP_OPEN_MINUTE,
+    DAILY_ELIMINATION_CLOSE_HOUR,
+    DAILY_ELIMINATION_CLOSE_MINUTE,
+    DAILY_ELIMINATION_DEADLINE_HOUR,
+    DAILY_ELIMINATION_DEADLINE_MINUTE,
+    DAILY_ELIMINATION_OPEN_HOUR,
+    DAILY_ELIMINATION_OPEN_MINUTE,
     DAILY_CUP_TIMEZONE,
 )
 
@@ -49,3 +55,44 @@ def get_daily_cup_window(*, now_utc: datetime) -> DailyCupWindow:
 
 def format_close_time_local(*, close_at_utc: datetime) -> str:
     return close_at_utc.astimezone(ZoneInfo(DAILY_CUP_TIMEZONE)).strftime("%H:%M")
+
+
+def get_daily_elimination_window(*, now_utc: datetime) -> DailyCupWindow:
+    tz = ZoneInfo(DAILY_CUP_TIMEZONE)
+    local_now = now_utc.astimezone(tz)
+    local_date = local_now.date()
+    open_local = datetime(
+        local_date.year,
+        local_date.month,
+        local_date.day,
+        DAILY_ELIMINATION_OPEN_HOUR,
+        DAILY_ELIMINATION_OPEN_MINUTE,
+        tzinfo=tz,
+    )
+    close_local = datetime(
+        local_date.year,
+        local_date.month,
+        local_date.day,
+        DAILY_ELIMINATION_CLOSE_HOUR,
+        DAILY_ELIMINATION_CLOSE_MINUTE,
+        tzinfo=tz,
+    )
+    return DailyCupWindow(
+        berlin_date=local_date,
+        open_at_utc=open_local.astimezone(timezone.utc),
+        close_at_utc=close_local.astimezone(timezone.utc),
+    )
+
+
+def get_daily_elimination_deadline_utc(*, now_utc: datetime) -> datetime:
+    tz = ZoneInfo(DAILY_CUP_TIMEZONE)
+    local_now = now_utc.astimezone(tz)
+    local_deadline = datetime(
+        local_now.year,
+        local_now.month,
+        local_now.day,
+        DAILY_ELIMINATION_DEADLINE_HOUR,
+        DAILY_ELIMINATION_DEADLINE_MINUTE,
+        tzinfo=tz,
+    )
+    return local_deadline.astimezone(timezone.utc)

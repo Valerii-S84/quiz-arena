@@ -18,10 +18,16 @@ from app.game.tournaments.constants import (
     TOURNAMENT_STATUS_COMPLETED,
     TOURNAMENT_STATUS_REGISTRATION,
     TOURNAMENT_TYPE_DAILY_ARENA,
+    TOURNAMENT_TYPE_DAILY_ELIMINATION,
+)
+from app.workers.tasks.daily_cup_config import (
+    DAILY_CUP_TOURNAMENT_TYPE,
+    DAILY_ELIMINATION_CLOSE_HOUR,
+    DAILY_ELIMINATION_CLOSE_MINUTE,
 )
 
 settings = get_settings()
-_ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3"})
+_ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3", "BRACKET_LIVE"})
 
 
 class DailyCupUserStatus(str, Enum):
@@ -75,6 +81,12 @@ def _invite_open_at_utc(*, now_utc: datetime) -> datetime:
 
 
 def _close_at_utc(*, now_utc: datetime) -> datetime:
+    if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ELIMINATION:
+        return _local_daily_cup_anchor(
+            now_utc=now_utc,
+            hour=DAILY_ELIMINATION_CLOSE_HOUR,
+            minute=DAILY_ELIMINATION_CLOSE_MINUTE,
+        ).astimezone(timezone.utc)
     close_time_value = os.getenv("DAILY_CUP_CLOSE_TIME", settings.daily_cup_registration_close)
     close_hour, close_minute = _parse_hhmm(close_time_value, default_hour=18, default_minute=0)
     return _local_daily_cup_anchor(
@@ -92,6 +104,15 @@ def _has_pending_round_match_for_user(*, user_id: int, matches: list) -> bool:
     return False
 
 
+def _daily_cup_type_priority() -> tuple[str, str]:
+    fallback = (
+        TOURNAMENT_TYPE_DAILY_ELIMINATION
+        if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ARENA
+        else TOURNAMENT_TYPE_DAILY_ARENA
+    )
+    return DAILY_CUP_TOURNAMENT_TYPE, fallback
+
+
 async def get_daily_cup_status_for_user(
     session: AsyncSession,
     *,
@@ -101,11 +122,16 @@ async def get_daily_cup_status_for_user(
     if now_utc < _invite_open_at_utc(now_utc=now_utc):
         return DailyCupUserStatusSnapshot(status=DailyCupUserStatus.NO_TOURNAMENT, tournament=None)
 
-    tournament = await TournamentsRepo.get_by_type_and_registration_deadline(
-        session,
-        tournament_type=TOURNAMENT_TYPE_DAILY_ARENA,
-        registration_deadline=_close_at_utc(now_utc=now_utc),
-    )
+    tournament = None
+    close_at_utc = _close_at_utc(now_utc=now_utc)
+    for tournament_type in _daily_cup_type_priority():
+        tournament = await TournamentsRepo.get_by_type_and_registration_deadline(
+            session,
+            tournament_type=tournament_type,
+            registration_deadline=close_at_utc,
+        )
+        if tournament is not None:
+            break
     if tournament is None:
         return DailyCupUserStatusSnapshot(status=DailyCupUserStatus.NO_TOURNAMENT, tournament=None)
 

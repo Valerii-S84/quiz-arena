@@ -3,7 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from app.game.tournaments.pairing import build_swiss_pairs
+from app.game.tournaments.pairing import (
+    build_swiss_pairs,
+    create_elimination_bracket,
+    get_next_opponent,
+    get_winner_bracket_slot,
+)
 from app.game.tournaments.types import SwissParticipant
 
 UTC = timezone.utc
@@ -123,3 +128,47 @@ def test_build_swiss_pairs_does_not_repeat_bye_when_alternative_exists() -> None
     )
     bye_pair = next(pair for pair in round_pairs if pair.user_b is None)
     assert bye_pair.user_a != 11
+
+
+def test_create_elimination_bracket_with_eight_players_has_no_byes(monkeypatch) -> None:
+    monkeypatch.setattr("app.game.tournaments.pairing.random.shuffle", lambda values: None)
+    bracket = create_elimination_bracket(list(range(1, 9)), tournament_id=77)
+    slots = bracket["slots"]
+    assert int(bracket["size"]) == 8
+    assert int(bracket["rounds_total"]) == 3
+    assert int(bracket["bye_count"]) == 0
+    assert len(slots) == 8
+    assert all(slot["player_id"] is not None for slot in slots)
+    assert get_winner_bracket_slot(6, bracket) == 3
+    assert get_next_opponent(6, bracket) == 8
+
+
+def test_create_elimination_bracket_with_byes_distributes_evenly(monkeypatch) -> None:
+    monkeypatch.setattr("app.game.tournaments.pairing.random.shuffle", lambda values: None)
+    bracket = create_elimination_bracket(list(range(1, 11)), tournament_id=88)
+    slots = bracket["slots"]
+    assert int(bracket["size"]) == 16
+    assert int(bracket["bye_count"]) == 6
+    bye_total = sum(1 for slot in slots if bool(slot["is_bye"]))
+    assert bye_total == 6
+    for slot_index in range(0, len(slots), 2):
+        assert not (
+            bool(slots[slot_index]["is_bye"]) and bool(slots[slot_index + 1]["is_bye"])
+        ), f"double bye in pair {slot_index // 2}"
+
+
+def test_create_elimination_bracket_for_431_participants(monkeypatch) -> None:
+    monkeypatch.setattr("app.game.tournaments.pairing.random.shuffle", lambda values: None)
+    participants = list(range(1, 432))
+    bracket = create_elimination_bracket(participants, tournament_id=431)
+    slots = bracket["slots"]
+    assert int(bracket["size"]) == 512
+    assert int(bracket["rounds_total"]) == 9
+    assert int(bracket["bye_count"]) == 81
+    players_in_slots = [int(slot["player_id"]) for slot in slots if slot["player_id"] is not None]
+    assert len(players_in_slots) == 431
+    assert sorted(players_in_slots) == participants
+    for slot_index in range(0, len(slots), 2):
+        assert not (
+            bool(slots[slot_index]["is_bye"]) and bool(slots[slot_index + 1]["is_bye"])
+        ), f"double bye in pair {slot_index // 2}"

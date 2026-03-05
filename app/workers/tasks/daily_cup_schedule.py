@@ -14,6 +14,8 @@ from app.workers.tasks.daily_cup_config import (
     DAILY_CUP_PRESTART_REMINDER_HOUR,
     DAILY_CUP_PRESTART_REMINDER_MINUTE,
     DAILY_CUP_ROUND_ADVANCE_SLOTS,
+    DAILY_ELIMINATION_DEADLINE_HOUR,
+    DAILY_ELIMINATION_DEADLINE_MINUTE,
 )
 
 
@@ -49,6 +51,14 @@ def configure_daily_cup_schedule(celery_app) -> None:
         "daily-cup-close-registration": {
             "task": "app.workers.tasks.daily_cup.close_registration_and_start",
             "schedule": crontab(hour=DAILY_CUP_CLOSE_HOUR, minute=DAILY_CUP_CLOSE_MINUTE),
+            "options": {"queue": "q_normal"},
+        },
+        "daily-elimination-final-deadline": {
+            "task": "app.workers.tasks.daily_cup.final_deadline",
+            "schedule": crontab(
+                hour=DAILY_ELIMINATION_DEADLINE_HOUR,
+                minute=DAILY_ELIMINATION_DEADLINE_MINUTE,
+            ),
             "options": {"queue": "q_normal"},
         },
     }
