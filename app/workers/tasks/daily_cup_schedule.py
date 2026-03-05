@@ -50,7 +50,7 @@ def configure_daily_cup_schedule(celery_app) -> None:
         },
         "daily-cup-turn-reminders": {
             "task": "app.workers.tasks.daily_cup.send_turn_reminders",
-            "schedule": crontab(minute="*"),
+            "schedule": crontab(minute="*/10"),
             "options": {"queue": "q_normal"},
         },
         "daily-cup-close-registration": {
