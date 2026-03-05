@@ -9,10 +9,24 @@ from app.api.routes.admin.audit import write_admin_audit
 from app.api.routes.admin.deps import AdminPrincipal, add_admin_noindex_header, get_current_admin
 from app.db.models.quiz_attempts import QuizAttempt
 from app.db.models.quiz_questions import QuizQuestion
+from app.db.models.quiz_sessions import QuizSession
 from app.db.models.user_events import UserEvent
 from app.db.session import SessionLocal
 
 router = APIRouter(prefix="/admin/content", tags=["admin-content"])
+LEVEL_SORT_ORDER: dict[str, int] = {
+    "A1": 1,
+    "A2": 2,
+    "B1": 3,
+    "B2": 4,
+    "C1": 5,
+    "C2": 6,
+}
+
+
+def _level_sort_key(level: str) -> tuple[int, str]:
+    normalized = level.upper()
+    return (LEVEL_SORT_ORDER.get(normalized, 99), normalized)
 
 
 @router.get("")
@@ -76,6 +90,16 @@ async def get_content_health(
             )
         ).all()
 
+        mode_level_rows = (
+            await session.execute(
+                select(QuizSession.mode_code, QuizQuestion.level, func.count(QuizAttempt.id))
+                .select_from(QuizAttempt)
+                .join(QuizSession, QuizSession.id == QuizAttempt.session_id)
+                .join(QuizQuestion, QuizQuestion.question_id == QuizAttempt.question_id)
+                .group_by(QuizSession.mode_code, QuizQuestion.level)
+            )
+        ).all()
+
     level_stats = []
     for level, total in totals:
         total_count = int(total)
@@ -113,6 +137,38 @@ async def get_content_health(
             "payload": grammar_event.payload,
         }
 
+    mode_totals: dict[str, int] = {}
+    total_mode_attempts = 0
+    for mode_code, _, attempts_total in mode_level_rows:
+        attempts_count = int(attempts_total)
+        mode_key = str(mode_code)
+        mode_totals[mode_key] = mode_totals.get(mode_key, 0) + attempts_count
+        total_mode_attempts += attempts_count
+
+    mode_level_distribution = []
+    sorted_mode_level_rows = sorted(
+        mode_level_rows,
+        key=lambda row: (str(row[0]), _level_sort_key(str(row[1]))),
+    )
+    for mode_code, level, attempts_total in sorted_mode_level_rows:
+        mode_key = str(mode_code)
+        level_key = str(level)
+        attempts_count = int(attempts_total)
+        mode_total = mode_totals.get(mode_key, 0)
+        percent_in_mode = round((attempts_count / mode_total) * 100, 2) if mode_total > 0 else 0
+        percent_of_all_attempts = (
+            round((attempts_count / total_mode_attempts) * 100, 2) if total_mode_attempts > 0 else 0
+        )
+        mode_level_distribution.append(
+            {
+                "mode_code": mode_key,
+                "level": level_key,
+                "attempts": attempts_count,
+                "percent_in_mode": percent_in_mode,
+                "percent_of_all_attempts": percent_of_all_attempts,
+            }
+        )
+
     return {
         "level_stats": level_stats,
         "flagged_questions": flagged_items,
@@ -120,6 +176,7 @@ async def get_content_health(
         "duplicates": [
             {"question_text": text, "count": int(count)} for text, count in duplicate_rows
         ],
+        "mode_level_distribution": mode_level_distribution,
     }
 
 

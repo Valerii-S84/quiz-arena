@@ -26,9 +26,9 @@ export async function fetchUsers() {
   return data;
 }
 
-export async function fetchPromo() {
+export async function fetchPromo(status?: string) {
   const { data } = await api.get("/admin/promo", {
-    params: { page: 1, limit: 50 },
+    params: { page: 1, limit: 100, status },
   });
   return data;
 }
