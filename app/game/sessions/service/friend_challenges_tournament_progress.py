@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import os
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,8 +18,14 @@ from app.game.friend_challenges.constants import (
     DUEL_STATUS_WALKOVER,
 )
 from app.game.tournaments.constants import (
+    TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_TYPE_DAILY_ARENA,
     TOURNAMENT_TYPE_DAILY_ELIMINATION,
+)
+
+_DAILY_CUP_TURN_RESPONSE_GRACE_MINUTES = max(
+    1,
+    int(os.getenv("DAILY_CUP_TURN_RESPONSE_GRACE_MINUTES", "15")),
 )
 
 
@@ -164,6 +171,14 @@ async def handle_tournament_duel_progress(
         return
     if tournament.type != TOURNAMENT_TYPE_DAILY_ARENA:
         return
+    if challenge.status in {DUEL_STATUS_CREATOR_DONE, DUEL_STATUS_OPPONENT_DONE}:
+        if tournament_match.status == TOURNAMENT_MATCH_STATUS_PENDING:
+            response_deadline = now_utc + timedelta(minutes=_DAILY_CUP_TURN_RESPONSE_GRACE_MINUTES)
+            tightened_deadline = min(tournament_match.deadline, response_deadline)
+            if tightened_deadline < tournament_match.deadline:
+                tournament_match.deadline = tightened_deadline
+            if tournament.round_deadline is None or tightened_deadline < tournament.round_deadline:
+                tournament.round_deadline = tightened_deadline
     if challenge.status not in {DUEL_STATUS_COMPLETED, DUEL_STATUS_WALKOVER}:
         return
 
