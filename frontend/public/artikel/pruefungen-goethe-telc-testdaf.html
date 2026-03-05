@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deutsche Sprachprüfungen A1–C2 | Aufbau, Ablauf, Vorbereitung</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Source+Sans+3:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f13;
+    --surface: #17171e;
+    --border: #2a2a38;
+    --text: #e8e6f0;
+    --muted: #8a8aa0;
+    --accent: #5eb8a0;
+    --accent2: #e0a04a;
+
+    --goethe: #5eb8a0;
+    --telc:   #6898d8;
+    --oesd:   #c87050;
+    --dtz:    #a870c8;
+    --testdaf:#58a8c0;
+    --dsh:    #d8784a;
+
+    --a1c:  #6ec6e0;
+    --a2c:  #4db8a8;
+    --b1c:  #7ec86e;
+    --b2c:  #c8b84e;
+    --c1c:  #e07848;
+    --c2c:  #d04870;
+
+    --skill-listen:  #6898d8;
+    --skill-read:    #58b890;
+    --skill-write:   #c8a050;
+    --skill-speak:   #d06878;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Sans 3', sans-serif;
+    font-weight: 300;
+    line-height: 1.78;
+    min-height: 100vh;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    padding: 88px 24px 64px;
+    text-align: center;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 75% 55% at 50% 0%, rgba(94,184,160,0.13) 0%, transparent 68%),
+      radial-gradient(ellipse 45% 38% at 85% 75%, rgba(104,152,216,0.09) 0%, transparent 58%),
+      radial-gradient(ellipse 40% 30% at 12% 85%, rgba(208,72,120,0.07) 0%, transparent 55%);
+    pointer-events: none;
+  }
+  .hero-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 18px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.1s forwards;
+  }
+  .hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.3rem, 5.5vw, 4.6rem);
+    font-weight: 900;
+    line-height: 1.08;
+    margin-bottom: 22px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.25s forwards;
+  }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero-sub {
+    max-width: 660px;
+    margin: 0 auto 44px;
+    color: var(--muted);
+    font-size: 1.06rem;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.4s forwards;
+  }
+
+  /* ── PROVIDER PILLS ── */
+  .provider-strip {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-bottom: 10px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.55s forwards;
+  }
+  .prov-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 13px;
+    border-radius: 20px;
+    border: 1.5px solid currentColor;
+  }
+  .pill-goethe  { color: var(--goethe); }
+  .pill-telc    { color: var(--telc); }
+  .pill-oesd    { color: var(--oesd); }
+  .pill-dtz     { color: var(--dtz); }
+  .pill-testdaf { color: var(--testdaf); }
+  .pill-dsh     { color: var(--dsh); }
+
+  .hero-sub2 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    color: var(--muted);
+    text-align: center;
+    margin-bottom: 0;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.65s forwards;
+  }
+
+  /* ── 4-SKILL BAR ── */
+  .skill-overview {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 36px 24px 0;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.75s forwards;
+  }
+  .skill-bar-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 52px;
+  }
+  @media (max-width: 580px) { .skill-bar-row { grid-template-columns: 1fr 1fr; } }
+  .skill-cell {
+    background: var(--surface);
+    padding: 22px 16px;
+    text-align: center;
+  }
+  .skill-icon { font-size: 28px; margin-bottom: 8px; }
+  .skill-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+  .skill-name.s-listen { color: var(--skill-listen); }
+  .skill-name.s-read   { color: var(--skill-read); }
+  .skill-name.s-write  { color: var(--skill-write); }
+  .skill-name.s-speak  { color: var(--skill-speak); }
+  .skill-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+
+  /* ── MAIN CONTAINER ── */
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 24px 88px;
+  }
+
+  /* ── SECTION HEADER ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 60px 0 30px;
+  }
+  .section-header::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .section-header h2 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* ── PROVIDER CARD ── */
+  .prov-card {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    opacity: 0;
+    animation: fadeUp 0.5s ease forwards;
+    transition: border-color 0.25s;
+  }
+  .prov-card:nth-child(1) { animation-delay: 0.05s; }
+  .prov-card:nth-child(2) { animation-delay: 0.12s; }
+  .prov-card:nth-child(3) { animation-delay: 0.19s; }
+  .prov-card:nth-child(4) { animation-delay: 0.26s; }
+  .prov-card:nth-child(5) { animation-delay: 0.33s; }
+  .prov-card:nth-child(6) { animation-delay: 0.40s; }
+
+  .prov-header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 20px;
+    padding: 24px 28px 20px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .prov-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    font-weight: 900;
+    width: 64px;
+    text-align: center;
+    line-height: 1;
+  }
+  .prov-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.28rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 4px;
+  }
+  .prov-subtitle { font-size: 0.86rem; color: var(--muted); }
+  .prov-toggle {
+    font-size: 22px;
+    color: var(--muted);
+    transition: transform 0.3s;
+    line-height: 1;
+  }
+  .prov-card.open .prov-toggle { transform: rotate(180deg); }
+
+  .prov-body {
+    padding: 0 28px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease, padding 0.3s ease;
+  }
+  .prov-card.open .prov-body {
+    max-height: 4000px;
+    padding-bottom: 28px;
+  }
+
+  /* ── DESCRIPTION ── */
+  .prov-description {
+    font-size: 0.96rem;
+    color: var(--muted);
+    margin-bottom: 22px;
+    line-height: 1.82;
+    padding: 15px 18px;
+    background: rgba(255,255,255,0.025);
+    border-radius: 10px;
+    border-left: 3px solid currentColor;
+  }
+
+  /* ── GRID ── */
+  .prov-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+  @media (max-width: 640px) {
+    .prov-grid { grid-template-columns: 1fr; }
+    .prov-header { gap: 12px; padding: 20px 20px 18px; }
+    .prov-body { padding: 0 20px; }
+    .prov-card.open .prov-body { padding-bottom: 20px; }
+  }
+
+  .p-block {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .p-block h4 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .p-block ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .p-block ul li {
+    font-size: 0.9rem;
+    padding-left: 18px;
+    position: relative;
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .p-block ul li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    font-size: 0.75rem;
+    top: 2px;
+  }
+  .p-block-full { grid-column: 1 / -1; }
+
+  /* ── LEVEL TABLE ── */
+  .level-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+  }
+  .level-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+  }
+  .level-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  .level-table tr:last-child td { border-bottom: none; }
+  .level-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ── EXAM STRUCTURE BOX ── */
+  .exam-structure {
+    background: var(--surface);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .exam-structure-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 12px 18px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .exam-parts {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+  }
+  @media (max-width: 560px) { .exam-parts { grid-template-columns: 1fr 1fr; } }
+  .exam-part {
+    background: var(--surface);
+    padding: 14px 12px;
+    text-align: center;
+  }
+  .ep-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+  .ep-time {
+    font-size: 1.15rem;
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+  .ep-detail { font-size: 0.76rem; color: var(--muted); line-height: 1.45; }
+
+  /* ── TAGS ── */
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  /* ── NOTICE / FACT ── */
+  .notice {
+    background: rgba(94,184,160,0.07);
+    border: 1px solid rgba(94,184,160,0.2);
+    border-radius: 10px;
+    padding: 15px 20px;
+    font-size: 0.88rem;
+    color: var(--muted);
+    margin-bottom: 18px;
+    line-height: 1.72;
+  }
+  .notice strong { color: var(--accent); }
+
+  .warn-box {
+    background: rgba(224,160,74,0.07);
+    border: 1px solid rgba(224,160,74,0.2);
+    border-radius: 10px;
+    padding: 15px 20px;
+    font-size: 0.88rem;
+    color: var(--muted);
+    margin-bottom: 18px;
+    line-height: 1.72;
+  }
+  .warn-box strong { color: var(--accent2); }
+
+  /* ── PROVIDER COLORS ── */
+  .lv-goethe  { color: var(--goethe); border-color: rgba(94,184,160,0.22); }
+  .lv-telc    { color: var(--telc);   border-color: rgba(104,152,216,0.22); }
+  .lv-oesd    { color: var(--oesd);   border-color: rgba(200,112,80,0.22); }
+  .lv-dtz     { color: var(--dtz);    border-color: rgba(168,112,200,0.22); }
+  .lv-testdaf { color: var(--testdaf);border-color: rgba(88,168,192,0.22); }
+  .lv-dsh     { color: var(--dsh);    border-color: rgba(216,120,74,0.22); }
+
+  .prov-card.lv-goethe:hover  { border-color: var(--goethe); }
+  .prov-card.lv-telc:hover    { border-color: var(--telc); }
+  .prov-card.lv-oesd:hover    { border-color: var(--oesd); }
+  .prov-card.lv-dtz:hover     { border-color: var(--dtz); }
+  .prov-card.lv-testdaf:hover { border-color: var(--testdaf); }
+  .prov-card.lv-dsh:hover     { border-color: var(--dsh); }
+
+  .prov-description.lv-goethe  { border-color: var(--goethe); }
+  .prov-description.lv-telc    { border-color: var(--telc); }
+  .prov-description.lv-oesd    { border-color: var(--oesd); }
+  .prov-description.lv-dtz     { border-color: var(--dtz); }
+  .prov-description.lv-testdaf { border-color: var(--testdaf); }
+  .prov-description.lv-dsh     { border-color: var(--dsh); }
+
+  /* ── EXAM DAY TIMELINE ── */
+  .day-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 18px;
+  }
+  .dt-step {
+    display: grid;
+    grid-template-columns: 52px 1fr;
+    gap: 16px;
+    align-items: stretch;
+  }
+  .dt-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .dt-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    background: var(--bg);
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+  .dt-line {
+    width: 2px;
+    flex: 1;
+    background: var(--border);
+    margin: 4px 0;
+    min-height: 20px;
+  }
+  .dt-step:last-child .dt-line { display: none; }
+  .dt-content {
+    padding-bottom: 18px;
+  }
+  .dt-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    margin-bottom: 3px;
+    text-transform: uppercase;
+  }
+  .dt-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+  }
+  .dt-desc { font-size: 0.86rem; color: var(--muted); line-height: 1.6; }
+
+  /* ── SKILL TRAINING CARDS ── */
+  .training-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 600px) { .training-grid { grid-template-columns: 1fr; } }
+  .tr-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    border-top: 3px solid currentColor;
+  }
+  .tr-card.s-listen { color: var(--skill-listen); }
+  .tr-card.s-read   { color: var(--skill-read); }
+  .tr-card.s-write  { color: var(--skill-write); }
+  .tr-card.s-speak  { color: var(--skill-speak); }
+  .tr-icon { font-size: 22px; margin-bottom: 8px; }
+  .tr-title {
+    font-family: 'Source Sans 3', sans-serif;
+    font-weight: 600;
+    font-size: 0.97rem;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .tr-body { font-size: 0.86rem; color: var(--muted); line-height: 1.65; }
+  .tr-body ul { list-style: none; padding: 0; }
+  .tr-body ul li {
+    padding-left: 16px;
+    position: relative;
+    margin-bottom: 5px;
+  }
+  .tr-body ul li::before {
+    content: '·';
+    position: absolute;
+    left: 4px;
+  }
+
+  /* ── CHECKLIST ── */
+  .checklist-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 580px) { .checklist-grid { grid-template-columns: 1fr; } }
+  .cl-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: var(--text);
+  }
+  .cl-check {
+    width: 22px;
+    height: 22px;
+    border: 1.5px solid var(--border);
+    border-radius: 5px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* ── COMPARISON TABLE (BIG) ── */
+  .big-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin-bottom: 28px;
+  }
+  .big-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    white-space: nowrap;
+  }
+  .big-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  .big-table tr:last-child td { border-bottom: none; }
+  .big-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ── REDEMITTEL BOX ── */
+  .redemittel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 580px) { .redemittel-grid { grid-template-columns: 1fr; } }
+  .rd-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .rd-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+  .rd-phrase {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 0.9rem;
+    color: var(--text);
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    line-height: 1.55;
+  }
+  .rd-phrase:last-child { border-bottom: none; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 34px 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.83rem;
+    line-height: 1.8;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── SCORE BAR ── */
+  .score-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+    font-size: 0.86rem;
+  }
+  .score-label {
+    width: 90px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .score-track {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .score-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--accent);
+  }
+  .score-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════ HERO ════════════════════ -->
+<header class="hero">
+  <p class="hero-eyebrow">Deutschprüfungen · Goethe · telc · ÖSD · TestDaF · DSH · DTZ</p>
+  <h1>Deutsche<br><em>Sprachprüfungen</em><br>A1 – C2</h1>
+  <p class="hero-sub">Aufbau, Ablauf, Zeitangaben und gezielte Vorbereitung für alle wichtigen Deutschzertifikate — vollständig und faktisch geprüft.</p>
+
+  <div class="provider-strip">
+    <span class="prov-pill pill-goethe">Goethe-Institut</span>
+    <span class="prov-pill pill-telc">telc</span>
+    <span class="prov-pill pill-oesd">ÖSD</span>
+    <span class="prov-pill pill-dtz">DTZ</span>
+    <span class="prov-pill pill-testdaf">TestDaF</span>
+    <span class="prov-pill pill-dsh">DSH</span>
+  </div>
+  <p class="hero-sub2" style="margin-top:10px;">Niveau A1 · A2 · B1 · B2 · C1 · C2 nach GER/CEFR</p>
+</header>
+
+<!-- ════════════════════ 4 SKILLS BAR ════════════════════ -->
+<div class="container" style="max-width:880px; padding-bottom:0;">
+  <div class="skill-overview">
+    <div class="skill-bar-row">
+      <div class="skill-cell">
+        <div class="skill-icon">🎧</div>
+        <div class="skill-name s-listen">Hören</div>
+        <div class="skill-desc">Hörverstehen — gesprochene Texte, Dialoge, Nachrichten, Ansagen verstehen</div>
+      </div>
+      <div class="skill-cell">
+        <div class="skill-icon">📖</div>
+        <div class="skill-name s-read">Lesen</div>
+        <div class="skill-desc">Leseverstehen — Texte, Artikel, Formulare, E-Mails verstehen und auswerten</div>
+      </div>
+      <div class="skill-cell">
+        <div class="skill-icon">✍️</div>
+        <div class="skill-name s-write">Schreiben</div>
+        <div class="skill-desc">Schriftlicher Ausdruck — Briefe, E-Mails, Berichte, Stellungnahmen, Essays verfassen</div>
+      </div>
+      <div class="skill-cell">
+        <div class="skill-icon">🗣️</div>
+        <div class="skill-name s-speak">Sprechen</div>
+        <div class="skill-desc">Mündlicher Ausdruck — Monolog, Dialog, Diskussion, Präsentation, Reaktion</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ PRÜFUNGSANBIETER ════════════════════ -->
+<div class="container">
+
+  <div class="section-header"><h2>Prüfungsanbieter im Detail</h2></div>
+
+  <!-- ─── GOETHE ─── -->
+  <div class="prov-card lv-goethe" id="prov-goethe">
+    <div class="prov-header" onclick="toggleCard('prov-goethe')">
+      <div class="prov-logo">Goethe</div>
+      <div>
+        <p class="prov-title">Goethe-Institut — Goethe-Zertifikat</p>
+        <p class="prov-subtitle">A1 – C2 · International anerkannt · Modular aufgebaut</p>
+      </div>
+      <div class="prov-toggle">▾</div>
+    </div>
+    <div class="prov-body">
+      <p class="prov-description lv-goethe">
+        Das <strong>Goethe-Zertifikat</strong> ist die weltweit bekannteste und am weitesten verbreitete Deutschprüfung. Sie wird vom Goethe-Institut herausgegeben — einer deutschen Kulturinstitution mit Präsenz in über 90 Ländern. Die Prüfungen decken alle Niveaustufen von A1 bis C2 ab und sind nach dem GER/CEFR-Rahmen strukturiert. Ein zentrales Merkmal ist die <strong>modulare Struktur</strong>: Jedes Niveau besteht aus vier klar getrennten Modulen (Lesen, Hören, Schreiben, Sprechen), die teilweise auch einzeln absolviert werden können. Benotung: Pro Modul sind maximal 100 Punkte erreichbar; Bestehensgrenze liegt bei 60 Punkten (60 %) pro Modul.
+      </p>
+
+      <div class="notice"><strong>Anerkennung:</strong> Goethe-Zertifikate werden weltweit von Behörden, Universitäten und Arbeitgebern anerkannt — u. a. für Visaverfahren, Einbürgerung, Studium und Beruf in Deutschland, Österreich und der Schweiz.</div>
+
+      <!-- Niveau-Übersicht -->
+      <div class="p-block p-block-full" style="margin-bottom:18px;">
+        <h4>Prüfungsaufbau nach Niveau — Goethe-Zertifikat</h4>
+        <table class="level-table">
+          <thead><tr>
+            <th>Niveau</th><th>Hören</th><th>Lesen</th><th>Schreiben</th><th>Sprechen</th><th>Gesamt</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td><strong style="color:var(--a1c)">A1</strong></td>
+              <td>ca. 20 Min.</td><td>ca. 25 Min.</td><td>ca. 20 Min.</td><td>ca. 15 Min.</td>
+              <td>ca. 80 Min.</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--a2c)">A2</strong></td>
+              <td>ca. 25 Min.</td><td>ca. 30 Min.</td><td>ca. 30 Min.</td><td>ca. 15 Min.</td>
+              <td>ca. 100 Min.</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--b1c)">B1</strong></td>
+              <td>ca. 40 Min.</td><td>ca. 45 Min.</td><td>ca. 60 Min.</td><td>ca. 15 Min.</td>
+              <td>ca. 160 Min.</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--b2c)">B2</strong></td>
+              <td>ca. 40 Min.</td><td>ca. 65 Min.</td><td>ca. 75 Min.</td><td>ca. 15 Min.</td>
+              <td>ca. 195 Min.</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--c1c)">C1</strong></td>
+              <td>ca. 40 Min.</td><td>ca. 70 Min.</td><td>ca. 80 Min.</td><td>ca. 15 Min.</td>
+              <td>ca. 205 Min.</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--c2c)">C2</strong></td>
+              <td>ca. 40 Min.</td><td>ca. 70 Min.</td><td>ca. 80 Min.</td><td>ca. 15 Min.</td>
+              <td>ca. 205 Min.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="prov-grid">
+        <div class="p-block">
+          <h4>Aufgabentypen — Lesen &amp; Hören</h4>
+          <ul>
+            <li>Zuordnungsaufgaben (Welche Aussage passt zu welchem Text?)</li>
+            <li>Multiple Choice (eine oder mehrere richtige Antworten)</li>
+            <li>Richtig / Falsch / Nicht im Text</li>
+            <li>Lückentexte (passendes Wort einsetzen)</li>
+            <li>Reihenfolge-Aufgaben (Aussagen in Reihenfolge bringen)</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Aufgabentypen — Schreiben &amp; Sprechen</h4>
+          <ul>
+            <li>Schreiben: formal/informell Brief oder E-Mail (A1–B1)</li>
+            <li>Schreiben: Stellungnahme, Bericht, Erörterung (B2–C2)</li>
+            <li>Sprechen A1/A2: Vorstellen, einfacher Dialog, Bildkarte</li>
+            <li>Sprechen B1+: Meinung äußern, Partner-Diskussion, Präsentation</li>
+            <li>Sprechen meist als Paarprüfung — 2 Kandidaten + 2 Prüfer</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Bewertung &amp; Bestehen</h4>
+          <ul>
+            <li>Jedes Modul: max. 100 Punkte, Bestehensgrenze 60 Punkte</li>
+            <li>Alle vier Module müssen einzeln mit ≥ 60 Punkten bestanden werden</li>
+            <li>Nicht bestandene Module können nachgeholt werden (modulare Zertifizierung)</li>
+            <li>Gesamtergebnis: Summe aller vier Module (max. 400 Punkte)</li>
+            <li>Noten: Sehr gut (≥ 90%), Gut (≥ 80%), Befriedigend (≥ 70%), Ausreichend (≥ 60%)</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Anmeldung &amp; Prüfungsablauf</h4>
+          <ul>
+            <li>Anmeldung beim lokalen Goethe-Institut oder autorisierten Prüfungszentrum</li>
+            <li>Gültiger Lichtbildausweis (Reisepass oder Personalausweis) erforderlich</li>
+            <li>Schriftliche Prüfung und mündliche Prüfung häufig an zwei verschiedenen Tagen</li>
+            <li>Ergebnisse in der Regel 4–6 Wochen nach der Prüfung</li>
+            <li>Zertifikat ist zeitlich unbegrenzt gültig (kein Verfalldatum)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="warn-box"><strong>⚡ Wichtig für A1:</strong> Das Goethe-Zertifikat A1: Start Deutsch 1 wird speziell für den Familiennachzug nach Deutschland benötigt. Es gibt auch eine Variante für Jugendliche (<em>Fit in Deutsch 1</em>).</div>
+    </div>
+  </div>
+
+  <!-- ─── TELC ─── -->
+  <div class="prov-card lv-telc" id="prov-telc">
+    <div class="prov-header" onclick="toggleCard('prov-telc')">
+      <div class="prov-logo">telc</div>
+      <div>
+        <p class="prov-title">telc — The European Language Certificates</p>
+        <p class="prov-subtitle">A1 – C1 · Integrationsrelevant · Viele Prüfungszentren in DE/AT</p>
+      </div>
+      <div class="prov-toggle">▾</div>
+    </div>
+    <div class="prov-body">
+      <p class="prov-description lv-telc">
+        <strong>telc</strong> (The European Language Certificates, Sitz in Frankfurt am Main) bietet standardisierte Sprachprüfungen für viele Sprachen und Niveaustufen an. Im Deutschen-Bereich ist telc besonders relevant für den <strong>Integrations- und Migrationskontext</strong>: Die telc-Prüfungen werden von den deutschen Behörden, dem BAMF und vielen Arbeitgebern anerkannt. Ein Besonderheit ist die breite Palette an berufs- und branchenspezifischen Prüfungen (z. B. <em>telc Deutsch B2 Pflege</em> für Pflegepersonal oder <em>telc Deutsch B2 Beruf</em>). telc-Prüfungen sind in Aufbau und Bewertung etwas anders strukturiert als Goethe-Prüfungen: Es gibt einen schriftlichen Teil (Sprachbausteine + rezeptive + produktive Fertigkeiten) und einen mündlichen Teil.
+      </p>
+
+      <div class="prov-grid">
+        <div class="p-block">
+          <h4>Aufbau telc Deutsch B1 (Beispiel)</h4>
+          <ul>
+            <li><strong>Schriftliche Prüfung (~90 Min.):</strong></li>
+            <li>Leseverstehen: 3 Teile, ca. 30 Min.</li>
+            <li>Sprachbausteine: 2 Teile (Lückentext-Grammatik), ca. 15 Min.</li>
+            <li>Hörverstehen: 3 Teile, ca. 25 Min.</li>
+            <li>Schreiben: 1 Text (Brief/E-Mail), ca. 30 Min.</li>
+            <li><strong>Mündliche Prüfung (~15 Min.):</strong></li>
+            <li>Vorstellung, gemeinsame Aufgabe, Präsentation</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Besonderheit: Sprachbausteine</h4>
+          <ul>
+            <li>telc-Prüfungen enthalten „Sprachbausteine" — ein eigener Prüfungsteil</li>
+            <li>Lückentexte, bei denen Grammatik und Wortschatz direkt getestet werden</li>
+            <li>Teil 1: offene Lücken (Wort selbst einsetzen)</li>
+            <li>Teil 2: Multiple Choice aus drei Optionen</li>
+            <li>Dieser Teil fehlt beim Goethe-Zertifikat — ist ein telc-Spezifikum</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>telc-Prüfungen — Übersicht Niveaus</h4>
+          <ul>
+            <li><strong style="color:var(--a1c)">A1</strong> telc Deutsch A1</li>
+            <li><strong style="color:var(--a2c)">A2</strong> telc Deutsch A2 / A2+ Schule</li>
+            <li><strong style="color:var(--b1c)">B1</strong> telc Deutsch B1 / B1+ Beruf</li>
+            <li><strong style="color:var(--b2c)">B2</strong> telc Deutsch B2 / B2 Medizin / B2 Pflege / B2 Beruf</li>
+            <li><strong style="color:var(--c1c)">C1</strong> telc Deutsch C1 / C1 Hochschule</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Bewertung &amp; Bestehen</h4>
+          <ul>
+            <li>Schriftlicher Teil: max. 150 Punkte (je nach Niveau)</li>
+            <li>Mündlicher Teil: max. 45 Punkte (je nach Niveau)</li>
+            <li>Bestehensgrenze: 60% der Gesamtpunktzahl</li>
+            <li>Schriftlich und mündlich werden separat bewertet</li>
+            <li>Beide Teile müssen bestanden sein — bei Nicht-Bestehen eines Teils gilt die Prüfung als nicht bestanden</li>
+          </ul>
+        </div>
+      </div>
+      <div class="notice"><strong>Berufsbezeichnungen:</strong> Für ausländische Fachkräfte in Pflege, Medizin und Sozialarbeit gibt es spezialisierte telc-Prüfungen mit berufsrelevantem Wortschatz und Situationen. Diese werden von vielen Ärztekammern und Krankenhäusern explizit verlangt.</div>
+    </div>
+  </div>
+
+  <!-- ─── ÖSD ─── -->
+  <div class="prov-card lv-oesd" id="prov-oesd">
+    <div class="prov-header" onclick="toggleCard('prov-oesd')">
+      <div class="prov-logo">ÖSD</div>
+      <div>
+        <p class="prov-title">ÖSD — Österreichisches Sprachdiplom Deutsch</p>
+        <p class="prov-subtitle">A1 – C2 · Stark in Österreich · Modular zertifizierbar</p>
+      </div>
+      <div class="prov-toggle">▾</div>
+    </div>
+    <div class="prov-body">
+      <p class="prov-description lv-oesd">
+        Das <strong>ÖSD</strong> (Österreichisches Sprachdiplom Deutsch) ist eine österreichische Bildungsinstitution, die Deutschprüfungen nach GER/CEFR für alle Niveaus anbietet. ÖSD-Zertifikate werden in Österreich, Deutschland und der Schweiz von Behörden anerkannt und sind international verbreitet. Ein besonderes Merkmal: Die Prüfungen sind klar in <strong>schriftliches Modul</strong> (Lesen + Hören + Schreiben) und <strong>mündliches Modul</strong> (Sprechen) unterteilt — beide können getrennt abgelegt und zertifiziert werden. Das ÖSD legt besonderen Wert auf authentisches österreichisches Deutsch und realitätsnahe Kommunikationssituationen.
+      </p>
+      <div class="prov-grid">
+        <div class="p-block">
+          <h4>Aufbau ÖSD B2 (Beispiel)</h4>
+          <ul>
+            <li><strong>Schriftliches Modul (~165 Min.):</strong></li>
+            <li>Leseverstehen: 3–4 Aufgaben, ca. 60 Min.</li>
+            <li>Hörverstehen: 3–4 Aufgaben, ca. 30 Min.</li>
+            <li>Schriftlicher Ausdruck: Stellungnahme oder Brief, ca. 75 Min.</li>
+            <li><strong>Mündliches Modul (~20 Min. pro Person):</strong></li>
+            <li>Monologischer Teil + Interaktion mit Partner</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Besonderheiten ÖSD</h4>
+          <ul>
+            <li>Modulare Zertifizierung: schriftlich und mündlich können <em>getrennt</em> zertifiziert werden</li>
+            <li>Das schriftliche Zertifikat gilt 3 Jahre (für spätere mündliche Ergänzung)</li>
+            <li>Österreichisches Standarddeutsch in Texten und Hörmaterial</li>
+            <li>ÖSD-Zertifikate erfüllen die Anforderungen für den österreichischen Aufenthaltstitel</li>
+            <li>Auch spezifische Prüfungen für Jugendliche (KID = Kindersprachdiplom)</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Niveaus und Bezeichnungen</h4>
+          <ul>
+            <li><strong style="color:var(--a1c)">A1</strong> ÖSD Zertifikat A1</li>
+            <li><strong style="color:var(--a2c)">A2</strong> ÖSD Zertifikat A2</li>
+            <li><strong style="color:var(--b1c)">B1</strong> ÖSD Zertifikat B1</li>
+            <li><strong style="color:var(--b2c)">B2</strong> ÖSD Zertifikat B2</li>
+            <li><strong style="color:var(--c1c)">C1</strong> ÖSD Zertifikat C1</li>
+            <li><strong style="color:var(--c2c)">C2</strong> ÖSD Zertifikat C2</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Bewertung ÖSD</h4>
+          <ul>
+            <li>Schriftliches Modul: max. 100 Punkte, Bestehensgrenze 60%</li>
+            <li>Mündliches Modul: max. 100 Punkte, Bestehensgrenze 60%</li>
+            <li>Bewertungskriterien Sprechen: Kommunikativität, Korrektheit, Spektrum</li>
+            <li>Bewertungskriterien Schreiben: Inhalt, Aufbau, Sprachrichtigkeit, Wortschatz</li>
+            <li>Gesamtzertifikat: beide Module müssen bestanden sein</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── DTZ ─── -->
+  <div class="prov-card lv-dtz" id="prov-dtz">
+    <div class="prov-header" onclick="toggleCard('prov-dtz')">
+      <div class="prov-logo">DTZ</div>
+      <div>
+        <p class="prov-title">DTZ — Deutsch-Test für Zuwanderer</p>
+        <p class="prov-subtitle">A2–B1 · BAMF-Integrationskurs · Aufenthaltsrecht</p>
+      </div>
+      <div class="prov-toggle">▾</div>
+    </div>
+    <div class="prov-body">
+      <p class="prov-description lv-dtz">
+        Der <strong>DTZ</strong> (Deutsch-Test für Zuwanderer) ist eine staatlich vorgeschriebene Prüfung, die am Ende eines <strong>BAMF-Integrationskurses</strong> abgelegt wird. Er ist kein allgemeines Sprachzertifikat, sondern eine praxisorientierte Prüfung, die auf das Leben in Deutschland ausgerichtet ist. Das Ergebnis wird als <strong>A2 oder B1</strong> ausgewiesen (oder als „unter A2", wenn das Mindestniveau nicht erreicht wird). Der DTZ wird von verschiedenen Prüfungsorganisationen durchgeführt (u. a. telc, Goethe-Institut). Die Prüfung hat direkten Einfluss auf aufenthaltsrechtliche Entscheidungen.
+      </p>
+
+      <div class="warn-box"><strong>⚡ Aufenthaltsrechtliche Relevanz:</strong> Das Ergebnis des DTZ beeinflusst direkt die aufenthaltsrechtliche Situation in Deutschland. B1 ist Voraussetzung für die unbefristete Niederlassungserlaubnis (§ 9 AufenthG). Wer nur A2 erreicht, muss in manchen Fällen weitere Kurse absolvieren.</div>
+
+      <div class="prov-grid">
+        <div class="p-block">
+          <h4>Aufbau DTZ — Schriftliche Prüfung</h4>
+          <ul>
+            <li>Gesamtdauer schriftlich: ca. 100 Minuten</li>
+            <li><strong>Hören:</strong> 3 Teile, Alltagsdialoge und Ansagen, ca. 25 Min.</li>
+            <li><strong>Lesen:</strong> 3 Teile, Formulare, Nachrichten, kurze Texte, ca. 45 Min.</li>
+            <li><strong>Schreiben:</strong> 1 Aufgabe — formelle Nachricht (Termin, Anfrage, Problem), ca. 30 Min.</li>
+            <li>Hören und Lesen werden zusammengezählt (gemeinsame Punktgrenze)</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Aufbau DTZ — Mündliche Prüfung</h4>
+          <ul>
+            <li>Dauer: ca. 15 Minuten pro Person</li>
+            <li>Teil 1: Vorstellen (Name, Herkunft, Beruf, Familie)</li>
+            <li>Teil 2: Alltagssituation aus Bildkarte beschreiben</li>
+            <li>Teil 3: Meinung zu einem Thema äußern, Reaktion auf Partner</li>
+            <li>Bewertet wird: Kommunikative Effizienz, nicht sprachliche Perfektion</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Typische Themen im DTZ</h4>
+          <ul>
+            <li>Arbeit und Beruf (Bewerbung, Arbeitsvertrag, Kollegen)</li>
+            <li>Wohnen und Nachbarn (Mietvertrag, Hausordnung)</li>
+            <li>Gesundheit und Arztbesuche</li>
+            <li>Ämter und Behörden (Anträge, Formulare)</li>
+            <li>Schule und Kindergarten (für Kinder)</li>
+            <li>Öffentlicher Nahverkehr, Einkaufen</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Bewertung &amp; Ergebnisse</h4>
+          <ul>
+            <li>Ergebnis: <strong>B1</strong> (höchstes), <strong>A2</strong>, oder <strong>unter A2</strong></li>
+            <li>Schreiben wird separat bewertet</li>
+            <li>Sprechen wird separat bewertet</li>
+            <li>Kein klassisches Notensystem — Einstufung nach Sprachniveau</li>
+            <li>Wiederholung möglich, wenn Ergebnis nicht ausreicht</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── TestDaF ─── -->
+  <div class="prov-card lv-testdaf" id="prov-testdaf">
+    <div class="prov-header" onclick="toggleCard('prov-testdaf')">
+      <div class="prov-logo">TDaF</div>
+      <div>
+        <p class="prov-title">TestDaF — Test Deutsch als Fremdsprache</p>
+        <p class="prov-subtitle">B2–C1 · Hochschulzugang · TDN-Stufensystem</p>
+      </div>
+      <div class="prov-toggle">▾</div>
+    </div>
+    <div class="prov-body">
+      <p class="prov-description lv-testdaf">
+        Der <strong>TestDaF</strong> ist eine Hochschulzugangsprüfung für internationale Studienbewerber an deutschen Universitäten und Fachhochschulen. Er wird vom TestDaF-Institut (Hagen) entwickelt und weltweit an autorisierten Testzentren angeboten. Das Besondere: Statt eines CEFR-Niveaus bekommt man für jede der vier Fertigkeiten eine <strong>TDN-Stufe</strong> (TestDaF-Niveaustufe) — TDN 3, TDN 4 oder TDN 5. Für die Hochschulzulassung wird in der Regel TDN 4 in allen vier Fertigkeiten verlangt (manche Hochschulen akzeptieren auch TDN 3 in einem Teil). TestDaF kann auch digital (dTestDaF) abgelegt werden.
+      </p>
+
+      <div class="p-block p-block-full" style="margin-bottom:18px;">
+        <h4>Das TDN-Stufensystem — Bedeutung der Stufen</h4>
+        <table class="level-table">
+          <thead><tr><th>TDN-Stufe</th><th>Ungefähres CEFR-Niveau</th><th>Bedeutung</th><th>Hochschule</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong style="color:var(--b2c)">TDN 3</strong></td>
+              <td>B2 (unteres)</td>
+              <td>Grundlegende Kompetenz für akademische Kommunikation</td>
+              <td>Meist nicht ausreichend — von manchen HS akzeptiert</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--c1c)">TDN 4</strong></td>
+              <td>B2+ / C1 (unteres)</td>
+              <td>Gute Kompetenz — akademisch arbeitsfähig</td>
+              <td>Standard-Anforderung der meisten deutschen Hochschulen</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--c2c)">TDN 5</strong></td>
+              <td>C1 (oberes)</td>
+              <td>Sehr gute Kompetenz — nahezu akademisch muttersprachlich</td>
+              <td>Übertrifft die Anforderungen — immer ausreichend</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="prov-grid">
+        <div class="p-block">
+          <h4>Aufbau TestDaF — 4 Teile</h4>
+          <ul>
+            <li><strong>Leseverstehen:</strong> 3 Aufgaben, ca. 60 Min. — akademische Texte, Tabellen, Schaubilder</li>
+            <li><strong>Hörverstehen:</strong> 3 Aufgaben, ca. 40 Min. — Vorlesung, Interview, Gespräch</li>
+            <li><strong>Schriftlicher Ausdruck:</strong> 1 Aufgabe, ca. 60 Min. — Diagramm beschreiben + Stellungnahme</li>
+            <li><strong>Mündlicher Ausdruck:</strong> 7 Aufgaben, ca. 35 Min. — als Tonaufnahme, kein Prüfer anwesend</li>
+            <li>Gesamtdauer: ca. 3 Stunden 15 Minuten (ohne Pausen)</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Besonderheit: Mündlicher Ausdruck ohne Prüfer</h4>
+          <ul>
+            <li>Der mündliche Teil wird <em>als Tonaufnahme</em> abgelegt — kein Gespräch mit Prüfer</li>
+            <li>7 Aufgaben zu akademischen Themen (Uni-Alltag, Graphiken, Diskussionen)</li>
+            <li>Vorbereitung: kurze Vorbereitungszeit pro Aufgabe (15–30 Sek.)</li>
+            <li>Sprechen: ca. 30–90 Sekunden pro Aufgabe</li>
+            <li>Bewertung durch geschulte Bewerter nach festen Kriterien</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Typische akademische Themen</h4>
+          <div class="tags" style="margin-top:0;">
+            <span class="tag">Studium und Hochschule</span>
+            <span class="tag">Umwelt und Klimawandel</span>
+            <span class="tag">Gesellschaft und Politik</span>
+            <span class="tag">Wirtschaft und Globalisierung</span>
+            <span class="tag">Medizin und Gesundheit</span>
+            <span class="tag">Technik und Innovation</span>
+            <span class="tag">Statistiken und Diagramme</span>
+            <span class="tag">Demografischer Wandel</span>
+          </div>
+        </div>
+        <div class="p-block">
+          <h4>Vorbereitung TestDaF</h4>
+          <ul>
+            <li>Akademischen Wortschatz systematisch aufbauen (Definitionen, Ursache-Wirkung)</li>
+            <li>Diagramme beschreiben trainieren (Anstieg, Rückgang, Plateau)</li>
+            <li>Schnelles Lesen — Kernaussagen in langen Texten identifizieren</li>
+            <li>Mündliche Aufnahmen üben: strukturiert, ohne Zögern sprechen</li>
+            <li>Offizielle Modellsätze und frühere Prüfungen auf testdaf.de üben</li>
+          </ul>
+        </div>
+      </div>
+      <div class="notice"><strong>Digital oder Papier?</strong> TestDaF kann seit 2023 auch als <em>dTestDaF</em> (digital, am Computer) abgelegt werden. Das Format ist inhaltlich identisch — nur die Durchführungsform unterscheidet sich.</div>
+    </div>
+  </div>
+
+  <!-- ─── DSH ─── -->
+  <div class="prov-card lv-dsh" id="prov-dsh">
+    <div class="prov-header" onclick="toggleCard('prov-dsh')">
+      <div class="prov-logo">DSH</div>
+      <div>
+        <p class="prov-title">DSH — Deutsche Sprachprüfung für den Hochschulzugang</p>
+        <p class="prov-subtitle">B2–C1/C2 · Hochschulprüfung · Je nach Universität unterschiedlich</p>
+      </div>
+      <div class="prov-toggle">▾</div>
+    </div>
+    <div class="prov-body">
+      <p class="prov-description lv-dsh">
+        Die <strong>DSH</strong> (Deutsche Sprachprüfung für den Hochschulzugang) ist eine <em>Hochschulprüfung</em> — sie wird direkt von der jeweiligen Universität oder Fachhochschule organisiert und abgenommen. Im Gegensatz zu TestDaF gibt es kein zentrales, einheitliches Format: Jede Hochschule entwickelt ihre eigenen Aufgaben, jedoch müssen alle DSH-Prüfungen den Rahmenbestimmungen der Hochschulrektorenkonferenz (HRK) entsprechen. Das Ergebnis ist nach DSH-Stufen gegliedert: <strong>DSH-1</strong>, <strong>DSH-2</strong> und <strong>DSH-3</strong>. Für die Zulassung zum Studium wird in der Regel DSH-2 verlangt.
+      </p>
+
+      <div class="p-block p-block-full" style="margin-bottom:18px;">
+        <h4>DSH-Stufen — Bedeutung und Anforderungen</h4>
+        <table class="level-table">
+          <thead><tr><th>DSH-Stufe</th><th>Prozentuales Ergebnis</th><th>CEFR (ungefähr)</th><th>Studiumszulassung</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong style="color:var(--b2c)">DSH-1</strong></td>
+              <td>57 % – 66 %</td>
+              <td>ca. B2</td>
+              <td>Eingeschränkt — manche HS akzeptieren es mit Auflagen</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--c1c)">DSH-2</strong></td>
+              <td>67 % – 81 %</td>
+              <td>ca. C1</td>
+              <td>Standard-Zulassung — von allen deutschen Hochschulen anerkannt</td>
+            </tr>
+            <tr>
+              <td><strong style="color:var(--c2c)">DSH-3</strong></td>
+              <td>82 % und mehr</td>
+              <td>ca. C1–C2</td>
+              <td>Sehr gut — übertrifft alle Anforderungen</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="prov-grid">
+        <div class="p-block">
+          <h4>Schriftlicher Teil — typische Inhalte</h4>
+          <ul>
+            <li><strong>Hörverstehen:</strong> Vorlesung oder Vortrag (20–30 Min.), Notizen machen, dann Aufgaben lösen</li>
+            <li><strong>Leseverstehen:</strong> Wissenschaftlicher Text (800–1200 Wörter), Verstehens- und Transferaufgaben</li>
+            <li><strong>Wissenschaftliche Strukturen:</strong> Grammatik, Satzbau, Konnektoren in wissenschaftlichem Kontext</li>
+            <li><strong>Textproduktion:</strong> Zusammenfassung + argumentativer Text (~300–400 Wörter), ca. 60–70 Min.</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Mündlicher Teil</h4>
+          <ul>
+            <li>Dauer: ca. 20–30 Minuten (je nach Hochschule)</li>
+            <li>Kurzpräsentation zu einem Thema (5–10 Min. Vorbereitung)</li>
+            <li>Fachgespräch auf Basis des Präsentationsthemas</li>
+            <li>Prüfer: 2 Hochschuldozenten</li>
+            <li>Wichtig: Wenn schriftlicher Teil unter Mindestgrenze, gilt mündlich nicht mehr</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Wichtige Unterschiede zu TestDaF</h4>
+          <ul>
+            <li>DSH: Hochschuleigene Prüfung, nur an dieser HS gültig (in der Regel)</li>
+            <li>TestDaF: Zentral entwickelt, bundesweit und international gültig</li>
+            <li>DSH: Muss vor Ort an der Ziel-HS abgelegt werden</li>
+            <li>DSH: Format und Schwierigkeit variieren je nach Hochschule</li>
+            <li>TestDaF: Einheitlich — gleicher Standard weltweit</li>
+          </ul>
+        </div>
+        <div class="p-block">
+          <h4>Vorbereitung DSH</h4>
+          <ul>
+            <li>Wissenschaftssprache intensiv üben (Definitionen, Kausalität, Schlussfolgerungen)</li>
+            <li>Vorlesungen hören und Notizen strukturiert mitschreiben</li>
+            <li>Zusammenfassungen schreiben — sachlich, in eigenen Worten</li>
+            <li>Grammatik Niveau C1: Partizipialkonstruktionen, Passiv, Nominalisierungen</li>
+            <li>Probeprüfungen der Ziel-Hochschule herunterladen und üben</li>
+          </ul>
+        </div>
+      </div>
+      <div class="warn-box"><strong>⚡ Gültigkeitsdauer:</strong> Das DSH-Zertifikat wird normalerweise unbegrenzt ausgestellt, <strong>aber</strong>: Es gilt nur für die ausstellende Hochschule oder im besten Fall für alle deutschen Hochschulen — je nach Regelung. TestDaF ist immer bundesweit gültig.</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ PRÜFUNGSTAG ════════════════════ -->
+  <div class="section-header"><h2>So läuft ein Prüfungstag ab</h2></div>
+
+  <p style="color:var(--muted); margin-bottom:24px; font-size:0.95rem; line-height:1.75;">
+    Unabhängig vom Anbieter folgt ein Prüfungstag immer einem ähnlichen Ablauf. Wer diesen Ablauf kennt, geht ruhiger und besser vorbereitet in die Prüfung.
+  </p>
+
+  <div class="day-timeline" style="max-width:640px;">
+    <div class="dt-step">
+      <div class="dt-left"><div class="dt-dot"></div><div class="dt-line"></div></div>
+      <div class="dt-content">
+        <div class="dt-time">Schritt 1 · Anmeldung</div>
+        <div class="dt-title">Einlass und Identitätsprüfung</div>
+        <div class="dt-desc">Anmeldung am Empfang des Prüfungszentrums. Gültiger Reisepass oder Personalausweis vorzeigen (kein Führerschein bei manchen Anbietern). Sitzplatznummer in Empfang nehmen. Keine Handys, Smartwatches oder Notizen erlaubt — alles abgeben oder ausschalten.</div>
+      </div>
+    </div>
+    <div class="dt-step">
+      <div class="dt-left"><div class="dt-dot"></div><div class="dt-line"></div></div>
+      <div class="dt-content">
+        <div class="dt-time">Schritt 2 · Einweisung</div>
+        <div class="dt-title">Regeln und Ablauf erklären</div>
+        <div class="dt-desc">Die Prüfungsleitung erklärt die Regeln: Kein Sprechen, kein Wörterbuch, kein Handy. Aufgabenhefte werden ausgeteilt, aber noch nicht geöffnet. Ruhig bleiben — auch wenn andere Kandidaten nervös wirken.</div>
+      </div>
+    </div>
+    <div class="dt-step">
+      <div class="dt-left"><div class="dt-dot"></div><div class="dt-line"></div></div>
+      <div class="dt-content">
+        <div class="dt-time">Schritt 3 · Hören</div>
+        <div class="dt-title">Hörverstehen (meistens zuerst)</div>
+        <div class="dt-desc">Meist der erste Prüfungsteil. Tonaufnahmen werden abgespielt — in der Regel zweimal. Notizen in Stichpunkten machen. Nicht den ganzen Satz aufschreiben — Schlüsselwörter, Zahlen, Namen reichen. Nicht in Panik geraten, wenn man etwas verpasst hat — beim zweiten Hören ergänzen.</div>
+      </div>
+    </div>
+    <div class="dt-step">
+      <div class="dt-left"><div class="dt-dot"></div><div class="dt-line"></div></div>
+      <div class="dt-content">
+        <div class="dt-time">Schritt 4 · Lesen</div>
+        <div class="dt-title">Leseverstehen</div>
+        <div class="dt-desc">Texte lesen und Aufgaben lösen. Strategie: erst Fragen lesen, dann gezielt im Text suchen. Nicht zu viel Zeit bei einer Aufgabe verbringen — weitergehen und zurückkehren. Zeit ist knapp kalkuliert.</div>
+      </div>
+    </div>
+    <div class="dt-step">
+      <div class="dt-left"><div class="dt-dot"></div><div class="dt-line"></div></div>
+      <div class="dt-content">
+        <div class="dt-time">Schritt 5 · Schreiben</div>
+        <div class="dt-title">Schriftlicher Ausdruck</div>
+        <div class="dt-desc">Einen Text verfassen — Brief, E-Mail, Stellungnahme oder Essay je nach Niveau. Immer: Aufgabe sorgfältig lesen, Struktur planen (2–3 Min.), dann schreiben. Am Ende nochmals korrigieren (5 Min. einplanen). Handschrift muss lesbar sein.</div>
+      </div>
+    </div>
+    <div class="dt-step">
+      <div class="dt-left"><div class="dt-dot"></div><div class="dt-line"></div></div>
+      <div class="dt-content">
+        <div class="dt-time">Schritt 6 · Pause</div>
+        <div class="dt-title">Kurze Pause (je nach Zentrum)</div>
+        <div class="dt-desc">15–30 Minuten Pause zwischen schriftlichem und mündlichem Teil (oder zwischen Tagen). Wasser trinken, durchatmen. Nicht mit anderen Kandidaten über Aufgaben sprechen — das erzeugt zusätzliche Nervosität.</div>
+      </div>
+    </div>
+    <div class="dt-step">
+      <div class="dt-left"><div class="dt-dot"></div><div class="dt-line"></div></div>
+      <div class="dt-content">
+        <div class="dt-time">Schritt 7 · Sprechen</div>
+        <div class="dt-title">Mündliche Prüfung</div>
+        <div class="dt-desc">Meist als Paarprüfung (zwei Kandidaten + zwei Prüfer) oder Einzelprüfung. Kurze Vorbereitungszeit auf das Thema (~5 Min.). Dann: Monolog, Dialog, Diskussion — je nach Niveau. Ruhig und strukturiert sprechen. Fehler sind erlaubt — Kommunikation zählt.</div>
+      </div>
+    </div>
+    <div class="dt-step">
+      <div class="dt-left"><div class="dt-dot" style="border-color:var(--accent2);"></div></div>
+      <div class="dt-content">
+        <div class="dt-time" style="color:var(--accent2);">Schritt 8 · Ergebnis</div>
+        <div class="dt-title">Warten auf das Ergebnis</div>
+        <div class="dt-desc">Ergebnisse je nach Anbieter in 2–8 Wochen. Goethe und telc: oft 4–6 Wochen. TestDaF: ca. 6–8 Wochen. DSH: oft schneller (2–4 Wochen), da hochschulintern. Zertifikat wird per Post oder digital zugesandt.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ PRÜFUNGSTAKTIK ════════════════════ -->
+  <div class="section-header"><h2>Prüfungstaktik nach Fertigkeit</h2></div>
+
+  <div class="training-grid">
+    <div class="tr-card s-listen">
+      <div class="tr-icon">🎧</div>
+      <div class="tr-title">Hören — Strategie &amp; Training</div>
+      <div class="tr-body">
+        <ul>
+          <li>Fragen <em>vor</em> dem Hören lesen — wissen, worauf man achten muss</li>
+          <li>Stichpunkte machen: Zahlen, Namen, Orte, Gründe, Daten</li>
+          <li>Beim zweiten Hören (wenn vorhanden) Lücken schließen und überprüfen</li>
+          <li>„Prüfungstempo" trainieren — nicht nur langsame Podcasts hören</li>
+          <li>Bei unbekannten Wörtern: Kontext nutzen, nicht abbrechen</li>
+          <li>Typische Quellen: Deutsche Welle, Deutschlandfunk, ZDF Mediathek</li>
+        </ul>
+      </div>
+    </div>
+    <div class="tr-card s-read">
+      <div class="tr-icon">📖</div>
+      <div class="tr-title">Lesen — Strategie &amp; Training</div>
+      <div class="tr-body">
+        <ul>
+          <li>Zuerst Fragen lesen, dann gezielt im Text suchen (nicht alles gleich intensiv lesen)</li>
+          <li>Überschriften und erste Sätze jedes Absatzes für Struktur nutzen</li>
+          <li>Typische Aufgaben kennen: Richtig/Falsch, MC, Zuordnung, Lücken</li>
+          <li>Zeit einteilen: pro Aufgabe max. Zeit vorher schätzen, nicht hängen bleiben</li>
+          <li>Unbekannte Wörter aus Kontext erschließen — kein Wörterbuch</li>
+          <li>Zeitungen lesen: Zeit Online, Der Standard, Neue Zürcher Zeitung</li>
+        </ul>
+      </div>
+    </div>
+    <div class="tr-card s-write">
+      <div class="tr-icon">✍️</div>
+      <div class="tr-title">Schreiben — Struktur &amp; Training</div>
+      <div class="tr-body">
+        <ul>
+          <li><strong>A1–B1:</strong> Anrede → Zweck → 2–3 Infopunkte → Bitte/Frage → Gruß + Name</li>
+          <li><strong>B2–C2:</strong> Einleitung (These) → Hauptteil (Argumente, Beispiele) → Schluss</li>
+          <li>Immer: Aufgabe genau lesen — alle Punkte müssen behandelt werden</li>
+          <li>Konnektoren verwenden: <em>außerdem, allerdings, dennoch, einerseits…andererseits</em></li>
+          <li>Letzte 5 Minuten: Korrektur auf Rechtschreibung, Grammatik, Vollständigkeit</li>
+          <li>Schreibtraining: täglich 1 kurzen Text (E-Mail, Meinung, Zusammenfassung)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="tr-card s-speak">
+      <div class="tr-icon">🗣️</div>
+      <div class="tr-title">Sprechen — Technik &amp; Training</div>
+      <div class="tr-body">
+        <ul>
+          <li>20–40 Redemittel auswendig lernen — diese ersetzen das Zögern</li>
+          <li>Zeitgefühl trainieren: 1 Min., 2 Min., 3 Min. sprechen (mit Stoppuhr)</li>
+          <li>Paarprüfung: aktiv reagieren — <em>„Da stimme ich zu…", „Ich sehe das etwas anders…"</em></li>
+          <li>Fehler nicht unterbrechen — weiter sprechen, am Ende korrigieren</li>
+          <li>Struktur: These → Begründung → Beispiel → Schluss (auch mündlich)</li>
+          <li>Laut sprechen üben — Handy aufnehmen und selbst zuhören</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ REDEMITTEL ════════════════════ -->
+  <div class="section-header"><h2>Wichtige Redemittel für die mündliche Prüfung</h2></div>
+
+  <div class="redemittel-grid">
+    <div class="rd-card">
+      <div class="rd-title">Meinung äußern</div>
+      <div class="rd-phrase">„Ich bin der Meinung, dass …"</div>
+      <div class="rd-phrase">„Meiner Ansicht nach …"</div>
+      <div class="rd-phrase">„Ich finde / halte es für wichtig, dass …"</div>
+      <div class="rd-phrase">„Ich bin davon überzeugt, dass …"</div>
+      <div class="rd-phrase">„Aus meiner Sicht …"</div>
+    </div>
+    <div class="rd-card">
+      <div class="rd-title">Zustimmen &amp; Widersprechen</div>
+      <div class="rd-phrase">„Da stimme ich Ihnen / dir zu."</div>
+      <div class="rd-phrase">„Das sehe ich genauso."</div>
+      <div class="rd-phrase">„Da bin ich anderer Meinung."</div>
+      <div class="rd-phrase">„Das stimmt zwar, aber …"</div>
+      <div class="rd-phrase">„Ich würde das etwas differenzierter sehen."</div>
+    </div>
+    <div class="rd-card">
+      <div class="rd-title">Begründen &amp; Argumentieren</div>
+      <div class="rd-phrase">„Das liegt daran, dass …"</div>
+      <div class="rd-phrase">„Ein Grund dafür ist …"</div>
+      <div class="rd-phrase">„Außerdem / Darüber hinaus …"</div>
+      <div class="rd-phrase">„Einerseits … andererseits …"</div>
+      <div class="rd-phrase">„Zum Beispiel … / Ein Beispiel dafür ist …"</div>
+    </div>
+    <div class="rd-card">
+      <div class="rd-title">Abschließen &amp; Zusammenfassen</div>
+      <div class="rd-phrase">„Zusammenfassend lässt sich sagen, dass …"</div>
+      <div class="rd-phrase">„Alles in allem bin ich der Meinung …"</div>
+      <div class="rd-phrase">„Abschließend möchte ich betonen …"</div>
+      <div class="rd-phrase">„Das Wichtigste ist meiner Meinung nach …"</div>
+      <div class="rd-phrase">„Ich komme daher zu dem Schluss, dass …"</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ GROSSE VERGLEICHSTABELLE ════════════════════ -->
+  <div class="section-header"><h2>Alle Prüfungen im Vergleich</h2></div>
+
+  <table class="big-table">
+    <thead>
+      <tr>
+        <th>Prüfung</th>
+        <th>Niveaus</th>
+        <th>Dauer gesamt</th>
+        <th>Besonderheit</th>
+        <th>Wofür anerkannt</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong style="color:var(--goethe)">Goethe-Zertifikat</strong></td>
+        <td>A1 – C2</td>
+        <td>80 – 205 Min. je nach Niveau</td>
+        <td>Modular, 4 Teile einzeln bestehbar; international sehr weit verbreitet</td>
+        <td>Visum, Aufenthaltstitel (AT/DE), Studium, Beruf, Einbürgerung (CH)</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--telc)">telc Deutsch</strong></td>
+        <td>A1 – C1</td>
+        <td>90 – 210 Min. je nach Niveau</td>
+        <td>Sprachbausteine als Extra-Teil; Berufssprachen-Varianten (Pflege, Medizin)</td>
+        <td>BAMF-Integration, Berufsanerkennung, Behörden DE/AT</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--oesd)">ÖSD Zertifikat</strong></td>
+        <td>A1 – C2</td>
+        <td>100 – 185 Min. je nach Niveau</td>
+        <td>Schriftlich und mündlich getrennt zertifizierbar; österreichisches Standarddeutsch</td>
+        <td>Aufenthaltstitel AT, Studium AT/DE, international anerkannt</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--dtz)">DTZ</strong></td>
+        <td>A2 – B1</td>
+        <td>ca. 115 Min.</td>
+        <td>Nur im Rahmen des BAMF-Integrationskurses; Ergebnis: A2 oder B1</td>
+        <td>Niederlassungserlaubnis DE (§ 9 AufenthG), BAMF-Kursnachweis</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--testdaf)">TestDaF</strong></td>
+        <td>B2 – C1 (TDN 3–5)</td>
+        <td>ca. 3 Std. 15 Min.</td>
+        <td>Kein Prüfer beim Sprechen (Tonaufnahme); bundesweit + international gültig</td>
+        <td>Hochschulzulassung alle deutschen Universitäten; international</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--dsh)">DSH</strong></td>
+        <td>B2 – C2 (DSH-1/2/3)</td>
+        <td>ca. 3–4 Std. (schriftlich + mündlich)</td>
+        <td>Hochschuleigene Prüfung — Format variiert; meist nur an der ausstellenden HS gültig</td>
+        <td>Hochschulzulassung an der jeweiligen Uni/FH in Deutschland</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ════════════════════ CHECKLISTE ════════════════════ -->
+  <div class="section-header"><h2>Bin ich prüfungsbereit? — Checkliste</h2></div>
+
+  <div class="checklist-grid">
+    <div class="cl-item"><div class="cl-check"></div><span>Ich kann Aufgaben im Lesen innerhalb der vorgesehenen Zeit lösen — nicht nur verstehen, sondern auch unter Zeitdruck arbeiten.</span></div>
+    <div class="cl-item"><div class="cl-check"></div><span>Ich kann beim Hören Hauptaussage und wichtige Details zuverlässig erfassen und in Stichworten notieren.</span></div>
+    <div class="cl-item"><div class="cl-check"></div><span>Ich kann die Textsorte meines Niveaus strukturiert und vollständig schreiben (Brief, E-Mail, Stellungnahme…).</span></div>
+    <div class="cl-item"><div class="cl-check"></div><span>Ich kann 2–3 Minuten fließend zu einem Thema sprechen und auf Fragen oder Kommentare reagieren.</span></div>
+    <div class="cl-item"><div class="cl-check"></div><span>Ich kenne den genauen Aufbau meiner Prüfung (Teile, Reihenfolge, Zeiten) — keine Überraschungen am Prüfungstag.</span></div>
+    <div class="cl-item"><div class="cl-check"></div><span>Ich habe mindestens 2–3 vollständige Probeprüfungen unter echten Bedingungen (Zeitdruck, ohne Hilfsmittel) absolviert.</span></div>
+    <div class="cl-item"><div class="cl-check"></div><span>Ich habe 20–30 Redemittel für das Sprechen automatisiert — sie kommen ohne Zögern.</span></div>
+    <div class="cl-item"><div class="cl-check"></div><span>Ich kenne die Bestehensregeln meiner Prüfung: welche Mindestpunktzahl pro Teil, was passiert bei Nicht-Bestehen.</span></div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <p>Offizielle Quellen:
+    <a href="https://www.goethe.de/de/spr/kup/prf.html" target="_blank">Goethe-Institut Prüfungen</a> ·
+    <a href="https://www.telc.net" target="_blank">telc GmbH</a> ·
+    <a href="https://www.osd.at" target="_blank">ÖSD</a> ·
+    <a href="https://www.testdaf.de" target="_blank">TestDaF-Institut</a> ·
+    <a href="https://www.bamf.de" target="_blank">BAMF (DTZ)</a> ·
+    <a href="https://www.hochschulkompass.de" target="_blank">HRK (DSH)</a>
+  </p>
+  <p style="margin-top:6px;">Artikel erstellt 2025 · Alle Angaben nach offiziellen Prüfungsformaten · Für Unterrichtszwecke</p>
+</footer>
+
+<script>
+  function toggleCard(id) {
+    const card = document.getElementById(id);
+    card.classList.toggle('open');
+  }
+  document.getElementById('prov-goethe').classList.add('open');
+</script>
+
+</body>
+</html>
