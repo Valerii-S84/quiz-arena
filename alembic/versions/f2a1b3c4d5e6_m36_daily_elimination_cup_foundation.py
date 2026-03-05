@@ -20,7 +20,9 @@ depends_on: Sequence[str] | None = None
 
 def upgrade() -> None:
     with op.batch_alter_table("tournaments") as batch_op:
-        batch_op.add_column(sa.Column("bracket", postgresql.JSONB(astext_type=sa.Text()), nullable=True))
+        batch_op.add_column(
+            sa.Column("bracket", postgresql.JSONB(astext_type=sa.Text()), nullable=True)
+        )
         batch_op.alter_column(
             "type",
             existing_type=sa.String(length=16),
@@ -57,9 +59,15 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column("round_number", sa.Integer(), nullable=True))
         batch_op.add_column(sa.Column("bracket_slot_a", sa.Integer(), nullable=True))
         batch_op.add_column(sa.Column("bracket_slot_b", sa.Integer(), nullable=True))
-        batch_op.add_column(sa.Column("match_timeout_task_id", sa.String(length=255), nullable=True))
-        batch_op.add_column(sa.Column("player_a_finished_at", sa.DateTime(timezone=True), nullable=True))
-        batch_op.add_column(sa.Column("player_b_finished_at", sa.DateTime(timezone=True), nullable=True))
+        batch_op.add_column(
+            sa.Column("match_timeout_task_id", sa.String(length=255), nullable=True)
+        )
+        batch_op.add_column(
+            sa.Column("player_a_finished_at", sa.DateTime(timezone=True), nullable=True)
+        )
+        batch_op.add_column(
+            sa.Column("player_b_finished_at", sa.DateTime(timezone=True), nullable=True)
+        )
         batch_op.drop_constraint("ck_tournament_matches_round_no_range", type_="check")
         batch_op.create_check_constraint(
             "ck_tournament_matches_round_no_range",

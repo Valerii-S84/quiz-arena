@@ -24,13 +24,13 @@ from app.game.tournaments.constants import (
     TOURNAMENT_TYPE_DAILY_ARENA,
     status_for_round,
 )
-from app.game.tournaments.internal import resolve_round_deadline
 from app.game.tournaments.elimination_lifecycle import (
     complete_elimination_tournament as _complete_elimination_tournament,
 )
 from app.game.tournaments.elimination_lifecycle import (
     on_elimination_match_complete as _on_elimination_match_complete,
 )
+from app.game.tournaments.internal import resolve_round_deadline
 from app.game.tournaments.rounds import (
     collect_bye_history,
     collect_previous_pairs,

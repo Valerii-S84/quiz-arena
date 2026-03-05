@@ -9,7 +9,9 @@ from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
-from app.game.sessions.service.friend_challenges_tournament import create_tournament_match_friend_challenge
+from app.game.sessions.service.friend_challenges_tournament import (
+    create_tournament_match_friend_challenge,
+)
 from app.game.tournaments.constants import (
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_MODE_CODE,
@@ -170,7 +172,9 @@ async def complete_elimination_tournament(
         int(tournament.current_round),
         _to_int(bracket.get("rounds_total", 1), default=1),
     )
-    enqueue_daily_cup_round_messaging(tournament_id=str(tournament.id), enqueue_completion_followups=True)
+    enqueue_daily_cup_round_messaging(
+        tournament_id=str(tournament.id), enqueue_completion_followups=True
+    )
     return {
         "processed": 1,
         "next_match_created": 0,

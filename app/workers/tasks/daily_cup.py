@@ -14,12 +14,6 @@ from app.workers.tasks.daily_cup_async import (
 from app.workers.tasks.daily_cup_async import (
     send_daily_cup_last_call_reminder_async as _send_daily_cup_last_call_reminder_async,
 )
-from app.workers.tasks.daily_elimination_async import (
-    run_daily_elimination_final_deadline_async as _run_daily_elimination_final_deadline_async,
-)
-from app.workers.tasks.daily_elimination_async import (
-    run_elimination_match_timeout_async as _run_elimination_match_timeout_async,
-)
 from app.workers.tasks.daily_cup_messaging import run_daily_cup_round_messaging
 from app.workers.tasks.daily_cup_nonfinishers_summary import run_daily_cup_nonfinishers_summary
 from app.workers.tasks.daily_cup_prestart_reminder import (
@@ -30,6 +24,12 @@ from app.workers.tasks.daily_cup_rounds import (
     advance_daily_cup_rounds_async as _advance_daily_cup_rounds_async,
 )
 from app.workers.tasks.daily_cup_schedule import configure_daily_cup_schedule
+from app.workers.tasks.daily_elimination_async import (
+    run_daily_elimination_final_deadline_async as _run_daily_elimination_final_deadline_async,
+)
+from app.workers.tasks.daily_elimination_async import (
+    run_elimination_match_timeout_async as _run_elimination_match_timeout_async,
+)
 
 open_daily_cup_registration_async = _open_daily_cup_registration_async
 close_daily_cup_registration_and_start_async = _close_daily_cup_registration_and_start_async

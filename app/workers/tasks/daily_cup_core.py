@@ -52,10 +52,7 @@ async def ensure_daily_cup_registration_tournament(
         tournament_type=tournament_type,
         registration_deadline=window.close_at_utc,
     )
-    if (
-        tournament is None
-        and tournament_type == TOURNAMENT_TYPE_DAILY_ELIMINATION
-    ):
+    if tournament is None and tournament_type == TOURNAMENT_TYPE_DAILY_ELIMINATION:
         tournament = await TournamentsRepo.get_by_type_and_registration_deadline_for_update(
             session,
             tournament_type=TOURNAMENT_TYPE_DAILY_ARENA,

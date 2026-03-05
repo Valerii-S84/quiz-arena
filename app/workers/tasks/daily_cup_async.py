@@ -30,13 +30,13 @@ from app.workers.tasks.daily_cup_core import (
     send_daily_cup_canceled_messages,
 )
 from app.workers.tasks.daily_cup_messaging import enqueue_daily_cup_round_messaging
-from app.workers.tasks.daily_cup_start import start_daily_arena_round_one
-from app.workers.tasks.daily_elimination_start import start_daily_elimination_bracket
 from app.workers.tasks.daily_cup_push_events import (
     list_already_pushed_user_ids,
     store_push_sent_events,
 )
+from app.workers.tasks.daily_cup_start import start_daily_arena_round_one
 from app.workers.tasks.daily_cup_time import format_close_time_local
+from app.workers.tasks.daily_elimination_start import start_daily_elimination_bracket
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup")
 
@@ -136,7 +136,11 @@ async def _send_daily_cup_registration_push_async(
 
 async def send_daily_cup_invite_async() -> dict[str, int]:
     return await _send_daily_cup_registration_push_async(
-        text_key="msg.elimination.invite_push" if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ELIMINATION else "msg.daily_cup.invite_push",
+        text_key=(
+            "msg.elimination.invite_push"
+            if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ELIMINATION
+            else "msg.daily_cup.invite_push"
+        ),
         log_event="daily_cup_invite_push_processed",
         sent_event_type="daily_cup_invite_push_sent",
     )
@@ -144,7 +148,11 @@ async def send_daily_cup_invite_async() -> dict[str, int]:
 
 async def open_daily_cup_registration_async() -> dict[str, int]:
     return await _send_daily_cup_registration_push_async(
-        text_key="msg.elimination.invite_push" if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ELIMINATION else "msg.daily_cup.push.registration",
+        text_key=(
+            "msg.elimination.invite_push"
+            if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ELIMINATION
+            else "msg.daily_cup.push.registration"
+        ),
         log_event="daily_cup_registration_push_processed",
         sent_event_type="daily_cup_registration_push_sent",
     )
@@ -179,7 +187,9 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
         )
         participants_total = len(participants)
         required_min_players = (
-            DAILY_ELIMINATION_MIN_PLAYERS if tournament.type == TOURNAMENT_TYPE_DAILY_ELIMINATION else DAILY_CUP_MIN_PARTICIPANTS
+            DAILY_ELIMINATION_MIN_PLAYERS
+            if tournament.type == TOURNAMENT_TYPE_DAILY_ELIMINATION
+            else DAILY_CUP_MIN_PARTICIPANTS
         )
         if participants_total < required_min_players:
             tournament.status = TOURNAMENT_STATUS_CANCELED

@@ -127,7 +127,9 @@ async def _settle_single_pending_match(
         if tournament is None or tournament.type != TOURNAMENT_TYPE_DAILY_ELIMINATION:
             return 0, None, 0
         challenge = (
-            await FriendChallengesRepo.get_by_id_for_update(session, locked_match.friend_challenge_id)
+            await FriendChallengesRepo.get_by_id_for_update(
+                session, locked_match.friend_challenge_id
+            )
             if locked_match.friend_challenge_id is not None
             else None
         )
@@ -202,9 +204,11 @@ async def run_daily_elimination_final_deadline_async() -> dict[str, int]:
         while guard < 5000:
             guard += 1
             async with SessionLocal.begin() as session:
-                pending_matches = await TournamentMatchesRepo.list_pending_for_tournament_for_update(
-                    session,
-                    tournament_id=tournament_id,
+                pending_matches = (
+                    await TournamentMatchesRepo.list_pending_for_tournament_for_update(
+                        session,
+                        tournament_id=tournament_id,
+                    )
                 )
                 pending_snapshot = [match for match in pending_matches]
             if not pending_snapshot:

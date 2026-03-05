@@ -76,7 +76,9 @@ def _maybe_complete_self_bot_match(
         or int(challenge.opponent_user_id) != int(challenge.creator_user_id)
     ):
         return
-    bot_target = max(0, min(int(round(int(challenge.total_rounds) * 0.7)), int(challenge.total_rounds) - 1))
+    bot_target = max(
+        0, min(int(round(int(challenge.total_rounds) * 0.7)), int(challenge.total_rounds) - 1)
+    )
     challenge.opponent_score = min(bot_target, max(0, int(challenge.creator_score) - 1))
     challenge.opponent_answered_round = int(challenge.total_rounds)
     challenge.opponent_finished_at = now_utc
@@ -119,7 +121,10 @@ async def handle_tournament_duel_progress(
 ) -> None:
     if challenge.tournament_match_id is None:
         return
-    from app.game.tournaments.lifecycle import check_and_advance_round, on_elimination_match_complete
+    from app.game.tournaments.lifecycle import (
+        check_and_advance_round,
+        on_elimination_match_complete,
+    )
     from app.game.tournaments.settlement import settle_pending_match_from_duel
     from app.workers.tasks.daily_cup_match_results import send_daily_cup_match_result_messages
 
