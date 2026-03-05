@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournaments import Tournament
 
 
@@ -106,12 +107,23 @@ class TournamentsRepo:
         tournament_type: str | None = None,
     ) -> list[Tournament]:
         resolved_limit = max(1, int(limit))
+        due_condition = Tournament.round_deadline <= now_utc
+        if tournament_type == "DAILY_ARENA":
+            due_pending_match_exists = exists(
+                select(TournamentMatch.id).where(
+                    TournamentMatch.tournament_id == Tournament.id,
+                    TournamentMatch.round_no == Tournament.current_round,
+                    TournamentMatch.status == "PENDING",
+                    TournamentMatch.deadline <= now_utc,
+                )
+            )
+            due_condition = or_(due_condition, due_pending_match_exists)
         stmt = (
             select(Tournament)
             .where(
                 Tournament.status.in_(("ROUND_1", "ROUND_2", "ROUND_3", "BRACKET_LIVE")),
                 Tournament.round_deadline.is_not(None),
-                Tournament.round_deadline <= now_utc,
+                due_condition,
             )
             .order_by(Tournament.round_deadline.asc())
             .limit(resolved_limit)

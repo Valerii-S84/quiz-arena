@@ -39,12 +39,21 @@ class _ReminderItem:
     deadline_text: str
 
 
-def resolve_turn_reminder_users(*, challenge: FriendChallenge) -> tuple[int, int] | None:
-    if challenge.status == DUEL_STATUS_CREATOR_DONE and challenge.opponent_user_id is not None:
-        return int(challenge.opponent_user_id), int(challenge.creator_user_id)
-    if challenge.status == DUEL_STATUS_OPPONENT_DONE and challenge.opponent_user_id is not None:
-        return int(challenge.creator_user_id), int(challenge.opponent_user_id)
-    return None
+def resolve_turn_reminder_users(*, challenge: FriendChallenge) -> tuple[tuple[int, int], ...]:
+    if challenge.opponent_user_id is None:
+        return ()
+    creator_user_id = int(challenge.creator_user_id)
+    opponent_user_id = int(challenge.opponent_user_id)
+    if challenge.status == DUEL_STATUS_CREATOR_DONE:
+        return ((opponent_user_id, creator_user_id),)
+    if challenge.status == DUEL_STATUS_OPPONENT_DONE:
+        return ((creator_user_id, opponent_user_id),)
+    if challenge.status == "ACCEPTED":
+        return (
+            (creator_user_id, opponent_user_id),
+            (opponent_user_id, creator_user_id),
+        )
+    return ()
 
 
 def _build_turn_reminder_text(*, opponent_label: str, deadline_text: str) -> str:
@@ -87,11 +96,11 @@ async def run_daily_cup_turn_reminders_async(
         participant_user_ids: set[int] = set()
         for _match, challenge in candidates:
             resolved_users = resolve_turn_reminder_users(challenge=challenge)
-            if resolved_users is None:
+            if not resolved_users:
                 continue
-            target_user_id, opponent_user_id = resolved_users
-            participant_user_ids.add(target_user_id)
-            participant_user_ids.add(opponent_user_id)
+            for target_user_id, opponent_user_id in resolved_users:
+                participant_user_ids.add(target_user_id)
+                participant_user_ids.add(opponent_user_id)
 
         users = await UsersRepo.list_by_ids(session, list(participant_user_ids))
         user_labels = {
@@ -107,31 +116,30 @@ async def run_daily_cup_turn_reminders_async(
             challenge.updated_at = now_utc_value
 
             resolved_users = resolve_turn_reminder_users(challenge=challenge)
-            if resolved_users is None:
+            if not resolved_users:
                 skipped_total += 1
                 continue
+            for target_user_id, opponent_user_id in resolved_users:
+                target_chat_id = telegram_targets.get(target_user_id)
+                if target_chat_id is None:
+                    skipped_total += 1
+                    continue
+                target_key = (match.tournament_id, target_user_id)
+                if target_key in queued_target_keys:
+                    skipped_total += 1
+                    continue
+                queued_target_keys.add(target_key)
 
-            target_user_id, opponent_user_id = resolved_users
-            target_chat_id = telegram_targets.get(target_user_id)
-            if target_chat_id is None:
-                skipped_total += 1
-                continue
-            target_key = (match.tournament_id, target_user_id)
-            if target_key in queued_target_keys:
-                skipped_total += 1
-                continue
-            queued_target_keys.add(target_key)
-
-            reminders.append(
-                _ReminderItem(
-                    tournament_id=match.tournament_id,
-                    challenge_id=str(challenge.id),
-                    target_user_id=target_user_id,
-                    target_chat_id=target_chat_id,
-                    opponent_label=user_labels.get(opponent_user_id, "Spieler"),
-                    deadline_text=format_deadline(match.deadline),
+                reminders.append(
+                    _ReminderItem(
+                        tournament_id=match.tournament_id,
+                        challenge_id=str(challenge.id),
+                        target_user_id=target_user_id,
+                        target_chat_id=target_chat_id,
+                        opponent_label=user_labels.get(opponent_user_id, "Spieler"),
+                        deadline_text=format_deadline(match.deadline),
+                    )
                 )
-            )
 
     sent_user_ids_by_tournament: dict[UUID, list[int]] = defaultdict(list)
     bot = build_bot()

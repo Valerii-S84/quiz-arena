@@ -150,7 +150,7 @@ class TournamentMatchesRepo:
                 Tournament.current_round == TournamentMatch.round_no,
                 TournamentMatch.status == "PENDING",
                 TournamentMatch.deadline > now_utc,
-                FriendChallenge.status.in_(("CREATOR_DONE", "OPPONENT_DONE")),
+                FriendChallenge.status.in_(("ACCEPTED", "CREATOR_DONE", "OPPONENT_DONE")),
                 FriendChallenge.opponent_user_id.is_not(None),
                 or_(
                     FriendChallenge.expires_last_chance_notified_at.is_(None),
