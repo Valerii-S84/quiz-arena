@@ -18,11 +18,11 @@ function applyEmbeddedTheme(html: string): string {
   const embedThemeOverride = `
 <style id="embedded-article-theme-override">
   :root {
-    --bg: #f5f9fc;
-    --surface: #ffffff;
-    --border: #d6e3eb;
-    --text: #203043;
-    --muted: #5c6f82;
+    --bg: #cedde8;
+    --surface: #f4f7fa;
+    --border: #b8cad6;
+    --text: #132233;
+    --muted: #31465b;
     --accent: #e8734a;
     --a0-bg: rgba(155,155,155,0.14);
     --a1-bg: rgba(110,198,224,0.14);
@@ -33,8 +33,9 @@ function applyEmbeddedTheme(html: string): string {
     --c2-bg: rgba(208,72,112,0.14);
   }
   body {
-    background: linear-gradient(135deg, #d7ebf5 0%, #e4f1e0 50%, #f8ecd8 100%) !important;
+    background: linear-gradient(135deg, #b7d1df 0%, #c4d7bf 50%, #dbcfbf 100%) !important;
     color: var(--text) !important;
+    font-weight: 400 !important;
   }
   .card-block,
   .tip-card,
@@ -43,10 +44,17 @@ function applyEmbeddedTheme(html: string): string {
   .notice,
   .time-badge,
   .exams-table th {
-    background: rgba(255, 255, 255, 0.9) !important;
+    background: rgba(255, 255, 255, 0.97) !important;
+  }
+  .card-description,
+  .tip-desc,
+  .ag-desc,
+  .cefr-group-sub,
+  .card-subtitle {
+    color: #3f556a !important;
   }
   .exams-table tr:hover td {
-    background: rgba(15, 23, 42, 0.03) !important;
+    background: rgba(15, 23, 42, 0.06) !important;
   }
 </style>`;
   if (html.includes("</head>")) {
@@ -89,7 +97,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   return (
     <main
       lang="de"
-      className="min-h-screen bg-[linear-gradient(135deg,#d7ebf5_0%,#e4f1e0_50%,#f8ecd8_100%)] text-slate-900"
+      className="min-h-screen bg-[linear-gradient(135deg,#c1d8e5_0%,#cde0c7_50%,#e0d5c5_100%)] text-slate-900"
     >
       <div className="sticky top-0 z-20 border-b border-white/60 bg-white/82 px-4 py-3 backdrop-blur sm:px-6">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-start">
