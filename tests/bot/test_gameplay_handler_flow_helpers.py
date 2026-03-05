@@ -114,8 +114,7 @@ async def test_build_friend_invite_link_uses_public_bot_username() -> None:
         challenge_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     )
     assert invite_link == (
-        "https://t.me/Deine_Deutsch_Quiz_bot?start=duel_"
-        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        "https://t.me/Deine_Deutsch_Quiz_bot?start=duel_" "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     )
 
 

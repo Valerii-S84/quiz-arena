@@ -106,7 +106,9 @@ async def run_private_tournament_proof_cards_async(
                 "cached_reused": 0,
                 "failed": 0,
             }
-        users = await UsersRepo.list_by_ids(session, [int(item.user_id) for item in all_participants])
+        users = await UsersRepo.list_by_ids(
+            session, [int(item.user_id) for item in all_participants]
+        )
         user_labels = {
             int(user.id): _format_user_label(username=user.username, first_name=user.first_name)
             for user in users

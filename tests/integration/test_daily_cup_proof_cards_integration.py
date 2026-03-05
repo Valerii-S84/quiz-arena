@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -11,6 +12,7 @@ from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
 from app.workers.tasks import daily_cup_proof_cards
+from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
 from tests.integration.friend_challenge_fixtures import _create_user
 from tests.integration.test_private_tournament_worker_integration import (
     _DummyWorkerBot,
@@ -60,7 +62,13 @@ async def _create_completed_daily_cup(*, now_utc: datetime, user_ids: list[int])
 
 @pytest.mark.asyncio
 async def test_daily_cup_proof_cards_reuse_cached_file_ids_on_second_run(monkeypatch) -> None:
-    now_utc = datetime.now(UTC)
+    # Keep registration and runtime on the same local day for DAILY_CUP_TIMEZONE.
+    now_utc = (
+        datetime.now(UTC)
+        .astimezone(ZoneInfo(DAILY_CUP_TIMEZONE))
+        .replace(hour=12, minute=0, second=0, microsecond=0)
+        .astimezone(UTC)
+    )
     await _ensure_tournament_schema()
 
     user_ids = [await _create_user(f"daily_cup_proof_{idx}") for idx in range(4)]
