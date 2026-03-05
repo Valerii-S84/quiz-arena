@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import structlog
 
@@ -16,6 +18,7 @@ from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.tasks.daily_cup_core import persist_daily_cup_standings_message_ids
+from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
 from app.workers.tasks.daily_cup_messaging_text import (
     build_completed_text,
     build_round_text,
@@ -37,6 +40,11 @@ def _is_celery_task(task_obj: object) -> bool:
     return type(task_obj).__module__.startswith("celery.")
 
 
+def _is_today_tournament(*, registration_deadline: datetime, now_utc: datetime) -> bool:
+    tz = ZoneInfo(DAILY_CUP_TIMEZONE)
+    return registration_deadline.astimezone(tz).date() == now_utc.astimezone(tz).date()
+
+
 async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str, int]:
     return await run_daily_cup_round_messaging_async_with_followups(
         tournament_id=tournament_id,
@@ -55,6 +63,9 @@ async def run_daily_cup_round_messaging_async_with_followups(
         return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
 
     is_completed = False
+    allow_completion_followups = False
+    registration_deadline: datetime | None = None
+    now_utc_value = datetime.now(timezone.utc)
     async with SessionLocal.begin() as session:
         tournament = await TournamentsRepo.get_by_id(session, parsed_tournament_id)
         if (
@@ -85,6 +96,12 @@ async def run_daily_cup_round_messaging_async_with_followups(
                 round_no=int(tournament.current_round),
             )
         is_completed = tournament.status == "COMPLETED"
+        registration_deadline = tournament.registration_deadline
+        if is_completed:
+            allow_completion_followups = _is_today_tournament(
+                registration_deadline=tournament.registration_deadline,
+                now_utc=now_utc_value,
+            )
 
     standings_user_ids = [int(item.user_id) for item in participants]
     points_by_user = {int(item.user_id): format_points(item.score) for item in participants}
@@ -182,13 +199,22 @@ async def run_daily_cup_round_messaging_async_with_followups(
         replaced_message_ids=replaced_message_ids,
     )
     if is_completed and enqueue_completion_followups:
-        from app.workers.tasks.daily_cup_nonfinishers_summary import (
-            enqueue_daily_cup_nonfinishers_summary,
-        )
-        from app.workers.tasks.daily_cup_proof_cards import enqueue_daily_cup_proof_cards
+        if allow_completion_followups:
+            from app.workers.tasks.daily_cup_nonfinishers_summary import (
+                enqueue_daily_cup_nonfinishers_summary,
+            )
+            from app.workers.tasks.daily_cup_proof_cards import enqueue_daily_cup_proof_cards
 
-        enqueue_daily_cup_proof_cards(tournament_id=tournament_id, delay_seconds=2)
-        enqueue_daily_cup_nonfinishers_summary(tournament_id=tournament_id)
+            enqueue_daily_cup_proof_cards(tournament_id=tournament_id, delay_seconds=2)
+            enqueue_daily_cup_nonfinishers_summary(tournament_id=tournament_id)
+        else:
+            logger.info(
+                "daily_cup_completion_followups_skipped_stale_tournament",
+                tournament_id=tournament_id,
+                registration_deadline=(
+                    registration_deadline.isoformat() if registration_deadline is not None else None
+                ),
+            )
 
     return {
         "processed": 1,
