@@ -13,17 +13,17 @@ export default function EconomyPage() {
   return (
     <main className="space-y-6 py-2">
       <header className="surface rounded-2xl p-5">
-        <h1 className="text-3xl">Economy</h1>
-        <p className="mt-2 text-sm text-ember/70">Purchases, subscriptions, cohorts and LTV.</p>
+        <h1 className="text-3xl">Umsatz & Käufe</h1>
+        <p className="mt-2 text-sm text-ember/70">Käufe, Abos, Kohorten und LTV.</p>
       </header>
 
-      {isLoading || !data ? <p className="text-sm">Завантаження...</p> : null}
+      {isLoading || !data ? <p className="text-sm">Daten werden geladen...</p> : null}
 
       {data ? (
         <>
           <section className="grid gap-4 lg:grid-cols-2">
             <article className="surface rounded-2xl p-4">
-              <h2 className="text-xl">Revenue by Product</h2>
+              <h2 className="text-xl">Umsatz nach Produkt</h2>
               <div className="mt-4 h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -38,7 +38,7 @@ export default function EconomyPage() {
               </div>
             </article>
             <article className="surface rounded-2xl p-4">
-              <h2 className="text-xl">LTV Curve</h2>
+              <h2 className="text-xl">LTV-Kurve</h2>
               <div className="mt-4 h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data.charts.ltv_30d_by_cohort}>
@@ -53,16 +53,16 @@ export default function EconomyPage() {
           </section>
 
           <section className="surface overflow-x-auto rounded-2xl p-4">
-            <h2 className="text-xl">Purchases</h2>
+            <h2 className="text-xl">Käufe</h2>
             <table className="mt-4 min-w-full text-sm">
               <thead>
                 <tr className="border-b border-ember/20 text-left">
-                  <th className="py-2">User</th>
-                  <th className="py-2">Product</th>
+                  <th className="py-2">Nutzer</th>
+                  <th className="py-2">Produkt</th>
                   <th className="py-2">Stars</th>
                   <th className="py-2">EUR</th>
-                  <th className="py-2">Date</th>
-                  <th className="py-2">Source</th>
+                  <th className="py-2">Datum</th>
+                  <th className="py-2">Quelle</th>
                 </tr>
               </thead>
               <tbody>
@@ -72,7 +72,7 @@ export default function EconomyPage() {
                     <td className="py-2">{item.product}</td>
                     <td className="py-2">{item.stars}</td>
                     <td className="py-2">{item.eur}</td>
-                    <td className="py-2">{item.date ? new Date(item.date).toLocaleString("uk-UA") : "-"}</td>
+                    <td className="py-2">{item.date ? new Date(item.date).toLocaleString("de-DE") : "-"}</td>
                     <td className="py-2">{item.source}</td>
                   </tr>
                 ))}

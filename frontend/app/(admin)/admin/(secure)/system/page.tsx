@@ -11,15 +11,15 @@ export default function SystemPage() {
   return (
     <main className="space-y-6 py-2">
       <header className="surface rounded-2xl p-5">
-        <h1 className="text-3xl">System Health</h1>
+        <h1 className="text-3xl">Systemstatus</h1>
       </header>
 
-      {isLoading || !data ? <p className="text-sm">Завантаження...</p> : null}
+      {isLoading || !data ? <p className="text-sm">Daten werden geladen...</p> : null}
 
       {data ? (
         <>
           <section className="surface rounded-2xl p-4">
-            <h2 className="text-xl">Services Status</h2>
+            <h2 className="text-xl">Status der Dienste</h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               {Object.entries(data.services).map(([key, value]: [string, any]) => (
                 <article key={key} className="rounded-xl border border-ember/15 p-3 text-sm">
@@ -34,12 +34,12 @@ export default function SystemPage() {
 
           <section className="surface rounded-2xl p-4">
             <h2 className="text-xl">Queue</h2>
-            <p className="mt-2 text-sm">Pending: {data.queue_stats.pending}</p>
-            <p className="text-sm">Failed: {data.queue_stats.failed}</p>
+            <p className="mt-2 text-sm">Wartend: {data.queue_stats.pending}</p>
+            <p className="text-sm">Fehlgeschlagen: {data.queue_stats.failed}</p>
           </section>
 
           <section className="surface rounded-2xl p-4">
-            <h2 className="text-xl">API Latency (p50/p95)</h2>
+            <h2 className="text-xl">API-Latenz (p50/p95)</h2>
             <div className="mt-4 h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.api_latency}>
@@ -54,14 +54,14 @@ export default function SystemPage() {
           </section>
 
           <section className="surface rounded-2xl p-4">
-            <h2 className="text-xl">TOP-10 Errors</h2>
+            <h2 className="text-xl">TOP-10 Fehler</h2>
             <div className="mt-3 space-y-2 text-sm">
               {data.top_10_errors.map((row: any) => (
                 <div key={row.type} className="rounded-lg border border-ember/15 bg-white/70 px-3 py-2">
                   {row.type}: {row.count}
                 </div>
               ))}
-              {data.top_10_errors.length === 0 ? <p>No errors in current window.</p> : null}
+              {data.top_10_errors.length === 0 ? <p>Keine Fehler im aktuellen Zeitraum.</p> : null}
             </div>
           </section>
         </>

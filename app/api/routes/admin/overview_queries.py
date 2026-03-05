@@ -15,6 +15,7 @@ from app.api.routes.admin.overview_metrics import (
     retention_day_rate,
     sum_revenue_stars,
 )
+from app.api.routes.admin.overview_feature_usage import build_feature_usage_payload
 from app.api.routes.admin.overview_series import (
     count_new_users,
     count_quiz_users,
@@ -138,6 +139,13 @@ async def build_overview_payload(
     revenue_series = await fetch_revenue_series(session, from_utc=range_start, to_utc=range_end)
     users_series = await fetch_users_series(session, from_utc=range_start, to_utc=range_end)
     top_products = await fetch_top_products(session, from_utc=range_start, to_utc=range_end)
+    feature_usage = await build_feature_usage_payload(
+        session,
+        range_start=range_start,
+        range_end=range_end,
+        prev_start=prev_start,
+        prev_end=prev_end,
+    )
 
     webhook_errors, invalid_attempts = await fetch_alert_inputs(session, now_utc=now_utc)
 
@@ -201,5 +209,6 @@ async def build_overview_payload(
             {"step": "Purchase", "value": purchase_users_now},
         ],
         "top_products": top_products,
+        "feature_usage": feature_usage,
         "alerts": alerts,
     }
