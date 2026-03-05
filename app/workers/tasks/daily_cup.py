@@ -24,6 +24,9 @@ from app.workers.tasks.daily_cup_rounds import (
     advance_daily_cup_rounds_async as _advance_daily_cup_rounds_async,
 )
 from app.workers.tasks.daily_cup_schedule import configure_daily_cup_schedule
+from app.workers.tasks.daily_cup_turn_reminder import (
+    run_daily_cup_turn_reminders_async as _run_daily_cup_turn_reminders_async,
+)
 from app.workers.tasks.daily_elimination_async import (
     run_daily_elimination_final_deadline_async as _run_daily_elimination_final_deadline_async,
 )
@@ -37,6 +40,7 @@ advance_daily_cup_rounds_async = _advance_daily_cup_rounds_async
 send_daily_cup_invite_async = _send_daily_cup_invite_async
 send_daily_cup_last_call_reminder_async = _send_daily_cup_last_call_reminder_async
 send_daily_cup_prestart_reminder_async = _send_daily_cup_prestart_reminder_async
+run_daily_cup_turn_reminders_async = _run_daily_cup_turn_reminders_async
 run_elimination_match_timeout_async = _run_elimination_match_timeout_async
 run_daily_elimination_final_deadline_async = _run_daily_elimination_final_deadline_async
 
@@ -50,6 +54,7 @@ __all__ = [
     "run_daily_cup_proof_cards",
     "run_daily_cup_round_messaging",
     "run_daily_cup_nonfinishers_summary",
+    "run_daily_cup_turn_reminders_async",
     "run_daily_elimination_final_deadline",
     "run_elimination_match_timeout",
     "send_daily_cup_invite_async",
@@ -57,6 +62,7 @@ __all__ = [
     "send_daily_cup_prestart_reminder_async",
     "send_last_call_reminder",
     "send_prestart_reminder",
+    "send_turn_reminders",
     "send_invite",
 ]
 
@@ -86,6 +92,11 @@ def send_last_call_reminder() -> dict[str, int]:
 @celery_app.task(name="app.workers.tasks.daily_cup.send_prestart_reminder")
 def send_prestart_reminder() -> dict[str, int]:
     return run_async_job(send_daily_cup_prestart_reminder_async())
+
+
+@celery_app.task(name="app.workers.tasks.daily_cup.send_turn_reminders")
+def send_turn_reminders() -> dict[str, int]:
+    return run_async_job(run_daily_cup_turn_reminders_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.close_registration_and_start")

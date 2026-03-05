@@ -18,12 +18,12 @@ from app.db.session import SessionLocal
 from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES, TOURNAMENT_STATUS_COMPLETED
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
+from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
 from app.workers.tasks.daily_cup_proof_cards_text import (
     build_caption,
     format_points,
     format_user_label,
 )
-from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
 from app.workers.tasks.tournaments_proof_card_render import render_tournament_proof_card_png
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_proof_cards")
