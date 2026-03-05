@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deutschkurs Niveaustufen A0–C2 | GER/CEFR Lernplan</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Source+Sans+3:wght@300;400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f13;
+    --surface: #17171e;
+    --border: #2a2a38;
+    --text: #e8e6f0;
+    --muted: #8a8aa0;
+    --accent: #f0c040;
+
+    --a0: #9b9b9b;
+    --a1: #6ec6e0;
+    --a2: #4db8a8;
+    --b1: #7ec86e;
+    --b2: #c8b84e;
+    --c1: #e07848;
+    --c2: #d04870;
+
+    --a0-bg: rgba(155,155,155,0.08);
+    --a1-bg: rgba(110,198,224,0.08);
+    --a2-bg: rgba(77,184,168,0.08);
+    --b1-bg: rgba(126,200,110,0.08);
+    --b2-bg: rgba(200,184,78,0.08);
+    --c1-bg: rgba(224,120,72,0.08);
+    --c2-bg: rgba(208,72,112,0.08);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Sans 3', sans-serif;
+    font-weight: 300;
+    line-height: 1.75;
+    min-height: 100vh;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    padding: 88px 24px 64px;
+    text-align: center;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(240,192,64,0.13) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 40% at 80% 80%, rgba(208,72,112,0.09) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .hero-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 18px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.1s forwards;
+  }
+  .hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.4rem, 6vw, 4.8rem);
+    font-weight: 900;
+    line-height: 1.1;
+    margin-bottom: 22px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.25s forwards;
+  }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero-sub {
+    max-width: 660px;
+    margin: 0 auto 44px;
+    color: var(--muted);
+    font-size: 1.08rem;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.4s forwards;
+  }
+
+  /* ── LEVEL STRIP ── */
+  .level-strip {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-bottom: 10px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.55s forwards;
+  }
+  .level-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 5px 16px;
+    border-radius: 20px;
+    border: 1.5px solid currentColor;
+  }
+  .pill-a0 { color: var(--a0); }
+  .pill-a1 { color: var(--a1); }
+  .pill-a2 { color: var(--a2); }
+  .pill-b1 { color: var(--b1); }
+  .pill-b2 { color: var(--b2); }
+  .pill-c1 { color: var(--c1); }
+  .pill-c2 { color: var(--c2); }
+
+  .group-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    text-align: center;
+    margin-bottom: 36px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.65s forwards;
+  }
+
+  /* ── CEFR SUMMARY BAR ── */
+  .cefr-bar {
+    max-width: 860px;
+    margin: 0 auto 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.75s forwards;
+  }
+  @media (max-width: 600px) { .cefr-bar { grid-template-columns: 1fr; } }
+  .cefr-group {
+    padding: 22px 26px;
+    border-right: 1px solid var(--border);
+    text-align: center;
+  }
+  .cefr-group:last-child { border-right: none; }
+  .cefr-group-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 7px;
+  }
+  .cefr-group-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.12rem;
+    font-weight: 700;
+    margin-bottom: 5px;
+  }
+  .cefr-group-sub { font-size: 0.82rem; color: var(--muted); }
+  .cefr-group.elementary .cefr-group-title { color: var(--a1); }
+  .cefr-group.independent .cefr-group-title { color: var(--b1); }
+  .cefr-group.proficient .cefr-group-title { color: var(--c1); }
+
+  /* ── MAIN CONTAINER ── */
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 24px 88px;
+  }
+
+  /* ── SECTION HEADER ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 60px 0 32px;
+  }
+  .section-header::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .section-header h2 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* ── LEVEL CARD ── */
+  .level-card {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 28px;
+    opacity: 0;
+    animation: fadeUp 0.5s ease forwards;
+    transition: border-color 0.25s;
+  }
+  .level-card:nth-child(1) { animation-delay: 0.05s; }
+  .level-card:nth-child(2) { animation-delay: 0.12s; }
+  .level-card:nth-child(3) { animation-delay: 0.19s; }
+  .level-card:nth-child(4) { animation-delay: 0.26s; }
+  .level-card:nth-child(5) { animation-delay: 0.33s; }
+  .level-card:nth-child(6) { animation-delay: 0.40s; }
+  .level-card:nth-child(7) { animation-delay: 0.47s; }
+
+  .card-header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 20px;
+    padding: 26px 30px 22px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .level-badge {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.4rem;
+    font-weight: 900;
+    line-height: 1;
+    width: 68px;
+    text-align: center;
+  }
+  .card-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 5px;
+  }
+  .card-subtitle { font-size: 0.86rem; color: var(--muted); }
+  .card-toggle {
+    font-size: 22px;
+    color: var(--muted);
+    transition: transform 0.3s;
+    line-height: 1;
+  }
+  .level-card.open .card-toggle { transform: rotate(180deg); }
+
+  .card-body {
+    padding: 0 30px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease, padding 0.3s ease;
+  }
+  .level-card.open .card-body {
+    max-height: 3000px;
+    padding-bottom: 30px;
+  }
+
+  /* ── DESCRIPTION PARAGRAPH ── */
+  .card-description {
+    font-size: 0.97rem;
+    color: var(--muted);
+    margin-bottom: 24px;
+    line-height: 1.8;
+    padding: 16px 20px;
+    background: rgba(255,255,255,0.025);
+    border-radius: 10px;
+    border-left: 3px solid currentColor;
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 640px) {
+    .card-grid { grid-template-columns: 1fr; }
+    .card-header { gap: 12px; padding: 20px 20px 18px; }
+    .card-body { padding: 0 20px; }
+    .level-card.open .card-body { padding-bottom: 20px; }
+  }
+
+  .card-block {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .card-block h4 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 13px;
+  }
+  .card-block ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .card-block ul li {
+    font-size: 0.91rem;
+    padding-left: 20px;
+    position: relative;
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .card-block ul li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    font-size: 0.75rem;
+    top: 2px;
+  }
+  .card-block-full { grid-column: 1 / -1; }
+
+  .grammar-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .grammar-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 4px 11px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .example-item {
+    font-family: 'Playfair Display', serif;
+    font-size: 0.97rem;
+    font-style: italic;
+    color: var(--text);
+    padding: 9px 15px;
+    border-left: 2.5px solid currentColor;
+    margin-bottom: 9px;
+    background: rgba(255,255,255,0.025);
+    border-radius: 0 7px 7px 0;
+    line-height: 1.6;
+  }
+  .example-item .translation {
+    display: block;
+    font-family: 'Source Sans 3', sans-serif;
+    font-style: normal;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .selftest-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.91rem;
+    margin-bottom: 9px;
+    line-height: 1.6;
+  }
+  .selftest-check {
+    width: 20px;
+    height: 20px;
+    border: 1.5px solid var(--border);
+    border-radius: 5px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .time-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 5px 12px;
+    margin-top: 14px;
+  }
+
+  /* ── LEVEL COLORS ── */
+  .lv-a0 { color: var(--a0); border-color: rgba(155,155,155,0.2); }
+  .lv-a1 { color: var(--a1); border-color: rgba(110,198,224,0.2); }
+  .lv-a2 { color: var(--a2); border-color: rgba(77,184,168,0.2); }
+  .lv-b1 { color: var(--b1); border-color: rgba(126,200,110,0.2); }
+  .lv-b2 { color: var(--b2); border-color: rgba(200,184,78,0.2); }
+  .lv-c1 { color: var(--c1); border-color: rgba(224,120,72,0.2); }
+  .lv-c2 { color: var(--c2); border-color: rgba(208,72,112,0.2); }
+
+  .level-card.lv-a0:hover { border-color: var(--a0); }
+  .level-card.lv-a1:hover { border-color: var(--a1); }
+  .level-card.lv-a2:hover { border-color: var(--a2); }
+  .level-card.lv-b1:hover { border-color: var(--b1); }
+  .level-card.lv-b2:hover { border-color: var(--b2); }
+  .level-card.lv-c1:hover { border-color: var(--c1); }
+  .level-card.lv-c2:hover { border-color: var(--c2); }
+
+  .example-item.lv-a0 { border-color: var(--a0); }
+  .example-item.lv-a1 { border-color: var(--a1); }
+  .example-item.lv-a2 { border-color: var(--a2); }
+  .example-item.lv-b1 { border-color: var(--b1); }
+  .example-item.lv-b2 { border-color: var(--b2); }
+  .example-item.lv-c1 { border-color: var(--c1); }
+  .example-item.lv-c2 { border-color: var(--c2); }
+
+  .card-description.lv-a0 { border-color: var(--a0); }
+  .card-description.lv-a1 { border-color: var(--a1); }
+  .card-description.lv-a2 { border-color: var(--a2); }
+  .card-description.lv-b1 { border-color: var(--b1); }
+  .card-description.lv-b2 { border-color: var(--b2); }
+  .card-description.lv-c1 { border-color: var(--c1); }
+  .card-description.lv-c2 { border-color: var(--c2); }
+
+  /* ── PROGRESS BAR ── */
+  .progress-track {
+    max-width: 860px;
+    margin: 0 auto 68px;
+    padding: 28px 24px 0;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.85s forwards;
+  }
+  .progress-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .pb-seg { height: 100%; }
+  .pb-a0 { flex: 1; background: var(--a0); }
+  .pb-a1 { flex: 1.2; background: var(--a1); }
+  .pb-a2 { flex: 1.4; background: var(--a2); }
+  .pb-b1 { flex: 1.6; background: var(--b1); }
+  .pb-b2 { flex: 1.8; background: var(--b2); }
+  .pb-c1 { flex: 2; background: var(--c1); }
+  .pb-c2 { flex: 2.2; background: var(--c2); }
+  .progress-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  /* ── ASSESSMENT GRID ── */
+  .assessment-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 600px) { .assessment-grid { grid-template-columns: 1fr 1fr; } }
+  .ag-cell {
+    background: var(--surface);
+    padding: 22px 16px;
+    text-align: center;
+  }
+  .ag-icon { font-size: 30px; margin-bottom: 10px; }
+  .ag-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 7px;
+  }
+  .ag-desc { font-size: 0.83rem; color: var(--muted); line-height: 1.5; }
+
+  /* ── EXAMS TABLE ── */
+  .exams-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 28px;
+    font-size: 0.88rem;
+  }
+  .exams-table th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .exams-table td {
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  .exams-table tr:last-child td { border-bottom: none; }
+  .exams-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ── TIPS GRID ── */
+  .tips-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 600px) { .tips-grid { grid-template-columns: 1fr; } }
+  .tip-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px;
+  }
+  .tip-icon { font-size: 26px; margin-bottom: 12px; }
+  .tip-title {
+    font-family: 'Source Sans 3', sans-serif;
+    font-weight: 600;
+    font-size: 0.97rem;
+    margin-bottom: 7px;
+  }
+  .tip-desc { font-size: 0.86rem; color: var(--muted); line-height: 1.65; }
+
+  /* ── NOTICE BOX ── */
+  .notice {
+    background: rgba(240,192,64,0.07);
+    border: 1px solid rgba(240,192,64,0.2);
+    border-radius: 10px;
+    padding: 18px 22px;
+    font-size: 0.89rem;
+    color: var(--muted);
+    margin-bottom: 28px;
+    line-height: 1.7;
+  }
+  .notice strong { color: var(--accent); }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 36px 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.83rem;
+    line-height: 1.8;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════ HERO ════════════════════ -->
+<header class="hero">
+  <p class="hero-eyebrow">GER / CEFR · Gemeinsamer Europäischer Referenzrahmen</p>
+  <h1>Lernweg Deutsch:<br><em>A0 bis C2</em></h1>
+  <p class="hero-sub">Vollständige Beschreibung jeder Niveaustufe — was Sie können, welche Grammatik Sie brauchen, wie lange das Lernen dauert und welche Prüfungen Ihr Niveau bestätigen.</p>
+
+  <div class="level-strip">
+    <span class="level-pill pill-a0">A0</span>
+    <span class="level-pill pill-a1">A1</span>
+    <span class="level-pill pill-a2">A2</span>
+    <span class="level-pill pill-b1">B1</span>
+    <span class="level-pill pill-b2">B2</span>
+    <span class="level-pill pill-c1">C1</span>
+    <span class="level-pill pill-c2">C2</span>
+  </div>
+  <p class="group-label">Elementar · Selbstständig · Kompetent</p>
+</header>
+
+<!-- ════════════════════ CEFR OVERVIEW ════════════════════ -->
+<div class="container" style="max-width:860px; padding-bottom:0;">
+  <div class="cefr-bar">
+    <div class="cefr-group elementary">
+      <p class="cefr-group-label">A1 – A2</p>
+      <p class="cefr-group-title">Elementare Verwendung</p>
+      <p class="cefr-group-sub">Grundlegende Kommunikationsfähigkeit für den Alltag</p>
+    </div>
+    <div class="cefr-group independent">
+      <p class="cefr-group-label">B1 – B2</p>
+      <p class="cefr-group-title">Selbstständige Verwendung</p>
+      <p class="cefr-group-sub">Eigenständige Kommunikation in Beruf, Studium und Gesellschaft</p>
+    </div>
+    <div class="cefr-group proficient">
+      <p class="cefr-group-label">C1 – C2</p>
+      <p class="cefr-group-title">Kompetente Verwendung</p>
+      <p class="cefr-group-sub">Freies, präzises Sprachhandeln auf akademischem und beruflichem Spitzenniveau</p>
+    </div>
+  </div>
+
+  <div class="progress-track">
+    <div class="progress-bar">
+      <div class="pb-seg pb-a0"></div>
+      <div class="pb-seg pb-a1"></div>
+      <div class="pb-seg pb-a2"></div>
+      <div class="pb-seg pb-b1"></div>
+      <div class="pb-seg pb-b2"></div>
+      <div class="pb-seg pb-c1"></div>
+      <div class="pb-seg pb-c2"></div>
+    </div>
+    <div class="progress-labels">
+      <span>A0</span><span>A1</span><span>A2</span><span>B1</span><span>B2</span><span>C1</span><span>C2</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ LEVEL CARDS ════════════════════ -->
+<div class="container">
+
+  <div class="section-header"><h2>Niveaustufen im Detail</h2></div>
+
+  <!-- ─── A0 ─── -->
+  <div class="level-card lv-a0" id="lv-a0">
+    <div class="card-header" onclick="toggleCard('lv-a0')">
+      <div class="level-badge">A0</div>
+      <div>
+        <p class="card-title">Vorstufe / Einstieg</p>
+        <p class="card-subtitle">Pre-A1 · „Ich bin neu" · Erste Wörter und Phrasen</p>
+      </div>
+      <div class="card-toggle">▾</div>
+    </div>
+    <div class="card-body">
+      <p class="card-description lv-a0">
+        A0 ist keine offizielle Stufe des GER/CEFR – sie beschreibt den Zustand <strong>vor dem Einstieg</strong> in das System. Auf diesem Niveau haben Sie noch keine aktive Sprachkompetenz, aber Sie können erste Wörter, das Alphabet und einfache Begrüßungen aufnehmen. Viele Sprachschulen verwenden A0 als praktischen Startpunkt, um den Übergang zu A1 strukturiert zu gestalten. Das Ziel ist einfach: erste Hemmungen abbauen, sich mit Klang und Rhythmus des Deutschen vertraut machen und ein solides Fundament für A1 legen.
+      </p>
+      <div class="card-grid">
+        <div class="card-block">
+          <h4>Was Sie bereits können</h4>
+          <ul>
+            <li>Sehr einfache Wörter verstehen: Hallo, Danke, Ja, Nein, Bitte</li>
+            <li>Sich mit wenigen Wörtern vorstellen: Name, Herkunftsland</li>
+            <li>Das Alphabet buchstabieren: M-A-X</li>
+            <li>Zahlen von 1 bis 20 nennen</li>
+            <li>Grundlegende Farben und Wochentage kennen</li>
+            <li>Einfache Schilder und Aufschriften lesen (Eingang, Ausgang, WC)</li>
+          </ul>
+        </div>
+        <div class="card-block">
+          <h4>Typische Themen</h4>
+          <ul>
+            <li>Begrüßung und Verabschiedung</li>
+            <li>Name, Alter, Herkunftsland</li>
+            <li>Zahlen 1–100, Farben</li>
+            <li>Wochentage und Monate</li>
+            <li>Einfache Orte: Bahnhof, Schule, Café, Supermarkt</li>
+            <li>Höfliche Grundformeln: Entschuldigung, Wie bitte?</li>
+          </ul>
+        </div>
+        <div class="card-block card-block-full">
+          <h4>Erste Grammatikbausteine</h4>
+          <div class="grammar-tags">
+            <span class="grammar-tag">Artikel: der / die / das</span>
+            <span class="grammar-tag">Personalpronomen: ich, du, er, sie, es</span>
+            <span class="grammar-tag">Präsens von sein und haben</span>
+            <span class="grammar-tag">Basisverben: heißen, kommen, wohnen</span>
+            <span class="grammar-tag">W-Fragen: Wie? Woher? Was?</span>
+            <span class="grammar-tag">Zahlen 1–100</span>
+          </div>
+        </div>
+        <div class="card-block">
+          <h4>Kleiner Selbsttest</h4>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann meinen Namen auf Deutsch buchstabieren.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann sagen: „Ich heiße … / Ich komme aus …"</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kenne die Zahlen von 1 bis 20.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich verstehe einfache Begrüßungen und kann sie erwidern.</span></div>
+        </div>
+        <div class="card-block">
+          <h4>Beispielsätze</h4>
+          <div class="example-item lv-a0">„Hallo! Ich heiße Lina. Ich komme aus der Ukraine."</div>
+          <div class="example-item lv-a0">„Mein Name ist Max. Ich bin zwanzig Jahre alt."</div>
+          <div class="example-item lv-a0">„Entschuldigung! Wie bitte?"</div>
+        </div>
+      </div>
+      <div class="time-badge">⏱ 0 – 60 Unterrichtsstunden</div>
+    </div>
+  </div>
+
+  <!-- ─── A1 ─── -->
+  <div class="level-card lv-a1" id="lv-a1">
+    <div class="card-header" onclick="toggleCard('lv-a1')">
+      <div class="level-badge">A1</div>
+      <div>
+        <p class="card-title">Elementare Sprachverwendung</p>
+        <p class="card-subtitle">„Überleben im Alltag" · Erste offizielle GER/CEFR-Stufe</p>
+      </div>
+      <div class="card-toggle">▾</div>
+    </div>
+    <div class="card-body">
+      <p class="card-description lv-a1">
+        Auf A1 können Sie sich in <strong>einfachen, vertrauten Alltagssituationen</strong> verständigen, sofern Ihr Gesprächspartner langsam und deutlich spricht und bereit ist, zu helfen. Sie verstehen und benutzen sehr geläufige Ausdrücke und ganz einfache Sätze. Das Ziel ist nicht Perfektion, sondern funktionale Kommunikation: im Café bestellen, nach dem Weg fragen, sich vorstellen. Auf A1 lernt man, Deutsch als Überlebensinstrument im Alltag einzusetzen.
+      </p>
+      <div class="card-grid">
+        <div class="card-block">
+          <h4>Was Sie können</h4>
+          <ul>
+            <li>Sich vorstellen und einfache persönliche Fragen stellen und beantworten</li>
+            <li>Im Café oder Restaurant bestellen und bezahlen</li>
+            <li>Nach dem Weg fragen und einfache Wegbeschreibungen verstehen</li>
+            <li>Einfache Formulare ausfüllen (Name, Adresse, Geburtsdatum)</li>
+            <li>Kurze Ansagen verstehen, wenn langsam und deutlich gesprochen wird</li>
+            <li>Über Familie, Beruf und Wohnort sprechen</li>
+          </ul>
+        </div>
+        <div class="card-block">
+          <h4>Typische Themen</h4>
+          <ul>
+            <li>Familie und Freunde</li>
+            <li>Wohnung, Haus, Zimmer</li>
+            <li>Essen, Trinken, Einkaufen</li>
+            <li>Uhrzeit, Tagesablauf, Wochentage</li>
+            <li>Berufe und Hobbys</li>
+            <li>Stadtteile, Verkehrsmittel</li>
+          </ul>
+        </div>
+        <div class="card-block card-block-full">
+          <h4>Grammatik auf diesem Niveau</h4>
+          <div class="grammar-tags">
+            <span class="grammar-tag">Präsens – regelmäßige Verben</span>
+            <span class="grammar-tag">Modalverben: können, müssen, wollen, möchten</span>
+            <span class="grammar-tag">Negation: nicht / kein</span>
+            <span class="grammar-tag">Nominativ &amp; Akkusativ</span>
+            <span class="grammar-tag">Trennbare Verben (erste)</span>
+            <span class="grammar-tag">W-Fragen + Ja-/Nein-Fragen</span>
+            <span class="grammar-tag">Possessivpronomen: mein, dein, sein</span>
+            <span class="grammar-tag">Plural der Nomen (häufigste Formen)</span>
+          </div>
+        </div>
+        <div class="card-block">
+          <h4>Kleiner Selbsttest</h4>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann im Café einen Kaffee und die Rechnung bestellen.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann nach dem Weg zur U-Bahn fragen.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich verstehe, wenn jemand langsam und deutlich mit mir spricht.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann einfache Angaben zu meiner Person machen.</span></div>
+        </div>
+        <div class="card-block">
+          <h4>Beispielsätze</h4>
+          <div class="example-item lv-a1">„Ich hätte gern einen Kaffee und ein Croissant, bitte. Und die Rechnung, bitte."</div>
+          <div class="example-item lv-a1">„Entschuldigung, wo ist die nächste U-Bahn-Station?"</div>
+          <div class="example-item lv-a1">„Ich wohne in Wien. Ich arbeite als Lehrerin. Ich habe zwei Kinder."</div>
+        </div>
+      </div>
+      <div class="time-badge">⏱ 60 – 160 Unterrichtsstunden (ab Null)</div>
+    </div>
+  </div>
+
+  <!-- ─── A2 ─── -->
+  <div class="level-card lv-a2" id="lv-a2">
+    <div class="card-header" onclick="toggleCard('lv-a2')">
+      <div class="level-badge">A2</div>
+      <div>
+        <p class="card-title">Sicherer Alltag</p>
+        <p class="card-subtitle">„Alltag sicher erklären" · Routinesituationen ohne Stress</p>
+      </div>
+      <div class="card-toggle">▾</div>
+    </div>
+    <div class="card-body">
+      <p class="card-description lv-a2">
+        Auf A2 können Sie sich in <strong>routinemäßigen Alltagssituationen</strong> verständigen und über vertraute Themen sprechen oder schreiben. Sie sind in der Lage, einfache Informationen über sich und Ihre Umgebung auszutauschen. Anders als auf A1 können Sie jetzt auch über <strong>Vergangenes berichten</strong>, Termine vereinbaren und einfache Gründe nennen. A2 ist der erste Schritt zur sprachlichen Selbstständigkeit im deutschsprachigen Alltag.
+      </p>
+      <div class="card-grid">
+        <div class="card-block">
+          <h4>Was Sie können</h4>
+          <ul>
+            <li>Alltagssituationen bewältigen: Arzttermin, Bank, Supermarkt, Behörden (einfach)</li>
+            <li>Kurz erzählen, was gestern oder letzte Woche passiert ist</li>
+            <li>Einen Termin telefonisch vereinbaren oder absagen</li>
+            <li>Einfache SMS, Notizen oder kurze E-Mails schreiben</li>
+            <li>Einfache Gründe nennen und verknüpfen: „weil …", „deshalb …"</li>
+            <li>Kurze Ankündigungen, Schilder und Menüs verstehen</li>
+          </ul>
+        </div>
+        <div class="card-block">
+          <h4>Typische Themen</h4>
+          <ul>
+            <li>Gesundheit, Arztbesuch, Apotheke</li>
+            <li>Arbeit, Kollegen, Büro</li>
+            <li>Feste, Traditionen, Jahreszeiten</li>
+            <li>Wochenendpläne und Freizeitaktivitäten</li>
+            <li>Einfache Beschwerden und Bitten</li>
+            <li>Reisen, Unterkunft, Ausflüge</li>
+          </ul>
+        </div>
+        <div class="card-block card-block-full">
+          <h4>Grammatik auf diesem Niveau</h4>
+          <div class="grammar-tags">
+            <span class="grammar-tag">Perfekt (Hauptvergangenheit)</span>
+            <span class="grammar-tag">Akkusativ &amp; Dativ (sicher)</span>
+            <span class="grammar-tag">Trennbare und untrennbare Verben</span>
+            <span class="grammar-tag">Nebensätze: weil, dass, wenn</span>
+            <span class="grammar-tag">Vergleiche: größer als / am besten</span>
+            <span class="grammar-tag">Präpositionen mit Dativ und Akkusativ</span>
+            <span class="grammar-tag">Imperativ (Aufforderungen)</span>
+            <span class="grammar-tag">Zeitangaben: damals, gestern, nächste Woche</span>
+          </div>
+        </div>
+        <div class="card-block">
+          <h4>Kleiner Selbsttest</h4>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann beim Arzt einen Termin telefonisch vereinbaren.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann erzählen, was ich gestern gemacht habe.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich verstehe einfache Briefe und Aushänge.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann einen Termin verschieben oder absagen.</span></div>
+        </div>
+        <div class="card-block">
+          <h4>Beispielsätze</h4>
+          <div class="example-item lv-a2">„Ich habe gestern beim Arzt angerufen, weil ich Halsschmerzen habe."</div>
+          <div class="example-item lv-a2">„Können wir den Termin auf Donnerstagnachmittag verschieben?"</div>
+          <div class="example-item lv-a2">„Ich stehe um sieben Uhr auf und fahre mit der U-Bahn zur Arbeit."</div>
+        </div>
+      </div>
+      <div class="time-badge">⏱ 160 – 350 Unterrichtsstunden (ab Null)</div>
+    </div>
+  </div>
+
+  <!-- ─── B1 ─── -->
+  <div class="level-card lv-b1" id="lv-b1">
+    <div class="card-header" onclick="toggleCard('lv-b1')">
+      <div class="level-badge">B1</div>
+      <div>
+        <p class="card-title">Selbstständiges Sprechen</p>
+        <p class="card-subtitle">„Zusammenhängend sprechen" · Mindestanforderung für Aufenthalt &amp; Arbeit</p>
+      </div>
+      <div class="card-toggle">▾</div>
+    </div>
+    <div class="card-body">
+      <div class="notice"><strong>⚡ Wichtig:</strong> B1 ist das <strong>gesetzliche Mindesterfordernis</strong> für den dauerhaften Aufenthalt in Österreich (Niederlassungsbewilligung) und Deutschland (Niederlassungserlaubnis). In der Schweiz ist B1 Voraussetzung für die Einbürgerung. Auch für viele Ausbildungsberufe und die Anerkennung ausländischer Abschlüsse wird B1 verlangt.</div>
+      <p class="card-description lv-b1">
+        Auf B1 verstehen Sie die <strong>Hauptaussagen klarer Standardsprache</strong> zu vertrauten Themen aus Alltag, Schule und Beruf. Sie können die meisten Situationen bewältigen, die beim Reisen in einem deutschsprachigen Land entstehen. Sie können sich einfach und zusammenhängend zu vertrauten Themen äußern und über Erfahrungen, Ereignisse, Träume und Ziele berichten und kurze Begründungen oder Erklärungen geben. B1 bedeutet: Sie kommunizieren nicht mehr nur reaktiv – Sie <em>gestalten</em> aktiv Gespräche.
+      </p>
+      <div class="card-grid">
+        <div class="card-block">
+          <h4>Was Sie können</h4>
+          <ul>
+            <li>Über Erfahrungen, Pläne und Wünsche zusammenhängend sprechen</li>
+            <li>Eine einfache Meinung äußern und kurz begründen</li>
+            <li>Längere Alltagsgespräche führen – nicht perfekt, aber stabil</li>
+            <li>E-Mails, Beschwerden und kurze Bewerbungen schreiben</li>
+            <li>Den Inhalt von Radionachrichten und einfachen Podcasts verstehen</li>
+            <li>Texte zu vertrauten Themen lesen und den Hauptgedanken erfassen</li>
+          </ul>
+        </div>
+        <div class="card-block">
+          <h4>Typische Themen</h4>
+          <ul>
+            <li>Ausbildung, Studium, Berufseinstieg</li>
+            <li>Gesellschaft, Umwelt, Medien</li>
+            <li>Kultur, Reisen, Sport, Freizeit</li>
+            <li>Probleme und Lösungen im Alltag</li>
+            <li>Offizielle Briefe und Anträge</li>
+            <li>Persönliche Träume und Lebenspläne</li>
+          </ul>
+        </div>
+        <div class="card-block card-block-full">
+          <h4>Grammatik auf diesem Niveau</h4>
+          <div class="grammar-tags">
+            <span class="grammar-tag">Präteritum (sein, haben, Modalverben)</span>
+            <span class="grammar-tag">Nebensätze: obwohl, damit, während, als, bevor</span>
+            <span class="grammar-tag">Infinitiv mit zu</span>
+            <span class="grammar-tag">Konjunktiv II (hätte, wäre, würde) – Grundlagen</span>
+            <span class="grammar-tag">Relativsätze (Nominativ / Akkusativ)</span>
+            <span class="grammar-tag">Passiv Präsens – erste Einführung</span>
+            <span class="grammar-tag">Erste feste Redewendungen</span>
+            <span class="grammar-tag">Indirekte Fragen: Ich weiß nicht, ob …</span>
+          </div>
+        </div>
+        <div class="card-block">
+          <h4>Kleiner Selbsttest</h4>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann 2–3 Minuten frei über ein Thema sprechen.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann eine E-Mail schreiben, in der ich um Hilfe bitte.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich verstehe den Kern von Radionachrichten zu vertrauten Themen.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann meine Meinung äußern und einfach begründen.</span></div>
+        </div>
+        <div class="card-block">
+          <h4>Beispielsätze</h4>
+          <div class="example-item lv-b1">„Ich war letzten Sommer in München. Es hat mir sehr gut gefallen, obwohl es ziemlich teuer war."</div>
+          <div class="example-item lv-b1">„Ich denke, dass Deutschkenntnisse wichtig sind, weil ich hier langfristig arbeiten möchte."</div>
+          <div class="example-item lv-b1">„Ich möchte einen Termin vereinbaren, um das Problem persönlich zu besprechen."</div>
+        </div>
+      </div>
+      <div class="time-badge">⏱ 350 – 600 Unterrichtsstunden (ab Null)</div>
+    </div>
+  </div>
+
+  <!-- ─── B2 ─── -->
+  <div class="level-card lv-b2" id="lv-b2">
+    <div class="card-header" onclick="toggleCard('lv-b2')">
+      <div class="level-badge">B2</div>
+      <div>
+        <p class="card-title">Fließend und flexibel</p>
+        <p class="card-subtitle">„Flüssig und flexibel" · Sicher in Beruf und Studium</p>
+      </div>
+      <div class="card-toggle">▾</div>
+    </div>
+    <div class="card-body">
+      <div class="notice"><strong>⚡ Wichtig:</strong> B2 ist das <strong>Mindestniveau für die Zulassung zu den meisten Universitäten</strong> in Österreich und Deutschland. Für medizinische Berufe (Ärzte, Pflegepersonal, Apotheker) ist B2 in der Regel die gesetzlich vorgeschriebene Mindestvoraussetzung für die Berufsanerkennung.</div>
+      <p class="card-description lv-b2">
+        Auf B2 verstehen Sie die Hauptinhalte <strong>komplexer Texte zu konkreten und abstrakten Themen</strong>, einschließlich Fachdiskussionen in Ihrem Spezialgebiet. Sie können sich so spontan und fließend verständigen, dass ein normales Gespräch mit einem Muttersprachler ohne größere Anstrengung möglich ist. Sie können sich zu einem breiten Themenspektrum klar und detailliert ausdrücken und einen Standpunkt zu einer aktuellen Frage erläutern sowie Vor- und Nachteile verschiedener Möglichkeiten angeben.
+      </p>
+      <div class="card-grid">
+        <div class="card-block">
+          <h4>Was Sie können</h4>
+          <ul>
+            <li>An Diskussionen teilnehmen und Argumente strukturiert darlegen</li>
+            <li>Berufliche Verhandlungen und Besprechungen sicher führen</li>
+            <li>Klare, detaillierte Texte schreiben: Berichte, Stellungnahmen, Zusammenfassungen</li>
+            <li>Authentische Texte und Rundfunksendungen verstehen</li>
+            <li>Spontan reagieren, ohne sichtbar nach Worten suchen zu müssen</li>
+            <li>Stil und Ton je nach Situation anpassen (formell / informell)</li>
+          </ul>
+        </div>
+        <div class="card-block">
+          <h4>Typische Themen</h4>
+          <ul>
+            <li>Wirtschaft, Gesellschaft, aktuelle Politik</li>
+            <li>Wissenschaft und Technologie (zugänglich)</li>
+            <li>Kunst, Film, Literatur, Musik</li>
+            <li>Geschäftskorrespondenz und Berichte</li>
+            <li>Abstrakte Konzepte und Ideen</li>
+            <li>Interkulturelle Fragen und Lebensstile</li>
+          </ul>
+        </div>
+        <div class="card-block card-block-full">
+          <h4>Grammatik auf diesem Niveau</h4>
+          <div class="grammar-tags">
+            <span class="grammar-tag">Konjunktiv II (erweitert und sicher)</span>
+            <span class="grammar-tag">Passiv (Präteritum, Perfekt, mit Modalverben)</span>
+            <span class="grammar-tag">Nominalisierung (Verb → Nomen)</span>
+            <span class="grammar-tag">Partizipialkonstruktionen</span>
+            <span class="grammar-tag">Zweiteilige Konnektoren: sowohl … als auch, entweder … oder</span>
+            <span class="grammar-tag">Konjunktiv I (indirekte Rede)</span>
+            <span class="grammar-tag">Stilistische Register: neutral, formell, umgangssprachlich</span>
+            <span class="grammar-tag">Erweiterte Relativsätze (alle Fälle)</span>
+          </div>
+        </div>
+        <div class="card-block">
+          <h4>Kleiner Selbsttest</h4>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann spontan argumentieren, ohne lange nach Worten zu suchen.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann einen logisch aufgebauten Bericht oder eine Stellungnahme schreiben.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich verstehe die meisten Fernsehsendungen und Zeitungsartikel.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann Vor- und Nachteile eines Themas differenziert darstellen.</span></div>
+        </div>
+        <div class="card-block">
+          <h4>Beispielsätze</h4>
+          <div class="example-item lv-b2">„Meiner Meinung nach hat diese Maßnahme zwei wesentliche Vorteile, allerdings auch einen erheblichen Nachteil, der nicht unterschätzt werden sollte."</div>
+          <div class="example-item lv-b2">„Wenn ich mehr Zeit hätte, würde ich einen intensiveren Kurs belegen und täglich üben."</div>
+          <div class="example-item lv-b2">„Das Problem wird in der öffentlichen Diskussion häufig vereinfacht dargestellt."</div>
+        </div>
+      </div>
+      <div class="time-badge">⏱ 600 – 900 Unterrichtsstunden (ab Null)</div>
+    </div>
+  </div>
+
+  <!-- ─── C1 ─── -->
+  <div class="level-card lv-c1" id="lv-c1">
+    <div class="card-header" onclick="toggleCard('lv-c1')">
+      <div class="level-badge">C1</div>
+      <div>
+        <p class="card-title">Akademische und berufliche Kompetenz</p>
+        <p class="card-subtitle">„Sehr sicher im Studium und Beruf" · Flexibel und treffsicher</p>
+      </div>
+      <div class="card-toggle">▾</div>
+    </div>
+    <div class="card-body">
+      <p class="card-description lv-c1">
+        Auf C1 können Sie ein <strong>breites Spektrum anspruchsvoller, längerer Texte verstehen</strong> und auch implizite Bedeutungen erfassen. Sie drücken sich fließend und spontan aus, ohne öfter merklich nach Worten suchen zu müssen. Sie verwenden die Sprache im gesellschaftlichen und beruflichen Leben oder in Ausbildung und Studium wirksam und flexibel. Sie können sich klar, strukturiert und ausführlich zu komplexen Sachverhalten äußern und dabei verschiedene Mittel zur Textverknüpfung angemessen verwenden. C1 ist das Niveau der <strong>echten sprachlichen Freiheit</strong>: Sie meistern hitzige Diskussionen, schwierige Verhandlungen und anspruchsvolle akademische Texte.
+      </p>
+      <div class="card-grid">
+        <div class="card-block">
+          <h4>Was Sie können</h4>
+          <ul>
+            <li>Implizite Bedeutungen und Zwischentöne verstehen</li>
+            <li>Präsentationen halten und Meetings moderieren</li>
+            <li>Anspruchsvolle Texte strukturieren: Analysen, Essays, Konzepte</li>
+            <li>Stil flexibel anpassen: formal, sachlich, überzeugend, diplomatisch</li>
+            <li>Komplexe akademische Vorlesungen und Fachdiskussionen folgen</li>
+            <li>Literarische und journalistische Texte verstehen und analysieren</li>
+          </ul>
+        </div>
+        <div class="card-block">
+          <h4>Typische Themen</h4>
+          <ul>
+            <li>Akademische Texte und Fachartikel</li>
+            <li>Komplexe gesellschaftliche Fragen</li>
+            <li>Juristische und geschäftliche Sprache</li>
+            <li>Öffentliche Debatten und Reden</li>
+            <li>Literarische Prosa und wissenschaftliche Abhandlungen</li>
+            <li>Interkulturelle Kommunikation auf hohem Niveau</li>
+          </ul>
+        </div>
+        <div class="card-block card-block-full">
+          <h4>Sprache und Stilmittel auf diesem Niveau</h4>
+          <div class="grammar-tags">
+            <span class="grammar-tag">Nuancierte Konnektoren: nichtsdestotrotz, insofern, währenddessen</span>
+            <span class="grammar-tag">Erweiterte Partizipialkonstruktionen</span>
+            <span class="grammar-tag">Breite stilistische Variation</span>
+            <span class="grammar-tag">Idiomatik und feste Wendungen</span>
+            <span class="grammar-tag">Präzise, differenzierte Wortwahl</span>
+            <span class="grammar-tag">Kohäsionsmittel im Text (Referenz, Substitution, Ellipse)</span>
+            <span class="grammar-tag">Rhetorik: Ironie, Understatement, Litotes</span>
+          </div>
+        </div>
+        <div class="card-block">
+          <h4>Kleiner Selbsttest</h4>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann ein komplexes Thema 5–10 Minuten frei und strukturiert präsentieren.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Meine Texte wirken auf Muttersprachler professionell und gepflegt.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich erkenne Ironie, Andeutungen und Subtext im Gespräch.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich folge akademischen Vorlesungen ohne größere Schwierigkeiten.</span></div>
+        </div>
+        <div class="card-block">
+          <h4>Beispielsätze</h4>
+          <div class="example-item lv-c1">„Zusammenfassend lässt sich feststellen, dass die Maßnahme durchaus wirksam ist, sofern die strukturellen Rahmenbedingungen entsprechend angepasst werden."</div>
+          <div class="example-item lv-c1">„Ich schlage vor, das weitere Vorgehen in drei klar definierte Phasen zu gliedern, um Transparenz und Effizienz sicherzustellen."</div>
+        </div>
+      </div>
+      <div class="time-badge">⏱ 900 – 1200 Unterrichtsstunden (ab Null)</div>
+    </div>
+  </div>
+
+  <!-- ─── C2 ─── -->
+  <div class="level-card lv-c2" id="lv-c2">
+    <div class="card-header" onclick="toggleCard('lv-c2')">
+      <div class="level-badge">C2</div>
+      <div>
+        <p class="card-title">Meisterliche Sprachbeherrschung</p>
+        <p class="card-subtitle">„Nahezu wie ein Muttersprachler" · Funktionale Perfektion</p>
+      </div>
+      <div class="card-toggle">▾</div>
+    </div>
+    <div class="card-body">
+      <p class="card-description lv-c2">
+        C2 ist die höchste Stufe des GER/CEFR. Sie können auf diesem Niveau <strong>praktisch alles, was Sie hören oder lesen, mühelos verstehen</strong>. Sie können Informationen aus verschiedenen schriftlichen und mündlichen Quellen zusammenfassen und dabei Begründungen und Erklärungen in einer zusammenhängenden Darstellung wiedergeben. Sie können sich spontan, sehr flüssig und genau ausdrücken und dabei auch bei komplexeren Sachverhalten feinere Bedeutungsnuancen deutlich machen. C2 ist nicht gleichbedeutend mit dem Niveau eines Muttersprachlers – es beschreibt vielmehr eine <em>funktionale Meisterschaft</em>, die in praktisch allen Kommunikationssituationen trägt.
+      </p>
+      <div class="card-grid">
+        <div class="card-block">
+          <h4>Was Sie können</h4>
+          <ul>
+            <li>Praktisch jeden Text und jede Rede verstehen und zusammenfassen</li>
+            <li>Spontan, flüssig und stilistisch tadellos sprechen</li>
+            <li>Komplexe Inhalte präzise und komprimiert wiedergeben</li>
+            <li>Missverständnisse elegant vermeiden – diplomatisch und präzise</li>
+            <li>Ironie, Wortspiele, Humor und kulturelle Anspielungen erkennen und einsetzen</li>
+            <li>Sich je nach Zielgruppe flexibel ausdrücken (von umgangssprachlich bis hochformell)</li>
+          </ul>
+        </div>
+        <div class="card-block">
+          <h4>Typische Themen</h4>
+          <ul>
+            <li>Jedes Thema – von der Alltagssprache bis zur Wissenschaft</li>
+            <li>Feine gesellschaftliche und kulturelle Phänomene</li>
+            <li>Spezialisierte Fachterminologie in jedem Bereich</li>
+            <li>Rhetorik, Überzeugung, Verhandlung auf höchstem Niveau</li>
+            <li>Literatur, Philosophie, Kunst</li>
+          </ul>
+        </div>
+        <div class="card-block card-block-full">
+          <h4>Merkmale der Sprachkompetenz</h4>
+          <div class="grammar-tags">
+            <span class="grammar-tag">Höchste stilistische Präzision</span>
+            <span class="grammar-tag">Vollständige idiomatische Beherrschung</span>
+            <span class="grammar-tag">Flexible Anpassung an jede Zielgruppe</span>
+            <span class="grammar-tag">Nuancierte, differenzierte Argumentation</span>
+            <span class="grammar-tag">Ironie und Humor (Verständnis &amp; Einsatz)</span>
+            <span class="grammar-tag">Minimale fremdsprachliche Merkmale</span>
+            <span class="grammar-tag">Souveräner Umgang mit Tabuthemen und heiklen Situationen</span>
+          </div>
+        </div>
+        <div class="card-block">
+          <h4>Kleiner Selbsttest</h4>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich kann einen schwierigen Text präzise zusammenfassen, ohne Nuancen zu verlieren.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich finde auch in heiklen Gesprächen die genau passende Formulierung.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Muttersprachler nehmen mich als nahezu gleichwertig wahr.</span></div>
+          <div class="selftest-item"><div class="selftest-check"></div><span>Ich erkenne Ironie, Stil und kulturelle Referenzen ohne Probleme.</span></div>
+        </div>
+        <div class="card-block">
+          <h4>Beispielsätze</h4>
+          <div class="example-item lv-c2">„Der Kernpunkt ist weniger die Maßnahme selbst als die Art und Weise, wie sie kommuniziert, wahrgenommen und letztlich in der öffentlichen Debatte verankert wird."</div>
+          <div class="example-item lv-c2">„Gestatten Sie mir, das zu präzisieren: Es geht nicht um X per se, sondern um die systemischen Implikationen, die Y langfristig nach sich zieht."</div>
+        </div>
+      </div>
+      <div class="time-badge">⏱ 1200+ Unterrichtsstunden (ab Null)</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ SELF-ASSESSMENT ════════════════════ -->
+  <div class="section-header"><h2>Wie Sie Ihr Niveau einschätzen</h2></div>
+
+  <p style="color:var(--muted); margin-bottom:24px; font-size:0.96rem; line-height:1.75;">
+    Bewerten Sie sich <strong style="color:var(--text)">getrennt in vier Kompetenzbereichen</strong>. Ihr tatsächliches Sprachniveau entspricht dem Bereich, in dem Sie in mindestens 3 von 4 Fertigkeiten stabil und zuverlässig agieren können. Oft hinkt eine Fertigkeit hinter den anderen her – das ist völlig normal und zeigt, wo gezieltes Üben am sinnvollsten ist.
+  </p>
+
+  <div class="assessment-grid">
+    <div class="ag-cell">
+      <div class="ag-icon">🎧</div>
+      <div class="ag-label">Hören</div>
+      <div class="ag-desc">Verstehen Sie gesprochene Sprache, Nachrichten, Podcasts und Filme?</div>
+    </div>
+    <div class="ag-cell">
+      <div class="ag-icon">📖</div>
+      <div class="ag-label">Lesen</div>
+      <div class="ag-desc">Verstehen Sie Briefe, Artikel, Verträge und Anleitungen?</div>
+    </div>
+    <div class="ag-cell">
+      <div class="ag-icon">🗣</div>
+      <div class="ag-label">Sprechen</div>
+      <div class="ag-desc">Können Sie spontan reagieren, erzählen und argumentieren?</div>
+    </div>
+    <div class="ag-cell">
+      <div class="ag-icon">✍️</div>
+      <div class="ag-label">Schreiben</div>
+      <div class="ag-desc">Können Sie klare, korrekte und situationsgerechte Texte verfassen?</div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ PRÜFUNGEN ════════════════════ -->
+  <div class="section-header"><h2>Offizielle Prüfungen und Zertifikate</h2></div>
+
+  <p style="color:var(--muted); margin-bottom:20px; font-size:0.95rem; line-height:1.75;">
+    Die folgende Tabelle zeigt die wichtigsten anerkannten Deutschzertifikate und ihren praktischen Nutzen. Alle genannten Prüfungen werden international anerkannt – insbesondere für Behörden, Universitäten und Arbeitgeber im deutschsprachigen Raum.
+  </p>
+
+  <table class="exams-table">
+    <thead>
+      <tr>
+        <th>Niveau</th>
+        <th>Goethe-Institut</th>
+        <th>ÖSD (Österreich)</th>
+        <th>telc</th>
+        <th>Wozu wird es benötigt?</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong style="color:var(--a1)">A1</strong></td>
+        <td>Goethe-Zertifikat A1</td>
+        <td>ÖSD Zertifikat A1</td>
+        <td>telc Deutsch A1</td>
+        <td>Familienzusammenführung (DE / AT), Einreisevisum</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--a2)">A2</strong></td>
+        <td>Goethe-Zertifikat A2</td>
+        <td>ÖSD Zertifikat A2</td>
+        <td>telc Deutsch A2</td>
+        <td>Grundlegende Sozialleistungen, manche Ausbildungsplätze</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--b1)">B1</strong></td>
+        <td>Goethe-Zertifikat B1</td>
+        <td>ÖSD Zertifikat B1</td>
+        <td>telc Deutsch B1</td>
+        <td>Niederlassungsbewilligung (AT / DE), Einbürgerung (CH), viele Berufsausbildungen</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--b2)">B2</strong></td>
+        <td>Goethe-Zertifikat B2</td>
+        <td>ÖSD Zertifikat B2</td>
+        <td>telc Deutsch B2</td>
+        <td>Hochschulzulassung (AT / DE), medizinische Berufsanerkennung (Ärzte, Pflege, Apotheke)</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--c1)">C1</strong></td>
+        <td>Goethe-Zertifikat C1</td>
+        <td>ÖSD Zertifikat C1</td>
+        <td>telc Deutsch C1 Hochschule</td>
+        <td>Akademische Karriere, Führungspositionen, MasterStudium ohne Deutschkurs</td>
+      </tr>
+      <tr>
+        <td><strong style="color:var(--c2)">C2</strong></td>
+        <td>Goethe-Zertifikat C2 (GDS)</td>
+        <td>ÖSD Zertifikat C2</td>
+        <td>—</td>
+        <td>Unterrichten, Übersetzen, Dolmetschen, Top-Management, Journalismus auf Muttersprachniveau</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ════════════════════ LERNTIPPS ════════════════════ -->
+  <div class="section-header"><h2>Tipps für effektives Lernen</h2></div>
+
+  <div class="tips-grid">
+    <div class="tip-card">
+      <div class="tip-icon">🎯</div>
+      <div class="tip-title">Täglich lernen – auch nur 15 Minuten</div>
+      <div class="tip-desc">Regelmäßigkeit schlägt Intensität: 15 Minuten täglich sind wirksamer als 3 Stunden einmal pro Woche. Unser Gehirn festigt Sprache im Schlaf und durch Wiederholung.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">📻</div>
+      <div class="tip-title">Echte Sprache hören</div>
+      <div class="tip-desc">Ab A2 regelmäßig Podcasts, „Slow German", Deutsche Welle oder Radionachrichten hören. Das schult das Hörverständnis für echte Sprechsituationen – nicht nur für den Unterricht.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">📝</div>
+      <div class="tip-title">Vokabelheft mit Kontext führen</div>
+      <div class="tip-desc">Neue Wörter immer im ganzen Satz aufschreiben, nicht isoliert. Gehirn speichert Wörter in Bedeutungsnetzwerken – Kontext ist der Schlüssel zur langfristigen Erinnerung.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">💬</div>
+      <div class="tip-title">Vom ersten Tag an sprechen</div>
+      <div class="tip-desc">Warten Sie nicht auf das „richtige Niveau". Fehler sind kein Zeichen von Schwäche – sie sind Lernmaterial. Nur wer spricht, lernt wirklich sprechen. Mut zahlt sich aus.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">🎮</div>
+      <div class="tip-title">Im Kontext eintauchen</div>
+      <div class="tip-desc">Serien mit deutschen Untertiteln schauen, auf Deutsch spielen, Bücher lesen – alles ist Sprachkontakt. Je natürlicher der Kontext, desto tiefer verankert sich die Sprache.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">🗂</div>
+      <div class="tip-title">Ein Niveau – ein Fokus</div>
+      <div class="tip-desc">Mischen Sie keine C1-Grammatik in einen A2-Kurs. Das verursacht Verwirrung und verlangsamt den Fortschritt. Wer sein Niveau kennt, lernt gezielt und effizient.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">🔁</div>
+      <div class="tip-title">Wiederholen mit System (Spaced Repetition)</div>
+      <div class="tip-desc">Nutzen Sie Apps wie Anki oder Quizlet für systematische Wiederholung. Das Spaced-Repetition-Prinzip ist wissenschaftlich belegt als effizienteste Methode für Vokabellernen.</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-icon">🧑‍🤝‍🧑</div>
+      <div class="tip-title">Tandempartner suchen</div>
+      <div class="tip-desc">Ein Sprachpartner, der Deutsch als Muttersprache spricht und Ihre Sprache lernen möchte, ist unbezahlbar. Plattformen wie Tandem, HelloTalk oder lokale Sprachcafés helfen.</div>
+    </div>
+  </div>
+
+  <div class="notice" style="margin-top:4px;">
+    <strong>Hinweis zu den Stundenzahlen:</strong> Die angegebenen Stunden sind Richtwerte des Europarates und des Goethe-Instituts. Die tatsächlich benötigte Zeit hängt von der Muttersprache ab (slawische Sprachen liegen näher am Deutschen als romanische oder türkische), von der Unterrichtsintensität, der Lernerfahrung und dem sprachlichen Umfeld. Wer in einem deutschsprachigen Land lebt, macht in der Regel deutlich schneller Fortschritte als jemand, der nur im Klassenraum lernt.
+  </div>
+
+</div>
+
+<!-- ════════════════════ FOOTER ════════════════════ -->
+<footer>
+  <p>Quellen: <a href="https://www.coe.int/en/web/common-european-framework-reference-languages" target="_blank">Europarat – GER/CEFR</a> · <a href="https://www.goethe.de" target="_blank">Goethe-Institut</a> · <a href="https://www.osd.at" target="_blank">ÖSD</a> · <a href="https://www.telc.net" target="_blank">telc GmbH</a></p>
+  <p style="margin-top:6px;">Lernplan aktualisiert 2025 · Für Unterrichtszwecke</p>
+</footer>
+
+<script>
+  function toggleCard(id) {
+    const card = document.getElementById(id);
+    card.classList.toggle('open');
+  }
+  document.getElementById('lv-a1').classList.add('open');
+</script>
+
+</body>
+</html>
