@@ -7,10 +7,9 @@ type ArticlePageProps = {
   };
 };
 
-const ARTICLE_EMBEDS: Record<string, { title: string; src: string; fileName: string }> = {
+const ARTICLE_EMBEDS: Record<string, { title: string; fileName: string }> = {
   "sprachniveaus-a1-c1": {
     title: "Sprachniveaus A1-C1",
-    src: "/artikel/sprachniveaus-a1-c1.html",
     fileName: "sprachniveaus-a1-c1.html",
   },
 };
@@ -48,33 +47,25 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   return (
     <main
       lang="de"
-      className="min-h-screen bg-[linear-gradient(135deg,#d7ebf5_0%,#e4f1e0_50%,#f8ecd8_100%)] px-4 py-8 text-slate-900 sm:px-6 sm:py-10"
+      className="min-h-screen bg-[#0f0f13] text-slate-100"
     >
-      <div className="mx-auto max-w-6xl rounded-2xl border border-white/60 bg-white/76 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.10)] backdrop-blur-xl sm:p-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="sticky top-0 z-20 border-b border-white/10 bg-[#0f0f13]/95 px-4 py-3 backdrop-blur sm:px-6">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-start">
           <a
             href="/"
-            className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50"
+            className="inline-flex items-center rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20"
           >
             ← Zur Startseite
           </a>
-          <a
-            href={article.src}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center rounded-full bg-[#E8734A] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#d7653f]"
-          >
-            Artikel im Vollbild öffnen ↗
-          </a>
         </div>
-
-        <iframe
-          srcDoc={articleHtml}
-          title={article.title}
-          loading="lazy"
-          className="h-[78vh] w-full rounded-xl border border-slate-200 bg-white sm:h-[84vh]"
-        />
       </div>
+
+      <iframe
+        srcDoc={articleHtml}
+        title={article.title}
+        loading="lazy"
+        className="block h-[calc(100vh-61px)] w-full border-0 bg-white"
+      />
     </main>
   );
 }
