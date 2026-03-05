@@ -19,6 +19,18 @@ export async function fetchEconomyPurchases() {
   return data;
 }
 
+export async function fetchEconomySubscriptions() {
+  const { data } = await api.get("/admin/economy/subscriptions", {
+    params: { status: "ACTIVE" },
+  });
+  return data;
+}
+
+export async function fetchEconomyCohorts() {
+  const { data } = await api.get("/admin/economy/cohorts");
+  return data;
+}
+
 export async function fetchUsers() {
   const { data } = await api.get("/admin/users", {
     params: { page: 1, limit: 50 },
