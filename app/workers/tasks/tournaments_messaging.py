@@ -8,12 +8,12 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.application import build_bot
 from app.bot.keyboards.tournament import build_tournament_lobby_keyboard
+from app.core.telegram_links import public_bot_start_link
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
-from app.core.telegram_links import public_bot_start_link
 from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED, TOURNAMENT_TYPE_PRIVATE
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app

@@ -11,11 +11,11 @@ from aiogram.types import BufferedInputFile
 from app.bot.application import build_bot
 from app.bot.keyboards.daily_cup import build_daily_cup_share_keyboard, build_daily_cup_share_url
 from app.bot.texts.de import TEXTS_DE
+from app.core.telegram_links import public_bot_link
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
-from app.core.telegram_links import public_bot_link
 from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES, TOURNAMENT_STATUS_COMPLETED
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app

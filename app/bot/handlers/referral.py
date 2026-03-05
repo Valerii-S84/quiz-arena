@@ -16,8 +16,8 @@ from app.bot.keyboards.referral import (
     build_referral_share_url,
 )
 from app.bot.texts.de import TEXTS_DE
-from app.core.telegram_links import public_bot_start_link
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
+from app.core.telegram_links import public_bot_start_link
 from app.db.session import SessionLocal
 from app.economy.referrals.service import ReferralOverview, ReferralService
 from app.services.user_onboarding import UserOnboardingService
