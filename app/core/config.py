@@ -23,6 +23,10 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = Field(alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_secret: str = Field(alias="TELEGRAM_WEBHOOK_SECRET")
+    telegram_public_bot_username: str = Field(
+        default="Deine_Deutsch_Quiz_bot",
+        alias="TELEGRAM_PUBLIC_BOT_USERNAME",
+    )
     welcome_image_file_id: str = Field(default="", alias="WELCOME_IMAGE_FILE_ID")
     telegram_home_header_file_id: str = Field(default="", alias="TELEGRAM_HOME_HEADER_FILE_ID")
     # Telegram channel target for one-time Kanal-Bonus check (supports @username or chat id).

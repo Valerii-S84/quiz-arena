@@ -16,6 +16,7 @@ from app.bot.keyboards.referral import (
     build_referral_share_url,
 )
 from app.bot.texts.de import TEXTS_DE
+from app.core.telegram_links import public_bot_start_link
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.session import SessionLocal
 from app.economy.referrals.service import ReferralOverview, ReferralService
@@ -36,12 +37,10 @@ def _normalize_reward_choice(reward_code: str) -> str:
 
 async def _build_invite_link(bot: Bot, *, referral_code: str) -> str | None:
     try:
-        me = await bot.get_me()
+        await bot.get_me()
     except Exception:
         return None
-    if not me.username:
-        return None
-    return f"https://t.me/{me.username}?start=ref_{referral_code}"
+    return public_bot_start_link(start_param=f"ref_{referral_code}")
 
 
 async def _load_overview(

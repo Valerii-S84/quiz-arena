@@ -9,6 +9,7 @@ import pytest
 from app.bot.handlers import gameplay, gameplay_tournaments, gameplay_tournaments_more
 from app.bot.handlers.gameplay_flows import tournament_lobby_flow
 from app.bot.texts.de import TEXTS_DE
+from app.workers.tasks import tournaments_proof_cards
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
 
@@ -90,9 +91,13 @@ async def test_handle_tournament_share_result_sends_share_keyboard_and_emits_eve
         return "https://t.me/share/url?url=x&text=y"
 
     emitted: list[str] = []
+    enqueued: list[tuple[str, int | None]] = []
 
     async def _fake_emit(*args, **kwargs):
         emitted.append(str(kwargs.get("event_type")))
+
+    def _fake_enqueue(*, tournament_id: str, user_id: int | None = None) -> None:
+        enqueued.append((tournament_id, user_id))
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(
@@ -106,6 +111,11 @@ async def test_handle_tournament_share_result_sends_share_keyboard_and_emits_eve
         _fake_share_url,
     )
     monkeypatch.setattr(gameplay, "emit_analytics_event", _fake_emit)
+    monkeypatch.setattr(
+        tournaments_proof_cards,
+        "enqueue_private_tournament_proof_cards",
+        _fake_enqueue,
+    )
 
     callback = DummyCallback(
         data="friend:tournament:share:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
@@ -119,6 +129,7 @@ async def test_handle_tournament_share_result_sends_share_keyboard_and_emits_eve
     urls = [button.url for row in response.kwargs["reply_markup"].inline_keyboard for button in row]
     assert any(url and "https://t.me/share/url" in url for url in urls)
     assert emitted == ["private_tournament_result_shared"]
+    assert enqueued == [("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", 17)]
 
 
 @pytest.mark.asyncio

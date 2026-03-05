@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, Protocol
 
 from aiogram.types import CallbackQuery
 
+from app.core.telegram_links import public_bot_link, public_bot_start_link
+
 if TYPE_CHECKING:
     from app.game.sessions.types import FriendChallengeSnapshot
 
@@ -88,15 +90,13 @@ async def _build_friend_invite_link(
     bot = callback.bot
     assert bot is not None
     try:
-        me = await bot.get_me()
+        await bot.get_me()
     except Exception:
         return None
-    if not me.username:
-        return None
     if challenge_id:
-        return f"https://t.me/{me.username}?start=duel_{challenge_id}"
+        return public_bot_start_link(start_param=f"duel_{challenge_id}")
     if invite_token:
-        return f"https://t.me/{me.username}?start=fc_{invite_token}"
+        return public_bot_start_link(start_param=f"fc_{invite_token}")
     return None
 
 
@@ -110,15 +110,13 @@ async def _build_friend_result_share_url(
     bot = callback.bot
     assert bot is not None
     try:
-        me = await bot.get_me()
+        await bot.get_me()
     except Exception:
-        return None
-    if not me.username:
         return None
 
     share_text = "\n".join([proof_card_text, "", share_cta_text])
     return build_share_url(
-        base_link=f"https://t.me/{me.username}",
+        base_link=public_bot_link(),
         share_text=share_text,
     )
 
@@ -131,12 +129,10 @@ async def _build_tournament_invite_link(
     bot = callback.bot
     assert bot is not None
     try:
-        me = await bot.get_me()
+        await bot.get_me()
     except Exception:
         return None
-    if not me.username:
-        return None
-    return f"https://t.me/{me.username}?start=tournament_{invite_code}"
+    return public_bot_start_link(start_param=f"tournament_{invite_code}")
 
 
 async def _build_tournament_share_url(
@@ -148,12 +144,10 @@ async def _build_tournament_share_url(
     bot = callback.bot
     assert bot is not None
     try:
-        me = await bot.get_me()
+        await bot.get_me()
     except Exception:
         return None
-    if not me.username:
-        return None
     return build_share_url(
-        base_link=f"https://t.me/{me.username}",
+        base_link=public_bot_link(),
         share_text=share_text,
     )

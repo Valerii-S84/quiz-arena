@@ -77,7 +77,7 @@ TEXTS_DE: dict[str, str] = {
     "msg.daily_cup.turn_reminder": "⏰ Erinnerung: Dein Duell mit {opponent_label} ist jetzt offen im Daily Arena Cup.\nBitte spiele jetzt.\nDeadline: {deadline} (Berlin)",
     "msg.daily_cup.not_finished_summary": "📝 Daily Arena Cup ist beendet.\nDu warst angemeldet, hast aber nicht alle Duelle zu Ende gespielt.\nMorgen gibt's die nächste Chance — wir sehen uns um 18:00.",
     "msg.daily_cup.final_results": "🏆 Daily Arena Cup — Abgeschlossen!\n🥇 {top_1}\n🥈 {top_2}\n🥉 {top_3}\n🎯 Dein Ergebnis: Platz {place} · {score} Punkte",
-    "msg.daily_cup.share_template": "🏆 Ich war beim Daily Arena Cup!\n🎯 Platz {place} von {total} · {points} Punkte\n📱 Mach mit: t.me/QuizArenaBot",
+    "msg.daily_cup.share_template": "🏆 Ich war beim Daily Arena Cup!\n🎯 Platz {place} von {total} · {points} Punkte\n📱 Mach mit: https://t.me/Deine_Deutsch_Quiz_bot",
     "msg.daily_cup.no_tournament": "🏆 Heute startet der Daily Arena Cup um 18:00.\n📣 Einladung kommt um 16:00.",
     "msg.daily_cup.not_participant": "Heute läuft der Cup schon ohne dich.\n🏆 Nächster Daily Arena Cup: morgen um 18:00.",
     "msg.daily_cup.share.ready": "📤 Ergebnis bereit. Tippe auf 'JETZT TEILEN'.",
