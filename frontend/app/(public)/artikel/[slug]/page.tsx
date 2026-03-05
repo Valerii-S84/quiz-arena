@@ -8,6 +8,10 @@ type ArticlePageProps = {
 };
 
 const ARTICLE_EMBEDS: Record<string, { title: string; fileName: string }> = {
+  "deutsche-sprache-geschichte": {
+    title: "Geschichte der deutschen Sprache",
+    fileName: "deutsche-sprache-geschichte.html",
+  },
   "sprachniveaus-a1-c1": {
     title: "Sprachniveaus A1-C1",
     fileName: "sprachniveaus-a1-c1.html",
