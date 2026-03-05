@@ -98,6 +98,7 @@ async def run_daily_cup_turn_reminders_async(*, batch_size: int = DAILY_CUP_PUSH
         }
         telegram_targets = {int(user.id): int(user.telegram_user_id) for user in users}
 
+        queued_target_keys: set[tuple[UUID, int]] = set()
         for match, challenge in candidates:
             scanned_total += 1
             challenge.expires_last_chance_notified_at = now_utc_value
@@ -113,6 +114,11 @@ async def run_daily_cup_turn_reminders_async(*, batch_size: int = DAILY_CUP_PUSH
             if target_chat_id is None:
                 skipped_total += 1
                 continue
+            target_key = (match.tournament_id, target_user_id)
+            if target_key in queued_target_keys:
+                skipped_total += 1
+                continue
+            queued_target_keys.add(target_key)
 
             reminders.append(
                 _ReminderItem(
