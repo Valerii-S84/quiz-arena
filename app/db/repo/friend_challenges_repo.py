@@ -8,13 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.friend_challenges import FriendChallenge
 
-_DUEL_LIVE_STATUSES: tuple[str, ...] = (
-    "ACTIVE",
-    "PENDING",
-    "ACCEPTED",
-    "CREATOR_DONE",
-    "OPPONENT_DONE",
-)
+_DUEL_LIVE_STATUSES = ("ACTIVE", "PENDING", "ACCEPTED", "CREATOR_DONE", "OPPONENT_DONE")
+
 
 class FriendChallengesRepo:
     @staticmethod
@@ -131,7 +126,7 @@ class FriendChallengesRepo:
                 or_(
                     FriendChallenge.creator_user_id == user_id,
                     FriendChallenge.opponent_user_id == user_id,
-                )
+                ),
             )
             .order_by(FriendChallenge.created_at.desc())
             .limit(resolved_limit)
