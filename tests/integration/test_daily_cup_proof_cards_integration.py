@@ -91,6 +91,15 @@ async def test_daily_cup_proof_cards_reuse_cached_file_ids_on_second_run(monkeyp
         "🏆 Daily Arena Cup\nPlatz #3\nPunkte: 2\n📱 https://t.me/Deine_Deutsch_Quiz_bot",
         "🏆 Daily Arena Cup\nPlatz #4\nPunkte: 1\n📱 https://t.me/Deine_Deutsch_Quiz_bot",
     ]
+    first_batch_buttons = [
+        button.url
+        for item in bot.send_photos[:4]
+        for row in item["reply_markup"].inline_keyboard
+        for button in row
+        if button.url
+    ]
+    assert len(first_batch_buttons) == 4
+    assert all(url and "https://t.me/share/url" in url for url in first_batch_buttons)
 
     first_batch = len(bot.send_photos)
     second = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
