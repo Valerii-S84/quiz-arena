@@ -12,10 +12,20 @@ def test_run_daily_question_set_precompute_task_wrapper(monkeypatch) -> None:
 
 
 def test_run_daily_push_notifications_task_wrapper(monkeypatch) -> None:
-    async def fake_async(*, batch_size: int) -> dict[str, object]:
-        return {"batch_size": batch_size, "sent_total": 5, "skipped_total": 1}
+    async def fake_async(*, batch_size: int, push_kind: str) -> dict[str, object]:
+        return {
+            "batch_size": batch_size,
+            "push_kind": push_kind,
+            "sent_total": 5,
+            "skipped_total": 1,
+        }
 
     monkeypatch.setattr(daily_challenge, "run_daily_push_notifications_async", fake_async)
 
     result = daily_challenge.run_daily_push_notifications(batch_size=50)
-    assert result == {"batch_size": 50, "sent_total": 5, "skipped_total": 1}
+    assert result == {
+        "batch_size": 50,
+        "push_kind": "MORNING",
+        "sent_total": 5,
+        "skipped_total": 1,
+    }

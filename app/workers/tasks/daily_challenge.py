@@ -8,7 +8,10 @@ from app.workers.tasks.daily_challenge_async import (
 from app.workers.tasks.daily_challenge_async import (
     run_daily_question_set_precompute_async as _run_daily_question_set_precompute_async,
 )
-from app.workers.tasks.daily_challenge_config import DAILY_PUSH_BATCH_SIZE
+from app.workers.tasks.daily_challenge_config import (
+    DAILY_PUSH_BATCH_SIZE,
+    DAILY_PUSH_KIND_MORNING,
+)
 from app.workers.tasks.daily_challenge_schedule import configure_daily_challenge_schedule
 
 run_daily_question_set_precompute_async = _run_daily_question_set_precompute_async
@@ -28,8 +31,16 @@ def run_daily_question_set_precompute() -> dict[str, object]:
 
 
 @celery_app.task(name="app.workers.tasks.daily_challenge.run_daily_push_notifications")
-def run_daily_push_notifications(batch_size: int = DAILY_PUSH_BATCH_SIZE) -> dict[str, object]:
-    return run_async_job(run_daily_push_notifications_async(batch_size=batch_size))
+def run_daily_push_notifications(
+    batch_size: int = DAILY_PUSH_BATCH_SIZE,
+    push_kind: str = DAILY_PUSH_KIND_MORNING,
+) -> dict[str, object]:
+    return run_async_job(
+        run_daily_push_notifications_async(
+            batch_size=batch_size,
+            push_kind=push_kind,
+        )
+    )
 
 
 configure_daily_challenge_schedule(celery_app)
