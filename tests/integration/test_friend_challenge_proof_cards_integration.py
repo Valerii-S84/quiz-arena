@@ -76,6 +76,17 @@ async def test_friend_challenge_proof_cards_send_to_both_users_and_reuse_cache(
         f"🏆 DUELL ERGEBNIS\nScore: Du 4 : Gegner 2\nID: {challenge.challenge_id}",
         f"🏆 DUELL ERGEBNIS\nScore: Du 2 : Gegner 4\nID: {challenge.challenge_id}",
     ]
+    inline_queries = [
+        button.switch_inline_query
+        for item in bot.send_photos[:2]
+        for row in item["reply_markup"].inline_keyboard
+        for button in row
+        if button.switch_inline_query
+    ]
+    assert inline_queries == [
+        f"proof:duel:{challenge.challenge_id}",
+        f"proof:duel:{challenge.challenge_id}",
+    ]
 
     async with SessionLocal.begin() as session:
         refreshed = await FriendChallengesRepo.get_by_id_for_update(session, challenge.challenge_id)

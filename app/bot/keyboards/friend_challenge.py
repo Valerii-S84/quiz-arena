@@ -2,6 +2,8 @@ from urllib.parse import quote_plus
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.bot.keyboards.proof_card_share import build_friend_challenge_inline_share_query
+
 
 def _build_share_url(*, invite_link: str, share_text: str) -> str:
     return (
@@ -124,18 +126,14 @@ def build_friend_challenge_finished_keyboard(
     show_best_of_three: bool = True,
     show_next_series_game: bool = False,
 ) -> InlineKeyboardMarkup:
-    del show_best_of_three, show_next_series_game
+    del share_url, show_best_of_three, show_next_series_game
     rows: list[list[InlineKeyboardButton]] = []
     if include_share:
         rows.append(
             [
-                (
-                    InlineKeyboardButton(text="📤 Ergebnis teilen", url=share_url)
-                    if share_url
-                    else InlineKeyboardButton(
-                        text="📤 Ergebnis teilen",
-                        callback_data=f"friend:share:result:{challenge_id}",
-                    )
+                InlineKeyboardButton(
+                    text="📤 Ergebnis teilen",
+                    callback_data=f"friend:share:result:{challenge_id}",
                 )
             ]
         )
@@ -151,9 +149,17 @@ def build_friend_challenge_result_share_keyboard(
     share_url: str,
     challenge_id: str,
 ) -> InlineKeyboardMarkup:
+    del share_url
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="📤 JETZT TEILEN", url=share_url)],
+            [
+                InlineKeyboardButton(
+                    text="📤 KARTE TEILEN",
+                    switch_inline_query=build_friend_challenge_inline_share_query(
+                        challenge_id=challenge_id
+                    ),
+                )
+            ],
             [
                 InlineKeyboardButton(
                     text="🔁 REVANCHE", callback_data=f"friend:rematch:{challenge_id}"

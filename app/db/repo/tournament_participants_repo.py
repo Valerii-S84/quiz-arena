@@ -70,6 +70,20 @@ class TournamentParticipantsRepo:
         return list(result.scalars().all())
 
     @staticmethod
+    async def get_for_tournament_user(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+        user_id: int,
+    ) -> TournamentParticipant | None:
+        stmt = select(TournamentParticipant).where(
+            TournamentParticipant.tournament_id == tournament_id,
+            TournamentParticipant.user_id == user_id,
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def list_for_tournament_for_update(
         session: AsyncSession,
         *,

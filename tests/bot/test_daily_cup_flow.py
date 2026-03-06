@@ -13,7 +13,7 @@ from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
 
 @pytest.mark.asyncio
-async def test_handle_daily_cup_share_result_sends_share_url_and_enqueues_card(
+async def test_handle_daily_cup_share_result_sends_inline_share_and_enqueues_card(
     monkeypatch,
 ) -> None:
     async def _fake_home_snapshot(session, *, telegram_user):
@@ -67,13 +67,12 @@ async def test_handle_daily_cup_share_result_sends_share_url_and_enqueues_card(
 
     response = callback.message.answers[0]
     assert response.text == TEXTS_DE["msg.daily_cup.share.ready"]
-    urls = [
-        button.url
+    inline_queries = [
+        button.switch_inline_query
         for row in response.kwargs["reply_markup"].inline_keyboard
         for button in row
-        if button.url
+        if button.switch_inline_query
     ]
-    assert len(urls) == 1
-    assert "https://t.me/share/url" in (urls[0] or "")
+    assert inline_queries == ["proof:daily:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
     assert emitted == ["daily_cup_result_shared"]
     assert enqueued == [("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", 101, 0)]

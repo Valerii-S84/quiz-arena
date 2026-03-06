@@ -269,7 +269,5 @@ async def test_render_daily_cup_lobby_completed_shows_completed_marker() -> None
     assert "TB 9" in text
     assert "TB 4.5" in text
     buttons = [button for row in response.kwargs["reply_markup"].inline_keyboard for button in row]
-    urls = [button.url for button in buttons if button.url]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
-    assert any(url and "https://t.me/share/url" in url for url in urls)
     assert "daily:cup:share:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks

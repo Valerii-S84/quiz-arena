@@ -6,53 +6,21 @@ import structlog
 from aiogram.types import BufferedInputFile
 
 from app.bot.application import build_bot
+from app.bot.keyboards.friend_challenge import build_friend_challenge_result_share_keyboard
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.tasks.friend_challenges_proof_card_render import render_duel_proof_card_png
+from app.workers.tasks.friend_challenges_proof_card_text import build_caption, resolve_user_label
 
 logger = structlog.get_logger("app.workers.tasks.friend_challenges_proof_cards")
-
 _DUEL_FINAL_STATUSES = frozenset({"COMPLETED", "EXPIRED", "WALKOVER"})
 
 
 def _is_celery_task(task_obj: object) -> bool:
     return type(task_obj).__module__.startswith("celery.")
-
-
-def _resolve_user_label(*, user, fallback: str) -> str:
-    if user is None:
-        return fallback
-    if user.username:
-        return f"@{str(user.username).strip()}"
-    if user.first_name:
-        return str(user.first_name).strip() or fallback
-    return fallback
-
-
-def _build_caption(
-    *,
-    challenge_id: str,
-    status: str,
-    role: str,
-    creator_score: int,
-    opponent_score: int,
-) -> str:
-    if role == "creator":
-        my_score = creator_score
-        other_score = opponent_score
-    else:
-        my_score = opponent_score
-        other_score = creator_score
-    if status == "WALKOVER":
-        prefix = "⌛ DUELL WALKOVER"
-    elif status == "EXPIRED":
-        prefix = "⌛ DUELL ABGELAUFEN"
-    else:
-        prefix = "🏆 DUELL ERGEBNIS"
-    return f"{prefix}\n" f"Score: Du {my_score} : Gegner {other_score}\n" f"ID: {challenge_id}"
 
 
 async def run_friend_challenge_proof_cards_async(
@@ -86,8 +54,8 @@ async def run_friend_challenge_proof_cards_async(
         opponent_file_id = challenge.opponent_proof_card_file_id
         creator_chat = int(creator.telegram_user_id) if creator is not None else None
         opponent_chat = int(opponent.telegram_user_id) if opponent is not None else None
-        creator_name = _resolve_user_label(user=creator, fallback="Spieler 1")
-        opponent_name = _resolve_user_label(user=opponent, fallback="Spieler 2")
+        creator_name = resolve_user_label(user=creator, fallback="Spieler 1")
+        opponent_name = resolve_user_label(user=opponent, fallback="Spieler 2")
 
     creator_user_id = int(challenge.creator_user_id)
     opponent_user_id = (
@@ -97,7 +65,6 @@ async def run_friend_challenge_proof_cards_async(
     send_opponent = opponent_chat is not None and (user_id is None or user_id == opponent_user_id)
     if not send_creator and not send_opponent:
         return {"processed": 1, "sent": 0, "cached_reused": 0}
-
     must_render = (send_creator and not creator_file_id) or (send_opponent and not opponent_file_id)
     card_png = (
         render_duel_proof_card_png(
@@ -117,9 +84,10 @@ async def run_friend_challenge_proof_cards_async(
     cached_reused = 0
     new_creator_file_id: str | None = None
     new_opponent_file_id: str | None = None
+    keyboard = build_friend_challenge_result_share_keyboard(share_url="", challenge_id=challenge_id)
     try:
         if send_creator and creator_chat is not None:
-            creator_caption = _build_caption(
+            creator_caption = build_caption(
                 challenge_id=challenge_id,
                 status=status,
                 role="creator",
@@ -131,6 +99,7 @@ async def run_friend_challenge_proof_cards_async(
                     chat_id=creator_chat,
                     photo=creator_file_id,
                     caption=creator_caption,
+                    reply_markup=keyboard,
                 )
                 sent += 1
                 cached_reused += 1
@@ -142,13 +111,14 @@ async def run_friend_challenge_proof_cards_async(
                         filename=f"duel_{challenge_id}_creator.png",
                     ),
                     caption=creator_caption,
+                    reply_markup=keyboard,
                 )
                 sent += 1
                 if creator_message.photo:
                     new_creator_file_id = creator_message.photo[-1].file_id
 
         if send_opponent and opponent_chat is not None:
-            opponent_caption = _build_caption(
+            opponent_caption = build_caption(
                 challenge_id=challenge_id,
                 status=status,
                 role="opponent",
@@ -160,6 +130,7 @@ async def run_friend_challenge_proof_cards_async(
                     chat_id=opponent_chat,
                     photo=opponent_file_id,
                     caption=opponent_caption,
+                    reply_markup=keyboard,
                 )
                 sent += 1
                 cached_reused += 1
@@ -171,6 +142,7 @@ async def run_friend_challenge_proof_cards_async(
                         filename=f"duel_{challenge_id}_opponent.png",
                     ),
                     caption=opponent_caption,
+                    reply_markup=keyboard,
                 )
                 sent += 1
                 if opponent_message.photo:

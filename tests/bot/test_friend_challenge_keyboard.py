@@ -58,14 +58,14 @@ def test_friend_challenge_finished_keyboard_can_hide_share() -> None:
     assert "home:open" in callbacks
 
 
-def test_friend_challenge_finished_keyboard_uses_direct_share_url_when_provided() -> None:
+def test_friend_challenge_finished_keyboard_ignores_direct_share_url() -> None:
     keyboard = build_friend_challenge_finished_keyboard(
         challenge_id="00000000-0000-0000-0000-000000000001",
         share_url="https://t.me/share/url?url=x&text=y",
     )
     share_button = keyboard.inline_keyboard[0][0]
-    assert share_button.url == "https://t.me/share/url?url=x&text=y"
-    assert share_button.callback_data is None
+    assert share_button.url is None
+    assert share_button.callback_data == "friend:share:result:00000000-0000-0000-0000-000000000001"
 
 
 def test_friend_challenge_limit_keyboard_contains_buy_options_and_back() -> None:
@@ -123,7 +123,10 @@ def test_friend_challenge_result_share_keyboard_contains_share_and_navigation() 
         challenge_id="00000000-0000-0000-0000-000000000001",
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
-    assert any(button.url and "https://t.me/share/url" in button.url for button in buttons)
+    inline_queries = [
+        button.switch_inline_query for button in buttons if button.switch_inline_query
+    ]
+    assert inline_queries == ["proof:duel:00000000-0000-0000-0000-000000000001"]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert "friend:rematch:00000000-0000-0000-0000-000000000001" in callbacks
     assert "home:open" in callbacks
