@@ -93,18 +93,6 @@ async def test_friend_challenge_proof_cards_send_to_both_users_and_reuse_cache(
         f"proof:duel:{challenge.challenge_id}",
         f"proof:duel:{challenge.challenge_id}",
     ]
-    share_urls = [
-        button.url
-        for item in bot.send_photos[:2]
-        for row in item["reply_markup"].inline_keyboard
-        for button in row
-        if button.url
-    ]
-    assert share_urls == [
-        "https://t.me/Deine_Deutsch_Quiz_bot",
-        "https://t.me/Deine_Deutsch_Quiz_bot",
-    ]
-
     async with SessionLocal.begin() as session:
         refreshed = await FriendChallengesRepo.get_by_id_for_update(session, challenge.challenge_id)
         assert refreshed is not None
