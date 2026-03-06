@@ -15,6 +15,7 @@ class DailyPushLogsRepo:
         *,
         user_id: int,
         berlin_date: date,
+        push_kind: str,
         push_sent_at: datetime,
     ) -> bool:
         stmt = (
@@ -22,9 +23,16 @@ class DailyPushLogsRepo:
             .values(
                 user_id=user_id,
                 berlin_date=berlin_date,
+                push_kind=push_kind,
                 push_sent_at=push_sent_at,
             )
-            .on_conflict_do_nothing(index_elements=[DailyPushLog.user_id, DailyPushLog.berlin_date])
+            .on_conflict_do_nothing(
+                index_elements=[
+                    DailyPushLog.user_id,
+                    DailyPushLog.berlin_date,
+                    DailyPushLog.push_kind,
+                ]
+            )
             .returning(DailyPushLog.user_id)
         )
         result = await session.execute(stmt)

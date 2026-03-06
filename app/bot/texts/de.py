@@ -36,6 +36,7 @@ TEXTS_DE: dict[str, str] = {
     "msg.daily.result.summary.with_streak": "🏆 Heute: {score}/{total} richtig\n🔥 Streak: {streak} Tage\n⚡ Morgen wartet die nächste Runde!",
     "msg.daily.result.summary.no_streak": "🏆 Heute: {score}/{total} richtig\n⚡ Morgen wartet die nächste Runde!",
     "msg.daily.push.base": "⚡ Neue Daily Challenge — jetzt spielen!",
+    "msg.daily.push.evening": "⏰ Erinnerung: Deine Daily Challenge fuer heute ist noch offen.\nSpiel sie jetzt, bevor der Tag vorbei ist!",
     "msg.daily.push.streak": "🔥 Dein Streak: {streak} Tage — verlier ihn nicht!",
     "msg.game.session.not_found": "Diese Session ist nicht mehr verfügbar.",
     "msg.friend.challenge.created": "🤝 Duell erstellt. Teile den Link mit deinem Freund.",
