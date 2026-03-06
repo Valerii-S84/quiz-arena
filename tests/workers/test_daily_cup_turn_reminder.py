@@ -45,3 +45,12 @@ def test_resolve_turn_reminder_users_returns_empty_for_other_status() -> None:
 
     resolved = daily_cup_turn_reminder.resolve_turn_reminder_users(challenge=challenge)
     assert resolved == ()
+
+
+def test_resolve_turn_reminder_opponent_label_uses_arena_bot_for_self_match() -> None:
+    label = daily_cup_turn_reminder._resolve_turn_reminder_opponent_label(
+        target_user_id=10,
+        opponent_user_id=10,
+        user_labels={10: "Ich"},
+    )
+    assert label == "Arena Bot"

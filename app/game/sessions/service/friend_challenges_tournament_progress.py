@@ -17,8 +17,13 @@ from app.game.friend_challenges.constants import (
     DUEL_STATUS_OPPONENT_DONE,
     DUEL_STATUS_WALKOVER,
 )
+from app.game.sessions.service.friend_challenges_tournament_self_bot import (
+    is_self_bot_tournament_challenge,
+    maybe_complete_self_bot_match,
+)
 from app.game.tournaments.constants import (
     TOURNAMENT_MATCH_STATUS_PENDING,
+    TOURNAMENT_SELF_BOT_DEFAULT_CORRECT_ANSWERS,
     TOURNAMENT_TYPE_DAILY_ARENA,
     TOURNAMENT_TYPE_DAILY_ELIMINATION,
 )
@@ -70,29 +75,6 @@ def _ensure_elimination_winner(
     loser_id = user_b if winner_id == user_a else user_a
     challenge.winner_user_id = winner_id
     return winner_id, loser_id
-
-
-def _maybe_complete_self_bot_match(
-    *,
-    challenge: FriendChallenge,
-    now_utc: datetime,
-) -> None:
-    if (
-        challenge.status != DUEL_STATUS_CREATOR_DONE
-        or challenge.opponent_user_id is None
-        or int(challenge.opponent_user_id) != int(challenge.creator_user_id)
-    ):
-        return
-    bot_target = max(
-        0, min(int(round(int(challenge.total_rounds) * 0.7)), int(challenge.total_rounds) - 1)
-    )
-    challenge.opponent_score = min(bot_target, max(0, int(challenge.creator_score) - 1))
-    challenge.opponent_answered_round = int(challenge.total_rounds)
-    challenge.opponent_finished_at = now_utc
-    challenge.current_round = int(challenge.total_rounds)
-    challenge.status = DUEL_STATUS_COMPLETED
-    challenge.winner_user_id = int(challenge.creator_user_id)
-    challenge.completed_at = now_utc
 
 
 async def _update_elimination_timeout_state(
@@ -148,7 +130,7 @@ async def handle_tournament_duel_progress(
     if tournament is None:
         return
     if tournament.type == TOURNAMENT_TYPE_DAILY_ELIMINATION:
-        _maybe_complete_self_bot_match(challenge=challenge, now_utc=now_utc)
+        maybe_complete_self_bot_match(challenge=challenge, now_utc=now_utc)
         await _update_elimination_timeout_state(challenge=challenge, match=tournament_match)
         if challenge.status in {DUEL_STATUS_COMPLETED, DUEL_STATUS_WALKOVER}:
             winner_id, loser_id = _ensure_elimination_winner(
@@ -171,6 +153,12 @@ async def handle_tournament_duel_progress(
         return
     if tournament.type != TOURNAMENT_TYPE_DAILY_ARENA:
         return
+    if is_self_bot_tournament_challenge(challenge=challenge):
+        maybe_complete_self_bot_match(
+            challenge=challenge,
+            now_utc=now_utc,
+            fixed_bot_score=TOURNAMENT_SELF_BOT_DEFAULT_CORRECT_ANSWERS,
+        )
     if challenge.status in {DUEL_STATUS_CREATOR_DONE, DUEL_STATUS_OPPONENT_DONE}:
         if tournament_match.status == TOURNAMENT_MATCH_STATUS_PENDING:
             response_deadline = now_utc + timedelta(minutes=_DAILY_CUP_TURN_RESPONSE_GRACE_MINUTES)

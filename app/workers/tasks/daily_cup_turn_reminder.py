@@ -16,6 +16,7 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.friend_challenges.constants import DUEL_STATUS_CREATOR_DONE, DUEL_STATUS_OPPONENT_DONE
+from app.game.tournaments.constants import TOURNAMENT_SELF_BOT_LABEL
 from app.workers.tasks.daily_cup_config import (
     DAILY_CUP_PUSH_BATCH_SIZE,
     DAILY_CUP_TURN_REMINDER_INTERVAL_MINUTES,
@@ -61,6 +62,17 @@ def _build_turn_reminder_text(*, opponent_label: str, deadline_text: str) -> str
         opponent_label=opponent_label,
         deadline=deadline_text,
     )
+
+
+def _resolve_turn_reminder_opponent_label(
+    *,
+    target_user_id: int,
+    opponent_user_id: int,
+    user_labels: dict[int, str],
+) -> str:
+    if target_user_id == opponent_user_id:
+        return TOURNAMENT_SELF_BOT_LABEL
+    return user_labels.get(opponent_user_id, "Spieler")
 
 
 async def run_daily_cup_turn_reminders_async(
@@ -136,7 +148,11 @@ async def run_daily_cup_turn_reminders_async(
                         challenge_id=str(challenge.id),
                         target_user_id=target_user_id,
                         target_chat_id=target_chat_id,
-                        opponent_label=user_labels.get(opponent_user_id, "Spieler"),
+                        opponent_label=_resolve_turn_reminder_opponent_label(
+                            target_user_id=target_user_id,
+                            opponent_user_id=opponent_user_id,
+                            user_labels=user_labels,
+                        ),
                         deadline_text=format_deadline(match.deadline),
                     )
                 )

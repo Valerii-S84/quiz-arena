@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Protocol
 from aiogram.types import CallbackQuery
 
 from app.core.telegram_links import public_bot_link, public_bot_start_link
+from app.game.tournaments.constants import TOURNAMENT_SELF_BOT_LABEL
 
 if TYPE_CHECKING:
     from app.game.sessions.types import FriendChallengeSnapshot
@@ -35,6 +36,12 @@ async def _resolve_opponent_label(
     users_repo: _UsersRepo,
     format_user_label,
 ) -> str:
+    if (
+        challenge.tournament_match_id is not None
+        and challenge.opponent_user_id is not None
+        and int(challenge.opponent_user_id) == int(challenge.creator_user_id)
+    ):
+        return TOURNAMENT_SELF_BOT_LABEL
     opponent_user_id = _friend_opponent_user_id(challenge=challenge, user_id=user_id)
     if opponent_user_id is None:
         return "Freund"

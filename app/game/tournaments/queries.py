@@ -41,6 +41,11 @@ def _resolve_viewer_current_match(
     for match in matches:
         if int(match.user_a) == viewer_user_id:
             if match.user_b is None:
+                if (
+                    match.status == TOURNAMENT_MATCH_STATUS_PENDING
+                    and match.friend_challenge_id is not None
+                ):
+                    return match.friend_challenge_id, None
                 return None, None
             if match.status != TOURNAMENT_MATCH_STATUS_PENDING:
                 return None, int(match.user_b)

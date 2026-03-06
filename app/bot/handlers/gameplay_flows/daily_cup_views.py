@@ -8,6 +8,7 @@ from app.bot.handlers.gameplay_flows.tournament_views import format_points
 from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard, build_daily_cup_share_url
 from app.bot.texts.de import TEXTS_DE
 from app.core.telegram_links import public_bot_link
+from app.game.tournaments.constants import TOURNAMENT_SELF_BOT_LABEL
 from app.workers.tasks.tournaments_messaging_text import (
     format_deadline,
     is_message_not_modified_error,
@@ -110,7 +111,7 @@ async def render_daily_cup_lobby(
                 opponent_label = (
                     labels.get(lobby.viewer_current_opponent_user_id, "Gegner")
                     if lobby.viewer_current_opponent_user_id is not None
-                    else "Gegner"
+                    else TOURNAMENT_SELF_BOT_LABEL
                 )
                 body_lines.extend(
                     [
