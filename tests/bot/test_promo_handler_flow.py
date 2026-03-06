@@ -44,6 +44,17 @@ async def test_redeem_promo_from_text_prompts_when_code_missing() -> None:
     await promo._redeem_promo_from_text(message)
 
     assert message.answers[0].text == TEXTS_DE["msg.promo.input.hint"]
+    assert "reply_markup" not in message.answers[0].kwargs
+
+
+@pytest.mark.asyncio
+async def test_prompt_for_promo_input_does_not_use_force_reply() -> None:
+    message = _PromoMessage(text="/promo", from_user=SimpleNamespace(id=1))
+
+    await promo._prompt_for_promo_input(message)
+
+    assert message.answers[0].text == TEXTS_DE["msg.promo.input.hint"]
+    assert "reply_markup" not in message.answers[0].kwargs
 
 
 @pytest.mark.asyncio

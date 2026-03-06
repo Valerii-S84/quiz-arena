@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, ForceReply, Message
+from aiogram.types import CallbackQuery, Message
 
 from app.bot.keyboards.promo import build_promo_discount_keyboard
 from app.bot.keyboards.shop import build_shop_keyboard
@@ -84,10 +84,7 @@ def _extract_promo_code(message: Message) -> str | None:
 
 
 async def _prompt_for_promo_input(message: Message) -> None:
-    await message.answer(
-        TEXTS_DE["msg.promo.input.hint"],
-        reply_markup=ForceReply(selective=True, input_field_placeholder="WILLKOMMEN-50"),
-    )
+    await message.answer(TEXTS_DE["msg.promo.input.hint"])
 
 
 @router.callback_query(F.data == "promo:open")
