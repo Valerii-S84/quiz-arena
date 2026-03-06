@@ -47,6 +47,12 @@ def resolve_match_context(*, round_matches, viewer_user_id: int) -> tuple[str | 
             continue
         opponent_id = user_b if user_a == viewer_user_id else user_a
         if (
+            user_b is None
+            and match.status == TOURNAMENT_MATCH_STATUS_PENDING
+            and match.friend_challenge_id is not None
+        ):
+            return str(match.friend_challenge_id), None
+        if (
             user_b is not None
             and match.status == TOURNAMENT_MATCH_STATUS_PENDING
             and match.friend_challenge_id is not None

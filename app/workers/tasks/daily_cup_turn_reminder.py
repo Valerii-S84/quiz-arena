@@ -10,7 +10,6 @@ from aiogram.exceptions import TelegramForbiddenError
 
 from app.bot.application import build_bot
 from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard
-from app.bot.texts.de import TEXTS_DE
 from app.db.models.friend_challenges import FriendChallenge
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.users_repo import UsersRepo
@@ -22,6 +21,12 @@ from app.workers.tasks.daily_cup_config import (
 )
 from app.workers.tasks.daily_cup_core import now_utc
 from app.workers.tasks.daily_cup_push_events import store_push_sent_events
+from app.workers.tasks.daily_cup_turn_reminder_text import (
+    build_turn_reminder_text as _build_turn_reminder_text,
+)
+from app.workers.tasks.daily_cup_turn_reminder_text import (
+    resolve_turn_reminder_opponent_label as _resolve_turn_reminder_opponent_label,
+)
 from app.workers.tasks.tournaments_messaging_text import format_deadline, format_user_label
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_turn_reminder")
@@ -54,13 +59,6 @@ def resolve_turn_reminder_users(*, challenge: FriendChallenge) -> tuple[tuple[in
             (opponent_user_id, creator_user_id),
         )
     return ()
-
-
-def _build_turn_reminder_text(*, opponent_label: str, deadline_text: str) -> str:
-    return TEXTS_DE["msg.daily_cup.turn_reminder"].format(
-        opponent_label=opponent_label,
-        deadline=deadline_text,
-    )
 
 
 async def run_daily_cup_turn_reminders_async(
@@ -136,7 +134,11 @@ async def run_daily_cup_turn_reminders_async(
                         challenge_id=str(challenge.id),
                         target_user_id=target_user_id,
                         target_chat_id=target_chat_id,
-                        opponent_label=user_labels.get(opponent_user_id, "Spieler"),
+                        opponent_label=_resolve_turn_reminder_opponent_label(
+                            target_user_id=target_user_id,
+                            opponent_user_id=opponent_user_id,
+                            user_labels=user_labels,
+                        ),
                         deadline_text=format_deadline(match.deadline),
                     )
                 )
