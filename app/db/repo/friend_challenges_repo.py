@@ -16,7 +16,6 @@ _DUEL_LIVE_STATUSES: tuple[str, ...] = (
     "OPPONENT_DONE",
 )
 
-
 class FriendChallengesRepo:
     @staticmethod
     async def get_by_id(session: AsyncSession, challenge_id: UUID) -> FriendChallenge | None:
@@ -66,6 +65,7 @@ class FriendChallengesRepo:
         stmt = select(func.count(FriendChallenge.id)).where(
             FriendChallenge.creator_user_id == creator_user_id,
             FriendChallenge.access_type == access_type,
+            FriendChallenge.tournament_match_id.is_(None),
         )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
@@ -77,6 +77,7 @@ class FriendChallengesRepo:
         user_id: int,
     ) -> int:
         stmt = select(func.count(FriendChallenge.id)).where(
+            FriendChallenge.tournament_match_id.is_(None),
             FriendChallenge.status.in_(_DUEL_LIVE_STATUSES),
             or_(
                 FriendChallenge.creator_user_id == user_id,
@@ -108,6 +109,7 @@ class FriendChallengesRepo:
         created_after_utc: datetime,
     ) -> int:
         stmt = select(func.count(FriendChallenge.id)).where(
+            FriendChallenge.tournament_match_id.is_(None),
             FriendChallenge.creator_user_id == creator_user_id,
             FriendChallenge.created_at >= created_after_utc,
         )
@@ -125,6 +127,7 @@ class FriendChallengesRepo:
         stmt = (
             select(FriendChallenge)
             .where(
+                FriendChallenge.tournament_match_id.is_(None),
                 or_(
                     FriendChallenge.creator_user_id == user_id,
                     FriendChallenge.opponent_user_id == user_id,

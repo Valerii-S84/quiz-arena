@@ -102,3 +102,39 @@ async def test_friend_challenge_premium_is_unlimited() -> None:
             access_types.append(challenge.access_type)
 
         assert access_types == ["PREMIUM", "PREMIUM", "PREMIUM", "PREMIUM", "PREMIUM"]
+
+
+@pytest.mark.asyncio
+async def test_tournament_duels_do_not_consume_free_friend_challenge_quota() -> None:
+    now_utc = datetime(2026, 2, 19, 20, 30, tzinfo=UTC)
+    creator_user_id = await _create_user("fc_limit_creator_tournament")
+    opponent_user_id = await _create_user("fc_limit_opponent_tournament")
+
+    async with SessionLocal.begin() as session:
+        await GameSessionService.create_tournament_match_friend_challenge(
+            session,
+            creator_user_id=creator_user_id,
+            opponent_user_id=opponent_user_id,
+            mode_code="QUICK_MIX_A1A2",
+            total_rounds=12,
+            tournament_match_id=uuid4(),
+            now_utc=now_utc,
+        )
+        await GameSessionService.create_tournament_match_friend_challenge(
+            session,
+            creator_user_id=creator_user_id,
+            opponent_user_id=opponent_user_id,
+            mode_code="QUICK_MIX_A1A2",
+            total_rounds=12,
+            tournament_match_id=uuid4(),
+            now_utc=now_utc + timedelta(minutes=1),
+        )
+
+        challenge = await GameSessionService.create_friend_challenge(
+            session,
+            creator_user_id=creator_user_id,
+            mode_code="QUICK_MIX_A1A2",
+            now_utc=now_utc + timedelta(minutes=2),
+        )
+
+        assert challenge.access_type == "FREE"
