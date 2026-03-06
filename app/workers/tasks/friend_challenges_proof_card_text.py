@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.core.telegram_links import public_bot_link
+
 
 def resolve_user_label(*, user, fallback: str) -> str:
     if user is None:
@@ -31,4 +33,9 @@ def build_caption(
         prefix = "⌛ DUELL ABGELAUFEN"
     else:
         prefix = "🏆 DUELL ERGEBNIS"
-    return f"{prefix}\n" f"Score: Du {my_score} : Gegner {other_score}\n" f"ID: {challenge_id}"
+    return (
+        f"{prefix}\n"
+        f"Score: Du {my_score} : Gegner {other_score}\n"
+        f"ID: {challenge_id}\n"
+        f"📱 {public_bot_link()}"
+    )
