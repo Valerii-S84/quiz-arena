@@ -41,7 +41,7 @@ async def test_handle_friend_challenge_next_expired_shows_expired_message(
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_share_result_sends_share_url_and_emits_event(
+async def test_handle_friend_challenge_share_result_sends_inline_share_and_emits_event(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
@@ -98,14 +98,12 @@ async def test_handle_friend_challenge_share_result_sends_share_url_and_emits_ev
 
     response = callback.message.answers[0]
     assert TEXTS_DE["msg.friend.challenge.proof.share.ready"] in (response.text or "")
-    urls = [
-        button.url
+    inline_queries = [
+        button.switch_inline_query
         for row in response.kwargs["reply_markup"].inline_keyboard
         for button in row
-        if button.url
+        if button.switch_inline_query
     ]
-    assert len(urls) == 1
-    assert "https://t.me/share/url" in (urls[0] or "")
-    assert "https%3A%2F%2Ft.me%2FDeine_Deutsch_Quiz_bot" in (urls[0] or "")
+    assert inline_queries == ["proof:duel:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
     assert emitted == ["duel_share_clicked"]
     assert enqueued == [("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", 10)]

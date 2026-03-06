@@ -3,6 +3,7 @@ from aiogram.client.default import DefaultBotProperties
 
 from app.bot.handlers.channel_bonus import router as channel_bonus_router
 from app.bot.handlers.gameplay import router as gameplay_router
+from app.bot.handlers.gameplay_inline_share import router as gameplay_inline_share_router
 from app.bot.handlers.offers import router as offers_router
 from app.bot.handlers.payments import router as payments_router
 from app.bot.handlers.promo import router as promo_router
@@ -26,6 +27,7 @@ def build_dispatcher() -> Dispatcher:
     dispatcher = Dispatcher()
     dispatcher.include_router(start_router)
     dispatcher.include_router(channel_bonus_router)
+    dispatcher.include_router(gameplay_inline_share_router)
     dispatcher.include_router(gameplay_router)
     dispatcher.include_router(offers_router)
     dispatcher.include_router(payments_router)

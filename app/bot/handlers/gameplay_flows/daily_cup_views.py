@@ -5,9 +5,8 @@ from zoneinfo import ZoneInfo
 from aiogram.types import CallbackQuery, Message
 
 from app.bot.handlers.gameplay_flows.tournament_views import format_points
-from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard, build_daily_cup_share_url
+from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard
 from app.bot.texts.de import TEXTS_DE
-from app.core.telegram_links import public_bot_link
 from app.game.tournaments.constants import TOURNAMENT_SELF_BOT_LABEL
 from app.workers.tasks.tournaments_messaging_text import (
     format_deadline,
@@ -161,26 +160,12 @@ async def render_daily_cup_lobby(
         if lobby.viewer_current_match_challenge_id is not None
         else None
     )
-    share_url: str | None = None
-    if lobby.tournament.status == "COMPLETED" and lobby.viewer_joined:
-        standings_user_ids = [item.user_id for item in lobby.participants]
-        place = standings_user_ids.index(user_id) + 1
-        points_map = {item.user_id: format_points(item.score) for item in lobby.participants}
-        share_url = build_daily_cup_share_url(
-            base_link=public_bot_link(),
-            share_text=TEXTS_DE["msg.daily_cup.share_template"].format(
-                place=place,
-                total=len(standings_user_ids),
-                points=points_map.get(user_id, "0"),
-            ),
-        )
     keyboard = build_daily_cup_lobby_keyboard(
         tournament_id=str(lobby.tournament.tournament_id),
         can_join=lobby.tournament.status == "REGISTRATION" and not lobby.viewer_joined,
         play_challenge_id=play_challenge_id,
         show_share_result=lobby.tournament.status == "COMPLETED" and lobby.viewer_joined,
         show_proof_card=lobby.tournament.status == "COMPLETED" and lobby.viewer_joined,
-        share_url=share_url,
     )
     rendered_text = "\n".join(body_lines)
     if replace_current_message and isinstance(callback.message, Message):

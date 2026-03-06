@@ -4,6 +4,8 @@ from urllib.parse import quote_plus
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.bot.keyboards.proof_card_share import build_daily_cup_inline_share_query
+
 
 def build_daily_cup_registration_keyboard(*, tournament_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
@@ -56,25 +58,14 @@ def build_daily_cup_lobby_keyboard(
             ]
         )
     if show_share_result:
-        if share_url:
-            rows.append([InlineKeyboardButton(text="📤 JETZT TEILEN", url=share_url)])
-            rows.append(
-                [
-                    InlineKeyboardButton(
-                        text="✅ Geteilt",
-                        callback_data=f"daily:cup:share:{tournament_id}",
-                    )
-                ]
-            )
-        else:
-            rows.append(
-                [
-                    InlineKeyboardButton(
-                        text="📤 Ergebnis teilen",
-                        callback_data=f"daily:cup:share:{tournament_id}",
-                    )
-                ]
-            )
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="📤 Ergebnis teilen",
+                    callback_data=f"daily:cup:share:{tournament_id}",
+                )
+            ]
+        )
     rows.append(
         [
             InlineKeyboardButton(
@@ -92,26 +83,15 @@ def build_daily_cup_share_keyboard(
     tournament_id: str,
     share_url: str | None = None,
 ) -> InlineKeyboardMarkup:
-    rows: list[list[InlineKeyboardButton]] = []
-    if share_url:
-        rows.append([InlineKeyboardButton(text="📤 JETZT TEILEN", url=share_url)])
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text="✅ Geteilt",
-                    callback_data=f"daily:cup:share:{tournament_id}",
-                )
-            ]
-        )
-    else:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text="📤 Ergebnis teilen",
-                    callback_data=f"daily:cup:share:{tournament_id}",
-                )
-            ]
-        )
+    del share_url
+    rows = [
+        [
+            InlineKeyboardButton(
+                text="📤 KARTE TEILEN",
+                switch_inline_query=build_daily_cup_inline_share_query(tournament_id=tournament_id),
+            )
+        ]
+    ]
     rows.append(
         [
             InlineKeyboardButton(
