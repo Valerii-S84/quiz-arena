@@ -42,14 +42,6 @@ const WISSEN_ARTICLES = [
     slug: "pruefungen-goethe-telc-testdaf",
     title: "Prüfungen: Goethe / telc / TestDaF",
   },
-  {
-    slug: "artikel-der-die-das",
-    title: "Artikel im Deutschen: der/die/das",
-  },
-  {
-    slug: "te-ka-mo-lo-einfach-erklaert",
-    title: "TEKAMOLO einfach erklärt",
-  },
 ] as const;
 
 const STAR_POSITIONS = [
@@ -451,16 +443,7 @@ export default function PublicHomePage() {
         </section>
 
         <footer className="mt-12 border-t border-white/70 pt-6 text-center text-sm text-slate-700">
-          <p>
-            <a href={TELEGRAM_CHANNEL_URL} target="_blank" rel="noreferrer" className="hover:underline">
-              Telegram-Kanal
-            </a>{" "}
-            ·{" "}
-            <a href={TELEGRAM_BOT_URL} target="_blank" rel="noreferrer" className="hover:underline">
-              Quiz Arena Bot
-            </a>
-          </p>
-          <p className="mt-2">© 2025 Quiz Arena Deutsch · contact@deutchquizarena.de</p>
+          <p>© 2025 Chik&amp;com</p>
         </footer>
       </div>
 
