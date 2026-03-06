@@ -8,10 +8,7 @@ from app.workers.tasks.daily_challenge_async import (
 from app.workers.tasks.daily_challenge_async import (
     run_daily_question_set_precompute_async as _run_daily_question_set_precompute_async,
 )
-from app.workers.tasks.daily_challenge_config import (
-    DAILY_PUSH_BATCH_SIZE,
-    DAILY_PUSH_KIND_MORNING,
-)
+from app.workers.tasks.daily_challenge_config import DAILY_PUSH_BATCH_SIZE, DAILY_PUSH_KIND_MORNING
 from app.workers.tasks.daily_challenge_schedule import configure_daily_challenge_schedule
 
 run_daily_question_set_precompute_async = _run_daily_question_set_precompute_async

@@ -36,9 +36,11 @@ def _resolve_push_kind(push_kind: str) -> str:
 
 def _build_push_text(*, push_kind: str, current_streak: int) -> str:
     lines = [
-        TEXTS_DE["msg.daily.push.evening"]
-        if push_kind == DAILY_PUSH_KIND_EVENING_REMINDER
-        else TEXTS_DE["msg.daily.push.base"]
+        (
+            TEXTS_DE["msg.daily.push.evening"]
+            if push_kind == DAILY_PUSH_KIND_EVENING_REMINDER
+            else TEXTS_DE["msg.daily.push.base"]
+        )
     ]
     if current_streak > 0:
         lines.append(TEXTS_DE["msg.daily.push.streak"].format(streak=current_streak))

@@ -51,7 +51,9 @@ async def _create_user(seed: str) -> int:
 
 
 async def _create_daily_run(*, user_id: int, berlin_date: date, status: str) -> None:
-    completed_at = datetime(2026, 2, 26, 7, 0, tzinfo=timezone.utc) if status == "COMPLETED" else None
+    completed_at = (
+        datetime(2026, 2, 26, 7, 0, tzinfo=timezone.utc) if status == "COMPLETED" else None
+    )
     current_question = 7 if status == "COMPLETED" else 3
     async with SessionLocal.begin() as session:
         session.add(
@@ -120,7 +122,9 @@ async def test_evening_reminder_targets_incomplete_daily_runs(monkeypatch) -> No
     in_progress_user_id = await _create_user("daily-push-in-progress")
     abandoned_user_id = await _create_user("daily-push-abandoned")
     completed_user_id = await _create_user("daily-push-completed")
-    await _create_daily_run(user_id=in_progress_user_id, berlin_date=berlin_date, status="IN_PROGRESS")
+    await _create_daily_run(
+        user_id=in_progress_user_id, berlin_date=berlin_date, status="IN_PROGRESS"
+    )
     await _create_daily_run(user_id=abandoned_user_id, berlin_date=berlin_date, status="ABANDONED")
     await _create_daily_run(user_id=completed_user_id, berlin_date=berlin_date, status="COMPLETED")
 
