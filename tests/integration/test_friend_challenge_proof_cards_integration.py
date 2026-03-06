@@ -73,8 +73,14 @@ async def test_friend_challenge_proof_cards_send_to_both_users_and_reuse_cache(
         opponent_chat_id,
     ]
     assert [str(item["caption"]) for item in bot.send_photos[:2]] == [
-        f"🏆 DUELL ERGEBNIS\nScore: Du 4 : Gegner 2\nID: {challenge.challenge_id}",
-        f"🏆 DUELL ERGEBNIS\nScore: Du 2 : Gegner 4\nID: {challenge.challenge_id}",
+        (
+            f"🏆 DUELL ERGEBNIS\nScore: Du 4 : Gegner 2\nID: {challenge.challenge_id}\n"
+            "📱 https://t.me/Deine_Deutsch_Quiz_bot"
+        ),
+        (
+            f"🏆 DUELL ERGEBNIS\nScore: Du 2 : Gegner 4\nID: {challenge.challenge_id}\n"
+            "📱 https://t.me/Deine_Deutsch_Quiz_bot"
+        ),
     ]
     inline_queries = [
         button.switch_inline_query
@@ -87,7 +93,6 @@ async def test_friend_challenge_proof_cards_send_to_both_users_and_reuse_cache(
         f"proof:duel:{challenge.challenge_id}",
         f"proof:duel:{challenge.challenge_id}",
     ]
-
     async with SessionLocal.begin() as session:
         refreshed = await FriendChallengesRepo.get_by_id_for_update(session, challenge.challenge_id)
         assert refreshed is not None

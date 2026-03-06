@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -32,7 +33,11 @@ async def test_handle_proof_card_inline_share_returns_daily_cup_photo(monkeypatc
 
     async def _fake_get_participant(session, *, tournament_id, user_id):
         del session, tournament_id, user_id
-        return SimpleNamespace(proof_card_file_id="daily-file-id")
+        return SimpleNamespace(proof_card_file_id="daily-file-id", score=Decimal("4"))
+
+    async def _fake_list_for_tournament(session, *, tournament_id):
+        del session, tournament_id
+        return [SimpleNamespace(user_id=101, score=Decimal("4"))]
 
     monkeypatch.setattr(
         gameplay_inline_share.UsersRepo,
@@ -45,6 +50,11 @@ async def test_handle_proof_card_inline_share_returns_daily_cup_photo(monkeypatc
         "get_for_tournament_user",
         _fake_get_participant,
     )
+    monkeypatch.setattr(
+        gameplay_inline_share.TournamentParticipantsRepo,
+        "list_for_tournament",
+        _fake_list_for_tournament,
+    )
 
     inline_query = _DummyInlineQuery(
         telegram_user_id=555,
@@ -56,6 +66,11 @@ async def test_handle_proof_card_inline_share_returns_daily_cup_photo(monkeypatc
     assert answer["kwargs"] == {"cache_time": 0, "is_personal": True}
     result = answer["results"][0]
     assert result.photo_file_id == "daily-file-id"
+    assert (
+        result.caption
+        == "🏆 Daily Arena Cup\nPlatz #1\nPunkte: 4\n📱 https://t.me/Deine_Deutsch_Quiz_bot"
+    )
+    assert result.reply_markup.inline_keyboard[0][0].url == "https://t.me/Deine_Deutsch_Quiz_bot"
 
 
 @pytest.mark.asyncio
@@ -72,6 +87,8 @@ async def test_handle_proof_card_inline_share_returns_duel_photo_for_owner(monke
             status="COMPLETED",
             creator_user_id=101,
             opponent_user_id=202,
+            creator_score=4,
+            opponent_score=2,
             creator_proof_card_file_id="creator-file-id",
             opponent_proof_card_file_id="opponent-file-id",
         )
@@ -96,6 +113,11 @@ async def test_handle_proof_card_inline_share_returns_duel_photo_for_owner(monke
     answer = inline_query.answer_calls[0]
     result = answer["results"][0]
     assert result.photo_file_id == "opponent-file-id"
+    assert (
+        result.caption
+        == "🏆 DUELL ERGEBNIS\nScore: Du 2 : Gegner 4\nID: bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb\n📱 https://t.me/Deine_Deutsch_Quiz_bot"
+    )
+    assert result.reply_markup.inline_keyboard[0][0].url == "https://t.me/Deine_Deutsch_Quiz_bot"
 
 
 @pytest.mark.asyncio
@@ -112,6 +134,8 @@ async def test_handle_proof_card_inline_share_returns_no_results_for_stranger(mo
             status="COMPLETED",
             creator_user_id=101,
             opponent_user_id=202,
+            creator_score=4,
+            opponent_score=2,
             creator_proof_card_file_id="creator-file-id",
             opponent_proof_card_file_id="opponent-file-id",
         )
