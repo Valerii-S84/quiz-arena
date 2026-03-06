@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.bot.texts.de import TEXTS_DE
+from app.game.tournaments.constants import TOURNAMENT_SELF_BOT_LABEL
 
 
 def build_standings_lines(
@@ -40,8 +41,7 @@ def build_round_text(
         f"Deadline: {deadline_text} (Berlin)",
     ]
     if opponent_label is None:
-        lines.append("Gegner: Freilos")
-        lines.append("✅ BYE in dieser Runde: dein Duell gilt als Auto-Sieg.")
+        lines.append(f"Gegner: {TOURNAMENT_SELF_BOT_LABEL}")
     else:
         lines.append(f"Gegner: {opponent_label}")
     lines.extend(["", "📊 Tabelle", *standings_lines])
