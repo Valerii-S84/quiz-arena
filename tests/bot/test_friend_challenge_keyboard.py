@@ -27,11 +27,20 @@ def test_friend_challenge_back_keyboard_contains_home_only() -> None:
 
 def test_friend_challenge_create_keyboard_contains_type_options() -> None:
     keyboard = build_friend_challenge_create_keyboard()
-    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
-    assert "friend:challenge:type:direct" in callbacks
-    assert "friend:challenge:type:open" not in callbacks
-    assert "friend:challenge:type:tournament" in callbacks
-    assert "home:open" in callbacks
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    assert [button.text for button in buttons] == [
+        "👤 Freund herausfordern",
+        "🏆 Turnier mit Freunden",
+        "🥊 Arena Cup",
+        "↩️ Zurück",
+    ]
+    callbacks = [button.callback_data for button in buttons]
+    assert callbacks == [
+        "friend:challenge:type:direct",
+        "friend:challenge:type:tournament",
+        "daily:cup:menu",
+        "home:open",
+    ]
 
 
 def test_friend_challenge_finished_keyboard_contains_rematch_and_back() -> None:

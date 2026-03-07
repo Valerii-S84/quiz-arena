@@ -20,7 +20,7 @@ def build_tournament_format_keyboard() -> InlineKeyboardMarkup:
                     text="🧠 12 Fragen", callback_data="friend:tournament:format:12"
                 )
             ],
-            [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="friend:challenge:create")],
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data="friend:challenge:create")],
         ]
     )
 

@@ -50,6 +50,6 @@ def build_referral_share_keyboard(*, share_url: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Jetzt teilen", url=share_url)],
-            [InlineKeyboardButton(text="⬅️ Zurueck", callback_data="referral:open")],
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data="referral:open")],
         ]
     )

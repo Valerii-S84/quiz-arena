@@ -27,7 +27,7 @@ def build_friend_challenge_create_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="👤 Freund einladen",
+                    text="👤 Freund herausfordern",
                     callback_data="friend:challenge:type:direct",
                 )
             ],
@@ -38,7 +38,8 @@ def build_friend_challenge_create_keyboard() -> InlineKeyboardMarkup:
                     callback_data="friend:challenge:type:tournament",
                 )
             ],
-            [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")],
+            [InlineKeyboardButton(text="🥊 Arena Cup", callback_data="daily:cup:menu")],
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
         ]
     )
 
@@ -48,17 +49,17 @@ def build_friend_challenge_format_keyboard(*, challenge_type: str) -> InlineKeyb
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="⚡ Schnell - 5 Fragen",
+                    text="⚡ Blitz – 5 Fragen",
                     callback_data=f"friend:challenge:format:{challenge_type}:5",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="🧠 Voll - 12 Fragen",
+                    text="🧠 Voll – 12 Fragen",
                     callback_data=f"friend:challenge:format:{challenge_type}:12",
                 )
             ],
-            [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="friend:challenge:create")],
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data="friend:challenge:create")],
         ]
     )
 
@@ -71,7 +72,7 @@ def build_friend_challenge_next_keyboard(*, challenge_id: str) -> InlineKeyboard
                     text="▶️ NAECHSTE RUNDE", callback_data=f"friend:next:{challenge_id}"
                 )
             ],
-            [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")],
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
         ]
     )
 
@@ -79,7 +80,7 @@ def build_friend_challenge_next_keyboard(*, challenge_id: str) -> InlineKeyboard
 def build_friend_challenge_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")],
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
         ]
     )
 
@@ -95,7 +96,7 @@ def build_friend_challenge_share_keyboard(
         return InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="⚔️ Meine Duelle", callback_data="friend:my:duels")],
-                [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")],
+                [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
             ]
         )
     return InlineKeyboardMarkup(
@@ -115,7 +116,7 @@ def build_friend_challenge_share_keyboard(
                 )
             ],
             [InlineKeyboardButton(text="⚔️ Meine Duelle", callback_data="friend:my:duels")],
-            [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")],
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
         ]
     )
 
@@ -167,7 +168,7 @@ def build_friend_challenge_result_share_keyboard(
                     text="🔁 REVANCHE", callback_data=f"friend:rematch:{challenge_id}"
                 )
             ],
-            [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")],
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
         ]
     )
 
@@ -181,7 +182,7 @@ def build_friend_challenge_limit_keyboard() -> InlineKeyboardMarkup:
                 )
             ],
             [InlineKeyboardButton(text="💎 PREMIUM STARTER", callback_data="buy:PREMIUM_STARTER")],
-            [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")],
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
         ]
     )
 
@@ -195,7 +196,7 @@ def build_friend_open_taken_keyboard() -> InlineKeyboardMarkup:
                     callback_data="friend:challenge:type:open",
                 )
             ],
-            [InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")],
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
         ]
     )
 

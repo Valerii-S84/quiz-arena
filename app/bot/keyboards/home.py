@@ -5,7 +5,6 @@ def build_home_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🔥 Tägliche Challenge", callback_data="daily_challenge")],
-            [InlineKeyboardButton(text="🏆 Arena Cup", callback_data="daily:cup:menu")],
             [InlineKeyboardButton(text="⚔️ Duell", callback_data="friend:challenge:create")],
             [InlineKeyboardButton(text="🎯 Schnell-Runde", callback_data="play")],
             [InlineKeyboardButton(text="📚 Artikel-Training", callback_data="mode:ARTIKEL_SPRINT")],
