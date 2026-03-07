@@ -56,12 +56,15 @@ class FriendChallengesRepo:
         *,
         creator_user_id: int,
         access_type: str,
+        since: datetime | None = None,
     ) -> int:
         stmt = select(func.count(FriendChallenge.id)).where(
             FriendChallenge.creator_user_id == creator_user_id,
             FriendChallenge.access_type == access_type,
             FriendChallenge.tournament_match_id.is_(None),
         )
+        if since is not None:
+            stmt = stmt.where(FriendChallenge.created_at >= since)
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
 
