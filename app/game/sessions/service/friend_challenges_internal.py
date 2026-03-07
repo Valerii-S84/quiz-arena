@@ -110,10 +110,12 @@ async def _resolve_friend_challenge_access_type(
     premium_active = await EntitlementsRepo.has_active_premium(session, creator_user_id, now_utc)
     access_type = "PREMIUM"
     if not premium_active:
+        day_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
         free_count = await FriendChallengesRepo.count_by_creator_access_type(
             session,
             creator_user_id=creator_user_id,
             access_type="FREE",
+            since=day_start,
         )
         if free_count < FRIEND_CHALLENGE_FREE_CREATES:
             access_type = "FREE"
