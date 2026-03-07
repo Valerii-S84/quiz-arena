@@ -21,6 +21,8 @@ async def create_tournament_match_friend_challenge(
     *,
     creator_user_id: int,
     opponent_user_id: int,
+    tournament_id: UUID | None = None,
+    tournament_round_no: int | None = None,
     mode_code: str,
     total_rounds: int,
     tournament_match_id: UUID,
@@ -36,6 +38,8 @@ async def create_tournament_match_friend_challenge(
         total_rounds=resolved_rounds,
         now_utc=now_utc,
         challenge_seed=str(challenge_id),
+        tournament_id=tournament_id,
+        tournament_round_no=tournament_round_no,
         preferred_levels_by_round=preferred_levels_by_round,
     )
     challenge = await _create_friend_challenge_row(

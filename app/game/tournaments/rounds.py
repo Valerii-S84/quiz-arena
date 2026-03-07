@@ -128,6 +128,8 @@ async def create_round_matches(
             session,
             creator_user_id=pair.user_a,
             opponent_user_id=int(pair.user_b),
+            tournament_id=tournament.id,
+            tournament_round_no=round_no,
             mode_code=TOURNAMENT_MODE_CODE,
             total_rounds=duel_rounds,
             tournament_match_id=match_id,

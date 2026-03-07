@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Sequence
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,11 +36,18 @@ async def select_duel_question_ids(
     total_rounds: int,
     now_utc: datetime,
     challenge_seed: str,
+    tournament_id: UUID | None = None,
+    tournament_round_no: int | None = None,
     preferred_levels_by_round: Sequence[str] | None = None,
 ) -> list[str]:
     from app.game.sessions import service as service_module
 
     local_date = berlin_local_date(now_utc)
+    if tournament_id is not None:
+        resolved_tournament_round_no = max(1, int(tournament_round_no or 1))
+        seed_base = f"tournament:{tournament_id}:{resolved_tournament_round_no}"
+    else:
+        seed_base = f"duel:{challenge_seed}"
     selected_ids: list[str] = []
     for round_no in range(1, total_rounds + 1):
         preferred_level = _friend_challenge_level_for_round(round_number=round_no)
@@ -50,7 +58,7 @@ async def select_duel_question_ids(
             mode_code,
             local_date_berlin=local_date,
             previous_round_question_ids=selected_ids,
-            selection_seed=f"duel:{challenge_seed}:{round_no}",
+            selection_seed=f"{seed_base}:{round_no}",
             preferred_level=preferred_level,
         )
         selected_ids.append(selected_question.question_id)
