@@ -58,14 +58,13 @@ async def test_handle_friend_open_repost_creates_new_open_duel_and_shows_share(
 
     response = callback.message.answers[0]
     assert TEXTS_DE["msg.friend.challenge.created"] in (response.text or "")
-    urls = [
-        button.url
+    inline_queries = [
+        button.switch_inline_query
         for row in response.kwargs["reply_markup"].inline_keyboard
         for button in row
-        if button.url
+        if button.switch_inline_query
     ]
-    assert len(urls) == 1
-    assert "https://t.me/share/url" in (urls[0] or "")
+    assert inline_queries == ["invite:duel:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"]
 
 
 @pytest.mark.asyncio
