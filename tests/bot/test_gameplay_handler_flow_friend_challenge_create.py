@@ -31,7 +31,7 @@ async def test_handle_friend_challenge_create_opens_format_picker(monkeypatch) -
         if button.callback_data
     ]
     assert "friend:challenge:type:direct" in callbacks
-    assert "friend:challenge:type:open" in callbacks
+    assert "friend:challenge:type:open" not in callbacks
     assert "friend:challenge:type:tournament" in callbacks
 
 
