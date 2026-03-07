@@ -19,7 +19,7 @@ const TELEGRAM_CHANNEL_URL =
 const BOT_LOGO_PATH = "/logo/bot-logo.jpg";
 const CHANNEL_LOGO_PATH = "/logo/channel-logo.jpg";
 const WORKLOG_LOGO_PATH = "/products/worklog/logo.png";
-const WORKLOG_DOWNLOAD_PATH = "/downloads/worklog/direct-hoofdrapport.aia";
+const WORKLOG_DOWNLOAD_PATH = "/downloads/worklog/direct-hoofdrapport.apk";
 
 const GLASS_CARD_CLASS =
   "rounded-2xl border border-white/70 bg-white/74 shadow-[0_10px_30px_rgba(15,23,42,0.10)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_38px_rgba(15,23,42,0.16)]";
@@ -339,49 +339,39 @@ export default function PublicHomePage() {
 
         <section className="mt-10">
           <h2 className="text-3xl font-semibold text-slate-900">Produkte</h2>
-          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
             <article className={`${GLASS_CARD_CLASS} p-5 sm:p-6`}>
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-                <div className="mx-auto flex h-28 w-28 shrink-0 items-center justify-center rounded-[2rem] bg-[linear-gradient(180deg,#1f2937_0%,#111827_100%)] shadow-[0_18px_36px_rgba(15,23,42,0.18)] sm:mx-0 sm:h-32 sm:w-32">
+              <div className="flex items-start gap-4">
+                <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full ring-1 ring-white/80">
                   <Image
                     src={WORKLOG_LOGO_PATH}
                     alt="Worklog Logo"
-                    width={96}
-                    height={108}
-                    className="h-auto w-auto object-contain"
+                    fill
+                    sizes="40px"
+                    className="object-cover"
                   />
                 </div>
                 <div className="flex flex-1 flex-col">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Android Tool
+                    Android App
                   </p>
-                  <h4 className="mt-2 text-2xl font-semibold text-slate-900">Worklog</h4>
-                  <p className="mt-3 text-sm leading-6 text-slate-700">
-                    Ein kompaktes Sprach-Worklog für Android: Sprache wählen, sprechen, Text
-                    automatisch erkennen und mit Datum im Verlauf speichern. Ideal für schnelle
-                    Ideen, Arbeitsnotizen und persönliche Voice-to-Text-Einträge ohne Cloud-Zwang.
+                  <h4 className="mt-1 text-xl font-semibold text-slate-900">Worklog</h4>
+                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                    Sprach-Notizblock für Android: Sprache wählen, sprechen und Einträge lokal mit
+                    Datum speichern. Schnell, klar und ohne Cloud-Zwang.
                   </p>
-                  <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-slate-700">
-                    <span className="rounded-full bg-slate-100 px-3 py-1">Mehrsprachig</span>
-                    <span className="rounded-full bg-slate-100 px-3 py-1">
-                      Offline gespeichert
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-3 py-1">
-                      Verlauf mit Zeitstempel
-                    </span>
-                  </div>
-                  <ul className="mt-4 space-y-2 text-sm text-slate-700">
+                  <ul className="mt-3 space-y-1.5 text-sm text-slate-700">
                     <li className="flex gap-2">
                       <span className="text-emerald-600">✓</span>
-                      <span>Sprache auswählen und Diktat sofort starten</span>
+                      <span>Mehrsprachige Spracheingabe</span>
                     </li>
                     <li className="flex gap-2">
                       <span className="text-emerald-600">✓</span>
-                      <span>Texte lokal mit Datum und Uhrzeit speichern</span>
+                      <span>Lokaler Verlauf mit Zeitstempel</span>
                     </li>
                     <li className="flex gap-2">
                       <span className="text-emerald-600">✓</span>
-                      <span>Verlauf später ansehen und Einträge löschen</span>
+                      <span>Einträge ansehen und löschen</span>
                     </li>
                   </ul>
                 </div>
@@ -389,16 +379,19 @@ export default function PublicHomePage() {
 
               <div className="mt-6 flex flex-col gap-3 border-t border-white/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-slate-600">
-                  Download als MIT App Inventor Projektdatei (.aia), ca. 5 MB.
+                  Direkter Download als Android-App (.apk), ca. 9 MB.
                 </p>
                 <a
                   href={WORKLOG_DOWNLOAD_PATH}
-                  download="worklog-direct-hoofdrapport.aia"
+                  download="worklog-direct-hoofdrapport.apk"
                   className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-[0_8px_18px_rgba(15,23,42,0.22)] transition hover:bg-slate-800"
                 >
-                  Worklog herunterladen
+                  APK herunterladen
                 </a>
               </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Android: Datei öffnen, Installation erlauben, App starten.
+              </p>
             </article>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
