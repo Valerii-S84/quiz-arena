@@ -26,6 +26,7 @@ def _gameplay():
 def register(router: Router) -> None:
     router.callback_query(F.data == "friend:challenge:create")(handle_friend_challenge_create)
     router.callback_query(F.data == "create_tournament_start")(handle_create_tournament_start)
+    # HIDDEN: open challenge disabled for now.
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_CREATE_TYPE_RE))(
         handle_friend_challenge_type_selected
     )
