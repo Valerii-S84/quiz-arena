@@ -71,7 +71,7 @@ async def submit_answer(
             question_id=question.question_id,
             is_correct=is_correct,
             answered_at=now_utc,
-            response_ms=0,
+            response_ms=max(0, int((now_utc - quiz_session.started_at).total_seconds() * 1000)),
             idempotency_key=idempotency_key,
         ),
     )
