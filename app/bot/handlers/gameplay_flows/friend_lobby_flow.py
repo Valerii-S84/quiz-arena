@@ -105,6 +105,7 @@ async def handle_friend_challenge_create_selected(
         await callback.answer()
         return
     welcome_image_file_id = get_settings().resolved_welcome_image_file_id
+    photo_sent = False
     if welcome_image_file_id:
         bot = callback.bot
         assert bot is not None
@@ -116,6 +117,7 @@ async def handle_friend_challenge_create_selected(
                     "⚔️ Ich fordere dich heraus! Kannst du mich schlagen?\n\n" f"👉 {invite_link}"
                 ),
             )
+            photo_sent = True
         except TelegramAPIError as e:
             import logging
 
@@ -125,12 +127,16 @@ async def handle_friend_challenge_create_selected(
                 welcome_image_file_id,
                 e,
             )
-            welcome_image_file_id = ""
-    body_lines = [
-        TEXTS_DE["msg.friend.challenge.created"],
-        build_friend_plan_text(total_rounds=challenge.total_rounds),
-        TEXTS_DE["msg.friend.challenge.created.short"],
-    ]
+    body_lines = []
+    if not photo_sent:
+        body_lines.append("⚔️ Ich fordere dich heraus! Kannst du mich schlagen?")
+    body_lines.extend(
+        [
+            TEXTS_DE["msg.friend.challenge.created"],
+            build_friend_plan_text(total_rounds=challenge.total_rounds),
+            TEXTS_DE["msg.friend.challenge.created.short"],
+        ]
+    )
     ttl_text = build_friend_ttl_text(challenge=challenge, now_utc=now_utc)
     if ttl_text is not None:
         body_lines.append(ttl_text)
