@@ -111,7 +111,12 @@ Jedes Turnier durchläuft folgende Zustände:
 
 ## 5. Frage-Selektion
 
-* Ein globaler Seed pro Turnier
+* Für DAILY_ARENA und DAILY_ELIMINATION gilt:
+  `seed = "tournament:{tournament_id}:{tournament_round_no}:{duel_round_no}"`
+* Damit erhalten alle Paarungen derselben **Turnierrunde** identische `question_ids`
+* Zwischen Turnierrunden (z. B. 1/8 vs 1/4) sind die `question_ids` unterschiedlich
+* Für normale Friend Duels außerhalb von Turnieren bleibt:
+  `seed = "duel:{challenge_id}:{round_no}"`
 * Anti-Repeat global aktiv
 * Keine identischen Fragetypen hintereinander
 * Schwierigkeit entsprechend Turnier-Typ

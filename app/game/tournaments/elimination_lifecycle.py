@@ -118,6 +118,8 @@ async def _create_next_round_match(
         session,
         creator_user_id=user_a,
         opponent_user_id=user_b,
+        tournament_id=tournament.id,
+        tournament_round_no=next_round,
         mode_code=TOURNAMENT_MODE_CODE,
         total_rounds=rounds_for_tournament_format(format_code=tournament.format),
         tournament_match_id=match_id,
