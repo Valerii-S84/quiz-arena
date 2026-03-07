@@ -29,7 +29,7 @@ def test_friend_challenge_create_keyboard_contains_type_options() -> None:
     keyboard = build_friend_challenge_create_keyboard()
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
     assert "friend:challenge:type:direct" in callbacks
-    assert "friend:challenge:type:open" in callbacks
+    assert "friend:challenge:type:open" not in callbacks
     assert "friend:challenge:type:tournament" in callbacks
     assert "home:open" in callbacks
 

@@ -31,12 +31,7 @@ def build_friend_challenge_create_keyboard() -> InlineKeyboardMarkup:
                     callback_data="friend:challenge:type:direct",
                 )
             ],
-            [
-                InlineKeyboardButton(
-                    text="🌍 Offene Herausforderung",
-                    callback_data="friend:challenge:type:open",
-                )
-            ],
+            # HIDDEN: open challenge disabled for now.
             [
                 InlineKeyboardButton(
                     text="🏆 Turnier mit Freunden",
