@@ -116,7 +116,15 @@ async def handle_friend_challenge_create_selected(
                     "⚔️ Ich fordere dich heraus! Kannst du mich schlagen?\n\n" f"👉 {invite_link}"
                 ),
             )
-        except TelegramAPIError:
+        except TelegramAPIError as e:
+            import logging
+
+            logging.getLogger(__name__).error(
+                "send_photo failed for friend challenge: user=%s file_id=%s error=%s",
+                callback.from_user.id,
+                welcome_image_file_id,
+                e,
+            )
             welcome_image_file_id = ""
     body_lines = [
         TEXTS_DE["msg.friend.challenge.created"],
