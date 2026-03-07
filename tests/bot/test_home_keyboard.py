@@ -1,13 +1,12 @@
 from app.bot.keyboards.home import build_home_keyboard
 
 
-def test_home_keyboard_has_exact_6_buttons_in_canonical_order() -> None:
+def test_home_keyboard_has_exact_5_buttons_in_canonical_order() -> None:
     keyboard = build_home_keyboard()
     buttons = [button for row in keyboard.inline_keyboard for button in row]
-    assert len(buttons) == 6
+    assert len(buttons) == 5
     assert [button.text for button in buttons] == [
         "🔥 Tägliche Challenge",
-        "🏆 Arena Cup",
         "⚔️ Duell",
         "🎯 Schnell-Runde",
         "📚 Artikel-Training",
@@ -15,7 +14,6 @@ def test_home_keyboard_has_exact_6_buttons_in_canonical_order() -> None:
     ]
     assert [button.callback_data for button in buttons] == [
         "daily_challenge",
-        "daily:cup:menu",
         "friend:challenge:create",
         "play",
         "mode:ARTIKEL_SPRINT",
@@ -43,6 +41,6 @@ def test_home_keyboard_does_not_include_liga_or_removed_modes() -> None:
     assert "liga:open" not in callbacks
     assert all("LIGA" not in label for label in labels)
     assert "daily_challenge" in callbacks
-    assert "daily:cup:menu" in callbacks
+    assert "daily:cup:menu" not in callbacks
     assert "mode:CASES_PRACTICE" not in callbacks
     assert "referral:open" not in callbacks

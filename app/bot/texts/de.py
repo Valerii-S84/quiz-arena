@@ -1,6 +1,6 @@
 TEXTS_DE: dict[str, str] = {
     "msg.home.title": "🎮 QUIZ ARENA",
-    "msg.home.hint": "👇 Waehle unten eine Aktion.",
+    "msg.home.hint": "🎮 Lerne Deutsch – spiele, fordere Freunde heraus und steig auf!",
     "msg.home.stats.with_streak": "🔥 {streak} Tage Streak  ⚡ {free_energy}/20 + {paid_energy} Bonus",
     "msg.home.stats.no_streak": "⚡ {free_energy}/20 + {paid_energy} Bonus",
     "msg.home.badge.daily_cup_5": "🏅 Badge: 5 Tage in Folge im Arena Cup!",
@@ -41,8 +41,8 @@ TEXTS_DE: dict[str, str] = {
     "msg.game.session.not_found": "Diese Session ist nicht mehr verfügbar.",
     "msg.friend.challenge.created": "🤝 Duell erstellt. Teile den Link mit deinem Freund.",
     "msg.friend.challenge.created.fallback": "🤝 Duell erstellt. Teile den Start-Code: fc_{invite_token}",
-    "msg.friend.challenge.create.choose": "⚔️ Wen willst du herausfordern?",
-    "msg.friend.challenge.create.format": "Wie viele Fragen?",
+    "msg.friend.challenge.create.choose": "⚔️ Fordere einen Freund heraus! Wer mehr richtige Antworten hat, gewinnt.",
+    "msg.friend.challenge.create.format": "🎯 Wähle dein Format – Blitz für Schnelle, Voll für Mutige!",
     "msg.friend.challenge.tournament.format": "🏆 Turnier erstellen\n\nWie viele Fragen pro Spiel?",
     "msg.tournament.created": "🏆 Dein Turnier ist bereit!\nLade bis zu 7 Freunde ein.\nAlle spielen gegeneinander - 3 Runden.",
     "msg.tournament.joined": "✅ Du bist dem Turnier beigetreten.",

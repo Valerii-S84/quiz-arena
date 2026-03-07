@@ -68,5 +68,5 @@ def build_promo_discount_keyboard(
 
     if not rows:
         return None
-    rows.append([InlineKeyboardButton(text="⬅️ ZURUECK", callback_data="home:open")])
+    rows.append([InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
