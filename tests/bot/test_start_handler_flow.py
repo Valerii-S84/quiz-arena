@@ -161,9 +161,7 @@ async def test_handle_start_friend_token_expired(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_handle_start_duel_payload_joins_and_shows_invite_before_round_start(
-    monkeypatch,
-) -> None:
+async def test_handle_start_duel_payload_joins_and_shows_challenge_immediately(monkeypatch) -> None:
     monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
@@ -247,9 +245,8 @@ async def test_handle_start_duel_payload_joins_and_shows_invite_before_round_sta
     await start.handle_start(message)
 
     assert len(message.answers) == 2
-    assert "NAECHSTE RUNDE" in (message.answers[0].text or "")
-    assert TEXTS_DE["msg.friend.challenge.joined"] in (message.answers[1].text or "")
-    assert all(answer.kwargs.get("parse_mode") != "HTML" for answer in message.answers)
+    assert TEXTS_DE["msg.friend.challenge.joined"] in (message.answers[0].text or "")
+    assert message.answers[1].kwargs.get("parse_mode") == "HTML"
 
 
 @pytest.mark.asyncio
