@@ -118,7 +118,9 @@ async def _build_friend_challenge_invite_result(*, session, user_id: int, challe
     if challenge is None:
         return None
     is_creator = int(challenge.creator_user_id) == user_id
-    is_opponent = challenge.opponent_user_id is not None and int(challenge.opponent_user_id) == user_id
+    is_opponent = (
+        challenge.opponent_user_id is not None and int(challenge.opponent_user_id) == user_id
+    )
     if not is_creator and not is_opponent:
         return None
 
