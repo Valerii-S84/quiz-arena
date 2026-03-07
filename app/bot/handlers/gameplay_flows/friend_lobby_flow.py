@@ -127,15 +127,16 @@ async def handle_friend_challenge_create_selected(
                 welcome_image_file_id,
                 e,
             )
+    body_lines = []
     if not photo_sent:
-        await callback.message.answer(
-            f"⚔️ Ich fordere dich heraus! Kannst du mich schlagen?\n\n👉 {invite_link}"
-        )
-    body_lines = [
-        TEXTS_DE["msg.friend.challenge.created"],
-        build_friend_plan_text(total_rounds=challenge.total_rounds),
-        TEXTS_DE["msg.friend.challenge.created.short"],
-    ]
+        body_lines.append("⚔️ Ich fordere dich heraus! Kannst du mich schlagen?")
+    body_lines.extend(
+        [
+            TEXTS_DE["msg.friend.challenge.created"],
+            build_friend_plan_text(total_rounds=challenge.total_rounds),
+            TEXTS_DE["msg.friend.challenge.created.short"],
+        ]
+    )
     ttl_text = build_friend_ttl_text(challenge=challenge, now_utc=now_utc)
     if ttl_text is not None:
         body_lines.append(ttl_text)
