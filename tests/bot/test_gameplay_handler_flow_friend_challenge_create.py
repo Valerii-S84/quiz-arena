@@ -83,6 +83,10 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
     response = callback.message.answers[0]
     assert "https://t.me/" not in (response.text or "")
     keyboard = response.kwargs["reply_markup"]
-    share_urls = [button.url for row in keyboard.inline_keyboard for button in row if button.url]
-    assert any("start%3Dduel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in url for url in share_urls)
-    assert len(share_urls) == 1
+    inline_queries = [
+        button.switch_inline_query
+        for row in keyboard.inline_keyboard
+        for button in row
+        if button.switch_inline_query
+    ]
+    assert inline_queries == ["invite:duel:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]

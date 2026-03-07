@@ -159,3 +159,50 @@ async def test_handle_proof_card_inline_share_returns_no_results_for_stranger(mo
 
     answer = inline_query.answer_calls[0]
     assert answer["results"] == []
+
+
+@pytest.mark.asyncio
+async def test_handle_proof_card_inline_share_returns_invite_photo_for_creator(monkeypatch) -> None:
+    monkeypatch.setattr(gameplay_inline_share, "SessionLocal", DummySessionLocal())
+
+    async def _fake_get_user(session, telegram_user_id: int):
+        del session, telegram_user_id
+        return SimpleNamespace(id=303)
+
+    async def _fake_get_challenge(session, challenge_id):
+        del session, challenge_id
+        return SimpleNamespace(
+            creator_user_id=303,
+            opponent_user_id=None,
+        )
+
+    monkeypatch.setattr(
+        gameplay_inline_share.UsersRepo,
+        "get_by_telegram_user_id",
+        _fake_get_user,
+    )
+    monkeypatch.setattr(
+        gameplay_inline_share.FriendChallengesRepo,
+        "get_by_id",
+        _fake_get_challenge,
+    )
+    monkeypatch.setattr(
+        gameplay_inline_share,
+        "get_settings",
+        lambda: SimpleNamespace(resolved_welcome_image_file_id="invite-photo-file-id"),
+    )
+
+    inline_query = _DummyInlineQuery(
+        telegram_user_id=999,
+        query="invite:duel:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    )
+    await gameplay_inline_share.handle_proof_card_inline_share(inline_query)
+
+    answer = inline_query.answer_calls[0]
+    result = answer["results"][0]
+    assert result.photo_file_id == "invite-photo-file-id"
+    assert "Ich fordere dich heraus" in (result.caption or "")
+    assert (
+        "https://t.me/Deine_Deutsch_Quiz_bot?start=duel_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        in (result.caption or "")
+    )

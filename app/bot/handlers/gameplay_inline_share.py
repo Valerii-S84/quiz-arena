@@ -13,8 +13,10 @@ from aiogram.types import (
 from app.bot.keyboards.proof_card_share import (
     DAILY_CUP_INLINE_SHARE_PREFIX,
     FRIEND_CHALLENGE_INLINE_SHARE_PREFIX,
+    FRIEND_CHALLENGE_INVITE_INLINE_SHARE_PREFIX,
 )
-from app.core.telegram_links import public_bot_link
+from app.core.config import get_settings
+from app.core.telegram_links import public_bot_link, public_bot_start_link
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
@@ -111,7 +113,32 @@ async def _build_friend_challenge_result(*, session, user_id: int, challenge_id:
     )
 
 
-@router.inline_query(F.query.startswith("proof:"))
+async def _build_friend_challenge_invite_result(*, session, user_id: int, challenge_id: UUID):
+    challenge = await FriendChallengesRepo.get_by_id(session, challenge_id)
+    if challenge is None:
+        return None
+    is_creator = int(challenge.creator_user_id) == user_id
+    is_opponent = (
+        challenge.opponent_user_id is not None and int(challenge.opponent_user_id) == user_id
+    )
+    if not is_creator and not is_opponent:
+        return None
+
+    file_id = get_settings().resolved_welcome_image_file_id.strip()
+    if not file_id:
+        return None
+
+    invite_link = public_bot_start_link(start_param=f"duel_{challenge_id}")
+    return InlineQueryResultCachedPhoto(
+        id=f"duel-invite:{challenge_id.hex}",
+        photo_file_id=file_id,
+        title="Duell Einladung",
+        description="Teile deine Duell-Einladung als Bild.",
+        caption=f"⚔️ Ich fordere dich heraus! Kannst du mich schlagen?\n\n👉 {invite_link}",
+    )
+
+
+@router.inline_query(F.query.regexp(r"^(proof:|invite:)"))
 async def handle_proof_card_inline_share(inline_query: InlineQuery) -> None:
     async with SessionLocal.begin() as session:
         user = await UsersRepo.get_by_telegram_user_id(session, inline_query.from_user.id)
@@ -139,15 +166,26 @@ async def handle_proof_card_inline_share(inline_query: InlineQuery) -> None:
             query=inline_query.query,
             prefix=FRIEND_CHALLENGE_INLINE_SHARE_PREFIX,
         )
-        result = (
-            await _build_friend_challenge_result(
+        if challenge_id is not None:
+            result = await _build_friend_challenge_result(
                 session=session,
                 user_id=int(user.id),
                 challenge_id=challenge_id,
             )
-            if challenge_id is not None
-            else None
-        )
+        else:
+            invite_challenge_id = _parse_query_id(
+                query=inline_query.query,
+                prefix=FRIEND_CHALLENGE_INVITE_INLINE_SHARE_PREFIX,
+            )
+            result = (
+                await _build_friend_challenge_invite_result(
+                    session=session,
+                    user_id=int(user.id),
+                    challenge_id=invite_challenge_id,
+                )
+                if invite_challenge_id is not None
+                else None
+            )
     await inline_query.answer(
         [result] if result is not None else [],
         cache_time=0,
