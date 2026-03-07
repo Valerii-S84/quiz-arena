@@ -153,7 +153,21 @@ async def handle_start_friend_challenge_payload(
         summary_lines.append(TEXTS_DE["msg.friend.challenge.round.already.answered"])
     outgoing_messages: list[OutgoingStartMessage] = []
     welcome_image_file_id = get_settings().resolved_welcome_image_file_id
-    if welcome_image_file_id:
+    invite_caption = (
+        f"⚔️ {opponent_label} fordert dich zum Duell heraus!\n"
+        "Tippe auf \"▶️ NAECHSTE RUNDE\", um das Duell zu starten."
+    )
+    if challenge_joined_now:
+        outgoing_messages.append(
+            OutgoingStartMessage(
+                text=invite_caption,
+                reply_markup=build_friend_challenge_next_keyboard(
+                    challenge_id=str(challenge_start.snapshot.challenge_id)
+                ),
+                photo=welcome_image_file_id or None,
+            )
+        )
+    elif welcome_image_file_id:
         outgoing_messages.append(
             OutgoingStartMessage(
                 text=(
@@ -172,7 +186,7 @@ async def handle_start_friend_challenge_payload(
             reply_markup=build_friend_challenge_back_keyboard(),
         )
     )
-    if challenge_start.start_result is not None:
+    if challenge_start.start_result is not None and not challenge_joined_now:
         question_text = build_question_text(
             source="FRIEND_CHALLENGE",
             snapshot_free_energy=snapshot.free_energy,
