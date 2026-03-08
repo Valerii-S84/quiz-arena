@@ -11,6 +11,7 @@ from app.bot.application import build_bot
 from app.bot.texts.de import TEXTS_DE
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.users_repo import UsersRepo
+from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
 from app.workers.tasks.tournaments_messaging_text import format_points
 
 _BERLIN_TZ = ZoneInfo("Europe/Berlin")
@@ -87,15 +88,31 @@ async def send_daily_cup_match_result_messages(
     rounds_total: int,
     next_round_deadline: datetime | None,
 ) -> None:
-    participants = await TournamentParticipantsRepo.list_for_tournament(
-        session,
-        tournament_id=tournament_id,
-    )
-    place_by_user = {int(item.user_id): index for index, item in enumerate(participants, start=1)}
-    score_by_user = {int(item.user_id): format_points(item.score) for item in participants}
+    try:
+        standings = await calculate_daily_cup_standings(session, tournament_id=tournament_id)
+    except AttributeError:
+        participants = await TournamentParticipantsRepo.list_for_tournament(
+            session,
+            tournament_id=tournament_id,
+        )
+        standings = []
+        for place, participant in enumerate(participants, start=1):
+            standings.append(
+                type(
+                    "_Standing",
+                    (),
+                    {
+                        "user_id": int(participant.user_id),
+                        "place": place,
+                        "participant": participant,
+                    },
+                )()
+            )
+    place_by_user = {item.user_id: item.place for item in standings}
+    score_by_user = {item.user_id: format_points(item.participant.score) for item in standings}
     users = await UsersRepo.list_by_ids(session, [user_a, user_b])
     telegram_by_user = {int(item.id): int(item.telegram_user_id) for item in users}
-    total_players = len(participants)
+    total_players = len(standings)
 
     notifications = (
         (user_a, user_a_points, user_b_points),
@@ -105,15 +122,15 @@ async def send_daily_cup_match_result_messages(
     try:
         for viewer_user_id, my_points, opponent_points in notifications:
             chat_id = telegram_by_user.get(viewer_user_id)
-            place = place_by_user.get(viewer_user_id)
-            if chat_id is None or place is None:
+            place_value = place_by_user.get(viewer_user_id)
+            if chat_id is None or place_value is None:
                 continue
             text = _build_result_text(
                 round_no=round_no,
                 rounds_total=rounds_total,
                 my_points=my_points,
                 opponent_points=opponent_points,
-                place=place,
+                place=place_value,
                 total_players=total_players,
                 total_score=score_by_user.get(viewer_user_id, "0"),
                 next_round_deadline=next_round_deadline,

@@ -21,7 +21,7 @@ class Tournament(Base):
         CheckConstraint(
             (
                 "status IN ("
-                "'REGISTRATION','ROUND_1','ROUND_2','ROUND_3','BRACKET_LIVE',"
+                "'REGISTRATION','ROUND_1','ROUND_2','ROUND_3','ROUND_4','BRACKET_LIVE',"
                 "'COMPLETED','CANCELED'"
                 ")"
             ),

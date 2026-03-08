@@ -57,6 +57,11 @@ def configure_daily_cup_schedule(celery_app) -> None:
             "schedule": crontab(hour=DAILY_CUP_CLOSE_HOUR, minute=DAILY_CUP_CLOSE_MINUTE),
             "options": {"queue": "q_normal"},
         },
+        "daily-cup-publish-final-results": {
+            "task": "app.workers.tasks.daily_cup.publish_final_results",
+            "schedule": crontab(hour=20, minute=5),
+            "options": {"queue": "q_normal"},
+        },
         "daily-elimination-final-deadline": {
             "task": "app.workers.tasks.daily_cup.final_deadline",
             "schedule": crontab(

@@ -79,7 +79,7 @@ def test_build_question_text_contains_theme_counter_and_energy() -> None:
             options=("A", "B", "C", "D"),
             mode_code="QUICK_MIX_A1A2",
             source="MENU",
-            category="Wortschatz - Alltag",
+            category="B2 Wortschatz - Alltag",
             question_number=1,
             total_questions=1,
         ),
@@ -95,8 +95,9 @@ def test_build_question_text_contains_theme_counter_and_energy() -> None:
     )
     assert "⚡" in text
     assert "🔋 Energie:" in text
-    assert "📚 Thema:" in text
+    assert "📚 Thema: Wortschatz - Alltag" in text
     assert "❓ Frage 1/1" in text
+    assert "B2" not in text
 
 
 @pytest.mark.asyncio

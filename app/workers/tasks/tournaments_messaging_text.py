@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 from app.game.tournaments.constants import TOURNAMENT_MATCH_STATUS_PENDING
 
-ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3"})
+ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3", "ROUND_4"})
 _BERLIN_TZ = ZoneInfo("Europe/Berlin")
 
 

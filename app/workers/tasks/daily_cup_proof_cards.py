@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 from uuid import UUID
-from zoneinfo import ZoneInfo
 
 import structlog
 from aiogram.types import BufferedInputFile
@@ -17,6 +16,7 @@ from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES, TOURNAMENT_STATUS_COMPLETED
+from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
@@ -25,22 +25,14 @@ from app.workers.tasks.daily_cup_proof_cards_text import (
     format_points,
     format_user_label,
 )
+from app.workers.tasks.daily_cup_task_helpers import is_celery_task, is_today_daily_cup_tournament
 from app.workers.tasks.tournaments_proof_card_render import render_tournament_proof_card_png
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_proof_cards")
 
 
-def _is_celery_task(task_obj: object) -> bool:
-    return type(task_obj).__module__.startswith("celery.")
-
-
 def _empty_result() -> dict[str, int]:
     return {"processed": 0, "participants_total": 0, "sent": 0, "cached_reused": 0, "failed": 0}
-
-
-def _is_today_tournament(*, registration_deadline: datetime, now_utc: datetime) -> bool:
-    tz = ZoneInfo(DAILY_CUP_TIMEZONE)
-    return registration_deadline.astimezone(tz).date() == now_utc.astimezone(tz).date()
 
 
 async def run_daily_cup_proof_cards_async(
@@ -63,9 +55,10 @@ async def run_daily_cup_proof_cards_async(
             or tournament.status != TOURNAMENT_STATUS_COMPLETED
         ):
             return _empty_result()
-        if not _is_today_tournament(
+        if not is_today_daily_cup_tournament(
             registration_deadline=tournament.registration_deadline,
             now_utc=now_utc,
+            timezone_name=DAILY_CUP_TIMEZONE,
         ):
             logger.info(
                 "daily_cup_proof_cards_skipped_stale_tournament",
@@ -74,12 +67,10 @@ async def run_daily_cup_proof_cards_async(
             )
             return _empty_result()
 
-        all_participants = await TournamentParticipantsRepo.list_for_tournament(
-            session,
-            tournament_id=parsed_tournament_id,
-        )
-        if not all_participants:
+        standings = await calculate_daily_cup_standings(session, tournament_id=parsed_tournament_id)
+        if not standings:
             return _empty_result()
+        all_participants = [item.participant for item in standings]
 
         participants = (
             [item for item in all_participants if int(item.user_id) == user_id]
@@ -107,7 +98,7 @@ async def run_daily_cup_proof_cards_async(
     if initial_delay_seconds > 0:
         await asyncio.sleep(max(0, int(initial_delay_seconds)))
 
-    standings_user_ids = [int(item.user_id) for item in all_participants]
+    standings_user_ids = [item.user_id for item in standings]
     participant_rows = {int(item.user_id): item for item in participants}
     points_by_user = {int(item.user_id): format_points(item.score) for item in all_participants}
     participants_total = len(standings_user_ids)
@@ -156,10 +147,10 @@ async def run_daily_cup_proof_cards_async(
                     player_label=user_labels.get(current_user_id, "Spieler"),
                     place=place,
                     points=points,
-                    format_label="5 Fragen",
+                    format_label="7 Fragen",
                     completed_at=now_utc,
                     tournament_name="Daily Arena Cup",
-                    rounds_played=3,
+                    rounds_played=4,
                     is_daily_arena=True,
                 )
                 message = await bot.send_photo(
@@ -211,7 +202,7 @@ def enqueue_daily_cup_proof_cards(
     delay_seconds: int = 2,
 ) -> None:
     try:
-        if _is_celery_task(run_daily_cup_proof_cards):
+        if is_celery_task(run_daily_cup_proof_cards):
             run_daily_cup_proof_cards.apply_async(
                 kwargs={
                     "tournament_id": tournament_id,

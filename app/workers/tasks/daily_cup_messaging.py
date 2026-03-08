@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from uuid import UUID
-from zoneinfo import ZoneInfo
 
 import structlog
 
@@ -11,20 +10,22 @@ from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard, build_da
 from app.bot.texts.de import TEXTS_DE
 from app.core.telegram_links import public_bot_link
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
-from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES
+from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
 from app.workers.tasks.daily_cup_core import persist_daily_cup_standings_message_ids
+from app.workers.tasks.daily_cup_messaging_followups import handle_daily_cup_completion_followups
 from app.workers.tasks.daily_cup_messaging_text import (
     build_completed_text,
     build_round_text,
     build_standings_lines,
 )
+from app.workers.tasks.daily_cup_task_helpers import is_celery_task, is_today_daily_cup_tournament
 from app.workers.tasks.tournaments_messaging_text import (
     ROUND_STATUSES,
     format_deadline,
@@ -37,19 +38,9 @@ from app.workers.tasks.tournaments_messaging_text import (
 logger = structlog.get_logger("app.workers.tasks.daily_cup_messaging")
 
 
-def _is_celery_task(task_obj: object) -> bool:
-    return type(task_obj).__module__.startswith("celery.")
-
-
-def _is_today_tournament(*, registration_deadline: datetime, now_utc: datetime) -> bool:
-    tz = ZoneInfo(DAILY_CUP_TIMEZONE)
-    return registration_deadline.astimezone(tz).date() == now_utc.astimezone(tz).date()
-
-
 async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str, int]:
     return await run_daily_cup_round_messaging_async_with_followups(
-        tournament_id=tournament_id,
-        enqueue_completion_followups=False,
+        tournament_id=tournament_id, enqueue_completion_followups=False
     )
 
 
@@ -75,12 +66,10 @@ async def run_daily_cup_round_messaging_async_with_followups(
             or tournament.status in {"REGISTRATION", "CANCELED"}
         ):
             return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
-        participants = await TournamentParticipantsRepo.list_for_tournament(
-            session,
-            tournament_id=parsed_tournament_id,
-        )
-        if not participants:
+        standings = await calculate_daily_cup_standings(session, tournament_id=parsed_tournament_id)
+        if not standings:
             return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
+        participants = [item.participant for item in standings]
 
         users = await UsersRepo.list_by_ids(session, [int(item.user_id) for item in participants])
         labels = {
@@ -99,15 +88,16 @@ async def run_daily_cup_round_messaging_async_with_followups(
         is_completed = tournament.status == "COMPLETED"
         registration_deadline = tournament.registration_deadline
         if is_completed:
-            allow_completion_followups = _is_today_tournament(
+            allow_completion_followups = is_today_daily_cup_tournament(
                 registration_deadline=tournament.registration_deadline,
                 now_utc=now_utc_value,
+                timezone_name=DAILY_CUP_TIMEZONE,
             )
 
-    standings_user_ids = [int(item.user_id) for item in participants]
+    standings_user_ids = [item.user_id for item in standings]
     points_by_user = {int(item.user_id): format_points(item.score) for item in participants}
     tie_breaks_by_user = {int(item.user_id): format_points(item.tie_break) for item in participants}
-    place_by_user = {user_id: place for place, user_id in enumerate(standings_user_ids, start=1)}
+    place_by_user = {item.user_id: item.place for item in standings}
     participant_rows = {int(item.user_id): item for item in participants}
     participants_total = len(standings_user_ids)
 
@@ -199,23 +189,14 @@ async def run_daily_cup_round_messaging_async_with_followups(
         new_message_ids=new_message_ids,
         replaced_message_ids=replaced_message_ids,
     )
-    if is_completed and enqueue_completion_followups:
-        if allow_completion_followups:
-            from app.workers.tasks.daily_cup_nonfinishers_summary import (
-                enqueue_daily_cup_nonfinishers_summary,
-            )
-            from app.workers.tasks.daily_cup_proof_cards import enqueue_daily_cup_proof_cards
-
-            enqueue_daily_cup_proof_cards(tournament_id=tournament_id, delay_seconds=2)
-            enqueue_daily_cup_nonfinishers_summary(tournament_id=tournament_id)
-        else:
-            logger.info(
-                "daily_cup_completion_followups_skipped_stale_tournament",
-                tournament_id=tournament_id,
-                registration_deadline=(
-                    registration_deadline.isoformat() if registration_deadline is not None else None
-                ),
-            )
+    handle_daily_cup_completion_followups(
+        is_completed=is_completed,
+        enqueue_completion_followups=enqueue_completion_followups,
+        allow_completion_followups=allow_completion_followups,
+        tournament_id=tournament_id,
+        registration_deadline=registration_deadline,
+        logger=logger,
+    )
 
     return {
         "processed": 1,
@@ -232,7 +213,7 @@ def enqueue_daily_cup_round_messaging(
     enqueue_completion_followups: bool = False,
 ) -> None:
     try:
-        if _is_celery_task(run_daily_cup_round_messaging):
+        if is_celery_task(run_daily_cup_round_messaging):
             run_daily_cup_round_messaging.delay(
                 tournament_id=tournament_id,
                 enqueue_completion_followups=enqueue_completion_followups,
@@ -260,7 +241,6 @@ def run_daily_cup_round_messaging(
 ) -> dict[str, int]:
     return run_async_job(
         run_daily_cup_round_messaging_async_with_followups(
-            tournament_id=tournament_id,
-            enqueue_completion_followups=enqueue_completion_followups,
+            tournament_id=tournament_id, enqueue_completion_followups=enqueue_completion_followups
         )
     )

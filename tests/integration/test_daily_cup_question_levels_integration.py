@@ -171,7 +171,7 @@ async def test_daily_cup_round_2_and_3_question_level_mix(monkeypatch) -> None:
     await _assert_round_question_levels(
         tournament_id=tournament_id,
         round_no=1,
-        expected_levels=("A1", "A1", "A1", "A2", "A2"),
+        expected_levels=("A1", "A1", "A1", "A1", "A1", "A1", "A1"),
     )
 
     await _expire_round_and_advance(
@@ -183,7 +183,7 @@ async def test_daily_cup_round_2_and_3_question_level_mix(monkeypatch) -> None:
     await _assert_round_question_levels(
         tournament_id=tournament_id,
         round_no=2,
-        expected_levels=("A2", "A2", "A2", "A2", "A2"),
+        expected_levels=("A2", "A2", "A2", "A2", "A2", "A2", "A2"),
     )
 
     await _expire_round_and_advance(
@@ -195,7 +195,7 @@ async def test_daily_cup_round_2_and_3_question_level_mix(monkeypatch) -> None:
     await _assert_round_question_levels(
         tournament_id=tournament_id,
         round_no=3,
-        expected_levels=("A2", "B1", "B1", "B1", "B2"),
+        expected_levels=("A2", "A2", "A2", "A2", "B1", "B1", "B1"),
     )
 
     async with SessionLocal.begin() as session:

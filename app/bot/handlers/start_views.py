@@ -3,33 +3,18 @@ from __future__ import annotations
 import html
 from datetime import datetime
 
+from app.bot.handlers.question_theme_label import sanitize_question_theme_label
 from app.bot.texts.de import TEXTS_DE
 from app.game.friend_challenges.constants import is_duel_active_status
 from app.game.modes.presentation import display_mode_label
 from app.game.modes.rules import is_zero_cost_source
-from app.game.sessions.service import FRIEND_CHALLENGE_LEVEL_SEQUENCE
 from app.game.sessions.types import FriendChallengeSnapshot, StartSessionResult
 
 
 def _build_friend_plan_text(*, total_rounds: int) -> str:
     rounds = max(1, int(total_rounds))
-    sequence = list(FRIEND_CHALLENGE_LEVEL_SEQUENCE[:rounds])
-    if rounds > len(FRIEND_CHALLENGE_LEVEL_SEQUENCE):
-        sequence.extend(
-            [FRIEND_CHALLENGE_LEVEL_SEQUENCE[-1]] * (rounds - len(FRIEND_CHALLENGE_LEVEL_SEQUENCE))
-        )
-
-    counts: dict[str, int] = {}
-    for level in sequence:
-        counts[level] = counts.get(level, 0) + 1
-    mix_parts = [
-        f"{level} x{counts[level]}"
-        for level in ("A1", "A2", "B1", "B2", "C1", "C2")
-        if level in counts
-    ]
-    mix = ", ".join(mix_parts) if mix_parts else "A1 x1"
     mode_label = "Sprint" if rounds <= 5 else "Mix"
-    return f"{rounds} Fragen {mode_label}: {mix}. Keine Energie-Kosten."
+    return f"{rounds} Fragen {mode_label}. Keine Energie-Kosten."
 
 
 def _build_friend_ttl_text(*, challenge: FriendChallengeSnapshot, now_utc: datetime) -> str | None:
@@ -51,19 +36,15 @@ def _build_home_text(
     free_energy: int,
     paid_energy: int,
     current_streak: int,
+    best_streak: int,
     daily_cup_badge_unlocked: bool = False,
 ) -> str:
-    if current_streak > 0:
-        stats_line = TEXTS_DE["msg.home.stats.with_streak"].format(
-            streak=current_streak,
-            free_energy=free_energy,
-            paid_energy=paid_energy,
-        )
-    else:
-        stats_line = TEXTS_DE["msg.home.stats.no_streak"].format(
-            free_energy=free_energy,
-            paid_energy=paid_energy,
-        )
+    stats_line = TEXTS_DE["msg.home.stats.summary"].format(
+        current_streak=current_streak,
+        best_streak=best_streak,
+        free_energy=free_energy,
+        paid_energy=paid_energy,
+    )
     lines = [TEXTS_DE["msg.home.title"], stats_line]
     if daily_cup_badge_unlocked:
         lines.append(TEXTS_DE["msg.home.badge.daily_cup_5"])
@@ -78,12 +59,13 @@ def _build_question_text(
     snapshot_paid_energy: int,
     start_result: StartSessionResult,
 ) -> str:
-    theme_label = start_result.session.category or "Allgemein"
+    theme_label = sanitize_question_theme_label(start_result.session.category)
     question_number = start_result.session.question_number or 1
     total_questions = start_result.session.total_questions or 1
-    mode_line = TEXTS_DE["msg.game.mode"].format(
-        mode_code=display_mode_label(start_result.session.mode_code)
+    header_mode_label = start_result.session.header_mode_label_override or display_mode_label(
+        start_result.session.mode_code
     )
+    mode_line = TEXTS_DE["msg.game.mode"].format(mode_code=header_mode_label)
     energy_line = TEXTS_DE["msg.game.energy.left"].format(
         free_energy=(
             snapshot_free_energy if is_zero_cost_source(source) else start_result.energy_free
