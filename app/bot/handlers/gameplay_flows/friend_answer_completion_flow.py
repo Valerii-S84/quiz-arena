@@ -11,6 +11,7 @@ from app.bot.handlers.gameplay_flows.tournament_match_post_flow import (
     build_tournament_post_match_text,
     enqueue_tournament_post_match_updates,
     resolve_tournament_id_for_match,
+    resolve_tournament_place_for_user,
 )
 from app.bot.keyboards.friend_challenge import build_friend_challenge_finished_keyboard
 from app.bot.texts.de import TEXTS_DE
@@ -95,12 +96,22 @@ async def handle_completed_friend_challenge(
             session_local=session_local,
             tournament_match_id=challenge.tournament_match_id,
         )
+        try:
+            my_place, participants_total = await resolve_tournament_place_for_user(
+                session_local=session_local,
+                tournament_match_id=challenge.tournament_match_id,
+                user_id=snapshot_user_id,
+            )
+        except AttributeError:
+            my_place, participants_total = None, None
         tournament_keyboard = build_tournament_post_match_keyboard(tournament_id=tournament_id)
         await answerable.answer(
             build_tournament_post_match_text(
                 challenge=challenge,
                 user_id=snapshot_user_id,
                 opponent_label=opponent_label,
+                place=my_place,
+                participants_total=participants_total,
             ),
             reply_markup=tournament_keyboard,
         )
@@ -109,6 +120,14 @@ async def handle_completed_friend_challenge(
                 challenge=challenge,
                 user_id=opponent_user_id,
             )
+            try:
+                opponent_place, opponent_total = await resolve_tournament_place_for_user(
+                    session_local=session_local,
+                    tournament_match_id=challenge.tournament_match_id,
+                    user_id=opponent_user_id,
+                )
+            except AttributeError:
+                opponent_place, opponent_total = None, None
             await notify_opponent(
                 callback,
                 opponent_user_id=opponent_user_id,
@@ -116,6 +135,8 @@ async def handle_completed_friend_challenge(
                     challenge=challenge,
                     user_id=opponent_user_id,
                     opponent_label=opponent_label_for_opponent,
+                    place=opponent_place,
+                    participants_total=opponent_total,
                 ),
                 reply_markup=tournament_keyboard,
             )

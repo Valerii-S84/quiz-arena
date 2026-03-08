@@ -52,7 +52,7 @@ class MessagingSettingsMixin:
     tournament_max_participants: int = Field(default=8, alias="TOURNAMENT_MAX_PARTICIPANTS")
     tournament_min_participants: int = Field(default=2, alias="TOURNAMENT_MIN_PARTICIPANTS")
     tournament_rounds: int = Field(default=3, alias="TOURNAMENT_ROUNDS")
-    daily_cup_registration_open: str = Field(default="17:00", alias="DAILY_CUP_REGISTRATION_OPEN")
+    daily_cup_registration_open: str = Field(default="16:00", alias="DAILY_CUP_REGISTRATION_OPEN")
     daily_cup_registration_close: str = Field(default="18:00", alias="DAILY_CUP_REGISTRATION_CLOSE")
     daily_cup_round_duration_minutes: int = Field(
         default=60,

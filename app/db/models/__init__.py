@@ -30,6 +30,7 @@ from app.db.models.referrals import Referral
 from app.db.models.streak_state import StreakState
 from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournament_participants import TournamentParticipant
+from app.db.models.tournament_round_scores import TournamentRoundScore
 from app.db.models.tournaments import Tournament
 from app.db.models.user_events import UserEvent
 from app.db.models.users import User
@@ -68,6 +69,7 @@ __all__ = [
     "Tournament",
     "TournamentMatch",
     "TournamentParticipant",
+    "TournamentRoundScore",
     "UserEvent",
     "User",
 ]

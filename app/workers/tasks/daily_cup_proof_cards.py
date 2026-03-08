@@ -17,6 +17,7 @@ from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES, TOURNAMENT_STATUS_COMPLETED
+from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
@@ -74,12 +75,10 @@ async def run_daily_cup_proof_cards_async(
             )
             return _empty_result()
 
-        all_participants = await TournamentParticipantsRepo.list_for_tournament(
-            session,
-            tournament_id=parsed_tournament_id,
-        )
-        if not all_participants:
+        standings = await calculate_daily_cup_standings(session, tournament_id=parsed_tournament_id)
+        if not standings:
             return _empty_result()
+        all_participants = [item.participant for item in standings]
 
         participants = (
             [item for item in all_participants if int(item.user_id) == user_id]
@@ -107,7 +106,7 @@ async def run_daily_cup_proof_cards_async(
     if initial_delay_seconds > 0:
         await asyncio.sleep(max(0, int(initial_delay_seconds)))
 
-    standings_user_ids = [int(item.user_id) for item in all_participants]
+    standings_user_ids = [item.user_id for item in standings]
     participant_rows = {int(item.user_id): item for item in participants}
     points_by_user = {int(item.user_id): format_points(item.score) for item in all_participants}
     participants_total = len(standings_user_ids)
@@ -156,10 +155,10 @@ async def run_daily_cup_proof_cards_async(
                     player_label=user_labels.get(current_user_id, "Spieler"),
                     place=place,
                     points=points,
-                    format_label="5 Fragen",
+                    format_label="7 Fragen",
                     completed_at=now_utc,
                     tournament_name="Daily Arena Cup",
-                    rounds_played=3,
+                    rounds_played=4,
                     is_daily_arena=True,
                 )
                 message = await bot.send_photo(

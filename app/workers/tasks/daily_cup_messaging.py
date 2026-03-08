@@ -11,11 +11,11 @@ from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard, build_da
 from app.bot.texts.de import TEXTS_DE
 from app.core.telegram_links import public_bot_link
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
-from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES
+from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
@@ -75,12 +75,10 @@ async def run_daily_cup_round_messaging_async_with_followups(
             or tournament.status in {"REGISTRATION", "CANCELED"}
         ):
             return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
-        participants = await TournamentParticipantsRepo.list_for_tournament(
-            session,
-            tournament_id=parsed_tournament_id,
-        )
-        if not participants:
+        standings = await calculate_daily_cup_standings(session, tournament_id=parsed_tournament_id)
+        if not standings:
             return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
+        participants = [item.participant for item in standings]
 
         users = await UsersRepo.list_by_ids(session, [int(item.user_id) for item in participants])
         labels = {
@@ -104,10 +102,10 @@ async def run_daily_cup_round_messaging_async_with_followups(
                 now_utc=now_utc_value,
             )
 
-    standings_user_ids = [int(item.user_id) for item in participants]
+    standings_user_ids = [item.user_id for item in standings]
     points_by_user = {int(item.user_id): format_points(item.score) for item in participants}
     tie_breaks_by_user = {int(item.user_id): format_points(item.tie_break) for item in participants}
-    place_by_user = {user_id: place for place, user_id in enumerate(standings_user_ids, start=1)}
+    place_by_user = {item.user_id: item.place for item in standings}
     participant_rows = {int(item.user_id): item for item in participants}
     participants_total = len(standings_user_ids)
 

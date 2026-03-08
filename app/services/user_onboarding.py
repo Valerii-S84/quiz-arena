@@ -21,6 +21,7 @@ class HomeSnapshot:
     free_energy: int
     paid_energy: int
     current_streak: int
+    best_streak: int
     daily_cup_badge_unlocked: bool
 
 
@@ -92,5 +93,6 @@ class UserOnboardingService:
             free_energy=energy_snapshot.free_energy,
             paid_energy=energy_snapshot.paid_energy,
             current_streak=streak_snapshot.current_streak,
+            best_streak=streak_snapshot.best_streak,
             daily_cup_badge_unlocked=daily_cup_badge_unlocked,
         )

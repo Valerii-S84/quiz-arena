@@ -22,6 +22,7 @@ from app.game.sessions.service.friend_challenges_tournament_self_bot import (
     maybe_complete_self_bot_match,
 )
 from app.game.tournaments.constants import (
+    DAILY_CUP_MAX_ROUNDS,
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_SELF_BOT_DEFAULT_CORRECT_ANSWERS,
     TOURNAMENT_TYPE_DAILY_ARENA,
@@ -223,6 +224,6 @@ async def handle_tournament_duel_progress(
             user_b=int(tournament_match.user_b),
             user_a_points=int(challenge.creator_score),
             user_b_points=int(challenge.opponent_score),
-            rounds_total=max(1, int(challenge.total_rounds)),
+            rounds_total=DAILY_CUP_MAX_ROUNDS,
             next_round_deadline=tournament.round_deadline,
         )

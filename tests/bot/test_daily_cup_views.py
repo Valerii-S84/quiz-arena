@@ -206,8 +206,8 @@ async def test_render_daily_cup_lobby_round_waiting_final_round_shows_completion
     lobby = SimpleNamespace(
         tournament=SimpleNamespace(
             tournament_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-            status="ROUND_3",
-            current_round=3,
+            status="ROUND_4",
+            current_round=4,
             round_deadline=None,
         ),
         participants=(

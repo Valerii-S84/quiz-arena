@@ -63,7 +63,7 @@ async def render_daily_cup_lobby(
     body_lines = [
         "🏆 Daily Arena Cup",
         "",
-        "Format: 5 Fragen • 3 Runden",
+        "Format: 7 Fragen • 4 Runden",
     ]
     if lobby.tournament.status == "REGISTRATION":
         if lobby.viewer_joined:
@@ -120,7 +120,7 @@ async def render_daily_cup_lobby(
                         "",
                     ]
                 )
-            elif round_no >= 3:
+            elif round_no >= 4:
                 body_lines.extend([TEXTS_DE["msg.daily_cup.waiting_completion"], ""])
             else:
                 body_lines.extend(
@@ -140,7 +140,7 @@ async def render_daily_cup_lobby(
                 )
             body_lines.extend(
                 [
-                    f"Runde {round_no}/3",
+                    f"Runde {round_no}/4",
                     f"Deadline: {format_deadline(lobby.tournament.round_deadline)} (Berlin)",
                     "",
                 ]

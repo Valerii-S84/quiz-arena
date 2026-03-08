@@ -9,6 +9,7 @@ from app.bot.application import build_bot
 from app.bot.keyboards.daily_cup import build_daily_cup_registration_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
+from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.constants import (
@@ -18,10 +19,10 @@ from app.game.tournaments.constants import (
 )
 from app.workers.tasks.daily_cup_config import (
     DAILY_CUP_ACTIVE_LOOKBACK_DAYS,
-    DAILY_CUP_MIN_PARTICIPANTS,
     DAILY_CUP_PUSH_BATCH_SIZE,
     DAILY_CUP_TOURNAMENT_TYPE,
     DAILY_ELIMINATION_MIN_PLAYERS,
+    TOURNAMENT_MIN_PARTICIPANTS,
 )
 from app.workers.tasks.daily_cup_core import (
     emit_daily_cup_events,
@@ -30,12 +31,13 @@ from app.workers.tasks.daily_cup_core import (
     send_daily_cup_canceled_messages,
 )
 from app.workers.tasks.daily_cup_messaging import enqueue_daily_cup_round_messaging
+from app.workers.tasks.daily_cup_messaging import run_daily_cup_round_messaging_async_with_followups
 from app.workers.tasks.daily_cup_push_events import (
     list_already_pushed_user_ids,
     store_push_sent_events,
 )
 from app.workers.tasks.daily_cup_start import start_daily_arena_round_one
-from app.workers.tasks.daily_cup_time import format_close_time_local
+from app.workers.tasks.daily_cup_time import format_close_time_local, get_daily_cup_window
 from app.workers.tasks.daily_elimination_start import start_daily_elimination_bracket
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup")
@@ -166,6 +168,28 @@ async def send_daily_cup_last_call_reminder_async() -> dict[str, int]:
     )
 
 
+async def publish_daily_cup_final_results_async() -> dict[str, int]:
+    now_utc_value = _now_utc()
+    async with SessionLocal.begin() as session:
+        tournament = await TournamentsRepo.get_by_type_and_registration_deadline(
+            session,
+            tournament_type=DAILY_CUP_TOURNAMENT_TYPE,
+            registration_deadline=get_daily_cup_window(now_utc=now_utc_value).close_at_utc,
+        )
+        if (
+            tournament is None
+            or tournament.type == TOURNAMENT_TYPE_DAILY_ELIMINATION
+            or tournament.status != "COMPLETED"
+        ):
+            return {"processed": 0, "published": 0}
+        tournament_id = str(tournament.id)
+    result = await run_daily_cup_round_messaging_async_with_followups(
+        tournament_id=tournament_id,
+        enqueue_completion_followups=True,
+    )
+    return {"processed": 1, "published": int(result.get("processed", 0) > 0)}
+
+
 async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
     now_utc_value = _now_utc()
     canceled_telegram_targets: list[int] = []
@@ -189,7 +213,7 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
         required_min_players = (
             DAILY_ELIMINATION_MIN_PLAYERS
             if tournament.type == TOURNAMENT_TYPE_DAILY_ELIMINATION
-            else DAILY_CUP_MIN_PARTICIPANTS
+            else TOURNAMENT_MIN_PARTICIPANTS
         )
         if participants_total < required_min_players:
             tournament.status = TOURNAMENT_STATUS_CANCELED

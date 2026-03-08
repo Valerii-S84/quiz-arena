@@ -36,8 +36,8 @@ def build_round_text(
     lines = [
         "🏆 Daily Arena Cup",
         "",
-        f"⚔️ Runde {round_no}/3 gestartet",
-        "Format: 5 Fragen",
+        f"⚔️ Runde {round_no}/4 gestartet",
+        "Format: 7 Fragen",
         f"Deadline: {deadline_text} (Berlin)",
     ]
     if opponent_label is None:

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.tournaments.constants import (
+    DAILY_CUP_MAX_ROUNDS,
     TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS,
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_MAX_ROUNDS,
@@ -21,9 +21,11 @@ from app.game.tournaments.constants import (
     TOURNAMENT_STATUS_ROUND_1,
     TOURNAMENT_STATUS_ROUND_2,
     TOURNAMENT_STATUS_ROUND_3,
+    TOURNAMENT_STATUS_ROUND_4,
     TOURNAMENT_TYPE_DAILY_ARENA,
     status_for_round,
 )
+from app.game.tournaments.daily_cup_slots import get_round_deadline
 from app.game.tournaments.elimination_lifecycle import (
     complete_elimination_tournament as _complete_elimination_tournament,
 )
@@ -43,6 +45,7 @@ _ACTIVE_ROUND_STATUSES = frozenset(
         TOURNAMENT_STATUS_ROUND_1,
         TOURNAMENT_STATUS_ROUND_2,
         TOURNAMENT_STATUS_ROUND_3,
+        TOURNAMENT_STATUS_ROUND_4,
     }
 )
 
@@ -50,15 +53,25 @@ _ACTIVE_ROUND_STATUSES = frozenset(
 def _resolve_deadline_for_tournament(
     *,
     tournament: Tournament,
+    next_round: int,
     now_utc: datetime,
     round_duration_hours: int,
 ) -> datetime:
     if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA:
-        return now_utc + timedelta(minutes=max(1, int(settings.daily_cup_round_duration_minutes)))
+        return get_round_deadline(
+            round_number=next_round,
+            tournament_start=tournament.registration_deadline,
+        )
     return resolve_round_deadline(
         now_utc=now_utc,
         round_duration_hours=round_duration_hours,
     )
+
+
+def _max_rounds_for_tournament(*, tournament: Tournament) -> int:
+    if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA:
+        return DAILY_CUP_MAX_ROUNDS
+    return TOURNAMENT_MAX_ROUNDS
 
 
 async def close_expired_registration(
@@ -107,7 +120,7 @@ async def settle_round_and_advance(
             "tournament_completed": 0,
         }
 
-    if current_round >= TOURNAMENT_MAX_ROUNDS:
+    if current_round >= _max_rounds_for_tournament(tournament=tournament):
         tournament.status = TOURNAMENT_STATUS_COMPLETED
         tournament.round_deadline = None
         return {
@@ -128,6 +141,7 @@ async def settle_round_and_advance(
     next_round = current_round + 1
     next_deadline = _resolve_deadline_for_tournament(
         tournament=tournament,
+        next_round=next_round,
         now_utc=now_utc,
         round_duration_hours=round_duration_hours,
     )

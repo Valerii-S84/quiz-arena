@@ -4,9 +4,13 @@ import os
 
 from app.core.config import get_settings
 from app.game.tournaments.constants import (
+    DAILY_CUP_MAX_ROUNDS,
+    DAILY_CUP_MAX_PARTICIPANTS,
+    DAILY_CUP_QUESTIONS_PER_MATCH,
     TOURNAMENT_TYPE_DAILY_ARENA,
     TOURNAMENT_TYPE_DAILY_ELIMINATION,
 )
+from app.game.tournaments.daily_cup_slots import ROUND_SLOTS
 
 settings = get_settings()
 
@@ -42,7 +46,7 @@ DAILY_CUP_ROUND_DURATION_MINUTES = max(
     1,
     int(_round_minutes_raw or settings.daily_cup_round_duration_minutes),
 )
-DAILY_CUP_MIN_PARTICIPANTS = max(2, int(settings.daily_cup_min_participants))
+DAILY_CUP_MIN_PARTICIPANTS = max(4, int(settings.daily_cup_min_participants))
 DAILY_CUP_PUSH_BATCH_SIZE = 200
 DAILY_CUP_ACTIVE_LOOKBACK_DAYS = 7
 DAILY_CUP_TURN_REMINDER_INTERVAL_MINUTES = max(
@@ -53,7 +57,20 @@ DAILY_CUP_TURN_RESPONSE_GRACE_MINUTES = max(
     1,
     int(os.getenv("DAILY_CUP_TURN_RESPONSE_GRACE_MINUTES", "15")),
 )
-DAILY_CUP_DEFAULT_ADVANCE_SLOTS: tuple[tuple[int, int], ...] = ((19, 0), (20, 0), (21, 30))
+TOURNAMENT_MAX_PARTICIPANTS = DAILY_CUP_MAX_PARTICIPANTS
+TOURNAMENT_MIN_PARTICIPANTS = 4
+QUESTIONS_PER_MATCH = DAILY_CUP_QUESTIONS_PER_MATCH
+ROUND_DIFFICULTY_MAP: dict[int, tuple[str, ...]] = {
+    1: ("A1",),
+    2: ("A2",),
+    3: ("A2", "B1"),
+    4: ("B1", "B2"),
+}
+ROUND_DIFFICULTY_SPLIT: dict[int, tuple[int, int]] = {
+    3: (4, 3),
+    4: (3, 4),
+}
+DAILY_CUP_TOTAL_ROUNDS = DAILY_CUP_MAX_ROUNDS
 
 DAILY_CUP_INVITE_HOUR, DAILY_CUP_INVITE_MINUTE = _parse_hhmm(
     DAILY_CUP_INVITE_TIME,
@@ -73,7 +90,7 @@ DAILY_CUP_PRESTART_REMINDER_HOUR, DAILY_CUP_PRESTART_REMINDER_MINUTE = _parse_hh
 
 DAILY_CUP_OPEN_HOUR, DAILY_CUP_OPEN_MINUTE = _parse_hhmm(
     DAILY_CUP_REGISTRATION_OPEN,
-    default_hour=17,
+    default_hour=16,
     default_minute=0,
 )
 DAILY_CUP_CLOSE_HOUR, DAILY_CUP_CLOSE_MINUTE = _parse_hhmm(
@@ -82,22 +99,6 @@ DAILY_CUP_CLOSE_HOUR, DAILY_CUP_CLOSE_MINUTE = _parse_hhmm(
     default_minute=0,
 )
 
-
-def _parse_round_advance_slots(*, slots_value: str) -> tuple[tuple[int, int], ...]:
-    slots: list[tuple[int, int]] = []
-    for token in slots_value.split(","):
-        hour, minute = _parse_hhmm(token, default_hour=-1, default_minute=-1)
-        if hour < 0 or minute < 0:
-            return DAILY_CUP_DEFAULT_ADVANCE_SLOTS
-        slots.append((hour, minute))
-    if not slots:
-        return DAILY_CUP_DEFAULT_ADVANCE_SLOTS
-    return tuple(slots)
-
-
-DAILY_CUP_ROUND_ADVANCE_SLOTS = _parse_round_advance_slots(
-    slots_value=os.getenv("DAILY_CUP_ADVANCE_SLOTS", "19:00,20:00,21:30")
-)
 DAILY_ELIMINATION_OPEN_TIME = os.getenv("DAILY_ELIMINATION_OPEN_TIME", "16:00")
 DAILY_ELIMINATION_CLOSE_TIME = os.getenv("DAILY_ELIMINATION_CLOSE_TIME", "18:00")
 DAILY_ELIMINATION_DEADLINE = os.getenv("DAILY_ELIMINATION_DEADLINE", "21:30")
@@ -136,8 +137,8 @@ __all__ = [
     "DAILY_CUP_OPEN_HOUR",
     "DAILY_CUP_OPEN_MINUTE",
     "DAILY_CUP_PUSH_BATCH_SIZE",
-    "DAILY_CUP_ROUND_ADVANCE_SLOTS",
     "DAILY_CUP_ROUND_DURATION_MINUTES",
+    "DAILY_CUP_TOTAL_ROUNDS",
     "DAILY_CUP_TURN_RESPONSE_GRACE_MINUTES",
     "DAILY_CUP_TOURNAMENT_TYPE",
     "DAILY_CUP_TURN_REMINDER_INTERVAL_MINUTES",
@@ -150,4 +151,10 @@ __all__ = [
     "DAILY_ELIMINATION_MIN_PLAYERS",
     "DAILY_ELIMINATION_OPEN_HOUR",
     "DAILY_ELIMINATION_OPEN_MINUTE",
+    "QUESTIONS_PER_MATCH",
+    "ROUND_DIFFICULTY_MAP",
+    "ROUND_DIFFICULTY_SPLIT",
+    "ROUND_SLOTS",
+    "TOURNAMENT_MAX_PARTICIPANTS",
+    "TOURNAMENT_MIN_PARTICIPANTS",
 ]

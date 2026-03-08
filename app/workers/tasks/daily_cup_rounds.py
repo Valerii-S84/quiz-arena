@@ -11,6 +11,7 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.constants import (
+    DAILY_CUP_MAX_ROUNDS,
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_MATCH_STATUS_WALKOVER,
     TOURNAMENT_STATUS_COMPLETED,
@@ -160,7 +161,7 @@ async def advance_daily_cup_rounds_async() -> dict[str, int]:
                             user_b=int(match.user_b),
                             user_a_points=user_a_points,
                             user_b_points=user_b_points,
-                            rounds_total=max(1, int(challenge.total_rounds)),
+                            rounds_total=DAILY_CUP_MAX_ROUNDS,
                             next_round_deadline=tournament.round_deadline,
                         )
                     )

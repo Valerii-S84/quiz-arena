@@ -13,6 +13,8 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
+from app.game.tournaments.errors import TournamentFullError
+from app.game.tournaments.daily_cup_slots import get_round_deadline
 from app.game.tournaments.lifecycle import check_and_advance_round
 from app.game.tournaments.service import join_daily_cup_by_id
 from app.game.tournaments.settlement import settle_pending_match_from_duel
@@ -58,7 +60,11 @@ async def _set_last_seen(*, user_id: int, seen_at: datetime) -> None:
         await UsersRepo.touch_last_seen(session, user_id=user_id, seen_at=seen_at)
 
 
-async def _create_daily_cup_registration_tournament(*, now_utc: datetime) -> UUID:
+async def _create_daily_cup_registration_tournament(
+    *,
+    now_utc: datetime,
+    max_participants: int = 8,
+) -> UUID:
     window = get_daily_cup_window(now_utc=now_utc)
     async with SessionLocal.begin() as session:
         tournament = await TournamentsRepo.create(
@@ -70,7 +76,7 @@ async def _create_daily_cup_registration_tournament(*, now_utc: datetime) -> UUI
                 name="Daily Arena Cup",
                 status="REGISTRATION",
                 format="QUICK_5",
-                max_participants=8,
+                max_participants=max_participants,
                 current_round=0,
                 registration_deadline=window.close_at_utc,
                 round_deadline=None,
@@ -259,7 +265,10 @@ async def test_daily_cup_early_advance(monkeypatch) -> None:
         assert tournament is not None
         assert tournament.status == "ROUND_2"
         assert tournament.round_deadline is not None
-        assert tournament.round_deadline - now_utc <= timedelta(minutes=130)
+        assert tournament.round_deadline == get_round_deadline(
+            round_number=2,
+            tournament_start=tournament.registration_deadline,
+        )
 
 
 @pytest.mark.asyncio
@@ -306,6 +315,47 @@ async def test_push_skips_blocked_users(monkeypatch) -> None:
     assert int(result["users_scanned_total"]) == 1
     assert int(result["sent_total"]) == 0
     assert int(result["skipped_total"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_daily_cup_registration_accepts_hundredth_and_rejects_hundred_first() -> None:
+    now_utc = datetime(2026, 3, 1, 16, 30, tzinfo=UTC)
+    await _ensure_tournament_schema()
+
+    user_ids = [await _create_user(f"daily_cup_cap_{idx}") for idx in range(101)]
+    tournament_id = await _create_daily_cup_registration_tournament(
+        now_utc=now_utc,
+        max_participants=100,
+    )
+
+    async with SessionLocal.begin() as session:
+        for user_id in user_ids[:99]:
+            join_result = await join_daily_cup_by_id(
+                session,
+                user_id=user_id,
+                tournament_id=tournament_id,
+                now_utc=now_utc,
+            )
+            assert join_result.joined_now is True
+
+    async with SessionLocal.begin() as session:
+        hundredth = await join_daily_cup_by_id(
+            session,
+            user_id=user_ids[99],
+            tournament_id=tournament_id,
+            now_utc=now_utc,
+        )
+        assert hundredth.joined_now is True
+        assert hundredth.participants_total == 100
+
+    async with SessionLocal.begin() as session:
+        with pytest.raises(TournamentFullError):
+            await join_daily_cup_by_id(
+                session,
+                user_id=user_ids[100],
+                tournament_id=tournament_id,
+                now_utc=now_utc,
+            )
 
 
 @pytest.mark.asyncio
@@ -371,11 +421,14 @@ async def test_daily_cup_e2e_with_6_participants_reaches_completed(monkeypatch) 
     first_advance = await _expire_and_advance(round_no=1, run_at=now_utc + timedelta(hours=2))
     second_advance = await _expire_and_advance(round_no=2, run_at=now_utc + timedelta(hours=3))
     third_advance = await _expire_and_advance(round_no=3, run_at=now_utc + timedelta(hours=4))
+    fourth_advance = await _expire_and_advance(round_no=4, run_at=now_utc + timedelta(hours=5))
 
     assert int(first_advance["rounds_started_total"]) >= 1
     assert int(second_advance["rounds_started_total"]) >= 1
-    assert int(third_advance["tournaments_completed_total"]) >= 1
+    assert int(third_advance["rounds_started_total"]) >= 1
+    assert int(fourth_advance["tournaments_completed_total"]) >= 1
     assert round_enqueued == [
+        (str(tournament_id), False),
         (str(tournament_id), False),
         (str(tournament_id), False),
         (str(tournament_id), True),
@@ -387,7 +440,7 @@ async def test_daily_cup_e2e_with_6_participants_reaches_completed(monkeypatch) 
         assert tournament.status == "COMPLETED"
         assert tournament.round_deadline is None
         previous_pairs: set[frozenset[int]] = set()
-        for round_no in (1, 2, 3):
+        for round_no in (1, 2, 3, 4):
             matches = await TournamentMatchesRepo.list_by_tournament_round(
                 session,
                 tournament_id=tournament_id,

@@ -23,6 +23,7 @@ from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES, TOURNAMENT_STATUS_COMPLETED
+from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
 from app.workers.tasks.daily_cup_proof_cards_text import build_caption as build_daily_cup_caption
 from app.workers.tasks.daily_cup_proof_cards_text import format_points
 from app.workers.tasks.friend_challenges_proof_card_text import build_caption as build_duel_caption
@@ -61,12 +62,9 @@ async def _build_daily_cup_result(*, session, user_id: int, tournament_id: UUID)
     )
     if participant is None or not participant.proof_card_file_id:
         return None
-    standings = await TournamentParticipantsRepo.list_for_tournament(
-        session,
-        tournament_id=tournament_id,
-    )
+    standings = await calculate_daily_cup_standings(session, tournament_id=tournament_id)
     place = next(
-        index for index, item in enumerate(standings, start=1) if int(item.user_id) == int(user_id)
+        item.place for item in standings if int(item.user_id) == int(user_id)
     )
     caption = build_daily_cup_caption(
         place=place,

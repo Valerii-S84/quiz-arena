@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 from typing import TYPE_CHECKING
 
+from app.bot.handlers.question_theme_label import sanitize_question_theme_label
 from app.bot.texts.de import TEXTS_DE
 from app.game.modes.presentation import display_mode_label
 from app.game.modes.rules import is_zero_cost_source
@@ -18,11 +19,15 @@ def _build_question_text(
     snapshot_paid_energy: int,
     start_result: StartSessionResult,
 ) -> str:
-    theme_label = start_result.session.category or "Allgemein"
+    theme_label = sanitize_question_theme_label(start_result.session.category)
     question_number = start_result.session.question_number or 1
     total_questions = start_result.session.total_questions or 1
+    header_mode_label = (
+        start_result.session.header_mode_label_override
+        or display_mode_label(start_result.session.mode_code)
+    )
     mode_line = TEXTS_DE["msg.game.mode"].format(
-        mode_code=display_mode_label(start_result.session.mode_code)
+        mode_code=header_mode_label
     )
     energy_line = TEXTS_DE["msg.game.energy.left"].format(
         free_energy=(

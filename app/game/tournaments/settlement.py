@@ -10,15 +10,21 @@ from app.core.analytics_events import EVENT_SOURCE_WORKER
 from app.db.models.tournament_matches import TournamentMatch
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
+from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.friend_challenges.constants import normalize_duel_status
 from app.game.sessions.service.friend_challenges_internal import (
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
 )
+from app.game.tournaments.daily_cup_scoring import (
+    build_daily_cup_player_results,
+    store_daily_cup_player_result,
+)
 from app.game.tournaments.constants import (
     TOURNAMENT_MATCH_STATUS_COMPLETED,
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_MATCH_STATUS_WALKOVER,
+    TOURNAMENT_TYPE_DAILY_ARENA,
 )
 
 
@@ -169,14 +175,36 @@ async def settle_pending_match_from_duel(
         if challenge.status == "COMPLETED"
         else TOURNAMENT_MATCH_STATUS_WALKOVER
     )
-    await _apply_match_points(
-        session,
-        match=match,
-        match_status=match_status,
-        winner_id=winner_id,
-        score_a=score_a,
-        score_b=score_b,
-    )
+    tournament = await TournamentsRepo.get_by_id(session, match.tournament_id)
+    if tournament is not None and tournament.type == TOURNAMENT_TYPE_DAILY_ARENA:
+        creator_result, opponent_result = await build_daily_cup_player_results(
+            session,
+            match=match,
+            challenge=challenge,
+            winner_id=winner_id,
+        )
+        await store_daily_cup_player_result(
+            session,
+            match=match,
+            result=creator_result,
+            created_at=now_utc,
+        )
+        if opponent_result is not None:
+            await store_daily_cup_player_result(
+                session,
+                match=match,
+                result=opponent_result,
+                created_at=now_utc,
+            )
+    else:
+        await _apply_match_points(
+            session,
+            match=match,
+            match_status=match_status,
+            winner_id=winner_id,
+            score_a=score_a,
+            score_b=score_b,
+        )
     match.status = match_status
     match.winner_id = winner_id
     return True
