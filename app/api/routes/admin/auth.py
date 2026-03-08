@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 
 from app.api.routes.admin.deps import (
     ALLOWED_ADMIN_ROLES,
@@ -13,7 +12,6 @@ from app.api.routes.admin.deps import (
 )
 from app.core.config import Settings, get_settings
 from app.services.admin.auth import (
-    ADMIN_ACCESS_COOKIE,
     apply_auth_cookies,
     build_access_token,
     build_refresh_token,
@@ -24,59 +22,11 @@ from app.services.admin.auth import (
     verify_totp_code,
 )
 from app.services.admin.rate_limit import clear_failures, is_rate_limited, record_failure
-from app.services.internal_auth import extract_client_ip
+
+from .auth_helpers import configured_admin_role, rate_limit_bucket, set_partial_access_cookie
+from .auth_models import LoginRequest, LoginResponse, SessionResponse, Verify2FARequest
 
 router = APIRouter(prefix="/admin/auth", tags=["admin-auth"])
-
-
-class LoginRequest(BaseModel):
-    email: str = Field(min_length=5, max_length=200)
-    password: str = Field(min_length=6, max_length=256)
-
-
-class LoginResponse(BaseModel):
-    requires_2fa: bool
-
-
-class Verify2FARequest(BaseModel):
-    code: str = Field(min_length=6, max_length=12)
-
-
-class SessionResponse(BaseModel):
-    email: str
-    role: str
-    two_factor_verified: bool
-
-
-def _configured_admin_role(settings: Settings) -> str:
-    resolved_role = normalize_admin_role(settings.admin_role)
-    if resolved_role in ALLOWED_ADMIN_ROLES:
-        return resolved_role
-    return "admin"
-
-
-def _rate_limit_bucket(*, request: Request, settings: Settings) -> str:
-    client_ip = extract_client_ip(
-        request,
-        trusted_proxies=getattr(settings, "internal_api_trusted_proxies", ""),
-    )
-    return client_ip or "unknown"
-
-
-def _set_partial_access_cookie(
-    *, settings: Settings, response: Response, access_token: str
-) -> None:
-    secure = settings.app_env != "dev"
-    ttl_seconds = max(60, settings.admin_access_token_ttl_minutes * 60)
-    response.set_cookie(
-        key=ADMIN_ACCESS_COOKIE,
-        value=access_token,
-        max_age=ttl_seconds,
-        httponly=True,
-        samesite="strict",
-        secure=secure,
-        path="/",
-    )
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -85,7 +35,7 @@ async def login_admin(
     request: Request,
     settings: Settings = Depends(get_settings),
 ) -> Response:
-    bucket = _rate_limit_bucket(request=request, settings=settings)
+    bucket = rate_limit_bucket(request=request, settings=settings)
     window_seconds = settings.admin_login_rate_limit_window_minutes * 60
     if is_rate_limited(
         bucket=bucket,
@@ -105,13 +55,13 @@ async def login_admin(
         full_access_token = build_access_token(
             settings=settings,
             email=payload.email.lower(),
-            role=_configured_admin_role(settings),
+            role=configured_admin_role(settings),
             two_factor_verified=True,
         )
         full_refresh_token = build_refresh_token(
             settings=settings,
             email=payload.email.lower(),
-            role=_configured_admin_role(settings),
+            role=configured_admin_role(settings),
         )
         full_response = JSONResponse(content={"requires_2fa": False})
         add_admin_noindex_header(full_response)
@@ -126,12 +76,12 @@ async def login_admin(
     access_token = build_access_token(
         settings=settings,
         email=payload.email.lower(),
-        role=_configured_admin_role(settings),
+        role=configured_admin_role(settings),
         two_factor_verified=False,
     )
     response = JSONResponse(content={"requires_2fa": True})
     add_admin_noindex_header(response)
-    _set_partial_access_cookie(settings=settings, response=response, access_token=access_token)
+    set_partial_access_cookie(settings=settings, response=response, access_token=access_token)
     return response
 
 
@@ -144,7 +94,7 @@ async def verify_2fa(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     add_admin_noindex_header(response)
-    bucket = _rate_limit_bucket(request=request, settings=settings)
+    bucket = rate_limit_bucket(request=request, settings=settings)
     window_seconds = settings.admin_login_rate_limit_window_minutes * 60
     if is_rate_limited(
         bucket=bucket,

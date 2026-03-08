@@ -2,18 +2,20 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
+from app.bot.handlers.promo_view_helpers import (
+    format_berlin_time,
+    resolve_discount_label,
+    resolve_scope_label,
+)
 from app.bot.keyboards.promo import build_promo_discount_keyboard
 from app.bot.keyboards.shop import build_shop_keyboard
-from app.bot.promo_labels import get_promo_product_label
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
-from app.economy.energy.constants import BERLIN_TIMEZONE
 from app.economy.promo.errors import (
     PromoAlreadyUsedError,
     PromoExpiredError,
@@ -28,41 +30,6 @@ from app.services.user_onboarding import UserOnboardingService
 router = Router(name="promo")
 PROMO_INPUT_RE = re.compile(r"^/?promo\s+(.+)$", re.IGNORECASE)
 PROMO_PLAIN_RE = re.compile(r"^[A-Z0-9][A-Z0-9_-]{1,63}$")
-
-
-def _format_berlin_time(at_utc: datetime | None) -> str:
-    if at_utc is None:
-        return "unbekannt"
-    return at_utc.astimezone(ZoneInfo(BERLIN_TIMEZONE)).strftime("%d.%m %H:%M")
-
-
-def _resolve_scope_label(target_scope: str | None, *, applicable_products: list[str] | None) -> str:
-    if applicable_products:
-        if len(applicable_products) == 1:
-            product_label = get_promo_product_label(applicable_products[0])
-            if product_label is not None:
-                return product_label
-        return "ausgewaehlte Produkte"
-    if target_scope is None:
-        return "deine Auswahl"
-    if target_scope == "ANY":
-        return "alle Pakete"
-    if target_scope == "MICRO_ANY":
-        return "Mikro-Pakete"
-    if target_scope == "PREMIUM_ANY":
-        return "Premium-Plaene"
-    product_label = get_promo_product_label(target_scope)
-    if product_label is not None:
-        return product_label
-    return target_scope
-
-
-def _resolve_discount_label(result) -> str:
-    if result.discount_type == "FREE":
-        return "kostenlos"
-    if result.discount_type == "FIXED":
-        return f"{result.discount_value or 0}⭐ Rabatt"
-    return f"{result.discount_value or result.discount_percent or 0}% Rabatt"
 
 
 def _is_reply_to_promo_prompt(message: Message) -> bool:
@@ -192,7 +159,7 @@ async def _redeem_promo_from_text(message: Message) -> None:
         await message.answer(
             TEXTS_DE["msg.promo.success.grant.details"].format(
                 premium_days=result.premium_days or 0,
-                premium_ends_at=_format_berlin_time(result.premium_ends_at),
+                premium_ends_at=format_berlin_time(result.premium_ends_at),
             )
         )
         return
@@ -217,11 +184,11 @@ async def _redeem_promo_from_text(message: Message) -> None:
     )
     await message.answer(
         TEXTS_DE["msg.promo.success.discount.details"].format(
-            discount_label=_resolve_discount_label(result),
-            scope_label=_resolve_scope_label(
+            discount_label=resolve_discount_label(result),
+            scope_label=resolve_scope_label(
                 result.target_scope,
                 applicable_products=result.applicable_products,
             ),
-            reserved_until=_format_berlin_time(result.reserved_until),
+            reserved_until=format_berlin_time(result.reserved_until),
         )
     )

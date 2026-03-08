@@ -22,9 +22,7 @@ from app.db.repo.promo_repo_codes import (
 )
 from app.db.repo.promo_repo_redemptions import (
     count_active_reserved_redemptions,
-    count_discount_redemptions_by_status,
     count_redemptions_by_code_and_user,
-    count_redemptions_by_status,
     create_redemption,
     expire_reserved_redemptions,
     get_redemption_by_applied_purchase_id_for_update,
@@ -36,6 +34,10 @@ from app.db.repo.promo_repo_redemptions import (
     get_refunded_purchase_ids_with_pending_redemption_revoke,
     list_redemptions_by_code_and_user_for_update,
     revoke_redemption_for_refund,
+)
+from app.db.repo.promo_repo_redemptions_analytics import (
+    count_discount_redemptions_by_status,
+    count_redemptions_by_status,
 )
 
 

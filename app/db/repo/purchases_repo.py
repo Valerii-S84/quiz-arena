@@ -8,8 +8,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.purchases import Purchase
 
+from .purchases_repo_metrics import (
+    count_paid_purchases,
+    sum_paid_stars_amount,
+    sum_paid_stars_amount_by_product,
+)
+
 
 class PurchasesRepo:
+    count_paid_purchases = staticmethod(count_paid_purchases)
+    sum_paid_stars_amount = staticmethod(sum_paid_stars_amount)
+    sum_paid_stars_amount_by_product = staticmethod(sum_paid_stars_amount_by_product)
+
     @staticmethod
     async def get_by_id(session: AsyncSession, purchase_id: UUID) -> Purchase | None:
         return await session.get(Purchase, purchase_id)
@@ -110,33 +120,6 @@ class PurchasesRepo:
         )
         result = await session.execute(stmt)
         return list(result.scalars().all())
-
-    @staticmethod
-    async def count_paid_purchases(session: AsyncSession) -> int:
-        stmt = select(func.count(Purchase.id)).where(Purchase.paid_at.is_not(None))
-        result = await session.execute(stmt)
-        return int(result.scalar_one() or 0)
-
-    @staticmethod
-    async def sum_paid_stars_amount(session: AsyncSession) -> int:
-        stmt = select(func.coalesce(func.sum(Purchase.stars_amount), 0)).where(
-            Purchase.paid_at.is_not(None)
-        )
-        result = await session.execute(stmt)
-        return int(result.scalar_one() or 0)
-
-    @staticmethod
-    async def sum_paid_stars_amount_by_product(session: AsyncSession) -> dict[str, int]:
-        stmt = (
-            select(
-                Purchase.product_code,
-                func.coalesce(func.sum(Purchase.stars_amount), 0),
-            )
-            .where(Purchase.paid_at.is_not(None))
-            .group_by(Purchase.product_code)
-        )
-        result = await session.execute(stmt)
-        return {product_code: int(total or 0) for product_code, total in result.all()}
 
     @staticmethod
     async def count_by_user(session: AsyncSession, *, user_id: int) -> int:

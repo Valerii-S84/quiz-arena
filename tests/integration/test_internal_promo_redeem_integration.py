@@ -1,105 +1,30 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from uuid import UUID, uuid4
+from datetime import datetime, timedelta
+from uuid import UUID
 
 import pytest
-from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 
-from app.core.config import get_settings
 from app.db.models.promo_attempts import PromoAttempt
-from app.db.models.promo_codes import PromoCode
 from app.db.models.promo_redemptions import PromoRedemption
 from app.db.repo.purchases_repo import PurchasesRepo
-from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.promo.constants import PROMO_DISCOUNT_RESERVATION_TTL
 from app.economy.purchases.service import PurchaseService
-from app.main import app
-from app.services.promo_codes import hash_promo_code, normalize_promo_code
-
-UTC = timezone.utc
-
-
-async def _create_user(seed: str) -> int:
-    async with SessionLocal.begin() as session:
-        user = await UsersRepo.create(
-            session,
-            telegram_user_id=40_000_000_000 + (abs(hash(seed)) % 1_000_000),
-            referral_code=f"R{uuid4().hex[:10]}",
-            username=None,
-            first_name="PromoAPI",
-            referred_by_user_id=None,
-        )
-        return user.id
-
-
-async def _create_promo_code(
-    *,
-    raw_code: str,
-    promo_type: str,
-    now_utc: datetime,
-    grant_premium_days: int | None = None,
-    discount_percent: int | None = None,
-    target_scope: str = "PREMIUM_ANY",
-    first_purchase_only: bool = False,
-    new_users_only: bool = False,
-) -> PromoCode:
-    normalized = normalize_promo_code(raw_code)
-    code_hash = hash_promo_code(
-        normalized_code=normalized,
-        pepper=get_settings().promo_secret_pepper,
-    )
-
-    promo_id = abs(hash((raw_code, promo_type, target_scope))) % 1_000_000_000 + 1
-    promo_code = PromoCode(
-        id=promo_id,
-        code_hash=code_hash,
-        code_prefix=normalized[:8] or "PROMO",
-        campaign_name="integration-promo-redeem",
-        promo_type=promo_type,
-        grant_premium_days=grant_premium_days,
-        discount_percent=discount_percent,
-        target_scope=target_scope,
-        status="ACTIVE",
-        valid_from=now_utc - timedelta(days=1),
-        valid_until=now_utc + timedelta(days=1),
-        max_total_uses=100,
-        used_total=0,
-        max_uses_per_user=1,
-        new_users_only=new_users_only,
-        first_purchase_only=first_purchase_only,
-        created_by="integration-test",
-        created_at=now_utc,
-        updated_at=now_utc,
-    )
-
-    async with SessionLocal.begin() as session:
-        session.add(promo_code)
-        await session.flush()
-
-    return promo_code
-
-
-async def _post_redeem(payload: dict[str, object]) -> tuple[int, dict[str, object]]:
-    async with AsyncClient(
-        transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
-        base_url="http://testserver",
-    ) as client:
-        response = await client.post(
-            "/internal/promo/redeem",
-            json=payload,
-            headers={"X-Internal-Token": get_settings().internal_api_token},
-        )
-    return response.status_code, response.json()
+from tests.integration.internal_promo_test_support import (
+    UTC,
+    create_promo_code,
+    create_user,
+    post_redeem,
+)
 
 
 @pytest.mark.asyncio
 async def test_redeem_premium_grant_applies_entitlement_and_marks_redemption_applied() -> None:
     now_utc = datetime.now(UTC)
-    user_id = await _create_user("promo-grant")
-    await _create_promo_code(
+    user_id = await create_user("promo-grant")
+    await create_promo_code(
         raw_code="WILLKOMMEN-7",
         promo_type="PREMIUM_GRANT",
         grant_premium_days=7,
@@ -108,7 +33,7 @@ async def test_redeem_premium_grant_applies_entitlement_and_marks_redemption_app
         now_utc=now_utc,
     )
 
-    status_code, payload = await _post_redeem(
+    status_code, payload = await post_redeem(
         {
             "user_id": user_id,
             "promo_code": "willkommen 7",
@@ -132,8 +57,8 @@ async def test_redeem_premium_grant_applies_entitlement_and_marks_redemption_app
 @pytest.mark.asyncio
 async def test_redeem_discount_returns_reservation_and_is_idempotent_for_same_key() -> None:
     now_utc = datetime.now(UTC)
-    user_id = await _create_user("promo-discount")
-    promo_code = await _create_promo_code(
+    user_id = await create_user("promo-discount")
+    promo_code = await create_promo_code(
         raw_code="WILLKOMMEN-50",
         promo_type="PERCENT_DISCOUNT",
         grant_premium_days=None,
@@ -142,14 +67,14 @@ async def test_redeem_discount_returns_reservation_and_is_idempotent_for_same_ke
         now_utc=now_utc,
     )
 
-    first_status, first_payload = await _post_redeem(
+    first_status, first_payload = await post_redeem(
         {
             "user_id": user_id,
             "promo_code": "WILLKOMMEN-50",
             "idempotency_key": "promo-discount-1",
         }
     )
-    second_status, second_payload = await _post_redeem(
+    second_status, second_payload = await post_redeem(
         {
             "user_id": user_id,
             "promo_code": "WILLKOMMEN-50",
@@ -188,8 +113,8 @@ async def test_redeem_discount_returns_reservation_and_is_idempotent_for_same_ke
 @pytest.mark.asyncio
 async def test_redeem_returns_conflict_when_same_code_used_with_new_idempotency_key() -> None:
     now_utc = datetime.now(UTC)
-    user_id = await _create_user("promo-already-used")
-    await _create_promo_code(
+    user_id = await create_user("promo-already-used")
+    await create_promo_code(
         raw_code="EINMAL-50",
         promo_type="PERCENT_DISCOUNT",
         grant_premium_days=None,
@@ -198,14 +123,14 @@ async def test_redeem_returns_conflict_when_same_code_used_with_new_idempotency_
         now_utc=now_utc,
     )
 
-    first_status, _ = await _post_redeem(
+    first_status, _ = await post_redeem(
         {
             "user_id": user_id,
             "promo_code": "EINMAL-50",
             "idempotency_key": "promo-used-1",
         }
     )
-    second_status, second_payload = await _post_redeem(
+    second_status, second_payload = await post_redeem(
         {
             "user_id": user_id,
             "promo_code": "EINMAL-50",
@@ -221,8 +146,8 @@ async def test_redeem_returns_conflict_when_same_code_used_with_new_idempotency_
 @pytest.mark.asyncio
 async def test_redeem_allows_single_reattempt_after_expired_reservation() -> None:
     now_utc = datetime.now(UTC)
-    user_id = await _create_user("promo-expired-retry")
-    promo_code = await _create_promo_code(
+    user_id = await create_user("promo-expired-retry")
+    promo_code = await create_promo_code(
         raw_code="RETRY-50",
         promo_type="PERCENT_DISCOUNT",
         grant_premium_days=None,
@@ -231,7 +156,7 @@ async def test_redeem_allows_single_reattempt_after_expired_reservation() -> Non
         now_utc=now_utc,
     )
 
-    first_status, first_payload = await _post_redeem(
+    first_status, first_payload = await post_redeem(
         {
             "user_id": user_id,
             "promo_code": "RETRY-50",
@@ -247,7 +172,7 @@ async def test_redeem_allows_single_reattempt_after_expired_reservation() -> Non
         first_redemption.reserved_until = now_utc - timedelta(minutes=1)
         first_redemption.updated_at = now_utc
 
-    second_status, second_payload = await _post_redeem(
+    second_status, second_payload = await post_redeem(
         {
             "user_id": user_id,
             "promo_code": "RETRY-50",
@@ -277,8 +202,8 @@ async def test_redeem_allows_single_reattempt_after_expired_reservation() -> Non
 @pytest.mark.asyncio
 async def test_redeem_blocks_second_reattempt_after_two_expired_reservations() -> None:
     now_utc = datetime.now(UTC)
-    user_id = await _create_user("promo-expired-retry-limit")
-    await _create_promo_code(
+    user_id = await create_user("promo-expired-retry-limit")
+    await create_promo_code(
         raw_code="RETRY-LIMIT",
         promo_type="PERCENT_DISCOUNT",
         grant_premium_days=None,
@@ -287,7 +212,7 @@ async def test_redeem_blocks_second_reattempt_after_two_expired_reservations() -
         now_utc=now_utc,
     )
 
-    first_status, first_payload = await _post_redeem(
+    first_status, first_payload = await post_redeem(
         {
             "user_id": user_id,
             "promo_code": "RETRY-LIMIT",
@@ -303,7 +228,7 @@ async def test_redeem_blocks_second_reattempt_after_two_expired_reservations() -
         first_redemption.reserved_until = now_utc - timedelta(minutes=1)
         first_redemption.updated_at = now_utc
 
-    second_status, second_payload = await _post_redeem(
+    second_status, second_payload = await post_redeem(
         {
             "user_id": user_id,
             "promo_code": "RETRY-LIMIT",
@@ -321,7 +246,7 @@ async def test_redeem_blocks_second_reattempt_after_two_expired_reservations() -
         second_redemption.reserved_until = now_utc - timedelta(minutes=1)
         second_redemption.updated_at = now_utc
 
-    third_status, third_payload = await _post_redeem(
+    third_status, third_payload = await post_redeem(
         {
             "user_id": user_id,
             "promo_code": "RETRY-LIMIT",
@@ -335,9 +260,9 @@ async def test_redeem_blocks_second_reattempt_after_two_expired_reservations() -
 
 @pytest.mark.asyncio
 async def test_redeem_enforces_rate_limit_after_five_failed_attempts() -> None:
-    user_id = await _create_user("promo-rate-limit")
+    user_id = await create_user("promo-rate-limit")
     for idx in range(5):
-        status_code, payload = await _post_redeem(
+        status_code, payload = await post_redeem(
             {
                 "user_id": user_id,
                 "promo_code": f"INVALID-{idx}",
@@ -347,7 +272,7 @@ async def test_redeem_enforces_rate_limit_after_five_failed_attempts() -> None:
         assert status_code == 404
         assert payload["detail"]["code"] == "E_PROMO_INVALID"
 
-    blocked_status, blocked_payload = await _post_redeem(
+    blocked_status, blocked_payload = await post_redeem(
         {
             "user_id": user_id,
             "promo_code": "INVALID-BLOCKED",
@@ -369,8 +294,8 @@ async def test_redeem_enforces_rate_limit_after_five_failed_attempts() -> None:
 @pytest.mark.asyncio
 async def test_redeem_first_purchase_only_rejects_user_with_existing_purchase() -> None:
     now_utc = datetime.now(UTC)
-    user_id = await _create_user("promo-first-purchase")
-    await _create_promo_code(
+    user_id = await create_user("promo-first-purchase")
+    await create_promo_code(
         raw_code="FIRSTONLY-30",
         promo_type="PERCENT_DISCOUNT",
         grant_premium_days=None,
@@ -391,7 +316,7 @@ async def test_redeem_first_purchase_only_rejects_user_with_existing_purchase() 
         purchase = await PurchasesRepo.get_by_id(session, init.purchase_id)
         assert purchase is not None
 
-    status_code, payload = await _post_redeem(
+    status_code, payload = await post_redeem(
         {
             "user_id": user_id,
             "promo_code": "FIRSTONLY30",

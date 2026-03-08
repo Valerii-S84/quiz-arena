@@ -9,6 +9,15 @@ from app.db.models.promo_codes import PromoCode
 from app.economy.promo.batch import generate_raw_codes
 from app.services.promo_codes import normalize_promo_code
 
+from .promo_serialization import (
+    effective_applicable_products,
+    effective_discount_type,
+    effective_discount_value,
+    masked_code,
+    resolve_display_status,
+    serialize_valid_until,
+)
+
 OPEN_ENDED_VALID_UNTIL = datetime(9999, 12, 31, tzinfo=timezone.utc)
 LEGACY_PERCENT_TYPES = {"discount_percent", "percent_discount", "PERCENT_DISCOUNT"}
 LEGACY_GRANT_TYPES = {"bonus_subscription_days", "PREMIUM_GRANT", "premium_grant"}
@@ -154,46 +163,6 @@ def resolve_target_scope(*, promo_type: str, applicable_products: list[str] | No
     return "MULTI"
 
 
-def masked_code(code_prefix: str) -> str:
-    return f"{code_prefix}****"
-
-
-def effective_discount_type(promo: PromoCode) -> str | None:
-    if promo.promo_type == "PREMIUM_GRANT":
-        return None
-    return promo.discount_type or "PERCENT"
-
-
-def effective_discount_value(promo: PromoCode) -> int | None:
-    if promo.promo_type == "PREMIUM_GRANT":
-        return promo.grant_premium_days
-    if promo.discount_value is not None:
-        return promo.discount_value
-    return promo.discount_percent
-
-
-def effective_applicable_products(promo: PromoCode) -> list[str] | None:
-    if promo.applicable_products is not None:
-        return [str(item) for item in promo.applicable_products]
-    if promo.promo_type == "PERCENT_DISCOUNT" and promo.target_scope not in {"ANY", "MULTI"}:
-        if promo.target_scope in {"MICRO_ANY", "PREMIUM_ANY"}:
-            return None
-        return [promo.target_scope]
-    return None
-
-
-def resolve_display_status(promo: PromoCode, *, now_utc: datetime) -> str:
-    if promo.status == "PAUSED":
-        return "inactive"
-    if promo.status in {"EXPIRED", "DEPLETED"}:
-        return "expired"
-    if promo.valid_until <= now_utc:
-        return "expired"
-    if promo.max_total_uses is not None and promo.used_total >= promo.max_total_uses:
-        return "expired"
-    return "active"
-
-
 def serialize_promo(
     promo: PromoCode,
     *,
@@ -224,7 +193,7 @@ def serialize_promo(
         "discount_value": effective_discount_value(promo),
         "applicable_products": applicable_products,
         "valid_from": promo.valid_from.isoformat(),
-        "valid_until": None if is_open_ended else promo.valid_until.isoformat(),
+        "valid_until": serialize_valid_until(promo=promo, is_open_ended=is_open_ended),
         "max_total_uses": promo.max_total_uses or 0,
         "max_per_user": promo.max_uses_per_user,
         "used_total": promo.used_total,
