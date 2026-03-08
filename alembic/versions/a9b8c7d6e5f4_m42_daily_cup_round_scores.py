@@ -1,6 +1,6 @@
 """m42_daily_cup_round_scores
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: a9b8c7d6e5f4
 Revises: e5f6a7b8c9da
 Create Date: 2026-03-08 22:15:00.000000
 """
@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
-revision: str = "a1b2c3d4e5f6"
+revision: str = "a9b8c7d6e5f4"
 down_revision: str | None = "e5f6a7b8c9da"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
