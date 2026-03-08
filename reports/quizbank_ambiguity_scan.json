@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-02-22T21:02:08.258055+00:00",
+  "generated_at": "2026-03-08T15:14:05.809633+00:00",
   "summary": {
     "file_count": 19,
     "exact_duplicate_groups_total": 0,
@@ -12,7 +12,7 @@
   },
   "files": [
     {
-      "file": "QuizBank/Adjektivendungen_Beginner_Bank_A1_A2_210.csv",
+      "file": "QuizBank\\Adjektivendungen_Beginner_Bank_A1_A2_210.csv",
       "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -41,7 +41,7 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/Akkusativ_Dativ_Bank_A1_B1_210.csv",
+      "file": "QuizBank\\Akkusativ_Dativ_Bank_A1_B1_210.csv",
       "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -51,7 +51,7 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/Antonym_Match_Bank_A1_B1_210.csv",
+      "file": "QuizBank\\Antonym_Match_Bank_A1_B1_210.csv",
       "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -125,7 +125,7 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/Artikel_Sprint_Bank_A1_B2_1000.csv",
+      "file": "QuizBank\\Artikel_Sprint_Bank_A1_B2_1000.csv",
       "row_count": 1000,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -145,17 +145,7 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv",
-      "row_count": 500,
-      "exact_duplicate_groups": [],
-      "exact_conflict_groups": [],
-      "signature_conflict_groups": [],
-      "fuzzy_conflicts": [],
-      "same_row_multi_logical_candidates": [],
-      "template_repeat_groups": []
-    },
-    {
-      "file": "QuizBank/Lexical_Gap_Fill_Bank_A2_B1_210.csv",
+      "file": "QuizBank\\Lexical_Gap_Fill_Bank_A2_B1_210.csv",
       "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -247,7 +237,27 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/Mini_Dialog_Bank_A2_B1_210.csv",
+      "file": "QuizBank\\LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv",
+      "row_count": 500,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank\\logik_luecke_sheet_template.csv",
+      "row_count": 0,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank\\Mini_Dialog_Bank_A2_B1_210.csv",
       "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -257,7 +267,7 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/Modalverben_Bank_210.csv",
+      "file": "QuizBank\\Modalverben_Bank_210.csv",
       "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -267,7 +277,7 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/Negation_Quiz_Bank_A2_B1_210.csv",
+      "file": "QuizBank\\Negation_Quiz_Bank_A2_B1_210.csv",
       "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -277,7 +287,7 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/Plural_Check_Bank_500.csv",
+      "file": "QuizBank\\Plural_Check_Bank_500.csv",
       "row_count": 500,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -315,7 +325,7 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/Possessive_Adjectives_Bank_A2_B1_210.csv",
+      "file": "QuizBank\\Possessive_Adjectives_Bank_A2_B1_210.csv",
       "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -452,7 +462,7 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/Preposition_Selection_Bank_A2_B1_210.csv",
+      "file": "QuizBank\\Preposition_Selection_Bank_A2_B1_210.csv",
       "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -462,7 +472,7 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/Satzbau_Bank_A2_B1_210.csv",
+      "file": "QuizBank\\Satzbau_Bank_A2_B1_210.csv",
       "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -472,7 +482,7 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/Synonym_Match_Bank_A1_B1_210.csv",
+      "file": "QuizBank\\Synonym_Match_Bank_A1_B1_210.csv",
       "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -492,7 +502,7 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/Topic_Vocabulary_Themes_Bank_A2_B1_210.csv",
+      "file": "QuizBank\\Topic_Vocabulary_Themes_Bank_A2_B1_210.csv",
       "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -502,7 +512,17 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/Verb_Conjugation_Bank_A2_B1_210.csv",
+      "file": "QuizBank\\trennbare_verben_210_korrigiert.csv",
+      "row_count": 210,
+      "exact_duplicate_groups": [],
+      "exact_conflict_groups": [],
+      "signature_conflict_groups": [],
+      "fuzzy_conflicts": [],
+      "same_row_multi_logical_candidates": [],
+      "template_repeat_groups": []
+    },
+    {
+      "file": "QuizBank\\Verb_Conjugation_Bank_A2_B1_210.csv",
       "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
@@ -1413,28 +1433,8 @@
       "template_repeat_groups": []
     },
     {
-      "file": "QuizBank/W_Fragen_Bank_630.csv",
+      "file": "QuizBank\\W_Fragen_Bank_630.csv",
       "row_count": 630,
-      "exact_duplicate_groups": [],
-      "exact_conflict_groups": [],
-      "signature_conflict_groups": [],
-      "fuzzy_conflicts": [],
-      "same_row_multi_logical_candidates": [],
-      "template_repeat_groups": []
-    },
-    {
-      "file": "QuizBank/logik_luecke_sheet_template.csv",
-      "row_count": 0,
-      "exact_duplicate_groups": [],
-      "exact_conflict_groups": [],
-      "signature_conflict_groups": [],
-      "fuzzy_conflicts": [],
-      "same_row_multi_logical_candidates": [],
-      "template_repeat_groups": []
-    },
-    {
-      "file": "QuizBank/trennbare_verben_210_korrigiert.csv",
-      "row_count": 210,
       "exact_duplicate_groups": [],
       "exact_conflict_groups": [],
       "signature_conflict_groups": [],

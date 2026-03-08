@@ -260,13 +260,17 @@ async def test_redeem_allows_single_reattempt_after_expired_reservation() -> Non
 
     async with SessionLocal.begin() as session:
         rows = (
-            await session.execute(
-                select(PromoRedemption).where(
-                    PromoRedemption.promo_code_id == promo_code.id,
-                    PromoRedemption.user_id == user_id,
+            (
+                await session.execute(
+                    select(PromoRedemption).where(
+                        PromoRedemption.promo_code_id == promo_code.id,
+                        PromoRedemption.user_id == user_id,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     assert len(rows) == 2
 
 
@@ -309,7 +313,9 @@ async def test_redeem_blocks_second_reattempt_after_two_expired_reservations() -
     assert second_status == 200
 
     async with SessionLocal.begin() as session:
-        second_redemption = await session.get(PromoRedemption, UUID(second_payload["redemption_id"]))
+        second_redemption = await session.get(
+            PromoRedemption, UUID(second_payload["redemption_id"])
+        )
         assert second_redemption is not None
         second_redemption.status = "EXPIRED"
         second_redemption.reserved_until = now_utc - timedelta(minutes=1)

@@ -58,7 +58,12 @@ def _resolve_discount_fields(
         raise HTTPException(status_code=422, detail={"code": "E_PROMO_DISCOUNT_VALUE_REQUIRED"})
     if resolved_type == "PERCENT" and not 1 <= discount_value <= 100:
         raise HTTPException(status_code=422, detail={"code": "E_PROMO_DISCOUNT_VALUE_INVALID"})
-    return resolved_type, discount_value, discount_value if resolved_type == "PERCENT" else None, None
+    return (
+        resolved_type,
+        discount_value,
+        discount_value if resolved_type == "PERCENT" else None,
+        None,
+    )
 
 
 def _campaign_name(raw_value: str | None, *, fallback: str) -> str:
@@ -133,7 +138,9 @@ async def create_promo(*, payload: PromoCreateRequest, admin: AdminPrincipal) ->
     try:
         code_encrypted = encrypt_promo_code(raw_code)
     except ValueError as exc:
-        raise HTTPException(status_code=500, detail={"code": "E_PROMO_ENCRYPTION_UNAVAILABLE"}) from exc
+        raise HTTPException(
+            status_code=500, detail={"code": "E_PROMO_ENCRYPTION_UNAVAILABLE"}
+        ) from exc
 
     async with SessionLocal.begin() as session:
         if await AdminRuntimePromoRepo.get_by_hash(session, code_hash) is not None:
@@ -250,7 +257,9 @@ async def create_bulk_promos(
     }
 
 
-async def patch_promo(*, promo_id: int, payload: PromoPatchRequest, admin: AdminPrincipal) -> dict[str, object]:
+async def patch_promo(
+    *, promo_id: int, payload: PromoPatchRequest, admin: AdminPrincipal
+) -> dict[str, object]:
     now_utc = datetime.now(timezone.utc)
     async with SessionLocal.begin() as session:
         promo = await AdminRuntimePromoRepo.get_by_id_for_update(session, promo_id)
@@ -294,7 +303,7 @@ async def revoke_promo(
     admin: AdminPrincipal,
 ) -> dict[str, object]:
     now_utc = datetime.now(timezone.utc)
-    revoke_reason = (payload.reason.strip() if payload is not None and payload.reason else "")
+    revoke_reason = payload.reason.strip() if payload is not None and payload.reason else ""
     async with SessionLocal.begin() as session:
         promo = await AdminRuntimePromoRepo.get_by_id_for_update(session, promo_id)
         if promo is None:

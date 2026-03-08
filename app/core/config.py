@@ -4,9 +4,9 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_DEFAULT_PROMO_ENCRYPTION_KEY = urlsafe_b64encode(
-    b"0123456789abcdef0123456789abcdef"
-).decode("ascii").rstrip("=")
+_DEFAULT_PROMO_ENCRYPTION_KEY = (
+    urlsafe_b64encode(b"0123456789abcdef0123456789abcdef").decode("ascii").rstrip("=")
+)
 
 
 class Settings(BaseSettings):

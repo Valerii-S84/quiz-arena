@@ -90,6 +90,7 @@ async def _create_discount_promo_redemption(
 
     return promo_code_id, redemption_id
 
+
 async def _create_validated_redemption(
     *,
     promo_code_id: int,
@@ -117,6 +118,7 @@ async def _create_validated_redemption(
         )
         await session.flush()
     return redemption_id
+
 
 @pytest.mark.asyncio
 async def test_init_purchase_applies_discount_and_reserves_redemption() -> None:
@@ -161,6 +163,7 @@ async def test_init_purchase_applies_discount_and_reserves_redemption() -> None:
         assert redemption.reserved_until > now_utc
         assert redemption.reserved_until - redemption.updated_at == PROMO_DISCOUNT_RESERVATION_TTL
 
+
 @pytest.mark.asyncio
 async def test_validate_precheckout_rejects_expired_promo_reservation() -> None:
     now_utc = datetime.now(UTC)
@@ -202,6 +205,7 @@ async def test_validate_precheckout_rejects_expired_promo_reservation() -> None:
         redemption = await PromoRepo.get_redemption_by_id(session, redemption_id)
         assert redemption is not None
         assert redemption.status == "RESERVED"
+
 
 @pytest.mark.asyncio
 async def test_successful_payment_applies_redemption_once_and_increments_used_total() -> None:
@@ -265,6 +269,7 @@ async def test_successful_payment_applies_redemption_once_and_increments_used_to
         assert promo_code is not None
         assert promo_code.used_total == 1
 
+
 @pytest.mark.asyncio
 async def test_init_purchase_rejects_not_applicable_scope() -> None:
     now_utc = datetime.now(UTC)
@@ -290,6 +295,7 @@ async def test_init_purchase_rejects_not_applicable_scope() -> None:
     async with SessionLocal.begin() as session:
         purchase = await PurchasesRepo.get_by_idempotency_key(session, "promo-scope-mismatch-1")
         assert purchase is None
+
 
 @pytest.mark.asyncio
 async def test_init_purchase_replaces_active_invoice_with_new_discounted_one() -> None:
@@ -344,6 +350,7 @@ async def test_init_purchase_replaces_active_invoice_with_new_discounted_one() -
         assert second_redemption is not None
         assert second_redemption.status == "RESERVED"
         assert second_redemption.applied_purchase_id == second.purchase_id
+
 
 @pytest.mark.asyncio
 async def test_init_purchase_enforces_max_total_uses_before_invoice_creation() -> None:

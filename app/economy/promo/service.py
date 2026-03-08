@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from functools import partial
 from datetime import datetime, timezone
+from functools import partial
 from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession

@@ -21,9 +21,9 @@ from app.db.repo.promo_repo_codes import (
     pause_active_codes_by_hashes,
 )
 from app.db.repo.promo_repo_redemptions import (
-    count_redemptions_by_code_and_user,
     count_active_reserved_redemptions,
     count_discount_redemptions_by_status,
+    count_redemptions_by_code_and_user,
     count_redemptions_by_status,
     create_redemption,
     expire_reserved_redemptions,

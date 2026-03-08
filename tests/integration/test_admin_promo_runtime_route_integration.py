@@ -163,13 +163,17 @@ async def test_admin_promo_patch_updates_fields() -> None:
         assert promo.max_uses_per_user == 3
 
         audit_rows = (
-            await session.execute(
-                select(PromoAuditLog).where(
-                    PromoAuditLog.action == "UPDATE",
-                    PromoAuditLog.promo_code_id == promo_id,
+            (
+                await session.execute(
+                    select(PromoAuditLog).where(
+                        PromoAuditLog.action == "UPDATE",
+                        PromoAuditLog.promo_code_id == promo_id,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     assert len(audit_rows) == 1
 
 
@@ -371,12 +375,18 @@ async def test_admin_promo_audit_log_written() -> None:
 
     async with SessionLocal.begin() as session:
         audit_rows = (
-            await session.execute(
-                select(PromoAuditLog).where(PromoAuditLog.promo_code_id == promo_id)
+            (
+                await session.execute(
+                    select(PromoAuditLog).where(PromoAuditLog.promo_code_id == promo_id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     assert {"CREATE", "DEACTIVATE", "REVOKE"} <= {row.action for row in audit_rows}
-    assert next(row for row in audit_rows if row.action == "REVOKE").details["reason"] == "Missbrauch"
+    assert (
+        next(row for row in audit_rows if row.action == "REVOKE").details["reason"] == "Missbrauch"
+    )
 
 
 @pytest.mark.asyncio

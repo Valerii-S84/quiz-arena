@@ -77,21 +77,29 @@ async def test_admin_promo_detail_reveals_code_only_for_super_admin() -> None:
 
     async with SessionLocal.begin() as session:
         admin_audit_rows = (
-            await session.execute(
-                select(AdminAuditLog).where(
-                    AdminAuditLog.action == "promo_reveal_code",
-                    AdminAuditLog.target_id == str(promo_id),
+            (
+                await session.execute(
+                    select(AdminAuditLog).where(
+                        AdminAuditLog.action == "promo_reveal_code",
+                        AdminAuditLog.target_id == str(promo_id),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         promo_audit_rows = (
-            await session.execute(
-                select(PromoAuditLog).where(
-                    PromoAuditLog.action == "REVEAL_CODE",
-                    PromoAuditLog.promo_code_id == promo_id,
+            (
+                await session.execute(
+                    select(PromoAuditLog).where(
+                        PromoAuditLog.action == "REVEAL_CODE",
+                        PromoAuditLog.promo_code_id == promo_id,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         promo = await session.get(PromoCode, promo_id)
         assert promo is not None
         assert promo.code_encrypted is not None

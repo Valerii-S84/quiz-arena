@@ -20,7 +20,9 @@ def _status_condition(*, status: str | None, now_utc: datetime):
     expired_condition = or_(
         PromoCode.status.in_(("EXPIRED", "DEPLETED")),
         PromoCode.valid_until <= now_utc,
-        and_(PromoCode.max_total_uses.is_not(None), PromoCode.used_total >= PromoCode.max_total_uses),
+        and_(
+            PromoCode.max_total_uses.is_not(None), PromoCode.used_total >= PromoCode.max_total_uses
+        ),
     )
     if status == "active":
         return active_condition
@@ -133,7 +135,9 @@ class AdminRuntimePromoRepo:
 
     @staticmethod
     async def count_redemptions(session: AsyncSession, *, promo_id: int) -> int:
-        stmt = select(func.count(PromoRedemption.id)).where(PromoRedemption.promo_code_id == promo_id)
+        stmt = select(func.count(PromoRedemption.id)).where(
+            PromoRedemption.promo_code_id == promo_id
+        )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
 

@@ -3,15 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import (
-    BigInteger,
-    CheckConstraint,
-    DateTime,
-    ForeignKey,
-    Index,
-    String,
-    text,
-)
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column

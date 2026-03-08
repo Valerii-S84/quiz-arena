@@ -4,12 +4,12 @@ from math import ceil
 from uuid import uuid4
 
 from app.db.models.promo_codes import PromoCode
-from app.economy.purchases.catalog import ProductSpec
 from app.economy.promo.runtime import (
     resolve_applicable_products,
     resolve_discount_type,
     resolve_discount_value,
 )
+from app.economy.purchases.catalog import ProductSpec
 
 from .constants import PREMIUM_PLAN_RANKS
 
@@ -22,7 +22,9 @@ def _premium_plan_rank(plan_code: str | None) -> int:
     return PREMIUM_PLAN_RANKS.get(plan_code or "", 0)
 
 
-def _calculate_discount_amount(base_price: int, *, discount_type: str, discount_value: int | None) -> int:
+def _calculate_discount_amount(
+    base_price: int, *, discount_type: str, discount_value: int | None
+) -> int:
     if discount_type == "FREE":
         return base_price
     if discount_type == "FIXED":

@@ -4,21 +4,19 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from app.api.routes.admin.deps import AdminPrincipal, add_admin_noindex_header, get_current_admin
 
-from .promo_handlers import (
-    check_promo_code as _check_promo_code,
-    create_bulk_promos as _create_bulk_promos,
-    create_promo as _create_promo,
-    export_promos as _export_promos,
-    get_promo as _get_promo,
-    get_promo_stats as _get_promo_stats,
-    list_promo_audit as _list_promo_audit,
-    list_promo_products as _list_promo_products,
-    list_promo_usages as _list_promo_usages,
-    list_promos as _list_promos,
-    patch_promo as _patch_promo,
-    revoke_promo as _revoke_promo,
-    toggle_promo as _toggle_promo,
-)
+from .promo_handlers import check_promo_code as _check_promo_code
+from .promo_handlers import create_bulk_promos as _create_bulk_promos
+from .promo_handlers import create_promo as _create_promo
+from .promo_handlers import export_promos as _export_promos
+from .promo_handlers import get_promo as _get_promo
+from .promo_handlers import get_promo_stats as _get_promo_stats
+from .promo_handlers import list_promo_audit as _list_promo_audit
+from .promo_handlers import list_promo_products as _list_promo_products
+from .promo_handlers import list_promo_usages as _list_promo_usages
+from .promo_handlers import list_promos as _list_promos
+from .promo_handlers import patch_promo as _patch_promo
+from .promo_handlers import revoke_promo as _revoke_promo
+from .promo_handlers import toggle_promo as _toggle_promo
 from .promo_models import (
     PromoBulkCreateRequest,
     PromoCreateRequest,

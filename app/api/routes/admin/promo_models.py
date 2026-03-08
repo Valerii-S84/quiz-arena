@@ -99,7 +99,9 @@ def resolve_promo_type(raw_type: str | None) -> str:
     return "PERCENT_DISCOUNT"
 
 
-def resolve_discount_type(payload: PromoCreateRequest | PromoBulkCreateRequest | PromoPatchRequest) -> str | None:
+def resolve_discount_type(
+    payload: PromoCreateRequest | PromoBulkCreateRequest | PromoPatchRequest,
+) -> str | None:
     if payload.discount_type is not None:
         return payload.discount_type
     if payload.type in LEGACY_PERCENT_TYPES:
@@ -107,7 +109,9 @@ def resolve_discount_type(payload: PromoCreateRequest | PromoBulkCreateRequest |
     return None
 
 
-def resolve_discount_value(payload: PromoCreateRequest | PromoBulkCreateRequest | PromoPatchRequest) -> int | None:
+def resolve_discount_value(
+    payload: PromoCreateRequest | PromoBulkCreateRequest | PromoPatchRequest,
+) -> int | None:
     raw_value = payload.discount_value if payload.discount_value is not None else payload.value
     if raw_value is None:
         return None
@@ -117,7 +121,9 @@ def resolve_discount_value(payload: PromoCreateRequest | PromoBulkCreateRequest 
     return integer_value
 
 
-def resolve_max_total_uses(payload: PromoCreateRequest | PromoBulkCreateRequest | PromoPatchRequest) -> int | None:
+def resolve_max_total_uses(
+    payload: PromoCreateRequest | PromoBulkCreateRequest | PromoPatchRequest,
+) -> int | None:
     raw_value = payload.max_total_uses if payload.max_total_uses is not None else payload.max_uses
     if raw_value is None:
         return None
@@ -199,8 +205,14 @@ def serialize_promo(
     discount_type = effective_discount_type(promo)
     applicable_products = effective_applicable_products(promo)
     is_open_ended = promo.valid_until >= OPEN_ENDED_VALID_UNTIL
-    legacy_type = "bonus_subscription_days" if promo.promo_type == "PREMIUM_GRANT" else "discount_percent"
-    legacy_product_id = None if applicable_products is None or len(applicable_products) != 1 else applicable_products[0]
+    legacy_type = (
+        "bonus_subscription_days" if promo.promo_type == "PREMIUM_GRANT" else "discount_percent"
+    )
+    legacy_product_id = (
+        None
+        if applicable_products is None or len(applicable_products) != 1
+        else applicable_products[0]
+    )
     return {
         "id": promo.id,
         "code": masked_code(promo.code_prefix),

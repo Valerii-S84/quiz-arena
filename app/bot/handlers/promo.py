@@ -8,9 +8,9 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
-from app.bot.promo_labels import get_promo_product_label
 from app.bot.keyboards.promo import build_promo_discount_keyboard
 from app.bot.keyboards.shop import build_shop_keyboard
+from app.bot.promo_labels import get_promo_product_label
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
 from app.economy.energy.constants import BERLIN_TIMEZONE
