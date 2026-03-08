@@ -57,8 +57,12 @@ Use only the project venv binaries:
 ```bash
 .venv/bin/ruff check .
 .venv/bin/mypy .
-DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q
+.venv/bin/pytest -q
 ```
+
+`pytest` test bootstrap pins `DATABASE_URL` to the local PostgreSQL test DB
+`quiz_arena_test` via `tests/conftest.py`, so the command works without shell-specific
+env prefixes on Windows as well.
 
 ## Production Deploy
 
