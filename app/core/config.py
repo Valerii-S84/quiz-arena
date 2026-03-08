@@ -1,7 +1,12 @@
+from base64 import urlsafe_b64encode
 from functools import lru_cache
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_DEFAULT_PROMO_ENCRYPTION_KEY = urlsafe_b64encode(
+    b"0123456789abcdef0123456789abcdef"
+).decode("ascii").rstrip("=")
 
 
 class Settings(BaseSettings):
@@ -215,6 +220,7 @@ class Settings(BaseSettings):
         alias="ADMIN_ACCESS_TOKEN_TTL_MINUTES",
     )
     admin_refresh_token_ttl_days: int = Field(default=7, alias="ADMIN_REFRESH_TOKEN_TTL_DAYS")
+    admin_role: str = Field(default="admin", alias="ADMIN_ROLE")
     admin_login_rate_limit_attempts: int = Field(
         default=5,
         alias="ADMIN_LOGIN_RATE_LIMIT_ATTEMPTS",
@@ -260,6 +266,10 @@ class Settings(BaseSettings):
     )
     promo_secret_pepper: str = Field(
         default="dev_promo_pepper_change_me", alias="PROMO_SECRET_PEPPER"
+    )
+    promo_encryption_key: str = Field(
+        default=_DEFAULT_PROMO_ENCRYPTION_KEY,
+        alias="PROMO_ENCRYPTION_KEY",
     )
 
     database_url: str = Field(alias="DATABASE_URL")

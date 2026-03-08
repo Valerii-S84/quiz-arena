@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -24,6 +25,12 @@ from app.economy.promo.errors import (
 from app.economy.promo.grants import apply_premium_grant
 from app.economy.promo.idempotency import build_idempotent_result
 from app.economy.promo.rate_limit import enforce_rate_limit
+from app.economy.promo.retry_policy import can_user_retry_promo
+from app.economy.promo.runtime import (
+    resolve_applicable_products,
+    resolve_discount_type,
+    resolve_discount_value,
+)
 from app.economy.promo.types import PromoRedeemResult
 from app.services.promo_codes import hash_promo_code, normalize_promo_code
 
@@ -42,9 +49,12 @@ class PromoService:
         user_id: int,
         promo_code: str,
         idempotency_key: str,
+        source: str = "API",
         now_utc: datetime | None = None,
     ) -> PromoRedeemResult:
         now_utc = now_utc or datetime.now(timezone.utc)
+        record_attempt = partial(PromoService._record_attempt, source=source)
+        record_failed_attempt = partial(PromoService._record_failed_attempt, source=source)
 
         existing = await PromoRepo.get_redemption_by_idempotency_key_for_update(
             session, idempotency_key
@@ -67,7 +77,7 @@ class PromoService:
         try:
             await PromoService._enforce_rate_limit(session, user_id=user_id, now_utc=now_utc)
         except PromoRateLimitedError:
-            await PromoService._record_failed_attempt(
+            await record_failed_attempt(
                 user_id=user_id,
                 normalized_code_hash=code_hash,
                 result="RATE_LIMITED",
@@ -77,7 +87,7 @@ class PromoService:
             raise
 
         if not normalized_code:
-            await PromoService._record_failed_attempt(
+            await record_failed_attempt(
                 user_id=user_id,
                 normalized_code_hash=code_hash,
                 result="INVALID",
@@ -88,7 +98,7 @@ class PromoService:
 
         matched_code = await PromoRepo.get_code_by_hash_for_update(session, code_hash)
         if matched_code is None:
-            await PromoService._record_failed_attempt(
+            await record_failed_attempt(
                 user_id=user_id,
                 normalized_code_hash=code_hash,
                 result="INVALID",
@@ -96,20 +106,24 @@ class PromoService:
             )
             raise PromoInvalidError
 
-        existing_redemption = await PromoRepo.get_redemption_by_code_and_user_for_update(
+        previous_redemptions = await PromoRepo.list_redemptions_by_code_and_user_for_update(
             session,
             promo_code_id=matched_code.id,
             user_id=user_id,
         )
-        if existing_redemption is not None:
-            await PromoService._record_failed_attempt(
+        if not can_user_retry_promo(
+            redemptions=previous_redemptions,
+            max_uses_per_user=matched_code.max_uses_per_user,
+        ):
+            await record_failed_attempt(
                 user_id=user_id,
                 normalized_code_hash=code_hash,
                 result="NOT_APPLICABLE",
                 now_utc=now_utc,
                 metadata={
                     "reason": "ALREADY_USED",
-                    "redemption_id": str(existing_redemption.id),
+                    "max_uses_per_user": matched_code.max_uses_per_user,
+                    "previous_redemptions": len(previous_redemptions),
                 },
             )
             raise PromoAlreadyUsedError
@@ -117,7 +131,7 @@ class PromoService:
         if matched_code.status != "ACTIVE" or not (
             matched_code.valid_from <= now_utc < matched_code.valid_until
         ):
-            await PromoService._record_failed_attempt(
+            await record_failed_attempt(
                 user_id=user_id,
                 normalized_code_hash=code_hash,
                 result="EXPIRED",
@@ -128,7 +142,7 @@ class PromoService:
             matched_code.max_total_uses is not None
             and matched_code.used_total >= matched_code.max_total_uses
         ):
-            await PromoService._record_failed_attempt(
+            await record_failed_attempt(
                 user_id=user_id,
                 normalized_code_hash=code_hash,
                 result="EXPIRED",
@@ -142,7 +156,7 @@ class PromoService:
             purchase_count = await PurchasesRepo.count_by_user(session, user_id=user_id)
 
         if matched_code.new_users_only and purchase_count > 0:
-            await PromoService._record_failed_attempt(
+            await record_failed_attempt(
                 user_id=user_id,
                 normalized_code_hash=code_hash,
                 result="NOT_APPLICABLE",
@@ -151,7 +165,7 @@ class PromoService:
             )
             raise PromoNotApplicableError
         if matched_code.first_purchase_only and purchase_count > 0:
-            await PromoService._record_failed_attempt(
+            await record_failed_attempt(
                 user_id=user_id,
                 normalized_code_hash=code_hash,
                 result="NOT_APPLICABLE",
@@ -175,6 +189,9 @@ class PromoService:
                 validation_snapshot={
                     "promo_type": matched_code.promo_type,
                     "target_scope": matched_code.target_scope,
+                    "discount_type": resolve_discount_type(matched_code),
+                    "discount_value": resolve_discount_value(matched_code),
+                    "applicable_products": resolve_applicable_products(matched_code) or [],
                     "validated_at": now_utc.isoformat(),
                 },
                 created_at=now_utc,
@@ -198,7 +215,7 @@ class PromoService:
             matched_code.used_total += 1
             matched_code.updated_at = now_utc
 
-            await PromoService._record_attempt(
+            await record_attempt(
                 session,
                 user_id=user_id,
                 normalized_code_hash=code_hash,
@@ -215,7 +232,9 @@ class PromoService:
             )
 
         if matched_code.promo_type == "PERCENT_DISCOUNT":
-            if matched_code.discount_percent is None:
+            discount_type = resolve_discount_type(matched_code)
+            discount_value = resolve_discount_value(matched_code)
+            if discount_type is None:
                 raise PromoNotApplicableError
 
             reserved_until = now_utc + PROMO_DISCOUNT_RESERVATION_TTL
@@ -223,7 +242,7 @@ class PromoService:
             redemption.reserved_until = reserved_until
             redemption.updated_at = now_utc
 
-            await PromoService._record_attempt(
+            await record_attempt(
                 session,
                 user_id=user_id,
                 normalized_code_hash=code_hash,
@@ -235,9 +254,12 @@ class PromoService:
                 redemption_id=redemption.id,
                 result_type="PERCENT_DISCOUNT",
                 idempotent_replay=False,
+                discount_type=discount_type,
+                discount_value=discount_value,
                 discount_percent=matched_code.discount_percent,
                 reserved_until=reserved_until,
                 target_scope=matched_code.target_scope,
+                applicable_products=resolve_applicable_products(matched_code),
             )
 
         raise PromoInvalidError

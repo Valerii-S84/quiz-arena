@@ -41,7 +41,7 @@ async def list_codes(
     if status is not None:
         stmt = stmt.where(PromoCode.status == status)
     if campaign_name:
-        stmt = stmt.where(PromoCode.campaign_name == campaign_name)
+        stmt = stmt.where(PromoCode.campaign_name.ilike(f"%{campaign_name}%"))
     result = await session.execute(stmt)
     return list(result.scalars().all())
 

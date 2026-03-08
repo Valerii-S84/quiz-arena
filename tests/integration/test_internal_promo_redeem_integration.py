@@ -175,6 +175,14 @@ async def test_redeem_discount_returns_reservation_and_is_idempotent_for_same_ke
         assert redemption is not None
         assert redemption.reserved_until is not None
         assert redemption.reserved_until - redemption.updated_at == PROMO_DISCOUNT_RESERVATION_TTL
+        attempt = await session.scalar(
+            select(PromoAttempt)
+            .where(PromoAttempt.user_id == user_id)
+            .order_by(PromoAttempt.attempted_at.desc())
+            .limit(1)
+        )
+        assert attempt is not None
+        assert attempt.source == "API"
 
 
 @pytest.mark.asyncio
@@ -208,6 +216,115 @@ async def test_redeem_returns_conflict_when_same_code_used_with_new_idempotency_
     assert first_status == 200
     assert second_status == 409
     assert second_payload["detail"]["code"] == "E_PROMO_ALREADY_USED"
+
+
+@pytest.mark.asyncio
+async def test_redeem_allows_single_reattempt_after_expired_reservation() -> None:
+    now_utc = datetime.now(UTC)
+    user_id = await _create_user("promo-expired-retry")
+    promo_code = await _create_promo_code(
+        raw_code="RETRY-50",
+        promo_type="PERCENT_DISCOUNT",
+        grant_premium_days=None,
+        discount_percent=50,
+        target_scope="ENERGY_10",
+        now_utc=now_utc,
+    )
+
+    first_status, first_payload = await _post_redeem(
+        {
+            "user_id": user_id,
+            "promo_code": "RETRY-50",
+            "idempotency_key": "promo-retry-1",
+        }
+    )
+    assert first_status == 200
+
+    async with SessionLocal.begin() as session:
+        first_redemption = await session.get(PromoRedemption, UUID(first_payload["redemption_id"]))
+        assert first_redemption is not None
+        first_redemption.status = "EXPIRED"
+        first_redemption.reserved_until = now_utc - timedelta(minutes=1)
+        first_redemption.updated_at = now_utc
+
+    second_status, second_payload = await _post_redeem(
+        {
+            "user_id": user_id,
+            "promo_code": "RETRY-50",
+            "idempotency_key": "promo-retry-2",
+        }
+    )
+
+    assert second_status == 200
+    assert second_payload["redemption_id"] != first_payload["redemption_id"]
+
+    async with SessionLocal.begin() as session:
+        rows = (
+            await session.execute(
+                select(PromoRedemption).where(
+                    PromoRedemption.promo_code_id == promo_code.id,
+                    PromoRedemption.user_id == user_id,
+                )
+            )
+        ).scalars().all()
+    assert len(rows) == 2
+
+
+@pytest.mark.asyncio
+async def test_redeem_blocks_second_reattempt_after_two_expired_reservations() -> None:
+    now_utc = datetime.now(UTC)
+    user_id = await _create_user("promo-expired-retry-limit")
+    await _create_promo_code(
+        raw_code="RETRY-LIMIT",
+        promo_type="PERCENT_DISCOUNT",
+        grant_premium_days=None,
+        discount_percent=40,
+        target_scope="ENERGY_10",
+        now_utc=now_utc,
+    )
+
+    first_status, first_payload = await _post_redeem(
+        {
+            "user_id": user_id,
+            "promo_code": "RETRY-LIMIT",
+            "idempotency_key": "promo-retry-limit-1",
+        }
+    )
+    assert first_status == 200
+
+    async with SessionLocal.begin() as session:
+        first_redemption = await session.get(PromoRedemption, UUID(first_payload["redemption_id"]))
+        assert first_redemption is not None
+        first_redemption.status = "EXPIRED"
+        first_redemption.reserved_until = now_utc - timedelta(minutes=1)
+        first_redemption.updated_at = now_utc
+
+    second_status, second_payload = await _post_redeem(
+        {
+            "user_id": user_id,
+            "promo_code": "RETRY-LIMIT",
+            "idempotency_key": "promo-retry-limit-2",
+        }
+    )
+    assert second_status == 200
+
+    async with SessionLocal.begin() as session:
+        second_redemption = await session.get(PromoRedemption, UUID(second_payload["redemption_id"]))
+        assert second_redemption is not None
+        second_redemption.status = "EXPIRED"
+        second_redemption.reserved_until = now_utc - timedelta(minutes=1)
+        second_redemption.updated_at = now_utc
+
+    third_status, third_payload = await _post_redeem(
+        {
+            "user_id": user_id,
+            "promo_code": "RETRY-LIMIT",
+            "idempotency_key": "promo-retry-limit-3",
+        }
+    )
+
+    assert third_status == 409
+    assert third_payload["detail"]["code"] == "E_PROMO_ALREADY_USED"
 
 
 @pytest.mark.asyncio

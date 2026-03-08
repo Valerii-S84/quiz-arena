@@ -4,7 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from app.api.routes.admin.deps import AdminPrincipal, add_admin_noindex_header, get_pending_admin
+from app.api.routes.admin.deps import (
+    ALLOWED_ADMIN_ROLES,
+    AdminPrincipal,
+    add_admin_noindex_header,
+    get_pending_admin,
+    normalize_admin_role,
+)
 from app.core.config import Settings, get_settings
 from app.services.admin.auth import (
     ADMIN_ACCESS_COOKIE,
@@ -40,6 +46,13 @@ class SessionResponse(BaseModel):
     email: str
     role: str
     two_factor_verified: bool
+
+
+def _configured_admin_role(settings: Settings) -> str:
+    resolved_role = normalize_admin_role(settings.admin_role)
+    if resolved_role in ALLOWED_ADMIN_ROLES:
+        return resolved_role
+    return "admin"
 
 
 def _rate_limit_bucket(*, request: Request, settings: Settings) -> str:
@@ -92,13 +105,13 @@ async def login_admin(
         full_access_token = build_access_token(
             settings=settings,
             email=payload.email.lower(),
-            role="admin",
+            role=_configured_admin_role(settings),
             two_factor_verified=True,
         )
         full_refresh_token = build_refresh_token(
             settings=settings,
             email=payload.email.lower(),
-            role="admin",
+            role=_configured_admin_role(settings),
         )
         full_response = JSONResponse(content={"requires_2fa": False})
         add_admin_noindex_header(full_response)
@@ -113,6 +126,7 @@ async def login_admin(
     access_token = build_access_token(
         settings=settings,
         email=payload.email.lower(),
+        role=_configured_admin_role(settings),
         two_factor_verified=False,
     )
     response = JSONResponse(content={"requires_2fa": True})
@@ -193,7 +207,7 @@ async def refresh_session(
     add_admin_noindex_header(response)
     token = (request.cookies.get("qa_admin_refresh") or "").strip()
     payload = decode_refresh_token(settings=settings, token=token)
-    if payload is None or payload.role != "admin":
+    if payload is None or normalize_admin_role(payload.role) not in ALLOWED_ADMIN_ROLES:
         raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
     if settings.admin_2fa_required and not payload.two_factor_verified:
         raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
@@ -238,7 +252,7 @@ async def get_session(
     settings: Settings = Depends(get_settings),
 ) -> SessionResponse:
     add_admin_noindex_header(response)
-    if principal.role != "admin":
+    if normalize_admin_role(principal.role) not in ALLOWED_ADMIN_ROLES:
         raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
     if settings.admin_2fa_required and not principal.two_factor_verified:
         raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})

@@ -4,7 +4,7 @@ from app.db.repo.purchases_repo import PurchasesRepo
 
 from .builder import _as_init_result, _build_purchase
 from .constants import PREMIUM_PLAN_RANKS, PROMO_RESERVATION_TTL, STREAK_SAVER_PURCHASE_LOCK_WINDOW
-from .credit import apply_successful_payment
+from .credit import apply_successful_payment, apply_zero_cost_purchase
 from .entitlements import _apply_premium_entitlement
 from .events import _emit_purchase_event
 from .init import init_purchase
@@ -44,6 +44,7 @@ class PurchaseService:
     mark_invoice_sent = staticmethod(mark_invoice_sent)
     validate_precheckout = staticmethod(validate_precheckout)
     apply_successful_payment = staticmethod(apply_successful_payment)
+    apply_zero_cost_purchase = staticmethod(apply_zero_cost_purchase)
     refund_purchase = staticmethod(refund_purchase)
 
 

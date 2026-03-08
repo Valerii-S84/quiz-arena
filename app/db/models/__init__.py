@@ -1,6 +1,5 @@
 from app.db.models.admin_audit_log import AdminAuditLog
-from app.db.models.admin_promo_code_usages import AdminPromoCodeUsage
-from app.db.models.admin_promo_codes import AdminPromoCode
+from app.db.models.admins import Admin
 from app.db.models.analytics_daily import AnalyticsDaily
 from app.db.models.analytics_events import AnalyticsEvent
 from app.db.models.contact_requests import ContactRequest
@@ -19,6 +18,7 @@ from app.db.models.outbox_events import OutboxEvent
 from app.db.models.processed_updates import ProcessedUpdate
 from app.db.models.promo_attempts import PromoAttempt
 from app.db.models.promo_code_batches import PromoCodeBatch
+from app.db.models.promo_audit_log import PromoAuditLog
 from app.db.models.promo_codes import PromoCode
 from app.db.models.promo_redemptions import PromoRedemption
 from app.db.models.purchases import Purchase
@@ -36,8 +36,7 @@ from app.db.models.users import User
 
 __all__ = [
     "AdminAuditLog",
-    "AdminPromoCode",
-    "AdminPromoCodeUsage",
+    "Admin",
     "AnalyticsDaily",
     "AnalyticsEvent",
     "ContactRequest",
@@ -55,6 +54,7 @@ __all__ = [
     "OutboxEvent",
     "ProcessedUpdate",
     "PromoAttempt",
+    "PromoAuditLog",
     "PromoCode",
     "PromoCodeBatch",
     "PromoRedemption",

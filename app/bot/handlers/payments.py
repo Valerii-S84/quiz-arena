@@ -70,6 +70,19 @@ def _parse_buy_callback_data(callback_data: str) -> tuple[str, UUID | None, int 
     raise ValueError("invalid buy callback")
 
 
+def _success_text_key(product_code: str) -> str:
+    return {
+        "ENERGY_10": "msg.purchase.success.energy10",
+        "FRIEND_CHALLENGE_5": "msg.purchase.success.friend_challenge_ticket",
+        "MEGA_PACK_15": "msg.purchase.success.megapack",
+        "STREAK_SAVER_20": "msg.purchase.success.streaksaver",
+        "PREMIUM_STARTER": "msg.purchase.success.premium",
+        "PREMIUM_MONTH": "msg.purchase.success.premium",
+        "PREMIUM_SEASON": "msg.purchase.success.premium",
+        "PREMIUM_YEAR": "msg.purchase.success.premium",
+    }.get(product_code, "msg.purchase.success.energy10")
+
+
 @router.callback_query(F.data.startswith("buy:"))
 async def handle_buy(callback: CallbackQuery) -> None:
     if callback.data is None or callback.from_user is None:
@@ -123,6 +136,35 @@ async def handle_buy(callback: CallbackQuery) -> None:
         return
     except (ProductNotFoundError, PurchaseInitValidationError):
         await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)
+        return
+
+    if init_result.final_stars_amount == 0:
+        try:
+            async with SessionLocal.begin() as session:
+                snapshot = await UserOnboardingService.ensure_home_snapshot(
+                    session,
+                    telegram_user=callback.from_user,
+                )
+                await PurchaseService.apply_zero_cost_purchase(
+                    session,
+                    purchase_id=init_result.purchase_id,
+                    user_id=snapshot.user_id,
+                    now_utc=now_utc,
+                )
+        except (
+            PurchaseNotFoundError,
+            ProductNotFoundError,
+            PurchasePrecheckoutValidationError,
+        ):
+            await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)
+            return
+
+        if callback.message is not None:
+            await callback.message.answer(
+                TEXTS_DE[_success_text_key(product_code)],
+                reply_markup=build_home_keyboard(),
+            )
+        await callback.answer()
         return
 
     try:
@@ -228,15 +270,7 @@ async def handle_successful_payment(message: Message) -> None:
         )
         return
 
-    text_key = {
-        "ENERGY_10": "msg.purchase.success.energy10",
-        "FRIEND_CHALLENGE_5": "msg.purchase.success.friend_challenge_ticket",
-        "MEGA_PACK_15": "msg.purchase.success.megapack",
-        "STREAK_SAVER_20": "msg.purchase.success.streaksaver",
-        "PREMIUM_STARTER": "msg.purchase.success.premium",
-        "PREMIUM_MONTH": "msg.purchase.success.premium",
-        "PREMIUM_SEASON": "msg.purchase.success.premium",
-        "PREMIUM_YEAR": "msg.purchase.success.premium",
-    }.get(credit_result.product_code, "msg.purchase.success.energy10")
-
-    await message.answer(TEXTS_DE[text_key], reply_markup=build_home_keyboard())
+    await message.answer(
+        TEXTS_DE[_success_text_key(credit_result.product_code)],
+        reply_markup=build_home_keyboard(),
+    )

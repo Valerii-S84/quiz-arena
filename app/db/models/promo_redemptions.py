@@ -10,7 +10,6 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     String,
-    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -27,7 +26,6 @@ class PromoRedemption(Base):
             "status IN ('CREATED','VALIDATED','RESERVED','APPLIED','EXPIRED','REJECTED','REVOKED')",
             name="ck_promo_redemptions_status",
         ),
-        UniqueConstraint("promo_code_id", "user_id", name="uq_promo_redemptions_code_user"),
         Index("idx_promo_redemptions_code", "promo_code_id"),
         Index("idx_promo_redemptions_user", "user_id"),
         Index("idx_promo_redemptions_reserved_until", "reserved_until"),

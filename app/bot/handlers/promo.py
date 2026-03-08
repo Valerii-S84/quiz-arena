@@ -8,6 +8,7 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
+from app.bot.promo_labels import get_promo_product_label
 from app.bot.keyboards.promo import build_promo_discount_keyboard
 from app.bot.keyboards.shop import build_shop_keyboard
 from app.bot.texts.de import TEXTS_DE
@@ -22,7 +23,6 @@ from app.economy.promo.errors import (
     PromoRateLimitedError,
 )
 from app.economy.promo.service import PromoService
-from app.economy.purchases.catalog import get_product
 from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="promo")
@@ -36,7 +36,13 @@ def _format_berlin_time(at_utc: datetime | None) -> str:
     return at_utc.astimezone(ZoneInfo(BERLIN_TIMEZONE)).strftime("%d.%m %H:%M")
 
 
-def _resolve_scope_label(target_scope: str | None) -> str:
+def _resolve_scope_label(target_scope: str | None, *, applicable_products: list[str] | None) -> str:
+    if applicable_products:
+        if len(applicable_products) == 1:
+            product_label = get_promo_product_label(applicable_products[0])
+            if product_label is not None:
+                return product_label
+        return "ausgewaehlte Produkte"
     if target_scope is None:
         return "deine Auswahl"
     if target_scope == "ANY":
@@ -45,10 +51,18 @@ def _resolve_scope_label(target_scope: str | None) -> str:
         return "Mikro-Pakete"
     if target_scope == "PREMIUM_ANY":
         return "Premium-Plaene"
-    product = get_product(target_scope)
-    if product is not None:
-        return product.title
+    product_label = get_promo_product_label(target_scope)
+    if product_label is not None:
+        return product_label
     return target_scope
+
+
+def _resolve_discount_label(result) -> str:
+    if result.discount_type == "FREE":
+        return "kostenlos"
+    if result.discount_type == "FIXED":
+        return f"{result.discount_value or 0}⭐ Rabatt"
+    return f"{result.discount_value or result.discount_percent or 0}% Rabatt"
 
 
 def _is_reply_to_promo_prompt(message: Message) -> bool:
@@ -81,6 +95,15 @@ def _extract_promo_code(message: Message) -> str | None:
         return text
 
     return None
+
+
+def _resolve_attempt_source(message: Message) -> str:
+    text = (message.text or "").strip()
+    if PROMO_INPUT_RE.match(text) is not None:
+        return "COMMAND"
+    if _is_reply_to_promo_prompt(message):
+        return "BUTTON"
+    return "COMMAND"
 
 
 async def _prompt_for_promo_input(message: Message) -> None:
@@ -134,6 +157,7 @@ async def _redeem_promo_from_text(message: Message) -> None:
                 user_id=snapshot.user_id,
                 promo_code=promo_code,
                 idempotency_key=f"promo:{snapshot.user_id}:{message.message_id}",
+                source=_resolve_attempt_source(message),
                 now_utc=now_utc,
             )
     except PromoInvalidError:
@@ -176,16 +200,28 @@ async def _redeem_promo_from_text(message: Message) -> None:
     discount_keyboard = build_promo_discount_keyboard(
         redemption_id=result.redemption_id,
         target_scope=result.target_scope,
-        discount_percent=result.discount_percent,
+        discount_type=result.discount_type,
+        discount_value=result.discount_value,
+        applicable_products=result.applicable_products,
     )
+    if discount_keyboard is None:
+        await message.answer(
+            TEXTS_DE["msg.promo.discount.unavailable"],
+            reply_markup=build_shop_keyboard(),
+        )
+        return
+
     await message.answer(
         TEXTS_DE["msg.promo.success.discount"],
-        reply_markup=discount_keyboard or build_shop_keyboard(),
+        reply_markup=discount_keyboard,
     )
     await message.answer(
         TEXTS_DE["msg.promo.success.discount.details"].format(
-            discount_percent=result.discount_percent or 0,
-            scope_label=_resolve_scope_label(result.target_scope),
+            discount_label=_resolve_discount_label(result),
+            scope_label=_resolve_scope_label(
+                result.target_scope,
+                applicable_products=result.applicable_products,
+            ),
             reserved_until=_format_berlin_time(result.reserved_until),
         )
     )

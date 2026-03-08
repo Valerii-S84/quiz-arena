@@ -18,7 +18,28 @@ from app.economy.purchases.errors import (
 )
 
 from .constants import PROMO_RESERVATION_TTL, STREAK_SAVER_PURCHASE_LOCK_WINDOW
-from .utilities import _calculate_discount_amount, _is_promo_scope_applicable
+from .utilities import _calculate_discount_amount_for_promo, _is_promo_scope_applicable
+
+
+async def _ensure_discount_capacity_available(
+    session: AsyncSession,
+    *,
+    promo_code: PromoCode,
+    redemption_id: UUID,
+    now_utc: datetime,
+    error_type: type[Exception],
+) -> None:
+    if promo_code.max_total_uses is None:
+        return
+
+    reserved_total = await PromoRepo.count_active_reserved_redemptions(
+        session,
+        promo_code_id=promo_code.id,
+        now_utc=now_utc,
+        exclude_redemption_id=redemption_id,
+    )
+    if promo_code.used_total + reserved_total >= promo_code.max_total_uses:
+        raise error_type
 
 
 async def _validate_streak_saver_purchase_limit(
@@ -61,20 +82,25 @@ async def _validate_and_reserve_discount_redemption(
     promo_code = await PromoRepo.get_code_by_id_for_update(session, redemption.promo_code_id)
     if promo_code is None:
         raise PurchaseInitValidationError
-    if promo_code.promo_type != "PERCENT_DISCOUNT" or promo_code.discount_percent is None:
+    if promo_code.promo_type != "PERCENT_DISCOUNT":
         raise PurchaseInitValidationError
     if promo_code.status != "ACTIVE":
         raise PurchaseInitValidationError
     if not (promo_code.valid_from <= now_utc < promo_code.valid_until):
         raise PurchaseInitValidationError
-    if not _is_promo_scope_applicable(promo_code.target_scope, product=product):
+    if not _is_promo_scope_applicable(promo_code, product=product):
         raise PurchaseInitValidationError
-    if promo_code.max_total_uses is not None and promo_code.used_total >= promo_code.max_total_uses:
-        raise PurchaseInitValidationError
+    await _ensure_discount_capacity_available(
+        session,
+        promo_code=promo_code,
+        redemption_id=redemption.id,
+        now_utc=now_utc,
+        error_type=PurchaseInitValidationError,
+    )
 
-    discount_stars_amount = _calculate_discount_amount(
+    discount_stars_amount = _calculate_discount_amount_for_promo(
         product.stars_amount,
-        promo_code.discount_percent,
+        promo_code=promo_code,
     )
     redemption.status = "RESERVED"
     redemption.reserved_until = now_utc + PROMO_RESERVATION_TTL
@@ -110,5 +136,12 @@ async def _validate_reserved_discount_for_purchase(
         raise PurchasePrecheckoutValidationError
     if not (promo_code.valid_from <= now_utc < promo_code.valid_until):
         raise PurchasePrecheckoutValidationError
+    await _ensure_discount_capacity_available(
+        session,
+        promo_code=promo_code,
+        redemption_id=redemption.id,
+        now_utc=now_utc,
+        error_type=PurchasePrecheckoutValidationError,
+    )
 
     return redemption, promo_code

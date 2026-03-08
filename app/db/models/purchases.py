@@ -29,14 +29,14 @@ class Purchase(Base):
         ),
         CheckConstraint("base_stars_amount > 0", name="ck_purchases_base_amount_positive"),
         CheckConstraint("discount_stars_amount >= 0", name="ck_purchases_discount_non_negative"),
-        CheckConstraint("stars_amount > 0", name="ck_purchases_stars_amount_positive"),
+        CheckConstraint("stars_amount >= 0", name="ck_purchases_stars_amount_non_negative"),
         CheckConstraint(
             "status IN ('CREATED','INVOICE_SENT','PRECHECKOUT_OK','PAID_UNCREDITED','CREDITED',"
             "'FAILED','FAILED_CREDIT_PENDING_REVIEW','REFUNDED')",
             name="ck_purchases_status",
         ),
         CheckConstraint(
-            "stars_amount = GREATEST(1, base_stars_amount - discount_stars_amount)",
+            "stars_amount = GREATEST(0, base_stars_amount - discount_stars_amount)",
             name="ck_purchases_final_amount",
         ),
         Index("idx_purchases_user_created", "user_id", "created_at"),

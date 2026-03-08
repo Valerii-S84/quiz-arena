@@ -119,3 +119,12 @@ Verify freshness (CI uses this):
 ```bash
 make check-quizbank-reports
 ```
+
+## 8. Promo surfaces
+
+- `/admin/promo` is the canonical operator surface for promo CRUD:
+  create, edit, activate/deactivate, bulk generation, stats, audit, revoke.
+- `/ops/promo` stays monitoring-only for incident response and rollback checks.
+  Do not add create/edit flows there; promo management belongs in `/admin/promo`.
+- Operator-driven promo redemption cancellation uses status `REVOKED`.
+  This is the final runtime/database term and replaces earlier draft wording such as `CANCELLED`.

@@ -118,10 +118,45 @@ async def get_redemption_by_code_and_user_for_update(
             PromoRedemption.promo_code_id == promo_code_id,
             PromoRedemption.user_id == user_id,
         )
+        .order_by(PromoRedemption.updated_at.desc(), PromoRedemption.id.desc())
+        .limit(1)
         .with_for_update()
     )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def list_redemptions_by_code_and_user_for_update(
+    session: AsyncSession,
+    *,
+    promo_code_id: int,
+    user_id: int,
+) -> list[PromoRedemption]:
+    stmt = (
+        select(PromoRedemption)
+        .where(
+            PromoRedemption.promo_code_id == promo_code_id,
+            PromoRedemption.user_id == user_id,
+        )
+        .order_by(PromoRedemption.updated_at.desc(), PromoRedemption.id.desc())
+        .with_for_update()
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def count_redemptions_by_code_and_user(
+    session: AsyncSession,
+    *,
+    promo_code_id: int,
+    user_id: int,
+) -> int:
+    stmt = select(func.count(PromoRedemption.id)).where(
+        PromoRedemption.promo_code_id == promo_code_id,
+        PromoRedemption.user_id == user_id,
+    )
+    result = await session.execute(stmt)
+    return int(result.scalar_one() or 0)
 
 
 async def create_redemption(
@@ -130,6 +165,26 @@ async def create_redemption(
     session.add(redemption)
     await session.flush()
     return redemption
+
+
+async def count_active_reserved_redemptions(
+    session: AsyncSession,
+    *,
+    promo_code_id: int,
+    now_utc: datetime,
+    exclude_redemption_id: UUID | None = None,
+) -> int:
+    stmt = select(func.count(PromoRedemption.id)).where(
+        PromoRedemption.promo_code_id == promo_code_id,
+        PromoRedemption.status == "RESERVED",
+        PromoRedemption.reserved_until.is_not(None),
+        PromoRedemption.reserved_until > now_utc,
+    )
+    if exclude_redemption_id is not None:
+        stmt = stmt.where(PromoRedemption.id != exclude_redemption_id)
+
+    result = await session.execute(stmt)
+    return int(result.scalar_one() or 0)
 
 
 async def expire_reserved_redemptions(session: AsyncSession, *, now_utc: datetime) -> int:
