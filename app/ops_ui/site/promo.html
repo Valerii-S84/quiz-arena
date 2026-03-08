@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,20 +7,21 @@
     <link rel="stylesheet" href="/ops/static/ops-ui.css" />
   </head>
   <body data-page="promo">
+    <!-- Monitoring-only surface: promo CRUD lives in /admin/promo. -->
     <div class="background-grid" aria-hidden="true"></div>
     <header class="topbar">
       <div>
         <p class="eyebrow">Quiz Arena</p>
-        <h1>Promo Ops Console</h1>
+        <h1>Promo-Konsole</h1>
       </div>
       <div class="topbar-actions">
-        <nav class="tabs" aria-label="Ops sections">
+        <nav class="tabs" aria-label="Ops-Bereiche">
           <a class="tab active" href="/ops/promo">Promo</a>
           <a class="tab" href="/ops/referrals">Referrals</a>
           <a class="tab" href="/ops/notifications">Notifications</a>
         </nav>
         <form method="post" action="/ops/logout" class="logout-form">
-          <button class="ghost" type="submit">Sign Out</button>
+          <button class="ghost" type="submit">Abmelden</button>
         </form>
       </div>
     </header>
@@ -28,11 +29,11 @@
     <main class="layout">
       <section class="panel">
         <div class="panel-head">
-          <h2>Promo Dashboard</h2>
+          <h2>Promo-Uebersicht</h2>
           <div class="inline-controls">
-            <label for="promo-window-hours">Window</label>
+            <label for="promo-window-hours">Zeitraum</label>
             <input id="promo-window-hours" type="number" min="1" max="168" value="24" />
-            <button id="promo-refresh-dashboard" type="button">Refresh</button>
+            <button id="promo-refresh-dashboard" type="button">Aktualisieren</button>
           </div>
         </div>
         <div id="promo-dashboard-cards" class="cards"></div>
@@ -40,21 +41,21 @@
 
       <section class="panel">
         <div class="panel-head">
-          <h2>Campaigns</h2>
+          <h2>Kampagnen</h2>
           <div class="inline-controls wrap">
             <label for="promo-campaign-status">Status</label>
             <select id="promo-campaign-status">
-              <option value="">ALL</option>
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="PAUSED">PAUSED</option>
-              <option value="EXPIRED">EXPIRED</option>
-              <option value="DEPLETED">DEPLETED</option>
+              <option value="">ALLE</option>
+              <option value="ACTIVE">Aktiv</option>
+              <option value="PAUSED">Pausiert</option>
+              <option value="EXPIRED">Abgelaufen</option>
+              <option value="DEPLETED">Aufgebraucht</option>
             </select>
-            <label for="promo-campaign-name">Campaign</label>
-            <input id="promo-campaign-name" type="text" maxlength="128" placeholder="campaign substring" />
+            <label for="promo-campaign-name">Kampagne</label>
+            <input id="promo-campaign-name" type="text" maxlength="128" placeholder="Suche in Kampagnennamen" title="Suche nach einem Teil des Kampagnennamens" />
             <label for="promo-campaign-limit">Limit</label>
             <input id="promo-campaign-limit" type="number" min="1" max="200" value="50" />
-            <button id="promo-refresh-campaigns" type="button">Load</button>
+            <button id="promo-refresh-campaigns" type="button">Laden</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -62,13 +63,13 @@
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Campaign</th>
-                <th>Type</th>
+                <th>Kampagne</th>
+                <th>Typ</th>
                 <th>Status</th>
-                <th>Scope</th>
-                <th>Uses</th>
-                <th>Valid Until</th>
-                <th>Action</th>
+                <th>Bereich</th>
+                <th>Nutzungen</th>
+                <th>Gueltig bis</th>
+                <th>Aktion</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -77,13 +78,13 @@
       </section>
 
       <section class="panel">
-        <h2>Refund Rollback</h2>
+        <h2>Rollback nach Erstattung</h2>
         <div class="inline-controls wrap">
-          <label for="promo-purchase-id">Purchase UUID</label>
+          <label for="promo-purchase-id">Kauf-UUID</label>
           <input id="promo-purchase-id" type="text" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
-          <label for="promo-rollback-reason">Reason</label>
-          <input id="promo-rollback-reason" type="text" maxlength="256" placeholder="Optional reason" />
-          <button id="promo-run-rollback" type="button">Run Rollback</button>
+          <label for="promo-rollback-reason">Grund</label>
+          <input id="promo-rollback-reason" type="text" maxlength="256" placeholder="Optionaler Grund" />
+          <button id="promo-run-rollback" type="button">Rollback starten</button>
         </div>
         <pre id="promo-rollback-result" class="json-view"></pre>
       </section>

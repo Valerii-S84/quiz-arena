@@ -42,7 +42,7 @@ def test_ops_promo_page_is_served_for_allowed_ip(monkeypatch) -> None:
     )
 
     assert response.status_code == 200
-    assert "Promo Ops Console" in response.text
+    assert "Promo-Konsole" in response.text
 
 
 def test_ops_page_redirects_to_login_when_token_missing(monkeypatch) -> None:
@@ -83,7 +83,7 @@ def test_ops_login_creates_session_cookie(monkeypatch) -> None:
 
     response = client.get("/ops/promo", headers={"X-Forwarded-For": "127.0.0.1"})
     assert response.status_code == 200
-    assert "Promo Ops Console" in response.text
+    assert "Promo-Konsole" in response.text
 
 
 def test_ops_login_rejects_cross_origin_post(monkeypatch) -> None:

@@ -7,6 +7,8 @@ from app.core.integration_db_safety import assert_safe_integration_db
 from app.db.session import engine
 
 TRUNCATE_TABLES = (
+    "promo_audit_log",
+    "admins",
     "promo_attempts",
     "promo_redemptions",
     "contact_requests",

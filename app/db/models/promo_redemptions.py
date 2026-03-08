@@ -3,16 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import (
-    BigInteger,
-    CheckConstraint,
-    DateTime,
-    ForeignKey,
-    Index,
-    String,
-    UniqueConstraint,
-    text,
-)
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -27,7 +18,6 @@ class PromoRedemption(Base):
             "status IN ('CREATED','VALIDATED','RESERVED','APPLIED','EXPIRED','REJECTED','REVOKED')",
             name="ck_promo_redemptions_status",
         ),
-        UniqueConstraint("promo_code_id", "user_id", name="uq_promo_redemptions_code_user"),
         Index("idx_promo_redemptions_code", "promo_code_id"),
         Index("idx_promo_redemptions_user", "user_id"),
         Index("idx_promo_redemptions_reserved_until", "reserved_until"),

@@ -155,6 +155,16 @@ async def test_daily_cup_round_2_and_3_question_level_mix(monkeypatch) -> None:
     tournament_id = await _create_daily_cup_registration_tournament(now_utc=now_utc)
     await _join_users(tournament_id=tournament_id, user_ids=user_ids, now_utc=now_utc)
 
+    monkeypatch.setattr(
+        daily_cup_async,
+        "enqueue_daily_cup_round_messaging",
+        lambda *, tournament_id, enqueue_completion_followups=False: None,
+    )
+    monkeypatch.setattr(
+        daily_cup_rounds,
+        "enqueue_daily_cup_round_messaging",
+        lambda *, tournament_id, enqueue_completion_followups=False: None,
+    )
     monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
     await daily_cup_async.close_daily_cup_registration_and_start_async()
 

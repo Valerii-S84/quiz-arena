@@ -113,12 +113,22 @@ def test_critical_constraints_present() -> None:
     assert "uq_entitlements_active_premium_per_user" in entitlements_indexes
 
     promo_redemptions = Base.metadata.tables["promo_redemptions"]
+    promo_redemptions_check_names = {
+        constraint.name
+        for constraint in promo_redemptions.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    assert "ck_promo_redemptions_status" in promo_redemptions_check_names
+    promo_redemptions_indexes = {index.name for index in promo_redemptions.indexes}
+    assert "idx_promo_redemptions_code" in promo_redemptions_indexes
+    assert "idx_promo_redemptions_user" in promo_redemptions_indexes
+    assert "idx_promo_redemptions_reserved_until" in promo_redemptions_indexes
     promo_unique_constraints = {
         constraint.name
         for constraint in promo_redemptions.constraints
         if isinstance(constraint, UniqueConstraint)
     }
-    assert "uq_promo_redemptions_code_user" in promo_unique_constraints
+    assert "uq_promo_redemptions_code_user" not in promo_unique_constraints
 
     outbox_events = Base.metadata.tables["outbox_events"]
     outbox_indexes = {index.name for index in outbox_events.indexes}

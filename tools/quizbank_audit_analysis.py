@@ -12,6 +12,7 @@ from quizbank_audit_constants import (
     TEXT_CHECK_COLUMNS,
 )
 from quizbank_audit_io import TableData, normalize, parse_date
+from quizbank_report_paths import report_path
 
 
 def pick(row: dict[str, Any], column: str) -> Any:
@@ -176,7 +177,7 @@ def audit_table(path: Path, data: TableData) -> dict[str, Any]:
         readiness = "needs_fix"
 
     return {
-        "file": str(path),
+        "file": report_path(path),
         "parser": data.parser,
         "warnings": data.warnings,
         "row_count": len(rows),

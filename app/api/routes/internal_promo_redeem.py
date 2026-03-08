@@ -35,6 +35,7 @@ async def redeem_promo(
                 user_id=payload.user_id,
                 promo_code=payload.promo_code,
                 idempotency_key=payload.idempotency_key,
+                source="API",
                 now_utc=now_utc,
             )
     except (PromoInvalidError, PromoUserNotFoundError) as exc:

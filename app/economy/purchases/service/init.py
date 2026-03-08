@@ -73,13 +73,30 @@ async def init_purchase(
             if next_rank <= active_rank:
                 raise PremiumDowngradeNotAllowedError
 
-    active_invoice = await PurchasesRepo.get_active_invoice_for_user_product(
+    active_invoice = await PurchasesRepo.get_active_invoice_for_user_product_for_update(
         session,
         user_id=user_id,
         product_code=product.product_code,
     )
     if active_invoice is not None:
-        return _as_init_result(active_invoice, idempotent_replay=True)
+        if (
+            promo_redemption_id is not None
+            and active_invoice.applied_promo_code_id != applied_promo_code_id
+        ):
+            active_invoice.status = "FAILED"
+            if active_invoice.applied_promo_code_id is not None:
+                active_redemption = (
+                    await PromoRepo.get_redemption_by_applied_purchase_id_for_update(
+                        session,
+                        active_invoice.id,
+                    )
+                )
+                if active_redemption is not None and active_redemption.status == "RESERVED":
+                    active_redemption.status = "EXPIRED"
+                    active_redemption.reserved_until = now_utc
+                    active_redemption.updated_at = now_utc
+        else:
+            return _as_init_result(active_invoice, idempotent_replay=True)
 
     try:
         purchase = await PurchasesRepo.create(
@@ -95,7 +112,7 @@ async def init_purchase(
             created_at=now_utc,
         )
     except IntegrityError:
-        active_invoice = await PurchasesRepo.get_active_invoice_for_user_product(
+        active_invoice = await PurchasesRepo.get_active_invoice_for_user_product_for_update(
             session,
             user_id=user_id,
             product_code=product.product_code,

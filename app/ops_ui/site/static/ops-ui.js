@@ -45,6 +45,69 @@
     }, 2600);
   }
 
+  function promoTypeLabel(value) {
+    if (value === "PERCENT_DISCOUNT") {
+      return "Prozent-Rabatt";
+    }
+    if (value === "PREMIUM_GRANT") {
+      return "Premium-Tage";
+    }
+    return String(value || "-");
+  }
+
+  function promoStatusLabel(value) {
+    if (value === "ACTIVE") {
+      return "Aktiv";
+    }
+    if (value === "PAUSED") {
+      return "Pausiert";
+    }
+    if (value === "EXPIRED") {
+      return "Abgelaufen";
+    }
+    if (value === "DEPLETED") {
+      return "Aufgebraucht";
+    }
+    return String(value || "-");
+  }
+
+  function promoScopeLabel(value) {
+    if (value === "ANY") {
+      return "Alle Produkte";
+    }
+    if (value === "MICRO_ANY") {
+      return "Mikro-Pakete";
+    }
+    if (value === "PREMIUM_ANY") {
+      return "Premium-Plaene";
+    }
+    if (value === "ENERGY_10") {
+      return "+10 Energie";
+    }
+    if (value === "MEGA_PACK_15") {
+      return "Mega-Paket";
+    }
+    if (value === "STREAK_SAVER_20") {
+      return "Serien-Schutz";
+    }
+    if (value === "FRIEND_CHALLENGE_5") {
+      return "Duell-Ticket";
+    }
+    if (value === "PREMIUM_STARTER") {
+      return "Premium Start";
+    }
+    if (value === "PREMIUM_MONTH") {
+      return "Premium Monat";
+    }
+    if (value === "PREMIUM_SEASON") {
+      return "Premium Saison";
+    }
+    if (value === "PREMIUM_YEAR") {
+      return "Premium Jahr";
+    }
+    return String(value || "-");
+  }
+
   function buildQuery(params) {
     const search = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
@@ -146,17 +209,17 @@
       try {
         const data = await api(`/internal/promo/dashboard${buildQuery({ window_hours: dashboardWindow.value })}`);
         renderCards(dashboardCards, [
-          { label: "Attempts", value: safeNum(data.attempts_total) },
-          { label: "Acceptance", value: pct(data.acceptance_rate) },
-          { label: "Failure", value: pct(data.failure_rate) },
-          { label: "Applied redemptions", value: safeNum(data.redemptions_applied) },
-          { label: "Discount conversion", value: pct(data.discount_conversion_rate) },
-          { label: "Guard hashes", value: safeNum(data.guard_trigger_hashes) },
-          { label: "Active campaigns", value: safeNum(data.active_campaigns_total) },
-          { label: "Paused campaigns", value: safeNum(data.paused_campaigns_total) },
+          { label: "Versuche", value: safeNum(data.attempts_total) },
+          { label: "Akzeptanz", value: pct(data.acceptance_rate) },
+          { label: "Fehlerquote", value: pct(data.failure_rate) },
+          { label: "Eingeloeste Einloesungen", value: safeNum(data.redemptions_applied) },
+          { label: "Rabatt-Konversion", value: pct(data.discount_conversion_rate) },
+          { label: "Ausgeloeste Schutz-Hashes", value: safeNum(data.guard_trigger_hashes) },
+          { label: "Aktive Kampagnen", value: safeNum(data.active_campaigns_total) },
+          { label: "Pausierte Kampagnen", value: safeNum(data.paused_campaigns_total) },
         ]);
       } catch (error) {
-        showFlash(`Dashboard error: ${error.message}`, "err");
+        showFlash(`Fehler beim Laden der Uebersicht: ${error.message}`, "err");
       }
     }
 
@@ -180,9 +243,9 @@
           const fields = [
             row.id,
             row.campaign_name,
-            row.promo_type,
-            row.status,
-            row.target_scope,
+            promoTypeLabel(row.promo_type),
+            promoStatusLabel(row.status),
+            promoScopeLabel(row.target_scope),
             `${safeNum(row.used_total)} / ${maxUses}`,
             iso(row.valid_until),
           ];
@@ -197,10 +260,14 @@
           if (row.status === "ACTIVE" || row.status === "PAUSED") {
             const desired = row.status === "ACTIVE" ? "PAUSED" : "ACTIVE";
             const button = createActionButton({
-              label: desired === "PAUSED" ? "Pause" : "Activate",
+              label: desired === "PAUSED" ? "Pausieren" : "Aktivieren",
               className: desired === "PAUSED" ? "warn" : "ok",
               onClick: async () => {
-                const reason = window.prompt(`Reason for switching to ${desired}? (optional)`, "") || "";
+                const reason =
+                  window.prompt(
+                    `Grund fuer Wechsel zu ${promoStatusLabel(desired)}? (optional)`,
+                    ""
+                  ) || "";
                 try {
                   await api(`/internal/promo/campaigns/${row.id}/status`, {
                     method: "POST",
@@ -210,11 +277,11 @@
                       expected_current_status: row.status,
                     },
                   });
-                  showFlash(`Campaign ${row.id} -> ${desired}`, "ok");
+                  showFlash(`Kampagne ${row.id} -> ${promoStatusLabel(desired)}`, "ok");
                   await loadCampaigns();
                   await loadDashboard();
                 } catch (error) {
-                  showFlash(`Status update failed: ${error.message}`, "err");
+                  showFlash(`Status-Update fehlgeschlagen: ${error.message}`, "err");
                 }
               },
             });
@@ -227,14 +294,14 @@
           campaignTbody.appendChild(tr);
         });
       } catch (error) {
-        showFlash(`Campaigns error: ${error.message}`, "err");
+        showFlash(`Fehler beim Laden der Kampagnen: ${error.message}`, "err");
       }
     }
 
     async function runRollback() {
       const purchaseId = rollbackPurchaseId.value.trim();
       if (!purchaseId) {
-        showFlash("Purchase UUID is required", "err");
+        showFlash("Kauf-UUID ist erforderlich", "err");
         return;
       }
       try {
@@ -246,10 +313,10 @@
           },
         });
         renderJson(rollbackResult, data);
-        showFlash("Rollback completed", "ok");
+        showFlash("Rollback abgeschlossen", "ok");
       } catch (error) {
         renderJson(rollbackResult, { error: error.message });
-        showFlash(`Rollback failed: ${error.message}`, "err");
+        showFlash(`Rollback fehlgeschlagen: ${error.message}`, "err");
       }
     }
 
