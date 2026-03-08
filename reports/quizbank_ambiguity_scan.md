@@ -1,6 +1,6 @@
 # QuizBank Duplicate & Ambiguity Scan
 
-- Generated at: `2026-03-08T15:14:05.809633+00:00`
+- Generated at: `2026-03-08T16:25:19.716985+00:00`
 - Files scanned: `19`
 
 | File | Rows | Exact duplicate groups | Exact conflict groups | Signature conflict groups | Fuzzy conflicts | Same-row candidates | Template repeat groups |

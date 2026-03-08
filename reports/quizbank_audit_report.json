@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-08T15:14:03.724375+00:00",
+  "generated_at": "2026-03-08T16:25:18.101811+00:00",
   "input_dir": "QuizBank",
   "summary": {
     "file_count": 19,
@@ -13,7 +13,7 @@
   },
   "files": [
     {
-      "file": "QuizBank\\Adjektivendungen_Beginner_Bank_A1_A2_210.csv",
+      "file": "QuizBank/Adjektivendungen_Beginner_Bank_A1_A2_210.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -174,7 +174,7 @@
       }
     },
     {
-      "file": "QuizBank\\Akkusativ_Dativ_Bank_A1_B1_210.csv",
+      "file": "QuizBank/Akkusativ_Dativ_Bank_A1_B1_210.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -335,7 +335,7 @@
       }
     },
     {
-      "file": "QuizBank\\Antonym_Match_Bank_A1_B1_210.csv",
+      "file": "QuizBank/Antonym_Match_Bank_A1_B1_210.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -496,7 +496,7 @@
       }
     },
     {
-      "file": "QuizBank\\Artikel_Sprint_Bank_A1_B2_1000.csv",
+      "file": "QuizBank/Artikel_Sprint_Bank_A1_B2_1000.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 1000,
@@ -657,7 +657,7 @@
       }
     },
     {
-      "file": "QuizBank\\Lexical_Gap_Fill_Bank_A2_B1_210.csv",
+      "file": "QuizBank/Lexical_Gap_Fill_Bank_A2_B1_210.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -818,7 +818,7 @@
       }
     },
     {
-      "file": "QuizBank\\LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv",
+      "file": "QuizBank/LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 500,
@@ -983,7 +983,7 @@
       }
     },
     {
-      "file": "QuizBank\\logik_luecke_sheet_template.csv",
+      "file": "QuizBank/logik_luecke_sheet_template.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 0,
@@ -1045,7 +1045,7 @@
       }
     },
     {
-      "file": "QuizBank\\Mini_Dialog_Bank_A2_B1_210.csv",
+      "file": "QuizBank/Mini_Dialog_Bank_A2_B1_210.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -1206,7 +1206,7 @@
       }
     },
     {
-      "file": "QuizBank\\Modalverben_Bank_210.csv",
+      "file": "QuizBank/Modalverben_Bank_210.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -1367,7 +1367,7 @@
       }
     },
     {
-      "file": "QuizBank\\Negation_Quiz_Bank_A2_B1_210.csv",
+      "file": "QuizBank/Negation_Quiz_Bank_A2_B1_210.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -1528,7 +1528,7 @@
       }
     },
     {
-      "file": "QuizBank\\Plural_Check_Bank_500.csv",
+      "file": "QuizBank/Plural_Check_Bank_500.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 500,
@@ -1588,7 +1588,7 @@
       }
     },
     {
-      "file": "QuizBank\\Possessive_Adjectives_Bank_A2_B1_210.csv",
+      "file": "QuizBank/Possessive_Adjectives_Bank_A2_B1_210.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -1749,7 +1749,7 @@
       }
     },
     {
-      "file": "QuizBank\\Preposition_Selection_Bank_A2_B1_210.csv",
+      "file": "QuizBank/Preposition_Selection_Bank_A2_B1_210.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -1910,7 +1910,7 @@
       }
     },
     {
-      "file": "QuizBank\\Satzbau_Bank_A2_B1_210.csv",
+      "file": "QuizBank/Satzbau_Bank_A2_B1_210.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -2071,7 +2071,7 @@
       }
     },
     {
-      "file": "QuizBank\\Synonym_Match_Bank_A1_B1_210.csv",
+      "file": "QuizBank/Synonym_Match_Bank_A1_B1_210.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -2232,7 +2232,7 @@
       }
     },
     {
-      "file": "QuizBank\\Topic_Vocabulary_Themes_Bank_A2_B1_210.csv",
+      "file": "QuizBank/Topic_Vocabulary_Themes_Bank_A2_B1_210.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -2363,7 +2363,7 @@
       }
     },
     {
-      "file": "QuizBank\\trennbare_verben_210_korrigiert.csv",
+      "file": "QuizBank/trennbare_verben_210_korrigiert.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -2524,7 +2524,7 @@
       }
     },
     {
-      "file": "QuizBank\\Verb_Conjugation_Bank_A2_B1_210.csv",
+      "file": "QuizBank/Verb_Conjugation_Bank_A2_B1_210.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 210,
@@ -2685,7 +2685,7 @@
       }
     },
     {
-      "file": "QuizBank\\W_Fragen_Bank_630.csv",
+      "file": "QuizBank/W_Fragen_Bank_630.csv",
       "parser": "csv",
       "warnings": [],
       "row_count": 630,

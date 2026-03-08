@@ -11,10 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-
-def _csv_sort_key(path: Path) -> tuple[str, str]:
-    # Keep QuizBank report order stable across platforms and filesystems.
-    return (path.name.casefold(), path.name)
+from quizbank_report_paths import csv_sort_key
 
 
 def _norm_level(value: Any) -> str:
@@ -107,7 +104,7 @@ def main() -> None:
     input_dir = Path(args.input_dir)
     files = sorted(
         (p for p in input_dir.iterdir() if p.is_file() and p.suffix.lower() == ".csv"),
-        key=_csv_sort_key,
+        key=csv_sort_key,
     )
     per_file = [scan_csv(path) for path in files]
 
