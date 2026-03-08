@@ -13,7 +13,9 @@ from app.db.models.base import Base
 class TournamentRoundScore(Base):
     __tablename__ = "tournament_round_scores"
     __table_args__ = (
-        CheckConstraint("round_number >= 1 AND round_number <= 4", name="ck_round_scores_round_range"),
+        CheckConstraint(
+            "round_number >= 1 AND round_number <= 4", name="ck_round_scores_round_range"
+        ),
         CheckConstraint("wins IN (0, 1, 2)", name="ck_round_scores_points_range"),
         CheckConstraint(
             "correct_answers >= 0 AND correct_answers <= 7",
@@ -41,7 +43,9 @@ class TournamentRoundScore(Base):
     )
     round_number: Mapped[int] = mapped_column(Integer, nullable=False)
     player_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
-    opponent_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
+    opponent_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id"), nullable=True
+    )
     wins: Mapped[int] = mapped_column(Integer, nullable=False)
     is_draw: Mapped[bool] = mapped_column(Boolean, nullable=False)
     correct_answers: Mapped[int] = mapped_column(Integer, nullable=False)

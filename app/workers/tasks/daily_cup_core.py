@@ -71,7 +71,9 @@ async def ensure_daily_cup_registration_tournament(
             status=TOURNAMENT_STATUS_REGISTRATION,
             format=TOURNAMENT_FORMAT_QUICK_5,
             max_participants=(
-                1024 if tournament_type == TOURNAMENT_TYPE_DAILY_ELIMINATION else TOURNAMENT_MAX_PARTICIPANTS
+                1024
+                if tournament_type == TOURNAMENT_TYPE_DAILY_ELIMINATION
+                else TOURNAMENT_MAX_PARTICIPANTS
             ),
             current_round=0,
             registration_deadline=window.close_at_utc,

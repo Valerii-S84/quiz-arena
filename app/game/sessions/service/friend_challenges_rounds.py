@@ -39,7 +39,9 @@ async def _resolve_question_header_override(
 ) -> str | None:
     if tournament_match_id is None:
         return None
-    tournament_match = await TournamentMatchesRepo.get_by_id_for_update(session, tournament_match_id)
+    tournament_match = await TournamentMatchesRepo.get_by_id_for_update(
+        session, tournament_match_id
+    )
     if tournament_match is None:
         return None
     tournament = await TournamentsRepo.get_by_id(session, tournament_match.tournament_id)

@@ -111,7 +111,9 @@ async def _create_completed_daily_cup_with_seeded_scores(
         for user_id, rounds in round_specs.items():
             total_points = Decimal("0")
             total_correct = Decimal("0")
-            for round_number, (points, correct_answers, total_time_ms) in enumerate(rounds, start=1):
+            for round_number, (points, correct_answers, total_time_ms) in enumerate(
+                rounds, start=1
+            ):
                 total_points += Decimal(points)
                 total_correct += Decimal(correct_answers)
                 await TournamentRoundScoresRepo.upsert_result(

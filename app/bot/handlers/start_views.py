@@ -62,13 +62,10 @@ def _build_question_text(
     theme_label = sanitize_question_theme_label(start_result.session.category)
     question_number = start_result.session.question_number or 1
     total_questions = start_result.session.total_questions or 1
-    header_mode_label = (
-        start_result.session.header_mode_label_override
-        or display_mode_label(start_result.session.mode_code)
+    header_mode_label = start_result.session.header_mode_label_override or display_mode_label(
+        start_result.session.mode_code
     )
-    mode_line = TEXTS_DE["msg.game.mode"].format(
-        mode_code=header_mode_label
-    )
+    mode_line = TEXTS_DE["msg.game.mode"].format(mode_code=header_mode_label)
     energy_line = TEXTS_DE["msg.game.energy.left"].format(
         free_energy=(
             snapshot_free_energy if is_zero_cost_source(source) else start_result.energy_free

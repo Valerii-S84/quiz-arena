@@ -9,8 +9,8 @@ from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.tournaments.constants import (
-    DAILY_CUP_TOURNAMENT_TYPES,
     DAILY_CUP_MAX_PARTICIPANTS,
+    DAILY_CUP_TOURNAMENT_TYPES,
     TOURNAMENT_DEFAULT_MAX_PARTICIPANTS,
     TOURNAMENT_FORMAT_QUICK_5,
     TOURNAMENT_FORMAT_QUICK_12,

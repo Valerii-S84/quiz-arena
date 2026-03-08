@@ -42,6 +42,7 @@ TRUNCATE_TABLES = (
     "users",
 )
 
+
 @pytest.fixture(scope="session", autouse=True)
 def guard_integration_db_target() -> None:
     assert_safe_integration_db(str(engine.url))

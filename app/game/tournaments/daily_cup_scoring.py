@@ -71,7 +71,9 @@ async def build_daily_cup_player_results(
         if creator_done
         else _auto_finish_time_ms(deadline=match.deadline)
     )
-    opponent_user_id = int(challenge.opponent_user_id) if challenge.opponent_user_id is not None else None
+    opponent_user_id = (
+        int(challenge.opponent_user_id) if challenge.opponent_user_id is not None else None
+    )
     opponent_time_ms = (
         await QuizSessionsRepo.sum_completed_duration_ms_for_friend_challenge_user(
             session,
@@ -81,14 +83,20 @@ async def build_daily_cup_player_results(
         if opponent_done and opponent_user_id is not None
         else _auto_finish_time_ms(deadline=match.deadline)
     )
-    creator_score = _resolved_correct_answers(finished=creator_done, score=int(challenge.creator_score))
+    creator_score = _resolved_correct_answers(
+        finished=creator_done, score=int(challenge.creator_score)
+    )
     if match.user_b is None:
         bot_score = int(challenge.opponent_score)
         return (
             DailyCupPlayerResult(
                 player_id=creator_user_id,
                 opponent_id=None,
-                wins=0 if not creator_done else _points_for_result(score=creator_score, opponent_score=bot_score),
+                wins=(
+                    0
+                    if not creator_done
+                    else _points_for_result(score=creator_score, opponent_score=bot_score)
+                ),
                 correct_answers=creator_score,
                 total_time_ms=creator_time_ms,
                 is_draw=creator_done and creator_score == bot_score,
@@ -100,7 +108,13 @@ async def build_daily_cup_player_results(
     creator_result = DailyCupPlayerResult(
         player_id=creator_user_id,
         opponent_id=opponent_user_id,
-        wins=0 if not creator_done else _points_for_result(score=creator_score, opponent_score=int(challenge.opponent_score)),
+        wins=(
+            0
+            if not creator_done
+            else _points_for_result(
+                score=creator_score, opponent_score=int(challenge.opponent_score)
+            )
+        ),
         correct_answers=creator_score,
         total_time_ms=creator_time_ms,
         is_draw=winner_id is None,
@@ -115,7 +129,13 @@ async def build_daily_cup_player_results(
     opponent_result = DailyCupPlayerResult(
         player_id=opponent_user_id,
         opponent_id=creator_user_id,
-        wins=0 if not opponent_done else _points_for_result(score=opponent_score, opponent_score=int(challenge.creator_score)),
+        wins=(
+            0
+            if not opponent_done
+            else _points_for_result(
+                score=opponent_score, opponent_score=int(challenge.creator_score)
+            )
+        ),
         correct_answers=opponent_score,
         total_time_ms=opponent_time_ms,
         is_draw=winner_id is None,

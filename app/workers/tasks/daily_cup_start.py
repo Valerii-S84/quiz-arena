@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.tournament_participants import TournamentParticipant
 from app.db.models.tournaments import Tournament
-from app.game.tournaments.daily_cup_slots import get_round_deadline
 from app.game.tournaments.constants import TOURNAMENT_STATUS_ROUND_1
+from app.game.tournaments.daily_cup_slots import get_round_deadline
 from app.game.tournaments.rounds import create_round_matches
 
 

@@ -9,13 +9,13 @@ from app.workers.tasks.daily_cup_async import (
     open_daily_cup_registration_async as _open_daily_cup_registration_async,
 )
 from app.workers.tasks.daily_cup_async import (
+    publish_daily_cup_final_results_async as _publish_daily_cup_final_results_async,
+)
+from app.workers.tasks.daily_cup_async import (
     send_daily_cup_invite_async as _send_daily_cup_invite_async,
 )
 from app.workers.tasks.daily_cup_async import (
     send_daily_cup_last_call_reminder_async as _send_daily_cup_last_call_reminder_async,
-)
-from app.workers.tasks.daily_cup_async import (
-    publish_daily_cup_final_results_async as _publish_daily_cup_final_results_async,
 )
 from app.workers.tasks.daily_cup_messaging import run_daily_cup_round_messaging
 from app.workers.tasks.daily_cup_nonfinishers_summary import run_daily_cup_nonfinishers_summary

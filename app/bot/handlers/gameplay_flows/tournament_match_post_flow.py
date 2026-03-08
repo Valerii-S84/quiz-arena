@@ -4,8 +4,8 @@ from uuid import UUID
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
+from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES
 from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
@@ -87,7 +87,9 @@ async def resolve_tournament_place_for_user(
         if tournament is None:
             return None, None
         if tournament.type in DAILY_CUP_TOURNAMENT_TYPES:
-            standings = await calculate_daily_cup_standings(session, tournament_id=match.tournament_id)
+            standings = await calculate_daily_cup_standings(
+                session, tournament_id=match.tournament_id
+            )
             for item in standings:
                 if item.user_id == user_id:
                     return item.place, len(standings)

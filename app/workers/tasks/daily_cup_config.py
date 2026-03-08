@@ -4,8 +4,8 @@ import os
 
 from app.core.config import get_settings
 from app.game.tournaments.constants import (
-    DAILY_CUP_MAX_ROUNDS,
     DAILY_CUP_MAX_PARTICIPANTS,
+    DAILY_CUP_MAX_ROUNDS,
     DAILY_CUP_QUESTIONS_PER_MATCH,
     TOURNAMENT_TYPE_DAILY_ARENA,
     TOURNAMENT_TYPE_DAILY_ELIMINATION,

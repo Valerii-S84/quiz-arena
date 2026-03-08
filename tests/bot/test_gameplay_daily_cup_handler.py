@@ -32,6 +32,4 @@ async def test_handle_daily_cup_join_shows_german_full_message(monkeypatch) -> N
 
     await gameplay_daily_cup.handle_daily_cup_join(callback)
 
-    assert callback.answer_calls == [
-        {"text": TEXTS_DE["msg.daily_cup.full"], "show_alert": True}
-    ]
+    assert callback.answer_calls == [{"text": TEXTS_DE["msg.daily_cup.full"], "show_alert": True}]

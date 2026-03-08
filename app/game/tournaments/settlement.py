@@ -16,15 +16,15 @@ from app.game.sessions.service.friend_challenges_internal import (
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
 )
-from app.game.tournaments.daily_cup_scoring import (
-    build_daily_cup_player_results,
-    store_daily_cup_player_result,
-)
 from app.game.tournaments.constants import (
     TOURNAMENT_MATCH_STATUS_COMPLETED,
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_MATCH_STATUS_WALKOVER,
     TOURNAMENT_TYPE_DAILY_ARENA,
+)
+from app.game.tournaments.daily_cup_scoring import (
+    build_daily_cup_player_results,
+    store_daily_cup_player_result,
 )
 
 

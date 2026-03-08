@@ -232,7 +232,8 @@ async def test_daily_cup_auto_finish_uses_max_time_and_ranks_below_completed_los
         auto_rows = [
             row
             for row in round_rows
-            if int(row.player_id) in {int(auto_finished_match.user_a), int(auto_finished_match.user_b)}
+            if int(row.player_id)
+            in {int(auto_finished_match.user_a), int(auto_finished_match.user_b)}
         ]
         assert len(auto_rows) == 2
         assert all(int(row.total_time_ms) == AUTO_FINISH_MAX_TIME_MS for row in auto_rows)

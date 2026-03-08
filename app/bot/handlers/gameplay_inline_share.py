@@ -63,9 +63,7 @@ async def _build_daily_cup_result(*, session, user_id: int, tournament_id: UUID)
     if participant is None or not participant.proof_card_file_id:
         return None
     standings = await calculate_daily_cup_standings(session, tournament_id=tournament_id)
-    place = next(
-        item.place for item in standings if int(item.user_id) == int(user_id)
-    )
+    place = next(item.place for item in standings if int(item.user_id) == int(user_id))
     caption = build_daily_cup_caption(
         place=place,
         points=format_points(participant.score),
