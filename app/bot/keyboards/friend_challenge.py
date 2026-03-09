@@ -86,7 +86,7 @@ def build_friend_challenge_start_keyboard(*, challenge_id: str) -> InlineKeyboar
             [
                 InlineKeyboardButton(
                     text="⚔️ Jetzt spielen",
-                    callback_data=f"friend:next:{challenge_id}",
+                    callback_data=f"friend:challenge:round:start:{challenge_id}",
                 )
             ],
         ]

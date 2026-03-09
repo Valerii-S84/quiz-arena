@@ -125,7 +125,7 @@ async def test_friend_answer_branch_notifies_creator_once_when_opponent_finishes
         (
             10,
             TEXTS_DE["msg.friend.challenge.turn.reminder"],
-            "friend:next:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "friend:challenge:round:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         )
     ]
 

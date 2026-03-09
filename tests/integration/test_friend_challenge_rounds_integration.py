@@ -368,7 +368,7 @@ async def test_friend_challenge_opponent_finish_sends_exactly_one_push_if_creato
         (
             creator_user_id,
             "Dein Freund hat gespielt – du bist dran!",
-            f"friend:next:{challenge_id}",
+            f"friend:challenge:round:start:{challenge_id}",
         )
     ]
 
