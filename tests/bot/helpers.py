@@ -60,6 +60,7 @@ class DummyMessage:
     def __init__(self, *, bot: DummyBot | None = None) -> None:
         self.bot = bot or DummyBot()
         self.answers: list[DummyAnswerCall] = []
+        self.edit_reply_markup_calls: list[dict[str, Any]] = []
 
     async def answer(self, text: str | None = None, **kwargs: Any) -> None:
         self.answers.append(DummyAnswerCall(text=text, kwargs=kwargs))
@@ -79,6 +80,9 @@ class DummyMessage:
                 },
             )
         )
+
+    async def edit_reply_markup(self, **kwargs: Any) -> None:
+        self.edit_reply_markup_calls.append(kwargs)
 
 
 class DummyCallback:

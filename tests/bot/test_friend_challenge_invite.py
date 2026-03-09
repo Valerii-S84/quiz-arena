@@ -13,7 +13,7 @@ from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessio
 
 
 @pytest.mark.asyncio
-async def test_friend_challenge_invite_photo_contains_caption_and_accept_button(
+async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_controls(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
@@ -67,12 +67,29 @@ async def test_friend_challenge_invite_photo_contains_caption_and_accept_button(
 
     assert len(callback.bot.sent_photos) == 1
     photo_call = callback.bot.sent_photos[0]
-    assert photo_call["reply_markup"] is not None
+    keyboard = photo_call["reply_markup"]
+    assert keyboard is not None
     assert photo_call["caption"] == TEXTS_DE["msg.friend.challenge.invite.caption"]
     assert "https://t.me/" not in photo_call["caption"]
-
-    accept_button = photo_call["reply_markup"].inline_keyboard[0][0]
-    assert accept_button.text == "⚔️ Herausforderung annehmen"
-    assert (
-        accept_button.url == "https://t.me/testbot?start=duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    )
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    assert [button.text for button in buttons] == [
+        "📤 Teilen ->",
+        "📋 Link kopieren",
+        "✅ Einladung gesendet",
+        "⚔️ Jetzt spielen",
+        "⏳ Auf Freund warten",
+    ]
+    assert all(button.url is None for button in buttons)
+    assert [button.switch_inline_query for button in buttons if button.switch_inline_query] == [
+        "invite:duel:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    ]
+    callbacks = [button.callback_data for button in buttons if button.callback_data]
+    assert callbacks == [
+        "friend:copy:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "friend:invite:required:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "menu:main",
+    ]
+    assert "⚔️ Herausforderung annehmen" not in [
+        button.text for row in keyboard.inline_keyboard for button in row
+    ]

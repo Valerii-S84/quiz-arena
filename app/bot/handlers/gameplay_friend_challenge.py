@@ -53,8 +53,11 @@ def register(router: Router) -> None:
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_SHARE_RESULT_RE))(
         handle_friend_challenge_share_result
     )
-    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_WAITING_RE))(
-        handle_friend_challenge_waiting
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_INVITE_SENT_RE))(
+        handle_friend_challenge_invite_sent
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_INVITE_REQUIRED_RE))(
+        handle_friend_challenge_invite_required
     )
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_NEXT_RE))(
         handle_friend_challenge_next
@@ -223,8 +226,16 @@ async def handle_friend_challenge_share_result(callback: CallbackQuery) -> None:
     )
 
 
-async def handle_friend_challenge_waiting(callback: CallbackQuery) -> None:
-    await callback.answer()
+async def handle_friend_challenge_invite_sent(callback: CallbackQuery) -> None:
+    await friend_lobby_flow.handle_friend_challenge_invite_sent(
+        callback,
+        friend_invite_sent_re=gameplay_callbacks.FRIEND_INVITE_SENT_RE,
+        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
+    )
+
+
+async def handle_friend_challenge_invite_required(callback: CallbackQuery) -> None:
+    await callback.answer(TEXTS_DE["msg.friend.challenge.invite.confirm.first"])
 
 
 async def handle_friend_challenge_next(callback: CallbackQuery) -> None:

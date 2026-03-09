@@ -12,6 +12,7 @@ from app.db.session import SessionLocal
 from app.economy.energy.service import EnergyService
 from app.game.sessions.service import GameSessionService
 from app.game.sessions.service.progression import select_level_weighted
+from tests.integration.stable_ids import stable_telegram_user_id
 
 UTC = timezone.utc
 
@@ -48,7 +49,7 @@ async def _create_user(seed: str) -> int:
     async with SessionLocal.begin() as session:
         user = await UsersRepo.create(
             session,
-            telegram_user_id=50_000_000_000 + (abs(hash(seed)) % 1_000_000),
+            telegram_user_id=stable_telegram_user_id(prefix=50_000_000_000, seed=seed),
             referral_code=f"R{uuid4().hex[:10]}",
             username=None,
             first_name="Progress",
