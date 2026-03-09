@@ -67,7 +67,7 @@ async def test_notify_creator_about_join_sends_single_play_cta(monkeypatch) -> N
     assert sent["chat_id"] == 777
     assert sent["text"] == TEXTS_DE["msg.friend.challenge.opponent.ready"]
     assert sent["reply_markup"].inline_keyboard[0][0].callback_data == (
-        "friend:challenge:round:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        "friend:next:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     )
 
 
