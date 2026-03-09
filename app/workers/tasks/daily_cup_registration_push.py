@@ -25,6 +25,7 @@ from app.workers.tasks.daily_cup_time import format_close_time_local
 async def send_daily_cup_registration_push_async(
     *,
     now_utc_factory,
+    bot_factory=build_bot,
     text_key: str,
     log_event: str,
     sent_event_type: str,
@@ -48,7 +49,7 @@ async def send_daily_cup_registration_push_async(
     close_time_label = format_close_time_local(close_at_utc=tournament.registration_deadline)
     text = TEXTS_DE[text_key].format(close_time=close_time_label)
 
-    bot = build_bot()
+    bot = bot_factory()
     try:
         while True:
             async with SessionLocal.begin() as session:

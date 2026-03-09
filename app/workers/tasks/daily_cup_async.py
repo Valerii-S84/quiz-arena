@@ -40,6 +40,7 @@ _now_utc = now_utc
 async def send_daily_cup_invite_async() -> dict[str, int]:
     return await send_daily_cup_registration_push_async(
         now_utc_factory=_now_utc,
+        bot_factory=build_bot,
         text_key=(
             "msg.elimination.invite_push"
             if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ELIMINATION
@@ -54,6 +55,7 @@ async def send_daily_cup_invite_async() -> dict[str, int]:
 async def open_daily_cup_registration_async() -> dict[str, int]:
     return await send_daily_cup_registration_push_async(
         now_utc_factory=_now_utc,
+        bot_factory=build_bot,
         text_key=(
             "msg.elimination.invite_push"
             if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ELIMINATION
@@ -68,6 +70,7 @@ async def open_daily_cup_registration_async() -> dict[str, int]:
 async def send_daily_cup_last_call_reminder_async() -> dict[str, int]:
     return await send_daily_cup_registration_push_async(
         now_utc_factory=_now_utc,
+        bot_factory=build_bot,
         text_key="msg.daily_cup.last_call_reminder",
         log_event="daily_cup_last_call_reminder_processed",
         sent_event_type="daily_cup_last_call_reminder_sent",

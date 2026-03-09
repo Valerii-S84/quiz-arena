@@ -29,8 +29,10 @@ class DummyBot:
         self.username = username
         self.raise_on_get_me = False
         self.raise_on_send_message = False
+        self.raise_on_send_photo = False
         self.raise_on_send_invoice = False
         self.sent_messages: list[dict[str, Any]] = []
+        self.sent_photos: list[dict[str, Any]] = []
         self.sent_invoices: list[dict[str, Any]] = []
 
     async def get_me(self) -> SimpleNamespace:
@@ -42,6 +44,11 @@ class DummyBot:
         if self.raise_on_send_message:
             raise RuntimeError("send_message failed")
         self.sent_messages.append(kwargs)
+
+    async def send_photo(self, **kwargs: Any) -> None:
+        if self.raise_on_send_photo:
+            raise RuntimeError("send_photo failed")
+        self.sent_photos.append(kwargs)
 
     async def send_invoice(self, **kwargs: Any) -> None:
         if self.raise_on_send_invoice:

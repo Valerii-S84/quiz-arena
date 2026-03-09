@@ -40,6 +40,6 @@ async def handle_shop_open(callback: CallbackQuery) -> None:
     await start_flow.handle_shop_open(callback)
 
 
-@router.callback_query(F.data == "home:open")
+@router.callback_query((F.data == "home:open") | (F.data == "menu:main"))
 async def handle_home_open(callback: CallbackQuery) -> None:
     await start_flow.handle_home_open(callback)
