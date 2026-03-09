@@ -127,7 +127,11 @@ async def handle_start_message(message: Message) -> None:
         free_energy=snapshot.free_energy,
         paid_energy=snapshot.paid_energy,
         current_streak=snapshot.current_streak,
-        best_streak=getattr(snapshot, "best_streak", snapshot.current_streak),
+        best_streak=getattr(
+            snapshot,
+            "global_best_streak",
+            getattr(snapshot, "best_streak", snapshot.current_streak),
+        ),
         daily_cup_badge_unlocked=getattr(snapshot, "daily_cup_badge_unlocked", False),
     )
     await _send_home_message(
@@ -178,7 +182,11 @@ async def handle_home_open(callback: CallbackQuery) -> None:
         free_energy=snapshot.free_energy,
         paid_energy=snapshot.paid_energy,
         current_streak=snapshot.current_streak,
-        best_streak=getattr(snapshot, "best_streak", snapshot.current_streak),
+        best_streak=getattr(
+            snapshot,
+            "global_best_streak",
+            getattr(snapshot, "best_streak", snapshot.current_streak),
+        ),
         daily_cup_badge_unlocked=getattr(snapshot, "daily_cup_badge_unlocked", False),
     )
     await _send_home_message(
