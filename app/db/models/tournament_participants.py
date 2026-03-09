@@ -6,6 +6,7 @@ from uuid import UUID
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -49,3 +50,6 @@ class TournamentParticipant(Base):
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     standings_message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     proof_card_file_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    proof_card_sent: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )

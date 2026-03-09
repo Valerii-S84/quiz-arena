@@ -145,7 +145,7 @@ async def _create_completed_daily_cup_with_seeded_scores(
 
 
 @pytest.mark.asyncio
-async def test_daily_cup_proof_cards_reuse_cached_file_ids_on_second_run(monkeypatch) -> None:
+async def test_daily_cup_proof_cards_send_only_once_per_participant(monkeypatch) -> None:
     # Keep registration and runtime on the same local day for DAILY_CUP_TIMEZONE.
     now_utc = (
         datetime.now(UTC)
@@ -186,16 +186,67 @@ async def test_daily_cup_proof_cards_reuse_cached_file_ids_on_second_run(monkeyp
     assert all(query and query.startswith("proof:daily:") for query in first_batch_buttons)
 
     first_batch = len(bot.send_photos)
+    parsed_tournament_id = UUID(tournament_id)
+    async with SessionLocal.begin() as session:
+        participants = await TournamentParticipantsRepo.list_for_tournament(
+            session,
+            tournament_id=parsed_tournament_id,
+        )
+    assert all(item.proof_card_sent is True for item in participants)
+
     second = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
         tournament_id=tournament_id,
         initial_delay_seconds=0,
     )
-    assert int(second["sent"]) == 4
-    assert int(second["cached_reused"]) == 4
+    assert int(second["sent"]) == 0
+    assert int(second["cached_reused"]) == 0
     assert int(second["failed"]) == 0
     second_batch = bot.send_photos[first_batch:]
-    assert len(second_batch) == 4
-    assert all(isinstance(item["photo"], str) for item in second_batch)
+    assert second_batch == []
+
+
+@pytest.mark.asyncio
+async def test_daily_cup_proof_cards_skip_repeat_enqueue_for_same_participant(monkeypatch) -> None:
+    now_utc = (
+        datetime.now(UTC)
+        .astimezone(ZoneInfo(DAILY_CUP_TIMEZONE))
+        .replace(hour=12, minute=0, second=0, microsecond=0)
+        .astimezone(UTC)
+    )
+    await _ensure_tournament_schema()
+
+    user_ids = [await _create_user(f"daily_cup_proof_single_{idx}") for idx in range(4)]
+    tournament_id = await _create_completed_daily_cup(now_utc=now_utc, user_ids=user_ids)
+
+    bot = _DummyWorkerBot()
+    monkeypatch.setattr(daily_cup_proof_cards, "build_bot", lambda: bot)
+
+    first = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
+        tournament_id=tournament_id,
+        user_id=user_ids[0],
+        initial_delay_seconds=0,
+    )
+    assert first == {
+        "processed": 1,
+        "participants_total": 4,
+        "sent": 1,
+        "cached_reused": 0,
+        "failed": 0,
+    }
+
+    second = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
+        tournament_id=tournament_id,
+        user_id=user_ids[0],
+        initial_delay_seconds=0,
+    )
+    assert second == {
+        "processed": 1,
+        "participants_total": 4,
+        "sent": 0,
+        "cached_reused": 0,
+        "failed": 0,
+    }
+    assert len(bot.send_photos) == 1
 
 
 @pytest.mark.asyncio

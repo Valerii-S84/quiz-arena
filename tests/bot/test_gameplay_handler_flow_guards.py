@@ -6,6 +6,7 @@ import pytest
 
 from app.bot.handlers import gameplay
 from app.bot.texts.de import TEXTS_DE
+from app.game.sessions.errors import TournamentSessionStopNotAllowedError
 from tests.bot.helpers import DummyCallback, DummySessionLocal
 
 
@@ -73,6 +74,37 @@ async def test_handle_game_stop_with_session_payload_marks_session_abandoned(mon
     assert captured["user_id"] == "77"
     assert captured["session_id"] == "123e4567-e89b-12d3-a456-426614174000"
     assert captured["text"] == TEXTS_DE["msg.game.stopped"]
+
+
+@pytest.mark.asyncio
+async def test_handle_game_stop_with_tournament_session_payload_returns_error(monkeypatch) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+    captured = {"home_called": False}
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        del session, telegram_user
+        return SimpleNamespace(user_id=77)
+
+    async def _fake_abandon_session(session, *, user_id: int, session_id, now_utc) -> None:
+        del session, user_id, session_id, now_utc
+        raise TournamentSessionStopNotAllowedError
+
+    async def _fake_send_home_message(message, *, text: str) -> None:
+        del message, text
+        captured["home_called"] = True
+
+    monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(gameplay.GameSessionService, "abandon_session", _fake_abandon_session)
+    monkeypatch.setattr(gameplay, "_send_home_message", _fake_send_home_message)
+
+    callback = DummyCallback(
+        data="game:stop:123e4567-e89b-12d3-a456-426614174000",
+        from_user=SimpleNamespace(id=1),
+    )
+    await gameplay.handle_game_stop(callback)
+
+    assert captured["home_called"] is False
+    assert callback.answer_calls == [{"text": TEXTS_DE["msg.system.error"], "show_alert": True}]
 
 
 @pytest.mark.asyncio

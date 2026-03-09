@@ -39,7 +39,7 @@ from app.db.session import SessionLocal
 from app.economy.offers.constants import TRG_LOCKED_MODE_CLICK
 from app.economy.offers.service import OfferLoggingError, OfferService
 from app.economy.referrals.service import ReferralService
-from app.game.sessions.errors import SessionNotFoundError
+from app.game.sessions.errors import SessionNotFoundError, TournamentSessionStopNotAllowedError
 from app.game.sessions.service import GameSessionService
 from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
@@ -131,6 +131,9 @@ async def handle_game_stop(callback: CallbackQuery) -> None:
                     session_id=session_id,
                     now_utc=now_utc,
                 )
+            except TournamentSessionStopNotAllowedError:
+                await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+                return
             except SessionNotFoundError:
                 pass
     await _send_home_message(cast(Message, callback.message), text=TEXTS_DE["msg.game.stopped"])
