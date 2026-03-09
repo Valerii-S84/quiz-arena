@@ -6,7 +6,12 @@ from uuid import UUID
 
 import pytest
 
-from app.bot.handlers.gameplay_flows import friend_answer_completion_flow
+from app.bot.handlers import gameplay_tournament_notifications
+from app.bot.handlers.gameplay_flows import (
+    friend_answer_completion_flow,
+    tournament_match_post_flow,
+)
+from app.workers.tasks import tournaments_proof_cards
 from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessionLocal
 
 
@@ -91,3 +96,29 @@ async def test_completed_tournament_match_uses_tournament_keyboard_without_remat
     assert "🔄 Revanche" not in labels
     assert f"friend:tournament:view:{tournament_id}" in callbacks
     assert enqueued == [tournament_id]
+
+
+def test_enqueue_tournament_post_match_updates_does_not_enqueue_daily_cup_proof_cards(
+    monkeypatch,
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        gameplay_tournament_notifications,
+        "enqueue_tournament_round_messaging",
+        lambda *, tournament_id: calls.append(("round", tournament_id)),
+    )
+    monkeypatch.setattr(
+        tournaments_proof_cards,
+        "enqueue_private_tournament_proof_cards",
+        lambda *, tournament_id: calls.append(("proof", tournament_id)),
+    )
+
+    tournament_match_post_flow.enqueue_tournament_post_match_updates(
+        tournament_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    )
+
+    assert calls == [
+        ("round", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        ("proof", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+    ]
