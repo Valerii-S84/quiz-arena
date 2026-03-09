@@ -115,6 +115,7 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
     assert [button.text for button in invite_buttons] == [
         "📤 Teilen ->",
         "✅ Einladung gesendet",
+        "📋 Link kopieren",
         "⚔️ Jetzt spielen",
         "⏳ Auf Freund warten",
     ]
@@ -142,6 +143,7 @@ async def test_handle_friend_challenge_invite_sent_answers_with_waiting_toast() 
     ]
     assert edited_callbacks == [
         "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "friend:copy:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "friend:challenge:round:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "menu:main",
     ]

@@ -39,7 +39,7 @@ TEXTS_DE: dict[str, str] = {
     "msg.game.session.not_found": "Diese Session ist nicht mehr verfügbar.",
     "msg.friend.challenge.created": "🤝 Duell erstellt. Teile den Link mit deinem Freund.",
     "msg.friend.challenge.created.fallback": "🤝 Duell erstellt. Teile den Start-Code: fc_{invite_token}",
-    "msg.friend.challenge.invite.caption": "Du wurdest zu einem Duell herausgefordert! Kannst du gewinnen?",
+    "msg.friend.challenge.invite.caption": "🤝 Lade jetzt einen Freund ein!\n\n1. Teile die Einladung oder kopiere den Link.\n2. Sende sie an deinen Freund.\n3. Tippe dann auf '✅ Einladung gesendet'.\n4. Danach kannst du sofort selbst spielen.",
     "msg.friend.challenge.invite.waiting": "🎯 Einladung gesendet! Starte jetzt oder warte auf deinen Freund.",
     "msg.friend.challenge.invite.confirm.first": "Bestätige zuerst mit '✅ Einladung gesendet'.",
     "msg.friend.challenge.create.choose": "⚔️ Fordere einen Freund heraus! Wer mehr richtige Antworten hat, gewinnt.",

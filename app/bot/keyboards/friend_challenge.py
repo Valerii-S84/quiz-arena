@@ -133,6 +133,12 @@ def build_friend_challenge_share_keyboard(
             ],
             [
                 InlineKeyboardButton(
+                    text="📋 Link kopieren",
+                    callback_data=f"friend:copy:{challenge_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="⚔️ Jetzt spielen",
                     callback_data=f"friend:invite:required:{challenge_id}",
                 )
@@ -157,6 +163,12 @@ def build_friend_challenge_share_confirmed_keyboard(*, challenge_id: str) -> Inl
                 InlineKeyboardButton(
                     text="✅ Einladung gesendet",
                     callback_data=f"friend:invite:sent:{challenge_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📋 Link kopieren",
+                    callback_data=f"friend:copy:{challenge_id}",
                 )
             ],
             build_friend_challenge_start_keyboard(challenge_id=challenge_id).inline_keyboard[0],

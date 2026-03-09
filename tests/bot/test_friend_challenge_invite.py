@@ -75,6 +75,7 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
     assert [button.text for button in buttons] == [
         "📤 Teilen ->",
         "✅ Einladung gesendet",
+        "📋 Link kopieren",
         "⚔️ Jetzt spielen",
         "⏳ Auf Freund warten",
     ]
@@ -85,6 +86,7 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert callbacks == [
         "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "friend:copy:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "friend:invite:required:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "menu:main",
     ]
