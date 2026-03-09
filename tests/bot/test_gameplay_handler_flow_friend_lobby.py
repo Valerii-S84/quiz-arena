@@ -144,7 +144,7 @@ async def test_handle_friend_challenge_invite_sent_answers_with_waiting_toast() 
     assert edited_callbacks == [
         "friend:copy:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        "friend:challenge:round:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "friend:next:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "menu:main",
     ]
     assert callback.answer_calls == [

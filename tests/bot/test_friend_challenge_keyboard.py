@@ -150,7 +150,7 @@ def test_friend_challenge_start_keyboard_contains_single_cta() -> None:
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == ["⚔️ Jetzt spielen"]
     assert [button.callback_data for button in buttons] == [
-        "friend:challenge:round:start:00000000-0000-0000-0000-000000000001"
+        "friend:next:00000000-0000-0000-0000-000000000001"
     ]
 
 
@@ -169,7 +169,7 @@ def test_friend_challenge_share_confirmed_keyboard_contains_unlocked_choices() -
     assert [button.callback_data for button in buttons if button.callback_data] == [
         "friend:copy:00000000-0000-0000-0000-000000000001",
         "friend:invite:sent:00000000-0000-0000-0000-000000000001",
-        "friend:challenge:round:start:00000000-0000-0000-0000-000000000001",
+        "friend:next:00000000-0000-0000-0000-000000000001",
         "menu:main",
     ]
 
