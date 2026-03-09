@@ -11,6 +11,7 @@ from app.db.models.daily_runs import DailyRun
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.workers.tasks import daily_challenge_async
+from tests.integration.stable_ids import stable_telegram_user_id
 
 
 class _FrozenDateTime(datetime):
@@ -41,7 +42,7 @@ async def _create_user(seed: str) -> int:
     async with SessionLocal.begin() as session:
         user = await UsersRepo.create(
             session,
-            telegram_user_id=70_000_000_000 + (abs(hash(seed)) % 1_000_000),
+            telegram_user_id=stable_telegram_user_id(prefix=70_000_000_000, seed=seed),
             referral_code=f"P{uuid4().hex[:10]}",
             username=None,
             first_name="Push",

@@ -13,6 +13,7 @@ from app.db.models.users import User
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.energy.constants import BERLIN_TIMEZONE
+from tests.integration.stable_ids import stable_telegram_user_id
 
 UTC = timezone.utc
 
@@ -35,7 +36,7 @@ async def _create_user(seed: str) -> User:
     async with SessionLocal.begin() as session:
         user = await UsersRepo.create(
             session,
-            telegram_user_id=50_000_000_000 + (abs(hash(seed)) % 1_000_000),
+            telegram_user_id=stable_telegram_user_id(prefix=50_000_000_000, seed=seed),
             referral_code=f"X{uuid4().hex[:10].upper()}",
             username=None,
             first_name="User",

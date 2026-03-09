@@ -7,6 +7,7 @@ from app.db.models.promo_codes import PromoCode
 from app.db.models.promo_redemptions import PromoRedemption
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
+from tests.integration.stable_ids import stable_int_id, stable_telegram_user_id
 
 UTC = timezone.utc
 
@@ -15,7 +16,7 @@ async def create_user(seed: str) -> int:
     async with SessionLocal.begin() as session:
         user = await UsersRepo.create(
             session,
-            telegram_user_id=20_000_000_000 + (abs(hash(seed)) % 1_000_000),
+            telegram_user_id=stable_telegram_user_id(prefix=20_000_000_000, seed=seed),
             referral_code=f"R{uuid4().hex[:10]}",
             username=None,
             first_name="Promo",
@@ -31,7 +32,7 @@ async def create_discount_promo_redemption(
     discount_percent: int,
     now_utc: datetime,
 ) -> tuple[int, UUID]:
-    promo_code_id = abs(hash((user_id, product_code, discount_percent))) % 1_000_000_000 + 1
+    promo_code_id = stable_int_id(user_id, product_code, discount_percent)
     redemption_id = uuid4()
     async with SessionLocal.begin() as session:
         session.add(
