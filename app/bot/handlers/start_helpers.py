@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from aiogram.types import Message
 
+from app.bot.keyboards.friend_challenge import build_friend_challenge_start_keyboard
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.core.config import get_settings
@@ -99,6 +100,10 @@ async def _notify_creator_about_join(
         )
         if challenge_row is None:
             return
+        if challenge_row.creator_answered_round >= challenge_row.total_rounds:
+            return
+        if challenge_row.creator_answered_round != 0:
+            return
         if challenge_row.creator_push_count >= DUEL_MAX_PUSH_PER_USER:
             return
         challenge_row.creator_push_count += 1
@@ -115,6 +120,9 @@ async def _notify_creator_about_join(
         await bot.send_message(
             chat_id=creator.telegram_user_id,
             text=TEXTS_DE["msg.friend.challenge.opponent.ready"],
+            reply_markup=build_friend_challenge_start_keyboard(
+                challenge_id=str(challenge.challenge_id)
+            ),
         )
     except Exception:
         return

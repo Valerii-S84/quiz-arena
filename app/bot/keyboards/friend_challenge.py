@@ -6,6 +6,7 @@ from app.bot.keyboards.proof_card_share import (
     build_friend_challenge_inline_share_query,
     build_friend_challenge_invite_inline_share_query,
 )
+from app.core.config import get_settings
 
 
 def _build_share_url(*, invite_link: str, share_text: str) -> str:
@@ -14,34 +15,36 @@ def _build_share_url(*, invite_link: str, share_text: str) -> str:
     )
 
 
-def _build_share_template(*, total_rounds: int) -> str:
-    return "⚔️ Ich fordere dich heraus! Kannst du mich schlagen?"
-
-
 def build_friend_challenge_share_url(*, base_link: str, share_text: str) -> str:
     return _build_share_url(invite_link=base_link, share_text=share_text)
 
 
 def build_friend_challenge_create_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="👤 Freund herausfordern",
-                    callback_data="friend:challenge:type:direct",
-                )
-            ],
-            # HIDDEN: open challenge disabled for now.
+    settings = get_settings()
+    rows = [
+        [
+            InlineKeyboardButton(
+                text="👤 Freund herausfordern",
+                callback_data="friend:challenge:type:direct",
+            )
+        ],
+    ]
+    if settings.tournament_friends_enabled:
+        rows.append(
             [
                 InlineKeyboardButton(
                     text="🏆 Turnier mit Freunden",
                     callback_data="friend:challenge:type:tournament",
                 )
-            ],
+            ]
+        )
+    rows.extend(
+        [
             [InlineKeyboardButton(text="🥊 Arena Cup", callback_data="daily:cup:menu")],
             [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
         ]
     )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def build_friend_challenge_format_keyboard(*, challenge_type: str) -> InlineKeyboardMarkup:
@@ -77,6 +80,16 @@ def build_friend_challenge_next_keyboard(*, challenge_id: str) -> InlineKeyboard
     )
 
 
+def build_friend_challenge_start_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="⚔️ Jetzt spielen", callback_data=f"friend:challenge:round:start:{challenge_id}")
+            ],
+        ]
+    )
+
+
 def build_friend_challenge_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -103,6 +116,12 @@ def build_friend_challenge_share_keyboard(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
+                    text="⚔️ Herausforderung annehmen",
+                    url=invite_link,
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="📤 Teilen ->",
                     switch_inline_query=build_friend_challenge_invite_inline_share_query(
                         challenge_id=challenge_id
@@ -117,6 +136,21 @@ def build_friend_challenge_share_keyboard(
             ],
             [InlineKeyboardButton(text="⚔️ Meine Duelle", callback_data="friend:my:duels")],
             [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
+        ]
+    )
+
+
+def build_friend_challenge_waiting_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            build_friend_challenge_start_keyboard(challenge_id=challenge_id).inline_keyboard[0],
+            [
+                InlineKeyboardButton(
+                    text="⏳ Auf Freund warten",
+                    callback_data=f"friend:challenge:waiting:{challenge_id}",
+                )
+            ],
+            [InlineKeyboardButton(text="🏠 Hauptmenü", callback_data="menu:main")],
         ]
     )
 
@@ -147,11 +181,7 @@ def build_friend_challenge_finished_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def build_friend_challenge_result_share_keyboard(
-    *,
-    share_url: str,
-    challenge_id: str,
-) -> InlineKeyboardMarkup:
+def build_friend_challenge_result_share_keyboard(*, share_url: str, challenge_id: str) -> InlineKeyboardMarkup:
     del share_url
     return InlineKeyboardMarkup(
         inline_keyboard=[

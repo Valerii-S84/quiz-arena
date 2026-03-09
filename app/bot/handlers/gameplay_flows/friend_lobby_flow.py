@@ -10,6 +10,7 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_format_keyboard,
     build_friend_challenge_limit_keyboard,
     build_friend_challenge_share_keyboard,
+    build_friend_challenge_waiting_keyboard,
 )
 from app.bot.keyboards.tournament import build_tournament_format_keyboard
 from app.bot.texts.de import TEXTS_DE
@@ -106,6 +107,11 @@ async def handle_friend_challenge_create_selected(
         return
     welcome_image_file_id = get_settings().resolved_welcome_image_file_id
     photo_sent = False
+    share_keyboard = build_friend_challenge_share_keyboard(
+        invite_link=invite_link,
+        challenge_id=str(challenge.challenge_id),
+        total_rounds=challenge.total_rounds,
+    )
     if welcome_image_file_id:
         bot = callback.bot
         assert bot is not None
@@ -113,9 +119,8 @@ async def handle_friend_challenge_create_selected(
             await bot.send_photo(
                 chat_id=callback.from_user.id,
                 photo=welcome_image_file_id,
-                caption=(
-                    "⚔️ Ich fordere dich heraus! Kannst du mich schlagen?\n\n" f"👉 {invite_link}"
-                ),
+                caption=TEXTS_DE["msg.friend.challenge.invite.caption"],
+                reply_markup=share_keyboard,
             )
             photo_sent = True
         except TelegramAPIError as e:
@@ -127,25 +132,15 @@ async def handle_friend_challenge_create_selected(
                 welcome_image_file_id,
                 e,
             )
-    body_lines = []
     if not photo_sent:
-        body_lines.append("⚔️ Ich fordere dich heraus! Kannst du mich schlagen?")
-    body_lines.extend(
-        [
-            TEXTS_DE["msg.friend.challenge.created"],
-            build_friend_plan_text(total_rounds=challenge.total_rounds),
-            TEXTS_DE["msg.friend.challenge.created.short"],
-        ]
-    )
-    ttl_text = build_friend_ttl_text(challenge=challenge, now_utc=now_utc)
-    if ttl_text is not None:
-        body_lines.append(ttl_text)
+        await callback.message.answer(
+            TEXTS_DE["msg.friend.challenge.invite.caption"],
+            reply_markup=share_keyboard,
+        )
     await callback.message.answer(
-        "\n".join(body_lines),
-        reply_markup=build_friend_challenge_share_keyboard(
-            invite_link=invite_link,
+        TEXTS_DE["msg.friend.challenge.invite.waiting"],
+        reply_markup=build_friend_challenge_waiting_keyboard(
             challenge_id=str(challenge.challenge_id),
-            total_rounds=challenge.total_rounds,
         ),
     )
     await callback.answer()

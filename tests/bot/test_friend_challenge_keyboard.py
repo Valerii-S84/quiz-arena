@@ -7,7 +7,10 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_result_share_keyboard,
     build_friend_challenge_share_keyboard,
     build_friend_challenge_share_url,
+    build_friend_challenge_start_keyboard,
+    build_friend_challenge_waiting_keyboard,
 )
+from app.bot.keyboards import friend_challenge as friend_challenge_keyboard
 
 
 def test_friend_challenge_next_keyboard_contains_next_and_back() -> None:
@@ -25,22 +28,31 @@ def test_friend_challenge_back_keyboard_contains_home_only() -> None:
     assert callbacks == ["home:open"]
 
 
-def test_friend_challenge_create_keyboard_contains_type_options() -> None:
+def test_friend_challenge_create_keyboard_hides_tournament_by_default() -> None:
     keyboard = build_friend_challenge_create_keyboard()
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == [
         "👤 Freund herausfordern",
-        "🏆 Turnier mit Freunden",
         "🥊 Arena Cup",
         "↩️ Zurück",
     ]
     callbacks = [button.callback_data for button in buttons]
     assert callbacks == [
         "friend:challenge:type:direct",
-        "friend:challenge:type:tournament",
         "daily:cup:menu",
         "home:open",
     ]
+
+
+def test_friend_challenge_create_keyboard_can_show_tournament_when_enabled(monkeypatch) -> None:
+    monkeypatch.setattr(
+        friend_challenge_keyboard,
+        "get_settings",
+        lambda: type("Settings", (), {"tournament_friends_enabled": True})(),
+    )
+    keyboard = build_friend_challenge_create_keyboard()
+    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert "friend:challenge:type:tournament" in callbacks
 
 
 def test_friend_challenge_finished_keyboard_contains_rematch_and_back() -> None:
@@ -92,6 +104,8 @@ def test_friend_challenge_share_keyboard_contains_inline_share_and_back() -> Non
         total_rounds=5,
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
+    assert buttons[0].url == "https://t.me/quizarena_bot?start=fc_token"
+    assert buttons[0].text == "⚔️ Herausforderung annehmen"
     inline_queries = [
         button.switch_inline_query for button in buttons if button.switch_inline_query
     ]
@@ -113,6 +127,34 @@ def test_friend_challenge_share_keyboard_without_link_contains_back_only() -> No
     assert all(button.url is None for button in buttons)
     callbacks = [button.callback_data for button in buttons]
     assert callbacks == ["friend:my:duels", "home:open"]
+
+
+def test_friend_challenge_start_keyboard_contains_single_cta() -> None:
+    keyboard = build_friend_challenge_start_keyboard(
+        challenge_id="00000000-0000-0000-0000-000000000001"
+    )
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    assert [button.text for button in buttons] == ["⚔️ Jetzt spielen"]
+    assert [button.callback_data for button in buttons] == [
+        "friend:challenge:round:start:00000000-0000-0000-0000-000000000001"
+    ]
+
+
+def test_friend_challenge_waiting_keyboard_contains_all_choices() -> None:
+    keyboard = build_friend_challenge_waiting_keyboard(
+        challenge_id="00000000-0000-0000-0000-000000000001"
+    )
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    assert [button.text for button in buttons] == [
+        "⚔️ Jetzt spielen",
+        "⏳ Auf Freund warten",
+        "🏠 Hauptmenü",
+    ]
+    assert [button.callback_data for button in buttons] == [
+        "friend:challenge:round:start:00000000-0000-0000-0000-000000000001",
+        "friend:challenge:waiting:00000000-0000-0000-0000-000000000001",
+        "menu:main",
+    ]
 
 
 def test_friend_challenge_share_url_builder_encodes_target_and_text() -> None:

@@ -53,6 +53,9 @@ def register(router: Router) -> None:
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_SHARE_RESULT_RE))(
         handle_friend_challenge_share_result
     )
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_WAITING_RE))(
+        handle_friend_challenge_waiting
+    )
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_NEXT_RE))(
         handle_friend_challenge_next
     )
@@ -218,6 +221,10 @@ async def handle_friend_challenge_share_result(callback: CallbackQuery) -> None:
         emit_analytics_event=gameplay.emit_analytics_event,
         event_source_bot=gameplay.EVENT_SOURCE_BOT,
     )
+
+
+async def handle_friend_challenge_waiting(callback: CallbackQuery) -> None:
+    await callback.answer()
 
 
 async def handle_friend_challenge_next(callback: CallbackQuery) -> None:
