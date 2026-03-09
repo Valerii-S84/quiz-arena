@@ -119,12 +119,6 @@ def build_friend_challenge_share_keyboard(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="⚔️ Herausforderung annehmen",
-                    url=invite_link,
-                )
-            ],
-            [
-                InlineKeyboardButton(
                     text="📤 Teilen ->",
                     switch_inline_query=build_friend_challenge_invite_inline_share_query(
                         challenge_id=challenge_id

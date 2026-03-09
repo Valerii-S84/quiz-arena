@@ -106,6 +106,12 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
     )
     await gameplay_friend_challenge.handle_friend_challenge_create_selected(callback)
 
+    invite_message = callback.message.answers[0]
+    invite_buttons = [
+        button for row in invite_message.kwargs["reply_markup"].inline_keyboard for button in row
+    ]
+    assert all(button.url is None for button in invite_buttons)
+    assert not any(button.text == "⚔️ Herausforderung annehmen" for button in invite_buttons)
     waiting_message = callback.message.answers[1]
     assert waiting_message.text == TEXTS_DE["msg.friend.challenge.invite.waiting"]
     buttons = [

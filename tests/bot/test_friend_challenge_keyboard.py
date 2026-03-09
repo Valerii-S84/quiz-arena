@@ -97,15 +97,20 @@ def test_friend_challenge_limit_keyboard_contains_buy_options_and_back() -> None
     assert "home:open" in callbacks
 
 
-def test_friend_challenge_share_keyboard_contains_inline_share_and_back() -> None:
+def test_friend_challenge_share_keyboard_contains_share_and_copy_without_accept_url() -> None:
     keyboard = build_friend_challenge_share_keyboard(
         invite_link="https://t.me/quizarena_bot?start=fc_token",
         challenge_id="00000000-0000-0000-0000-000000000001",
         total_rounds=5,
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
-    assert buttons[0].url == "https://t.me/quizarena_bot?start=fc_token"
-    assert buttons[0].text == "⚔️ Herausforderung annehmen"
+    assert all(button.url is None for button in buttons)
+    assert [button.text for button in buttons] == [
+        "📤 Teilen ->",
+        "📋 Link kopieren",
+        "⚔️ Meine Duelle",
+        "↩️ Zurück",
+    ]
     inline_queries = [
         button.switch_inline_query for button in buttons if button.switch_inline_query
     ]
@@ -114,6 +119,7 @@ def test_friend_challenge_share_keyboard_contains_inline_share_and_back() -> Non
         button.callback_data == "friend:copy:00000000-0000-0000-0000-000000000001"
         for button in buttons
     )
+    assert not any(button.text == "⚔️ Herausforderung annehmen" for button in buttons)
     assert any(button.callback_data == "friend:my:duels" for button in buttons)
     assert any(button.callback_data == "home:open" for button in buttons)
 

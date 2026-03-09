@@ -91,9 +91,7 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
     assert photo_call["caption"] == TEXTS_DE["msg.friend.challenge.invite.caption"]
     keyboard = photo_call["reply_markup"]
     assert "https://t.me/" not in (photo_call["caption"] or "")
-    assert keyboard.inline_keyboard[0][0].url == (
-        "https://t.me/testbot?start=duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    )
+    assert keyboard is not None
     inline_queries = [
         button.switch_inline_query
         for row in keyboard.inline_keyboard
@@ -101,6 +99,14 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
         if button.switch_inline_query
     ]
     assert inline_queries == ["invite:duel:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
+    assert all(
+        button.url is None for row in keyboard.inline_keyboard for button in row
+    )
+    assert not any(
+        button.text == "⚔️ Herausforderung annehmen"
+        for row in keyboard.inline_keyboard
+        for button in row
+    )
     waiting_response = callback.message.answers[0]
     assert waiting_response.text == TEXTS_DE["msg.friend.challenge.invite.waiting"]
     waiting_callbacks = [
