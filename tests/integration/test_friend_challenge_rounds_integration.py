@@ -241,6 +241,60 @@ async def test_friend_challenge_creator_can_continue_without_waiting_for_opponen
 
 
 @pytest.mark.asyncio
+async def test_friend_challenge_creator_can_start_and_progress_before_opponent_joins() -> None:
+    now_utc = datetime(2026, 2, 19, 18, 50, tzinfo=UTC)
+    creator_user_id = await _create_user("fc_pending_creator")
+
+    async with SessionLocal.begin() as session:
+        challenge = await GameSessionService.create_friend_challenge(
+            session,
+            creator_user_id=creator_user_id,
+            mode_code="QUICK_MIX_A1A2",
+            now_utc=now_utc,
+            total_rounds=5,
+        )
+        round_one = await GameSessionService.start_friend_challenge_round(
+            session,
+            user_id=creator_user_id,
+            challenge_id=challenge.challenge_id,
+            idempotency_key="fc:pending:creator:start:1",
+            now_utc=now_utc,
+        )
+        assert round_one.start_result is not None
+
+        question = await get_question_by_id(
+            session,
+            round_one.start_result.session.mode_code,
+            question_id=round_one.start_result.session.question_id,
+            local_date_berlin=now_utc.date(),
+        )
+        assert question is not None
+        first_answer = await GameSessionService.submit_answer(
+            session,
+            user_id=creator_user_id,
+            session_id=round_one.start_result.session.session_id,
+            selected_option=question.correct_option,
+            idempotency_key="fc:pending:creator:answer:1",
+            now_utc=now_utc,
+        )
+        round_two = await GameSessionService.start_friend_challenge_round(
+            session,
+            user_id=creator_user_id,
+            challenge_id=challenge.challenge_id,
+            idempotency_key="fc:pending:creator:start:2",
+            now_utc=now_utc,
+        )
+
+    assert first_answer.friend_challenge is not None
+    assert first_answer.friend_challenge.status == "PENDING"
+    assert first_answer.friend_challenge.creator_score == 1
+    assert first_answer.friend_challenge_waiting_for_opponent is True
+    assert round_two.start_result is not None
+    assert round_two.snapshot.status == "PENDING"
+    assert round_two.snapshot.current_round == 2
+
+
+@pytest.mark.asyncio
 async def test_friend_challenge_opponent_round_one_does_not_send_push() -> None:
     now_utc = datetime(2026, 2, 19, 19, 0, tzinfo=UTC)
     _creator_user_id, opponent_user_id, challenge_id = await create_joined_duel(now_utc)
