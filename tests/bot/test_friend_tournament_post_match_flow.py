@@ -6,9 +6,11 @@ from uuid import UUID
 
 import pytest
 
-from app.bot.handlers.gameplay_flows import friend_answer_completion_flow
-from app.bot.handlers.gameplay_flows import tournament_match_post_flow
 from app.bot.handlers import gameplay_tournament_notifications
+from app.bot.handlers.gameplay_flows import (
+    friend_answer_completion_flow,
+    tournament_match_post_flow,
+)
 from app.workers.tasks import tournaments_proof_cards
 from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessionLocal
 

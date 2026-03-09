@@ -12,11 +12,6 @@ from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import (
     DailyChallengeAlreadyPlayedError,
     EnergyInsufficientError,
-    FriendChallengeAccessError,
-    FriendChallengeCompletedError,
-    FriendChallengeExpiredError,
-    FriendChallengeFullError,
-    FriendChallengeNotFoundError,
     ModeLockedError,
 )
 from app.game.sessions.types import AnswerSessionResult, FriendChallengeRoundStartResult
@@ -209,13 +204,3 @@ async def continue_regular_mode_after_answer(
         parse_mode="HTML",
     )
     await callback.answer()
-
-
-FRIEND_CHALLENGE_START_ERRORS = (
-    FriendChallengeNotFoundError,
-    FriendChallengeAccessError,
-    FriendChallengeCompletedError,
-    FriendChallengeFullError,
-)
-
-FRIEND_CHALLENGE_EXPIRED_ERROR = FriendChallengeExpiredError

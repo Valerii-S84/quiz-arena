@@ -8,6 +8,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 
 from app.bot.handlers import (
+    gameplay_analytics,
     gameplay_callbacks,
     gameplay_daily_cup,
     gameplay_friend_challenge,
@@ -46,6 +47,7 @@ from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="gameplay")
 EVENT_SOURCE_BOT = "BOT"
+emit_analytics_event = gameplay_analytics.emit_analytics_event
 
 ANSWER_RE, DAILY_RESULT_RE = gameplay_callbacks.ANSWER_RE, gameplay_callbacks.DAILY_RESULT_RE
 gameplay_friend_challenge.register(router)
@@ -67,13 +69,6 @@ _SESSION_DEPS: dict[str, object] = {
     "user_onboarding_service": UserOnboardingService,
     "game_session_service": GameSessionService,
 }
-
-
-async def emit_analytics_event(*args, **kwargs):
-    from app.core.analytics_events import emit_analytics_event as _emit_analytics_event
-
-    await _emit_analytics_event(*args, **kwargs)
-
 
 _resolve_opponent_label = partial(
     gameplay_helpers._resolve_opponent_label,
