@@ -142,7 +142,6 @@ def build_friend_challenge_waiting_keyboard(*, challenge_id: str) -> InlineKeybo
         inline_keyboard=[
             build_friend_challenge_start_keyboard(challenge_id=challenge_id).inline_keyboard[0],
             [InlineKeyboardButton(text="⏳ Auf Freund warten", callback_data="menu:main")],
-            [InlineKeyboardButton(text="🏠 Hauptmenü", callback_data="menu:main")],
         ]
     )
 

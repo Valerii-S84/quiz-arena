@@ -122,7 +122,7 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_invite_sent_sends_waiting_keyboard() -> None:
+async def test_handle_friend_challenge_invite_sent_answers_with_waiting_toast() -> None:
     callback = DummyCallback(
         data="friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         from_user=SimpleNamespace(id=17),
@@ -130,17 +130,9 @@ async def test_handle_friend_challenge_invite_sent_sends_waiting_keyboard() -> N
     )
     await gameplay_friend_challenge.handle_friend_challenge_invite_sent(callback)
 
-    waiting_message = callback.message.answers[0]
-    assert waiting_message.text == TEXTS_DE["msg.friend.challenge.invite.waiting"]
-    buttons = [
-        button.text
-        for row in waiting_message.kwargs["reply_markup"].inline_keyboard
-        for button in row
-    ]
-    assert buttons == [
-        "⚔️ Jetzt spielen",
-        "⏳ Auf Freund warten",
-        "🏠 Hauptmenü",
+    assert callback.message.answers == []
+    assert callback.answer_calls == [
+        {"text": TEXTS_DE["msg.friend.challenge.invite.waiting"], "show_alert": False}
     ]
 
 

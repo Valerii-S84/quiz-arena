@@ -10,7 +10,6 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_format_keyboard,
     build_friend_challenge_limit_keyboard,
     build_friend_challenge_share_keyboard,
-    build_friend_challenge_waiting_keyboard,
 )
 from app.bot.keyboards.tournament import build_tournament_format_keyboard
 from app.bot.texts.de import TEXTS_DE
@@ -153,11 +152,7 @@ async def handle_friend_challenge_invite_sent(
     if challenge_id is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
-    await callback.message.answer(
-        TEXTS_DE["msg.friend.challenge.invite.waiting"],
-        reply_markup=build_friend_challenge_waiting_keyboard(challenge_id=str(challenge_id)),
-    )
-    await callback.answer()
+    await callback.answer(TEXTS_DE["msg.friend.challenge.invite.waiting"])
 
 
 async def handle_friend_copy_link(

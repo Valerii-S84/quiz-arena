@@ -157,11 +157,9 @@ def test_friend_challenge_waiting_keyboard_contains_all_choices() -> None:
     assert [button.text for button in buttons] == [
         "⚔️ Jetzt spielen",
         "⏳ Auf Freund warten",
-        "🏠 Hauptmenü",
     ]
     assert [button.callback_data for button in buttons] == [
         "friend:challenge:round:start:00000000-0000-0000-0000-000000000001",
-        "menu:main",
         "menu:main",
     ]
 
