@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.referral_codes import generate_referral_code
 from app.db.models.users import User
+from app.db.repo.streak_repo import StreakRepo
 from app.db.repo.users_repo import UsersRepo
 from app.economy.energy.service import EnergyService
 from app.economy.referrals.service import ReferralService
@@ -22,6 +23,7 @@ class HomeSnapshot:
     paid_energy: int
     current_streak: int
     best_streak: int
+    global_best_streak: int
     daily_cup_badge_unlocked: bool
 
 
@@ -86,6 +88,7 @@ class UserOnboardingService:
         streak_snapshot = await StreakService.sync_rollover(
             session, user_id=user.id, now_utc=now_utc
         )
+        global_best_streak = await StreakRepo.get_global_best_streak(session)
         daily_cup_badge_unlocked = await has_daily_cup_5_day_badge(session, user_id=user.id)
 
         return HomeSnapshot(
@@ -94,5 +97,6 @@ class UserOnboardingService:
             paid_energy=energy_snapshot.paid_energy,
             current_streak=streak_snapshot.current_streak,
             best_streak=streak_snapshot.best_streak,
+            global_best_streak=global_best_streak,
             daily_cup_badge_unlocked=daily_cup_badge_unlocked,
         )
