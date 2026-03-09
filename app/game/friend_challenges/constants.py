@@ -56,3 +56,10 @@ def is_duel_active_status(status: str) -> bool:
 
 def is_duel_playable_status(status: str) -> bool:
     return status in DUEL_PLAYABLE_STATUSES
+
+
+def is_duel_playable_for_user(*, status: str, has_opponent: bool, is_creator: bool) -> bool:
+    normalized_status = normalize_duel_status(status=status, has_opponent=has_opponent)
+    if is_duel_playable_status(normalized_status):
+        return True
+    return normalized_status == DUEL_STATUS_PENDING and is_creator

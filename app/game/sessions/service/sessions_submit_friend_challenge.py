@@ -12,6 +12,8 @@ from app.game.friend_challenges.constants import (
     DUEL_STATUS_COMPLETED,
     DUEL_STATUS_CREATOR_DONE,
     DUEL_STATUS_OPPONENT_DONE,
+    DUEL_STATUS_PENDING,
+    is_duel_playable_for_user,
     is_duel_playable_status,
     normalize_duel_status,
 )
@@ -50,6 +52,7 @@ async def _apply_friend_challenge_answer(
         )
 
         is_creator = challenge.creator_user_id == user_id
+        has_opponent = challenge.opponent_user_id is not None
         if not is_creator and challenge.opponent_user_id != user_id:
             raise FriendChallengeAccessError
 
@@ -66,7 +69,11 @@ async def _apply_friend_challenge_answer(
                 source=EVENT_SOURCE_BOT,
             )
 
-        if is_duel_playable_status(challenge.status):
+        if is_duel_playable_for_user(
+            status=challenge.status,
+            has_opponent=has_opponent,
+            is_creator=is_creator,
+        ):
             if is_creator:
                 if challenge.creator_answered_round < answered_round:
                     if is_correct:
@@ -79,7 +86,7 @@ async def _apply_friend_challenge_answer(
                     challenge.opponent_answered_round = answered_round
 
             both_answered_round = (
-                challenge.opponent_user_id is not None
+                has_opponent
                 and challenge.creator_answered_round >= answered_round
                 and challenge.opponent_answered_round >= answered_round
             )
@@ -116,7 +123,7 @@ async def _apply_friend_challenge_answer(
             elif challenge.opponent_finished_at:
                 challenge.status = DUEL_STATUS_OPPONENT_DONE
             else:
-                challenge.status = DUEL_STATUS_ACCEPTED
+                challenge.status = DUEL_STATUS_ACCEPTED if has_opponent else DUEL_STATUS_PENDING
 
         challenge.updated_at = now_utc
         if challenge.tournament_match_id is not None:
@@ -127,8 +134,12 @@ async def _apply_friend_challenge_answer(
                 now_utc=now_utc,
             )
         friend_snapshot = _build_friend_challenge_snapshot(challenge)
-        friend_waiting_for_opponent = is_duel_playable_status(challenge.status) and (
-            challenge.opponent_user_id is None
+        friend_waiting_for_opponent = is_duel_playable_for_user(
+            status=challenge.status,
+            has_opponent=has_opponent,
+            is_creator=is_creator,
+        ) and (
+            not has_opponent
             or (
                 challenge.opponent_answered_round < answered_round
                 if is_creator
