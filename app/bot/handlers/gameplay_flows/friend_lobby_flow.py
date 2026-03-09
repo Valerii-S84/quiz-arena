@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, cast
 from datetime import datetime, timezone
+from typing import Any, cast
 
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery

@@ -80,9 +80,9 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
         "⏳ Auf Freund warten",
     ]
     assert all(button.url is None for button in buttons)
-    assert [
-        button.switch_inline_query for button in buttons if button.switch_inline_query
-    ] == ["invite:duel:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
+    assert [button.switch_inline_query for button in buttons if button.switch_inline_query] == [
+        "invite:duel:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    ]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert callbacks == [
         "friend:copy:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
@@ -90,7 +90,6 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
         "friend:invite:required:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "menu:main",
     ]
-    assert (
-        "⚔️ Herausforderung annehmen"
-        not in [button.text for row in keyboard.inline_keyboard for button in row]
-    )
+    assert "⚔️ Herausforderung annehmen" not in [
+        button.text for row in keyboard.inline_keyboard for button in row
+    ]

@@ -16,6 +16,7 @@ from app.bot.keyboards.friend_challenge import build_friend_challenge_create_key
 from app.bot.keyboards.tournament import build_tournament_format_keyboard
 from app.bot.texts.de import TEXTS_DE
 
+
 def _gameplay():
     from app.bot.handlers import gameplay
 
@@ -224,6 +225,7 @@ async def handle_friend_challenge_share_result(callback: CallbackQuery) -> None:
         event_source_bot=gameplay.EVENT_SOURCE_BOT,
     )
 
+
 async def handle_friend_challenge_invite_sent(callback: CallbackQuery) -> None:
     await friend_lobby_flow.handle_friend_challenge_invite_sent(
         callback,
@@ -231,8 +233,10 @@ async def handle_friend_challenge_invite_sent(callback: CallbackQuery) -> None:
         parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
     )
 
+
 async def handle_friend_challenge_invite_required(callback: CallbackQuery) -> None:
     await callback.answer(TEXTS_DE["msg.friend.challenge.invite.confirm.first"])
+
 
 async def handle_friend_challenge_next(callback: CallbackQuery) -> None:
     gameplay = _gameplay()

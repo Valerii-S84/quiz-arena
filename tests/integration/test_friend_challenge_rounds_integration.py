@@ -286,7 +286,9 @@ async def test_friend_challenge_opponent_round_three_does_not_send_push() -> Non
 
 
 @pytest.mark.asyncio
-async def test_friend_challenge_opponent_finish_sends_exactly_one_push_if_creator_not_started() -> None:
+async def test_friend_challenge_opponent_finish_sends_exactly_one_push_if_creator_not_started() -> (
+    None
+):
     now_utc = datetime(2026, 2, 19, 19, 30, tzinfo=UTC)
     creator_user_id, opponent_user_id, challenge_id = await create_joined_duel(now_utc)
     opponent_telegram_user_id = await telegram_user_id(opponent_user_id)
