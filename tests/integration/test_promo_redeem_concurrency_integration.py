@@ -15,6 +15,7 @@ from app.db.session import SessionLocal
 from app.economy.promo.errors import PromoAlreadyUsedError
 from app.economy.promo.service import PromoService
 from app.services.promo_codes import hash_promo_code, normalize_promo_code
+from tests.integration.stable_ids import stable_int_id, stable_telegram_user_id
 
 UTC = timezone.utc
 
@@ -23,7 +24,7 @@ async def _create_user(seed: str) -> int:
     async with SessionLocal.begin() as session:
         user = await UsersRepo.create(
             session,
-            telegram_user_id=70_000_000_000 + (abs(hash(seed)) % 1_000_000),
+            telegram_user_id=stable_telegram_user_id(prefix=70_000_000_000, seed=seed),
             referral_code=f"R{uuid4().hex[:10]}",
             username=None,
             first_name="PromoConcurrency",
@@ -39,7 +40,7 @@ async def _create_discount_code(*, raw_code: str, now_utc: datetime) -> PromoCod
         pepper=get_settings().promo_secret_pepper,
     )
 
-    promo_id = abs(hash((raw_code, "concurrency"))) % 1_000_000_000 + 1
+    promo_id = stable_int_id(raw_code, "concurrency")
     promo_code = PromoCode(
         id=promo_id,
         code_hash=code_hash,

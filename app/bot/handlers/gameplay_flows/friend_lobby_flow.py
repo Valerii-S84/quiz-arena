@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any, cast
 from datetime import datetime, timezone
 
 from aiogram.exceptions import TelegramAPIError
@@ -9,8 +10,8 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
     build_friend_challenge_format_keyboard,
     build_friend_challenge_limit_keyboard,
+    build_friend_challenge_share_confirmed_keyboard,
     build_friend_challenge_share_keyboard,
-    build_friend_challenge_waiting_keyboard,
 )
 from app.bot.keyboards.tournament import build_tournament_format_keyboard
 from app.bot.texts.de import TEXTS_DE
@@ -120,6 +121,7 @@ async def handle_friend_challenge_create_selected(
                 chat_id=callback.from_user.id,
                 photo=welcome_image_file_id,
                 caption=TEXTS_DE["msg.friend.challenge.invite.caption"],
+                parse_mode="HTML",
                 reply_markup=share_keyboard,
             )
             photo_sent = True
@@ -135,15 +137,32 @@ async def handle_friend_challenge_create_selected(
     if not photo_sent:
         await callback.message.answer(
             TEXTS_DE["msg.friend.challenge.invite.caption"],
+            parse_mode="HTML",
             reply_markup=share_keyboard,
         )
-    await callback.message.answer(
-        TEXTS_DE["msg.friend.challenge.invite.waiting"],
-        reply_markup=build_friend_challenge_waiting_keyboard(
-            challenge_id=str(challenge.challenge_id),
-        ),
-    )
     await callback.answer()
+
+
+async def handle_friend_challenge_invite_sent(
+    callback: CallbackQuery,
+    *,
+    friend_invite_sent_re,
+    parse_uuid_callback,
+) -> None:
+    if callback.message is None or callback.data is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    if not hasattr(callback.message, "edit_reply_markup"):
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    challenge_id = parse_uuid_callback(pattern=friend_invite_sent_re, callback_data=callback.data)
+    if challenge_id is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    await cast(Any, callback.message).edit_reply_markup(
+        reply_markup=build_friend_challenge_share_confirmed_keyboard(challenge_id=str(challenge_id))
+    )
+    await callback.answer(TEXTS_DE["msg.friend.challenge.invite.waiting"])
 
 
 async def handle_friend_copy_link(

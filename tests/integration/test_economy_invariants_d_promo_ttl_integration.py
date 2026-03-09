@@ -15,6 +15,7 @@ from app.economy.purchases.errors import PurchasePrecheckoutValidationError
 from app.economy.purchases.service import PurchaseService
 from app.services.promo_codes import hash_promo_code, normalize_promo_code
 from tests.integration.payments_idempotency_fixtures import UTC, _create_user
+from tests.integration.stable_ids import stable_int_id
 
 
 async def _create_discount_code(
@@ -28,7 +29,7 @@ async def _create_discount_code(
         normalized_code=normalized,
         pepper=get_settings().promo_secret_pepper,
     )
-    promo_code_id = abs(hash((raw_code, target_scope))) % 1_000_000_000 + 1
+    promo_code_id = stable_int_id(raw_code, target_scope)
 
     async with SessionLocal.begin() as session:
         session.add(

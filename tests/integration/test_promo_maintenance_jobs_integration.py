@@ -16,6 +16,7 @@ from app.workers.tasks.promo_maintenance import (
     run_promo_campaign_status_rollover_async,
     run_promo_reservation_expiry_async,
 )
+from tests.integration.stable_ids import stable_telegram_user_id
 
 UTC = timezone.utc
 
@@ -24,7 +25,7 @@ async def _create_user(seed: str) -> int:
     async with SessionLocal.begin() as session:
         user = await UsersRepo.create(
             session,
-            telegram_user_id=50_000_000_000 + (abs(hash(seed)) % 1_000_000),
+            telegram_user_id=stable_telegram_user_id(prefix=50_000_000_000, seed=seed),
             referral_code=f"R{uuid4().hex[:10]}",
             username=None,
             first_name="PromoJob",

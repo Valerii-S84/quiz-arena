@@ -106,17 +106,63 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
     )
     await gameplay_friend_challenge.handle_friend_challenge_create_selected(callback)
 
-    waiting_message = callback.message.answers[1]
-    assert waiting_message.text == TEXTS_DE["msg.friend.challenge.invite.waiting"]
-    buttons = [
-        button.text
-        for row in waiting_message.kwargs["reply_markup"].inline_keyboard
-        for button in row
+    invite_message = callback.message.answers[0]
+    invite_buttons = [
+        button for row in invite_message.kwargs["reply_markup"].inline_keyboard for button in row
     ]
-    assert buttons == [
+    assert all(button.url is None for button in invite_buttons)
+    assert not any(button.text == "⚔️ Herausforderung annehmen" for button in invite_buttons)
+    assert [button.text for button in invite_buttons] == [
+        "📤 Teilen ->",
+        "📋 Link kopieren",
+        "✅ Einladung gesendet",
         "⚔️ Jetzt spielen",
         "⏳ Auf Freund warten",
-        "🏠 Hauptmenü",
+    ]
+    assert len(callback.message.answers) == 1
+
+
+@pytest.mark.asyncio
+async def test_handle_friend_challenge_invite_sent_answers_with_waiting_toast() -> None:
+    message = DummyMessage()
+    callback = DummyCallback(
+        data="friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        from_user=SimpleNamespace(id=17),
+        message=message,
+    )
+    await gameplay_friend_challenge.handle_friend_challenge_invite_sent(callback)
+
+    assert callback.message.answers == []
+    assert len(message.edit_reply_markup_calls) == 1
+    edited_markup = message.edit_reply_markup_calls[0]["reply_markup"]
+    edited_callbacks = [
+        button.callback_data
+        for row in edited_markup.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert edited_callbacks == [
+        "friend:copy:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "friend:challenge:round:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "menu:main",
+    ]
+    assert callback.answer_calls == [
+        {"text": TEXTS_DE["msg.friend.challenge.invite.waiting"], "show_alert": False}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_handle_friend_challenge_invite_required_answers_with_confirmation_hint() -> None:
+    callback = DummyCallback(
+        data="friend:invite:required:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+    await gameplay_friend_challenge.handle_friend_challenge_invite_required(callback)
+
+    assert callback.answer_calls == [
+        {"text": TEXTS_DE["msg.friend.challenge.invite.confirm.first"], "show_alert": False}
     ]
 
 
