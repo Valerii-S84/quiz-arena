@@ -41,6 +41,7 @@ TEXTS_DE: dict[str, str] = {
     "msg.friend.challenge.created.fallback": "🤝 Duell erstellt. Teile den Start-Code: fc_{invite_token}",
     "msg.friend.challenge.invite.caption": "Du wurdest zu einem Duell herausgefordert! Kannst du gewinnen?",
     "msg.friend.challenge.invite.waiting": "🎯 Einladung gesendet! Starte jetzt oder warte auf deinen Freund.",
+    "msg.friend.challenge.invite.confirm.first": "Bestätige zuerst mit '✅ Einladung gesendet'.",
     "msg.friend.challenge.create.choose": "⚔️ Fordere einen Freund heraus! Wer mehr richtige Antworten hat, gewinnt.",
     "msg.friend.challenge.create.format": "🎯 Wähle dein Format – Blitz für Schnelle, Voll für Mutige!",
     "msg.friend.challenge.tournament.format": "🏆 Turnier erstellen\n\nWie viele Fragen pro Spiel?",

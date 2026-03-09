@@ -131,15 +131,34 @@ def build_friend_challenge_share_keyboard(
                     callback_data=f"friend:invite:sent:{challenge_id}",
                 )
             ],
-            build_friend_challenge_start_keyboard(challenge_id=challenge_id).inline_keyboard[0],
+            [
+                InlineKeyboardButton(
+                    text="⚔️ Jetzt spielen",
+                    callback_data=f"friend:invite:required:{challenge_id}",
+                )
+            ],
             [InlineKeyboardButton(text="⏳ Auf Freund warten", callback_data="menu:main")],
         ]
     )
 
 
-def build_friend_challenge_waiting_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:
+def build_friend_challenge_share_confirmed_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="📤 Teilen ->",
+                    switch_inline_query=build_friend_challenge_invite_inline_share_query(
+                        challenge_id=challenge_id
+                    ),
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="✅ Einladung gesendet",
+                    callback_data=f"friend:invite:sent:{challenge_id}",
+                )
+            ],
             build_friend_challenge_start_keyboard(challenge_id=challenge_id).inline_keyboard[0],
             [InlineKeyboardButton(text="⏳ Auf Freund warten", callback_data="menu:main")],
         ]

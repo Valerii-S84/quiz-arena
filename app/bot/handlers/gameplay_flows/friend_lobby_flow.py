@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any, cast
 from datetime import datetime, timezone
 
 from aiogram.exceptions import TelegramAPIError
@@ -9,6 +10,7 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
     build_friend_challenge_format_keyboard,
     build_friend_challenge_limit_keyboard,
+    build_friend_challenge_share_confirmed_keyboard,
     build_friend_challenge_share_keyboard,
 )
 from app.bot.keyboards.tournament import build_tournament_format_keyboard
@@ -148,10 +150,16 @@ async def handle_friend_challenge_invite_sent(
     if callback.message is None or callback.data is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
+    if not hasattr(callback.message, "edit_reply_markup"):
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
     challenge_id = parse_uuid_callback(pattern=friend_invite_sent_re, callback_data=callback.data)
     if challenge_id is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
+    await cast(Any, callback.message).edit_reply_markup(
+        reply_markup=build_friend_challenge_share_confirmed_keyboard(challenge_id=str(challenge_id))
+    )
     await callback.answer(TEXTS_DE["msg.friend.challenge.invite.waiting"])
 
 
