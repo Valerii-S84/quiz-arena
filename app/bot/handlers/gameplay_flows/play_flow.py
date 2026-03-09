@@ -111,6 +111,7 @@ async def start_mode(
         reply_markup=build_quiz_keyboard(
             session_id=str(result.session.session_id),
             options=result.session.options,
+            is_tournament=result.session.source == "TOURNAMENT",
         ),
         parse_mode="HTML",
     )
@@ -138,6 +139,7 @@ async def send_friend_round_question(
         reply_markup=build_quiz_keyboard(
             session_id=str(round_start.start_result.session.session_id),
             options=round_start.start_result.session.options,
+            is_tournament=round_start.snapshot.tournament_match_id is not None,
         ),
         parse_mode="HTML",
     )

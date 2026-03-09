@@ -31,6 +31,7 @@ class TournamentParticipantsRepo:
                 joined_at=joined_at,
                 standings_message_id=None,
                 proof_card_file_id=None,
+                proof_card_sent=False,
             )
             .on_conflict_do_nothing(
                 index_elements=[
@@ -179,6 +180,25 @@ class TournamentParticipantsRepo:
                 TournamentParticipant.proof_card_file_id.is_(None),
             )
             .values(proof_card_file_id=file_id)
+            .returning(TournamentParticipant.user_id)
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one_or_none() is not None)
+
+    @staticmethod
+    async def set_proof_card_sent(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+        user_id: int,
+    ) -> int:
+        stmt = (
+            update(TournamentParticipant)
+            .where(
+                TournamentParticipant.tournament_id == tournament_id,
+                TournamentParticipant.user_id == user_id,
+            )
+            .values(proof_card_sent=True)
             .returning(TournamentParticipant.user_id)
         )
         result = await session.execute(stmt)

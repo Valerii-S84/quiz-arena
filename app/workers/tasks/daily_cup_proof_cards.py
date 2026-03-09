@@ -78,13 +78,7 @@ async def run_daily_cup_proof_cards_async(
             else all_participants
         )
         if not participants:
-            return {
-                "processed": 1,
-                "participants_total": 0,
-                "sent": 0,
-                "cached_reused": 0,
-                "failed": 0,
-            }
+            return _empty_result() | {"processed": 1}
 
         users = await UsersRepo.list_by_ids(
             session, [int(item.user_id) for item in all_participants]
@@ -106,6 +100,7 @@ async def run_daily_cup_proof_cards_async(
     cached_reused = 0
     failed = 0
     new_file_ids: dict[int, str] = {}
+    sent_user_ids: set[int] = set()
 
     bot = build_bot()
     try:
@@ -127,10 +122,12 @@ async def run_daily_cup_proof_cards_async(
                 ),
             )
             keyboard = build_daily_cup_share_keyboard(
-                tournament_id=tournament_id,
-                share_url=share_url,
+                tournament_id=tournament_id, share_url=share_url
             )
-            cached_file_id = participant_rows[current_user_id].proof_card_file_id
+            participant_row = participant_rows[current_user_id]
+            if participant_row.proof_card_sent:
+                continue
+            cached_file_id = participant_row.proof_card_file_id
             try:
                 if cached_file_id:
                     await bot.send_photo(
@@ -141,6 +138,7 @@ async def run_daily_cup_proof_cards_async(
                     )
                     sent += 1
                     cached_reused += 1
+                    sent_user_ids.add(current_user_id)
                     continue
 
                 card_png = render_tournament_proof_card_png(
@@ -163,6 +161,7 @@ async def run_daily_cup_proof_cards_async(
                     reply_markup=keyboard,
                 )
                 sent += 1
+                sent_user_ids.add(current_user_id)
                 if message.photo:
                     new_file_ids[current_user_id] = message.photo[-1].file_id
             except Exception as exc:
@@ -176,8 +175,14 @@ async def run_daily_cup_proof_cards_async(
     finally:
         await bot.session.close()
 
-    if new_file_ids:
+    if new_file_ids or sent_user_ids:
         async with SessionLocal.begin() as session:
+            for current_user_id in sent_user_ids:
+                await TournamentParticipantsRepo.set_proof_card_sent(
+                    session,
+                    tournament_id=parsed_tournament_id,
+                    user_id=current_user_id,
+                )
             for current_user_id, file_id in new_file_ids.items():
                 await TournamentParticipantsRepo.set_proof_card_file_id_if_missing(
                     session,
