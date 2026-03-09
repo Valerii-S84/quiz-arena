@@ -121,6 +121,7 @@ async def handle_friend_challenge_create_selected(
                 chat_id=callback.from_user.id,
                 photo=welcome_image_file_id,
                 caption=TEXTS_DE["msg.friend.challenge.invite.caption"],
+                parse_mode="HTML",
                 reply_markup=share_keyboard,
             )
             photo_sent = True
@@ -136,6 +137,7 @@ async def handle_friend_challenge_create_selected(
     if not photo_sent:
         await callback.message.answer(
             TEXTS_DE["msg.friend.challenge.invite.caption"],
+            parse_mode="HTML",
             reply_markup=share_keyboard,
         )
     await callback.answer()

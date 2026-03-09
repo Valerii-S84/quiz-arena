@@ -107,8 +107,8 @@ def test_friend_challenge_share_keyboard_contains_share_and_copy_without_accept_
     assert all(button.url is None for button in buttons)
     assert [button.text for button in buttons] == [
         "📤 Teilen ->",
-        "✅ Einladung gesendet",
         "📋 Link kopieren",
+        "✅ Einladung gesendet",
         "⚔️ Jetzt spielen",
         "⏳ Auf Freund warten",
     ]
@@ -161,14 +161,14 @@ def test_friend_challenge_share_confirmed_keyboard_contains_unlocked_choices() -
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == [
         "📤 Teilen ->",
-        "✅ Einladung gesendet",
         "📋 Link kopieren",
+        "✅ Einladung gesendet",
         "⚔️ Jetzt spielen",
         "⏳ Auf Freund warten",
     ]
     assert [button.callback_data for button in buttons if button.callback_data] == [
-        "friend:invite:sent:00000000-0000-0000-0000-000000000001",
         "friend:copy:00000000-0000-0000-0000-000000000001",
+        "friend:invite:sent:00000000-0000-0000-0000-000000000001",
         "friend:challenge:round:start:00000000-0000-0000-0000-000000000001",
         "menu:main",
     ]
