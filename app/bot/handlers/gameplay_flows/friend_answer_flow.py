@@ -107,6 +107,7 @@ async def handle_friend_answer_branch(
     if (
         not result.idempotent_replay
         and opponent_user_id is not None
+        and opponent_user_id == challenge.creator_user_id
         and await _should_notify_creator_after_opponent_finished(
             session_local=session_local,
             challenge_id=challenge.challenge_id,
