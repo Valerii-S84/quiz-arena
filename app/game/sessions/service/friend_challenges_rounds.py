@@ -11,10 +11,7 @@ from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.economy.streak.time import berlin_local_date
-from app.game.friend_challenges.constants import (
-    is_duel_playable_for_user,
-    normalize_duel_status,
-)
+from app.game.friend_challenges.constants import is_duel_playable_for_user, normalize_duel_status
 from app.game.sessions.errors import (
     FriendChallengeAccessError,
     FriendChallengeCompletedError,
@@ -91,9 +88,7 @@ async def start_friend_challenge_round(
         raise FriendChallengeCompletedError
 
     participant_answered_round = (
-        challenge.creator_answered_round
-        if is_creator
-        else challenge.opponent_answered_round
+        challenge.creator_answered_round if is_creator else challenge.opponent_answered_round
     )
     next_round = participant_answered_round + 1
     if next_round > challenge.total_rounds:

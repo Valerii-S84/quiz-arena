@@ -9,10 +9,7 @@ from app.db.models.quiz_attempts import QuizAttempt
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.economy.streak.service import StreakService
-from app.game.friend_challenges.constants import (
-    is_duel_playable_for_user,
-    normalize_duel_status,
-)
+from app.game.friend_challenges.constants import is_duel_playable_for_user, normalize_duel_status
 from app.game.sessions.types import AnswerSessionResult
 
 from .friend_challenges_internal import _build_friend_challenge_snapshot
