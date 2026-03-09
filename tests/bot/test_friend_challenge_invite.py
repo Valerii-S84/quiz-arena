@@ -13,7 +13,9 @@ from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessio
 
 
 @pytest.mark.asyncio
-async def test_friend_challenge_invite_photo_contains_caption_and_accept_button(monkeypatch) -> None:
+async def test_friend_challenge_invite_photo_contains_caption_and_accept_button(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
@@ -71,4 +73,6 @@ async def test_friend_challenge_invite_photo_contains_caption_and_accept_button(
 
     accept_button = photo_call["reply_markup"].inline_keyboard[0][0]
     assert accept_button.text == "⚔️ Herausforderung annehmen"
-    assert accept_button.url == "https://t.me/testbot?start=duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    assert (
+        accept_button.url == "https://t.me/testbot?start=duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    )

@@ -5,9 +5,7 @@ from uuid import UUID
 
 ANSWER_RE = re.compile(r"^answer:([0-9a-f\-]{36}):([0-3])$")
 STOP_RE = re.compile(r"^game:stop:([0-9a-f\-]{36})$")
-FRIEND_NEXT_RE = re.compile(
-    r"^(?:friend:next|friend:challenge:round:start):([0-9a-f\-]{36})$"
-)
+FRIEND_NEXT_RE = re.compile(r"^(?:friend:next|friend:challenge:round:start):([0-9a-f\-]{36})$")
 FRIEND_CREATE_TYPE_RE = re.compile(r"^friend:challenge:type:(direct|open|tournament)$")
 FRIEND_CREATE_FORMAT_RE = re.compile(r"^friend:challenge:format:(direct|open):(5|12)$")
 FRIEND_CREATE_LEGACY_RE = re.compile(r"^friend:challenge:create:(5|12)$")

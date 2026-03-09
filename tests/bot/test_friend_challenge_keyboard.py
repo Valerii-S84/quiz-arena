@@ -1,3 +1,4 @@
+from app.bot.keyboards import friend_challenge as friend_challenge_keyboard
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
     build_friend_challenge_create_keyboard,
@@ -10,7 +11,6 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_start_keyboard,
     build_friend_challenge_waiting_keyboard,
 )
-from app.bot.keyboards import friend_challenge as friend_challenge_keyboard
 
 
 def test_friend_challenge_next_keyboard_contains_next_and_back() -> None:

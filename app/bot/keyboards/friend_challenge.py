@@ -84,7 +84,10 @@ def build_friend_challenge_start_keyboard(*, challenge_id: str) -> InlineKeyboar
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="⚔️ Jetzt spielen", callback_data=f"friend:challenge:round:start:{challenge_id}")
+                InlineKeyboardButton(
+                    text="⚔️ Jetzt spielen",
+                    callback_data=f"friend:challenge:round:start:{challenge_id}",
+                )
             ],
         ]
     )
@@ -181,7 +184,9 @@ def build_friend_challenge_finished_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def build_friend_challenge_result_share_keyboard(*, share_url: str, challenge_id: str) -> InlineKeyboardMarkup:
+def build_friend_challenge_result_share_keyboard(
+    *, share_url: str, challenge_id: str
+) -> InlineKeyboardMarkup:
     del share_url
     return InlineKeyboardMarkup(
         inline_keyboard=[

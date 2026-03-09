@@ -121,7 +121,9 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
 
 
 @pytest.mark.asyncio
-async def test_notify_creator_about_join_sends_push_when_creator_has_not_played(monkeypatch) -> None:
+async def test_notify_creator_about_join_sends_push_when_creator_has_not_played(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(start_helpers, "SessionLocal", DummySessionLocal())
 
     async def _fake_get_by_id_for_update(session, challenge_id):
