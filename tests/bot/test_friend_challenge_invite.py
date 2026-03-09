@@ -74,9 +74,9 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == [
         "📤 Teilen ->",
-        "📋 Link kopieren",
-        "⚔️ Meine Duelle",
-        "↩️ Zurück",
+        "✅ Einladung gesendet",
+        "⚔️ Jetzt spielen",
+        "⏳ Auf Freund warten",
     ]
     assert all(button.url is None for button in buttons)
     assert [

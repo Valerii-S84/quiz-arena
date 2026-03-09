@@ -107,21 +107,24 @@ def test_friend_challenge_share_keyboard_contains_share_and_copy_without_accept_
     assert all(button.url is None for button in buttons)
     assert [button.text for button in buttons] == [
         "📤 Teilen ->",
-        "📋 Link kopieren",
-        "⚔️ Meine Duelle",
-        "↩️ Zurück",
+        "✅ Einladung gesendet",
+        "⚔️ Jetzt spielen",
+        "⏳ Auf Freund warten",
     ]
     inline_queries = [
         button.switch_inline_query for button in buttons if button.switch_inline_query
     ]
     assert inline_queries == ["invite:duel:00000000-0000-0000-0000-000000000001"]
     assert any(
-        button.callback_data == "friend:copy:00000000-0000-0000-0000-000000000001"
+        button.callback_data == "friend:invite:sent:00000000-0000-0000-0000-000000000001"
+        for button in buttons
+    )
+    assert any(
+        button.callback_data == "friend:challenge:round:start:00000000-0000-0000-0000-000000000001"
         for button in buttons
     )
     assert not any(button.text == "⚔️ Herausforderung annehmen" for button in buttons)
-    assert any(button.callback_data == "friend:my:duels" for button in buttons)
-    assert any(button.callback_data == "home:open" for button in buttons)
+    assert any(button.callback_data == "menu:main" for button in buttons)
 
 
 def test_friend_challenge_share_keyboard_without_link_contains_back_only() -> None:
@@ -158,7 +161,7 @@ def test_friend_challenge_waiting_keyboard_contains_all_choices() -> None:
     ]
     assert [button.callback_data for button in buttons] == [
         "friend:challenge:round:start:00000000-0000-0000-0000-000000000001",
-        "friend:challenge:waiting:00000000-0000-0000-0000-000000000001",
+        "menu:main",
         "menu:main",
     ]
 

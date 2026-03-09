@@ -127,12 +127,12 @@ def build_friend_challenge_share_keyboard(
             ],
             [
                 InlineKeyboardButton(
-                    text="📋 Link kopieren",
-                    callback_data=f"friend:copy:{challenge_id}",
+                    text="✅ Einladung gesendet",
+                    callback_data=f"friend:invite:sent:{challenge_id}",
                 )
             ],
-            [InlineKeyboardButton(text="⚔️ Meine Duelle", callback_data="friend:my:duels")],
-            [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
+            build_friend_challenge_start_keyboard(challenge_id=challenge_id).inline_keyboard[0],
+            [InlineKeyboardButton(text="⏳ Auf Freund warten", callback_data="menu:main")],
         ]
     )
 
@@ -141,12 +141,7 @@ def build_friend_challenge_waiting_keyboard(*, challenge_id: str) -> InlineKeybo
     return InlineKeyboardMarkup(
         inline_keyboard=[
             build_friend_challenge_start_keyboard(challenge_id=challenge_id).inline_keyboard[0],
-            [
-                InlineKeyboardButton(
-                    text="⏳ Auf Freund warten",
-                    callback_data=f"friend:challenge:waiting:{challenge_id}",
-                )
-            ],
+            [InlineKeyboardButton(text="⏳ Auf Freund warten", callback_data="menu:main")],
             [InlineKeyboardButton(text="🏠 Hauptmenü", callback_data="menu:main")],
         ]
     )

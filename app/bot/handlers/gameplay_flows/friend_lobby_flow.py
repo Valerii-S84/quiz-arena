@@ -137,11 +137,25 @@ async def handle_friend_challenge_create_selected(
             TEXTS_DE["msg.friend.challenge.invite.caption"],
             reply_markup=share_keyboard,
         )
+    await callback.answer()
+
+
+async def handle_friend_challenge_invite_sent(
+    callback: CallbackQuery,
+    *,
+    friend_invite_sent_re,
+    parse_uuid_callback,
+) -> None:
+    if callback.message is None or callback.data is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    challenge_id = parse_uuid_callback(pattern=friend_invite_sent_re, callback_data=callback.data)
+    if challenge_id is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
     await callback.message.answer(
         TEXTS_DE["msg.friend.challenge.invite.waiting"],
-        reply_markup=build_friend_challenge_waiting_keyboard(
-            challenge_id=str(challenge.challenge_id),
-        ),
+        reply_markup=build_friend_challenge_waiting_keyboard(challenge_id=str(challenge_id)),
     )
     await callback.answer()
 

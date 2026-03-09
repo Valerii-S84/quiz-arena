@@ -102,21 +102,19 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
     assert all(
         button.url is None for row in keyboard.inline_keyboard for button in row
     )
+    callbacks = [
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
     assert not any(
         button.text == "⚔️ Herausforderung annehmen"
         for row in keyboard.inline_keyboard
         for button in row
     )
-    waiting_response = callback.message.answers[0]
-    assert waiting_response.text == TEXTS_DE["msg.friend.challenge.invite.waiting"]
-    waiting_callbacks = [
-        button.callback_data
-        for row in waiting_response.kwargs["reply_markup"].inline_keyboard
-        for button in row
-        if button.callback_data
-    ]
-    assert waiting_callbacks == [
+    assert callbacks == [
+        "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "friend:challenge:round:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        "friend:challenge:waiting:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "menu:main",
     ]

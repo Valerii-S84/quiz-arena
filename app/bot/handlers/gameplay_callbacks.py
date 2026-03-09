@@ -11,6 +11,7 @@ FRIEND_CREATE_FORMAT_RE = re.compile(r"^friend:challenge:format:(direct|open):(5
 FRIEND_CREATE_LEGACY_RE = re.compile(r"^friend:challenge:create:(5|12)$")
 FRIEND_REMATCH_RE = re.compile(r"^friend:rematch:([0-9a-f\-]{36})$")
 FRIEND_SHARE_RESULT_RE = re.compile(r"^friend:share:result:([0-9a-f\-]{36})$")
+FRIEND_INVITE_SENT_RE = re.compile(r"^friend:invite:sent:([0-9a-f\-]{36})$")
 FRIEND_SERIES_BEST3_RE = re.compile(r"^friend:series:best3:([0-9a-f\-]{36})$")
 FRIEND_SERIES_NEXT_RE = re.compile(r"^friend:series:next:([0-9a-f\-]{36})$")
 FRIEND_COPY_LINK_RE = re.compile(r"^friend:copy:([0-9a-f\-]{36})$")
