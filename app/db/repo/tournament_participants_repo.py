@@ -125,6 +125,27 @@ class TournamentParticipantsRepo:
         return int(result.scalar_one_or_none() is not None)
 
     @staticmethod
+    async def set_score(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+        user_id: int,
+        score: Decimal,
+        tie_break: Decimal,
+    ) -> int:
+        stmt = (
+            update(TournamentParticipant)
+            .where(
+                TournamentParticipant.tournament_id == tournament_id,
+                TournamentParticipant.user_id == user_id,
+            )
+            .values(score=score, tie_break=tie_break)
+            .returning(TournamentParticipant.user_id)
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one_or_none() is not None)
+
+    @staticmethod
     async def set_standings_message_id_if_missing(
         session: AsyncSession,
         *,
