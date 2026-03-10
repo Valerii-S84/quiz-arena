@@ -1,25 +1,25 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.db.models.tournament_round_scores import TournamentRoundScore
-from app.db.models.tournaments import Tournament
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
-from app.db.repo.tournament_round_scores_repo import (
-    TournamentRoundScorePayload,
-    TournamentRoundScoresRepo,
-)
-from app.db.repo.tournaments_repo import TournamentsRepo
+from app.db.repo.tournament_round_scores_repo import TournamentRoundScoresRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
 from app.game.tournaments.settlement import settle_pending_match_from_duel
 from app.workers.tasks import daily_cup_async
+from tests.integration.daily_cup_test_support import (
+    create_completed_daily_cup_with_participants,
+    store_daily_cup_results,
+    upsert_round_result,
+)
 from tests.integration.friend_challenge_fixtures import (
     _create_user,
     _seed_friend_challenge_questions,
@@ -34,76 +34,13 @@ UTC = timezone.utc
 AUTO_FINISH_MAX_TIME_MS = 2_147_483_647
 
 
-async def _create_completed_daily_cup_with_participants(
-    *,
-    now_utc: datetime,
-    user_ids: list[int],
-) -> str:
-    async with SessionLocal.begin() as session:
-        tournament = await TournamentsRepo.create(
-            session,
-            tournament=Tournament(
-                id=uuid4(),
-                type="DAILY_ARENA",
-                created_by=None,
-                name="Daily Arena Cup",
-                status="COMPLETED",
-                format="QUICK_5",
-                max_participants=100,
-                current_round=4,
-                registration_deadline=now_utc,
-                round_deadline=None,
-                invite_code=uuid4().hex[:12],
-                created_at=now_utc - timedelta(hours=6),
-            ),
-        )
-        for index, user_id in enumerate(user_ids):
-            await TournamentParticipantsRepo.create_once(
-                session,
-                tournament_id=tournament.id,
-                user_id=user_id,
-                joined_at=now_utc + timedelta(minutes=index),
-            )
-        return str(tournament.id)
-
-
-async def _upsert_round_result(
-    *,
-    tournament_id: UUID,
-    round_number: int,
-    player_id: int,
-    opponent_id: int | None,
-    points: int,
-    correct_answers: int,
-    total_time_ms: int,
-    is_draw: bool = False,
-) -> None:
-    async with SessionLocal.begin() as session:
-        await TournamentRoundScoresRepo.upsert_result(
-            session,
-            payload=TournamentRoundScorePayload(
-                tournament_id=tournament_id,
-                round_number=round_number,
-                player_id=player_id,
-                opponent_id=opponent_id,
-                wins=points,
-                is_draw=is_draw,
-                correct_answers=correct_answers,
-                total_time_ms=total_time_ms,
-                got_bye=False,
-                auto_finished=False,
-                created_at=datetime(2026, 3, 1, 20, 0, tzinfo=UTC),
-            ),
-        )
-
-
 @pytest.mark.asyncio
 async def test_daily_cup_standings_use_total_time_and_handle_full_equality() -> None:
     now_utc = datetime(2026, 3, 1, 20, 0, tzinfo=UTC)
     await _ensure_tournament_schema()
 
     user_ids = [await _create_user(f"daily_cup_tie_{idx}") for idx in range(4)]
-    tournament_id_str = await _create_completed_daily_cup_with_participants(
+    tournament_id_str = await create_completed_daily_cup_with_participants(
         now_utc=now_utc,
         user_ids=user_ids,
     )
@@ -117,7 +54,7 @@ async def test_daily_cup_standings_use_total_time_and_handle_full_equality() -> 
     }
     for player_id, rounds in seeded_rounds.items():
         for round_number, (points, correct_answers, total_time_ms) in enumerate(rounds, start=1):
-            await _upsert_round_result(
+            await upsert_round_result(
                 tournament_id=parsed_tournament_id,
                 round_number=round_number,
                 player_id=player_id,
@@ -137,7 +74,7 @@ async def test_daily_cup_standings_use_total_time_and_handle_full_equality() -> 
         (4, 20, 5000),
     ]
 
-    await _upsert_round_result(
+    await upsert_round_result(
         tournament_id=parsed_tournament_id,
         round_number=4,
         player_id=user_ids[1],
@@ -251,3 +188,120 @@ async def test_daily_cup_auto_finish_uses_max_time_and_ranks_below_completed_los
         int(auto_finished_match.user_a),
         int(auto_finished_match.user_b),
     ]
+
+
+@pytest.mark.asyncio
+async def test_daily_cup_participant_totals_match_round_scores_sum() -> None:
+    now_utc = datetime(2026, 3, 7, 12, 0, tzinfo=UTC)
+    await _ensure_tournament_schema()
+
+    user_id = await _create_user("daily_cup_totals_match_sum")
+    tournament_id = UUID(
+        await create_completed_daily_cup_with_participants(
+            now_utc=now_utc,
+            user_ids=[user_id],
+        )
+    )
+    await store_daily_cup_results(
+        now_utc=now_utc,
+        tournament_id=tournament_id,
+        round_results=[(1, user_id, None, 2, 5), (2, user_id, None, 1, 4)],
+    )
+
+    async with SessionLocal.begin() as session:
+        participant = await TournamentParticipantsRepo.get_for_tournament_user(
+            session,
+            tournament_id=tournament_id,
+            user_id=user_id,
+        )
+        totals = await TournamentRoundScoresRepo.aggregate_player_totals(
+            session,
+            player_id=user_id,
+            tournament_id=tournament_id,
+        )
+
+        assert participant is not None
+        assert participant.score == totals[0]
+        assert participant.tie_break == totals[1]
+        assert totals == (3, 9)
+
+
+@pytest.mark.asyncio
+async def test_daily_cup_idempotent_round_upsert_does_not_duplicate_participant_score() -> None:
+    now_utc = datetime(2026, 3, 7, 13, 0, tzinfo=UTC)
+    await _ensure_tournament_schema()
+
+    user_id = await _create_user("daily_cup_idempotent_upsert")
+    tournament_id = UUID(
+        await create_completed_daily_cup_with_participants(
+            now_utc=now_utc,
+            user_ids=[user_id],
+        )
+    )
+    await store_daily_cup_results(
+        now_utc=now_utc,
+        tournament_id=tournament_id,
+        round_results=[(1, user_id, None, 2, 6), (1, user_id, None, 2, 6)],
+    )
+
+    async with SessionLocal.begin() as session:
+        participant = await TournamentParticipantsRepo.get_for_tournament_user(
+            session,
+            tournament_id=tournament_id,
+            user_id=user_id,
+        )
+        round_rows = await session.execute(
+            select(func.count())
+            .select_from(TournamentRoundScore)
+            .where(
+                TournamentRoundScore.tournament_id == tournament_id,
+                TournamentRoundScore.player_id == user_id,
+                TournamentRoundScore.round_number == 1,
+            )
+        )
+
+        assert participant is not None
+        assert participant.score == 2
+        assert participant.tie_break == 6
+        assert int(round_rows.scalar_one()) == 1
+
+
+@pytest.mark.asyncio
+async def test_daily_cup_participant_scores_do_not_mix_between_players() -> None:
+    now_utc = datetime(2026, 3, 7, 14, 0, tzinfo=UTC)
+    await _ensure_tournament_schema()
+
+    user_ids = [await _create_user(f"daily_cup_isolated_totals_{idx}") for idx in range(2)]
+    tournament_id = UUID(
+        await create_completed_daily_cup_with_participants(
+            now_utc=now_utc,
+            user_ids=user_ids,
+        )
+    )
+    await store_daily_cup_results(
+        now_utc=now_utc,
+        tournament_id=tournament_id,
+        round_results=[
+            (1, user_ids[0], user_ids[1], 2, 7),
+            (1, user_ids[1], user_ids[0], 0, 3),
+        ],
+    )
+
+    async with SessionLocal.begin() as session:
+        first_participant = await TournamentParticipantsRepo.get_for_tournament_user(
+            session,
+            tournament_id=tournament_id,
+            user_id=user_ids[0],
+        )
+        second_participant = await TournamentParticipantsRepo.get_for_tournament_user(
+            session,
+            tournament_id=tournament_id,
+            user_id=user_ids[1],
+        )
+
+        assert first_participant is not None
+        assert second_participant is not None
+        assert first_participant.score == 2
+        assert first_participant.tie_break == 7
+        assert second_participant.score == 0
+        assert second_participant.tie_break == 3

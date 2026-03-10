@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -152,13 +151,6 @@ async def store_daily_cup_player_result(
     result: DailyCupPlayerResult,
     created_at: datetime,
 ) -> None:
-    await TournamentParticipantsRepo.apply_score_delta(
-        session,
-        tournament_id=match.tournament_id,
-        user_id=result.player_id,
-        score_delta=Decimal(result.wins),
-        tie_break_delta=Decimal(result.correct_answers),
-    )
     await TournamentRoundScoresRepo.upsert_result(
         session,
         payload=TournamentRoundScorePayload(
@@ -174,4 +166,16 @@ async def store_daily_cup_player_result(
             auto_finished=result.auto_finished,
             created_at=created_at,
         ),
+    )
+    score, tie_break = await TournamentRoundScoresRepo.aggregate_player_totals(
+        session,
+        player_id=result.player_id,
+        tournament_id=match.tournament_id,
+    )
+    await TournamentParticipantsRepo.set_score(
+        session,
+        tournament_id=match.tournament_id,
+        user_id=result.player_id,
+        score=score,
+        tie_break=tie_break,
     )

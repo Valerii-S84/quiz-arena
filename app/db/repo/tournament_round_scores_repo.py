@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
@@ -103,3 +104,21 @@ class TournamentRoundScoresRepo:
             )
             for player_id, wins, correct_answers, total_time_ms in result.all()
         ]
+
+    @staticmethod
+    async def aggregate_player_totals(
+        session: AsyncSession,
+        *,
+        player_id: int,
+        tournament_id: UUID,
+    ) -> tuple[Decimal, Decimal]:
+        stmt = select(
+            func.coalesce(func.sum(TournamentRoundScore.wins), 0),
+            func.coalesce(func.sum(TournamentRoundScore.correct_answers), 0),
+        ).where(
+            TournamentRoundScore.player_id == player_id,
+            TournamentRoundScore.tournament_id == tournament_id,
+        )
+        result = await session.execute(stmt)
+        score, tie_break = result.one()
+        return Decimal(int(score or 0)), Decimal(int(tie_break or 0))
