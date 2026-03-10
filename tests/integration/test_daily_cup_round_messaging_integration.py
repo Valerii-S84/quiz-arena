@@ -115,7 +115,9 @@ async def test_daily_cup_round_messaging_rounds_2_to_4_send_round_start_buttons(
 
     monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
     monkeypatch.setattr(daily_cup_async, "enqueue_daily_cup_round_messaging", lambda **kwargs: None)
-    monkeypatch.setattr(daily_cup_messaging, "enqueue_daily_cup_round_messaging", lambda **kwargs: None)
+    monkeypatch.setattr(
+        daily_cup_messaging, "enqueue_daily_cup_round_messaging", lambda **kwargs: None
+    )
     started = await daily_cup_async.close_daily_cup_registration_and_start_async()
     assert int(started["started"]) == 1
 
@@ -133,9 +135,7 @@ async def test_daily_cup_round_messaging_rounds_2_to_4_send_round_start_buttons(
     assert all(f"⚔️ Runde {target_round}/4 gestartet" in text for text in texts)
 
     actual_callbacks = Counter(
-        callback
-        for message in bot.messages
-        for callback in _start_button_callbacks(message)
+        callback for message in bot.messages for callback in _start_button_callbacks(message)
     )
     async with SessionLocal.begin() as session:
         matches = await TournamentMatchesRepo.list_by_tournament_round(
@@ -165,7 +165,9 @@ async def test_daily_cup_round_messaging_hides_round_start_button_for_completed_
 
     monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
     monkeypatch.setattr(daily_cup_async, "enqueue_daily_cup_round_messaging", lambda **kwargs: None)
-    monkeypatch.setattr(daily_cup_messaging, "enqueue_daily_cup_round_messaging", lambda **kwargs: None)
+    monkeypatch.setattr(
+        daily_cup_messaging, "enqueue_daily_cup_round_messaging", lambda **kwargs: None
+    )
     started = await daily_cup_async.close_daily_cup_registration_and_start_async()
     assert int(started["started"]) == 1
 
@@ -198,4 +200,3 @@ async def test_daily_cup_round_messaging_hides_round_start_button_for_completed_
     assert len(messages_by_chat) == 4
     for chat_id in completed_chat_ids:
         assert _start_button_callbacks(messages_by_chat[chat_id]) == []
-

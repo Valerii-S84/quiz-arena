@@ -138,7 +138,9 @@ async def test_concurrent_check_and_advance_round_starts_once(monkeypatch) -> No
 
     monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
     monkeypatch.setattr(daily_cup_async, "enqueue_daily_cup_round_messaging", lambda **kwargs: None)
-    monkeypatch.setattr(daily_cup_messaging, "enqueue_daily_cup_round_messaging", lambda **kwargs: None)
+    monkeypatch.setattr(
+        daily_cup_messaging, "enqueue_daily_cup_round_messaging", lambda **kwargs: None
+    )
     started = await daily_cup_async.close_daily_cup_registration_and_start_async()
     assert int(started["started"]) == 1
 

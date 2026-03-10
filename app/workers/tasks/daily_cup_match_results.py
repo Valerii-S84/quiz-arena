@@ -11,8 +11,8 @@ from app.bot.texts.de import TEXTS_DE
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
-from app.workers.tasks.tournaments_messaging_text import format_points
 from app.workers.tasks.daily_cup_messaging_text import build_next_round_start_text
+from app.workers.tasks.tournaments_messaging_text import format_points
 
 
 def _result_key(*, my_points: int, opponent_points: int, final_round: bool) -> str:
