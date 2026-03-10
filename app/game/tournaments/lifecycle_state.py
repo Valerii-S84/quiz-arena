@@ -5,8 +5,6 @@ from uuid import UUID
 
 from app.db.models.tournaments import Tournament
 from app.game.tournaments.constants import (
-    DAILY_CUP_MAX_ROUNDS,
-    TOURNAMENT_MAX_ROUNDS,
     TOURNAMENT_STATUS_CANCELED,
     TOURNAMENT_STATUS_COMPLETED,
     TOURNAMENT_TYPE_DAILY_ARENA,
@@ -79,9 +77,3 @@ def resolve_deadline_for_tournament(
         now_utc=now_utc,
         round_duration_hours=round_duration_hours,
     )
-
-
-def max_rounds_for_tournament(*, tournament: Tournament) -> int:
-    if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA:
-        return DAILY_CUP_MAX_ROUNDS
-    return TOURNAMENT_MAX_ROUNDS

@@ -8,14 +8,15 @@ import structlog
 
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
+from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.constants import (
-    DAILY_CUP_MAX_ROUNDS,
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_MATCH_STATUS_WALKOVER,
     TOURNAMENT_STATUS_COMPLETED,
     TOURNAMENT_TYPE_DAILY_ARENA,
+    daily_cup_max_rounds_for_participants,
 )
 from app.game.tournaments.lifecycle import settle_round_and_advance
 from app.workers.tasks.daily_cup_core import emit_daily_cup_events, now_utc
@@ -83,6 +84,13 @@ async def advance_daily_cup_rounds_async() -> dict[str, int]:
         )
         for tournament in due_rounds:
             round_before = max(1, int(tournament.current_round))
+            participants_total = await TournamentParticipantsRepo.count_for_tournament(
+                session,
+                tournament_id=tournament.id,
+            )
+            rounds_total = daily_cup_max_rounds_for_participants(
+                participants_total=participants_total
+            )
             pending_round_matches = await TournamentMatchesRepo.list_by_tournament_round_for_update(
                 session,
                 tournament_id=tournament.id,
@@ -159,7 +167,7 @@ async def advance_daily_cup_rounds_async() -> dict[str, int]:
                             user_b=int(match.user_b),
                             user_a_points=user_a_points,
                             user_b_points=user_b_points,
-                            rounds_total=DAILY_CUP_MAX_ROUNDS,
+                            rounds_total=rounds_total,
                             tournament_registration_deadline=tournament.registration_deadline,
                             next_round_start_time=(
                                 tournament.round_start_time

@@ -100,17 +100,32 @@ def _start_button_callbacks(message: dict[str, object]) -> list[str]:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("target_round", [2, 3, 4])
+@pytest.mark.parametrize(
+    ("participants_total", "target_round", "rounds_total"),
+    [
+        (4, 2, 3),
+        (4, 3, 3),
+        (21, 4, 4),
+    ],
+)
 async def test_daily_cup_round_messaging_rounds_2_to_4_send_round_start_buttons(
     monkeypatch,
+    participants_total: int,
     target_round: int,
+    rounds_total: int,
 ) -> None:
     now_utc = datetime(2026, 3, 1, 11, 0, tzinfo=UTC)
     await _ensure_tournament_schema()
     await _seed_friend_challenge_questions(now_utc=now_utc)
 
-    user_ids = [await _create_user(f"daily_cup_round_msg_{target_round}_{idx}") for idx in range(4)]
-    tournament_id = await _create_daily_cup_registration_tournament(now_utc=now_utc)
+    user_ids = [
+        await _create_user(f"daily_cup_round_msg_{participants_total}_{target_round}_{idx}")
+        for idx in range(participants_total)
+    ]
+    tournament_id = await _create_daily_cup_registration_tournament(
+        now_utc=now_utc,
+        max_participants=participants_total,
+    )
     await _join_users(tournament_id=tournament_id, user_ids=user_ids, now_utc=now_utc)
 
     monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
@@ -129,10 +144,10 @@ async def test_daily_cup_round_messaging_rounds_2_to_4_send_round_start_buttons(
     result = await daily_cup_messaging.run_daily_cup_round_messaging_async(
         tournament_id=str(tournament_id)
     )
-    assert int(result["sent"]) == 4
+    assert int(result["sent"]) == participants_total
 
     texts = [str(message["text"]) for message in bot.messages]
-    assert all(f"⚔️ Runde {target_round}/4 gestartet" in text for text in texts)
+    assert all(f"⚔️ Runde {target_round}/{rounds_total} gestartet" in text for text in texts)
 
     actual_callbacks = Counter(
         callback for message in bot.messages for callback in _start_button_callbacks(message)

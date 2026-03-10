@@ -10,6 +10,7 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.tournaments.constants import (
+    TOURNAMENT_MAX_ROUNDS,
     TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS,
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_MIN_PARTICIPANTS,
@@ -19,6 +20,7 @@ from app.game.tournaments.constants import (
     TOURNAMENT_STATUS_ROUND_3,
     TOURNAMENT_STATUS_ROUND_4,
     TOURNAMENT_TYPE_DAILY_ARENA,
+    daily_cup_max_rounds_for_participants,
 )
 from app.game.tournaments.elimination_lifecycle import (
     complete_elimination_tournament as _complete_elimination_tournament,
@@ -32,7 +34,6 @@ from app.game.tournaments.lifecycle_state import (
     mark_round_started,
     mark_tournament_canceled,
     mark_tournament_completed,
-    max_rounds_for_tournament,
     resolve_deadline_for_tournament,
 )
 from app.game.tournaments.rounds import (
@@ -50,6 +51,10 @@ _ACTIVE_ROUND_STATUSES = frozenset(
         TOURNAMENT_STATUS_ROUND_4,
     }
 )
+
+
+def _max_rounds_for_tournament(*, participants_total: int) -> int:
+    return daily_cup_max_rounds_for_participants(participants_total=participants_total)
 
 
 async def close_expired_registration(
@@ -92,14 +97,19 @@ async def settle_round_and_advance(
     if pending_left:
         return build_transition_result(matches_settled=matches_settled)
 
-    if current_round >= max_rounds_for_tournament(tournament=tournament):
-        mark_tournament_completed(tournament=tournament)
-        return build_transition_result(matches_settled=matches_settled, tournament_completed=1)
-
     participants = await TournamentParticipantsRepo.list_for_tournament_for_update(
         session,
         tournament_id=tournament.id,
     )
+    max_rounds = (
+        _max_rounds_for_tournament(participants_total=len(participants))
+        if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA
+        else TOURNAMENT_MAX_ROUNDS
+    )
+    if current_round >= max_rounds:
+        mark_tournament_completed(tournament=tournament)
+        return build_transition_result(matches_settled=matches_settled, tournament_completed=1)
+
     all_matches = await TournamentMatchesRepo.list_by_tournament_for_update(
         session,
         tournament_id=tournament.id,

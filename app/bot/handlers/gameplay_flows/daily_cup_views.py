@@ -7,7 +7,10 @@ from aiogram.types import CallbackQuery, Message
 from app.bot.handlers.gameplay_flows.tournament_views import format_points
 from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard
 from app.bot.texts.de import TEXTS_DE
-from app.game.tournaments.constants import TOURNAMENT_SELF_BOT_LABEL
+from app.game.tournaments.constants import (
+    TOURNAMENT_SELF_BOT_LABEL,
+    daily_cup_max_rounds_for_participants,
+)
 from app.workers.tasks.daily_cup_messaging_text import (
     build_standings_lines as build_daily_cup_standings_lines,
 )
@@ -44,12 +47,14 @@ async def render_daily_cup_lobby(
     participant_labels = [
         (item.user_id, labels.get(item.user_id, "Spieler")) for item in lobby.participants
     ]
+    participants_total = len(participant_labels)
+    rounds_total = daily_cup_max_rounds_for_participants(participants_total=participants_total)
     standings_user_ids = [item.user_id for item in lobby.participants]
     points_map = {item.user_id: format_points(item.score) for item in lobby.participants}
     body_lines = [
         "🏆 Daily Arena Cup",
         "",
-        "Format: 7 Fragen • 4 Runden",
+        "Format: 7 Fragen • 3-4 Runden",
     ]
     if lobby.tournament.status == "REGISTRATION":
         if lobby.viewer_joined:
@@ -105,8 +110,10 @@ async def render_daily_cup_lobby(
                         "",
                     ]
                 )
-            elif round_no >= 4:
-                body_lines.extend([TEXTS_DE["msg.daily_cup.waiting_completion"], ""])
+            elif round_no >= rounds_total:
+                body_lines.extend(
+                    [TEXTS_DE["msg.daily_cup.waiting_completion"].format(round_no=round_no), ""]
+                )
             else:
                 body_lines.extend(
                     [
@@ -125,7 +132,7 @@ async def render_daily_cup_lobby(
                 )
             body_lines.extend(
                 [
-                    f"Runde {round_no}/4",
+                    f"Runde {round_no}/{rounds_total}",
                     f"Deadline: {format_deadline(lobby.tournament.round_deadline)} (Berlin)",
                     "",
                 ]

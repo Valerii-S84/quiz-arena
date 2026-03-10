@@ -84,14 +84,11 @@ async def test_daily_cup_e2e_with_6_participants_reaches_completed(monkeypatch) 
     first_advance = await _expire_and_advance(round_no=1, run_at=now_utc + timedelta(hours=2))
     second_advance = await _expire_and_advance(round_no=2, run_at=now_utc + timedelta(hours=3))
     third_advance = await _expire_and_advance(round_no=3, run_at=now_utc + timedelta(hours=4))
-    fourth_advance = await _expire_and_advance(round_no=4, run_at=now_utc + timedelta(hours=5))
 
     assert int(first_advance["rounds_started_total"]) >= 1
     assert int(second_advance["rounds_started_total"]) >= 1
-    assert int(third_advance["rounds_started_total"]) >= 1
-    assert int(fourth_advance["tournaments_completed_total"]) >= 1
+    assert int(third_advance["tournaments_completed_total"]) >= 1
     assert round_enqueued == [
-        (str(tournament_id), False),
         (str(tournament_id), False),
         (str(tournament_id), False),
         (str(tournament_id), True),
@@ -103,7 +100,7 @@ async def test_daily_cup_e2e_with_6_participants_reaches_completed(monkeypatch) 
         assert tournament.status == "COMPLETED"
         assert tournament.round_deadline is None
         previous_pairs: set[frozenset[int]] = set()
-        for round_no in (1, 2, 3, 4):
+        for round_no in (1, 2, 3):
             matches = await TournamentMatchesRepo.list_by_tournament_round(
                 session,
                 tournament_id=tournament_id,

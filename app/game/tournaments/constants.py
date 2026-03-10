@@ -36,9 +36,16 @@ TOURNAMENT_DEFAULT_MAX_PARTICIPANTS = max(2, int(settings.tournament_max_partici
 TOURNAMENT_MIN_PARTICIPANTS = max(2, int(settings.tournament_min_participants))
 TOURNAMENT_DEFAULT_REGISTRATION_HOURS = max(1, int(settings.tournament_round_ttl_hours))
 TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS = max(1, int(settings.tournament_round_ttl_hours))
-DAILY_CUP_MAX_ROUNDS = 4
+DAILY_CUP_MAX_ROUNDS_SMALL = 3
+DAILY_CUP_MAX_ROUNDS_LARGE = 4
 DAILY_CUP_QUESTIONS_PER_MATCH = 7
 DAILY_CUP_MAX_PARTICIPANTS = 100
+
+
+def daily_cup_max_rounds_for_participants(*, participants_total: int) -> int:
+    if int(participants_total) >= 21:
+        return DAILY_CUP_MAX_ROUNDS_LARGE
+    return DAILY_CUP_MAX_ROUNDS_SMALL
 
 
 def rounds_for_tournament_format(*, format_code: str) -> int:
