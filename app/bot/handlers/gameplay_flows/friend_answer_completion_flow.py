@@ -15,6 +15,7 @@ from app.bot.handlers.gameplay_flows.tournament_match_post_flow import (
     enqueue_tournament_post_match_updates,
     resolve_tournament_id_for_match,
     resolve_tournament_place_for_user,
+    resolve_tournament_view_callback_data_for_match,
 )
 from app.bot.keyboards.friend_challenge import build_friend_challenge_finished_keyboard
 from app.bot.texts.de import TEXTS_DE
@@ -106,6 +107,7 @@ async def handle_completed_friend_challenge(
         resolve_opponent_label=resolve_opponent_label,
         notify_opponent=notify_opponent,
         resolve_tournament_id_for_match=resolve_tournament_id_for_match,
+        resolve_tournament_view_callback_data_for_match=resolve_tournament_view_callback_data_for_match,
         resolve_tournament_place_for_user=resolve_tournament_place_for_user,
         build_tournament_post_match_keyboard=build_tournament_post_match_keyboard,
         build_tournament_post_match_text=build_tournament_post_match_text,

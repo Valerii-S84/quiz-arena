@@ -22,6 +22,7 @@ async def handle_completed_tournament_match(
     resolve_opponent_label,
     notify_opponent,
     resolve_tournament_id_for_match,
+    resolve_tournament_view_callback_data_for_match,
     resolve_tournament_place_for_user,
     build_tournament_post_match_keyboard,
     build_tournament_post_match_text,
@@ -34,6 +35,10 @@ async def handle_completed_tournament_match(
         session_local=session_local,
         tournament_match_id=challenge.tournament_match_id,
     )
+    tournament_view_callback_data = await resolve_tournament_view_callback_data_for_match(
+        session_local=session_local,
+        tournament_match_id=challenge.tournament_match_id,
+    )
     try:
         my_place, participants_total = await resolve_tournament_place_for_user(
             session_local=session_local,
@@ -43,7 +48,10 @@ async def handle_completed_tournament_match(
     except AttributeError:
         my_place, participants_total = None, None
 
-    tournament_keyboard = build_tournament_post_match_keyboard(tournament_id=tournament_id)
+    tournament_keyboard = build_tournament_post_match_keyboard(
+        tournament_id=tournament_id,
+        tournament_view_callback_data=tournament_view_callback_data,
+    )
     await answerable.answer(
         build_tournament_post_match_text(
             challenge=challenge,
