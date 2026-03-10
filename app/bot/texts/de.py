@@ -1,6 +1,8 @@
 TEXTS_DE: dict[str, str] = {
     "msg.home.title": "🎮 QUIZ ARENA",
     "msg.home.hint": "Lerne Deutsch – spiele, fordere Freunde heraus und steig auf!",
+    "msg.home.stats.with_streak": "🔥 {streak} Tage Streak  ⚡ {free_energy}/20 + {paid_energy} Bonus",
+    "msg.home.stats.no_streak": "⚡ {free_energy}/20 + {paid_energy} Bonus",
     "msg.home.stats.summary": "Serie: {current_streak} | Beste: {best_streak}  ⚡ {free_energy}/20 + {paid_energy} Bonus",
     "msg.home.badge.daily_cup_5": "🏅 Badge: 5 Tage in Folge im Arena Cup!",
     "msg.home.energy": "Energie: {free_energy}/20 + {paid_energy} Bonus.",
