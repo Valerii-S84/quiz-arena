@@ -41,11 +41,6 @@ DAILY_CUP_REGISTRATION_OPEN = os.getenv("DAILY_CUP_OPEN_TIME", settings.daily_cu
 DAILY_CUP_REGISTRATION_CLOSE = os.getenv(
     "DAILY_CUP_CLOSE_TIME", settings.daily_cup_registration_close
 )
-_round_minutes_raw = os.getenv("DAILY_CUP_ROUND_MINUTES")
-DAILY_CUP_ROUND_DURATION_MINUTES = max(
-    1,
-    int(_round_minutes_raw or settings.daily_cup_round_duration_minutes),
-)
 DAILY_CUP_MIN_PARTICIPANTS = max(4, int(settings.daily_cup_min_participants))
 DAILY_CUP_PUSH_BATCH_SIZE = 200
 DAILY_CUP_ACTIVE_LOOKBACK_DAYS = 7
@@ -137,7 +132,6 @@ __all__ = [
     "DAILY_CUP_OPEN_HOUR",
     "DAILY_CUP_OPEN_MINUTE",
     "DAILY_CUP_PUSH_BATCH_SIZE",
-    "DAILY_CUP_ROUND_DURATION_MINUTES",
     "DAILY_CUP_TOTAL_ROUNDS",
     "DAILY_CUP_TURN_RESPONSE_GRACE_MINUTES",
     "DAILY_CUP_TOURNAMENT_TYPE",

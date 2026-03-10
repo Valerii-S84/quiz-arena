@@ -99,8 +99,12 @@ async def run_daily_cup_nonfinishers_summary_async(*, tournament_id: str) -> dic
         users = await UsersRepo.list_by_ids(session, sorted(participant_user_ids))
         telegram_targets = {int(user.id): int(user.telegram_user_id) for user in users}
 
+        rounds_played = await TournamentMatchesRepo.get_max_round_no(
+            session,
+            tournament_id=parsed_tournament_id,
+        )
         matches = []
-        for round_no in (1, 2, 3):
+        for round_no in range(1, rounds_played + 1):
             round_matches = await TournamentMatchesRepo.list_by_tournament_round(
                 session,
                 tournament_id=parsed_tournament_id,
