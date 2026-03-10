@@ -7,8 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.repo.daily_runs_repo import DailyRunsRepo
+from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
-from app.game.sessions.errors import SessionNotFoundError
+from app.game.sessions.errors import SessionNotFoundError, TournamentSessionStopNotAllowedError
 from app.game.sessions.types import DailyRunSummary
 
 from .constants import DAILY_CHALLENGE_TOTAL_QUESTIONS
@@ -24,6 +25,10 @@ async def abandon_session(
     quiz_session = await QuizSessionsRepo.get_by_id_for_update(session, session_id)
     if quiz_session is None or quiz_session.user_id != user_id:
         raise SessionNotFoundError
+    if quiz_session.friend_challenge_id is not None:
+        challenge = await FriendChallengesRepo.get_by_id(session, quiz_session.friend_challenge_id)
+        if challenge is not None and challenge.tournament_match_id is not None:
+            raise TournamentSessionStopNotAllowedError
     if quiz_session.status != "STARTED":
         return
 

@@ -22,6 +22,10 @@ class InvalidAnswerOptionError(GameSessionError):
     pass
 
 
+class TournamentSessionStopNotAllowedError(GameSessionError):
+    pass
+
+
 class FriendChallengeNotFoundError(GameSessionError):
     pass
 
