@@ -11,6 +11,7 @@ from pathlib import Path
 from quizbank_audit_analysis import audit_table
 from quizbank_audit_io import read_table
 from quizbank_audit_report import build_markdown
+from quizbank_report_paths import csv_sort_key, report_path
 
 
 def main() -> None:
@@ -34,6 +35,7 @@ def main() -> None:
         for path in input_dir.iterdir()
         if path.is_file() and path.suffix.lower() in {".csv", ".xlsx", ".xlsm"}
     )
+    files = sorted(files, key=csv_sort_key)
 
     file_reports = []
     for file_path in files:
@@ -54,7 +56,7 @@ def main() -> None:
     }
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "input_dir": str(input_dir),
+        "input_dir": report_path(input_dir),
         "summary": summary,
         "files": file_reports,
     }

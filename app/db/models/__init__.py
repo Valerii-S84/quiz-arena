@@ -1,6 +1,5 @@
 from app.db.models.admin_audit_log import AdminAuditLog
-from app.db.models.admin_promo_code_usages import AdminPromoCodeUsage
-from app.db.models.admin_promo_codes import AdminPromoCode
+from app.db.models.admins import Admin
 from app.db.models.analytics_daily import AnalyticsDaily
 from app.db.models.analytics_events import AnalyticsEvent
 from app.db.models.contact_requests import ContactRequest
@@ -18,6 +17,7 @@ from app.db.models.offers_impressions import OfferImpression
 from app.db.models.outbox_events import OutboxEvent
 from app.db.models.processed_updates import ProcessedUpdate
 from app.db.models.promo_attempts import PromoAttempt
+from app.db.models.promo_audit_log import PromoAuditLog
 from app.db.models.promo_code_batches import PromoCodeBatch
 from app.db.models.promo_codes import PromoCode
 from app.db.models.promo_redemptions import PromoRedemption
@@ -30,14 +30,14 @@ from app.db.models.referrals import Referral
 from app.db.models.streak_state import StreakState
 from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournament_participants import TournamentParticipant
+from app.db.models.tournament_round_scores import TournamentRoundScore
 from app.db.models.tournaments import Tournament
 from app.db.models.user_events import UserEvent
 from app.db.models.users import User
 
 __all__ = [
     "AdminAuditLog",
-    "AdminPromoCode",
-    "AdminPromoCodeUsage",
+    "Admin",
     "AnalyticsDaily",
     "AnalyticsEvent",
     "ContactRequest",
@@ -55,6 +55,7 @@ __all__ = [
     "OutboxEvent",
     "ProcessedUpdate",
     "PromoAttempt",
+    "PromoAuditLog",
     "PromoCode",
     "PromoCodeBatch",
     "PromoRedemption",
@@ -68,6 +69,7 @@ __all__ = [
     "Tournament",
     "TournamentMatch",
     "TournamentParticipant",
+    "TournamentRoundScore",
     "UserEvent",
     "User",
 ]

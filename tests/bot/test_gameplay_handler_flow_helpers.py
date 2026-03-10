@@ -62,16 +62,42 @@ def test_build_friend_proof_card_text_includes_winner_score_and_signature() -> N
 
 
 def test_build_question_text_contains_theme_counter_and_energy() -> None:
+    start_result = _start_result()
+    start_result.session.category = "A1 Artikel - Nominativ"
     text = gameplay._build_question_text(
         source="MENU",
         snapshot_free_energy=18,
         snapshot_paid_energy=2,
-        start_result=_start_result(),
+        start_result=start_result,
     )
     assert "⚡" in text
     assert "🔋 Energie:" in text
-    assert "📚 Thema:" in text
+    assert "📚 Thema: Artikel - Nominativ" in text
     assert "❓ Frage 3/12" in text
+    assert "A1" not in text
+
+
+def test_build_question_text_uses_daily_arena_cup_header_override() -> None:
+    start_result = _start_result()
+    start_result.session.header_mode_label_override = "Daily Arena Cup"
+
+    text = gameplay._build_question_text(
+        source="FRIEND_CHALLENGE",
+        snapshot_free_energy=18,
+        snapshot_paid_energy=2,
+        start_result=start_result,
+    )
+
+    assert "<b>⚡ Daily Arena Cup</b>" in text
+
+
+def test_build_friend_plan_text_hides_level_mix() -> None:
+    text = gameplay._build_friend_plan_text(total_rounds=12)
+
+    assert text == "12 Fragen Mix. Keine Energie-Kosten."
+    assert "A1" not in text
+    assert "A2" not in text
+    assert "B1" not in text
 
 
 @pytest.mark.asyncio
@@ -100,3 +126,34 @@ async def test_build_friend_result_share_url_returns_none_on_bot_error() -> None
         proof_card_text="proof card",
     )
     assert share_url is None
+
+
+@pytest.mark.asyncio
+async def test_build_friend_invite_link_uses_public_bot_username() -> None:
+    callback = DummyCallback(
+        data="x",
+        from_user=SimpleNamespace(id=1),
+        message=DummyMessage(),
+    )
+    invite_link = await gameplay._build_friend_invite_link(
+        callback,
+        challenge_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    )
+    assert invite_link == (
+        "https://t.me/Deine_Deutsch_Quiz_bot?start=duel_" "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    )
+
+
+@pytest.mark.asyncio
+async def test_build_friend_result_share_url_uses_public_bot_link() -> None:
+    callback = DummyCallback(
+        data="x",
+        from_user=SimpleNamespace(id=1),
+        message=DummyMessage(),
+    )
+    share_url = await gameplay._build_friend_result_share_url(
+        callback,
+        proof_card_text="proof card",
+    )
+    assert share_url is not None
+    assert "https%3A%2F%2Ft.me%2FDeine_Deutsch_Quiz_bot" in share_url

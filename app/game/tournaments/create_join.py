@@ -9,6 +9,7 @@ from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.tournaments.constants import (
+    DAILY_CUP_MAX_PARTICIPANTS,
     DAILY_CUP_TOURNAMENT_TYPES,
     TOURNAMENT_DEFAULT_MAX_PARTICIPANTS,
     TOURNAMENT_FORMAT_QUICK_5,
@@ -149,6 +150,8 @@ async def join_daily_cup_by_id(
             joined_now=False,
             participants_total=len(existing_user_ids),
         )
+    if len(existing_user_ids) >= min(int(tournament.max_participants), DAILY_CUP_MAX_PARTICIPANTS):
+        raise TournamentFullError
 
     joined_now = await TournamentParticipantsRepo.create_once(
         session,

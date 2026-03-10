@@ -13,6 +13,7 @@ async def record_attempt(
     user_id: int,
     normalized_code_hash: str,
     result: str,
+    source: str,
     now_utc: datetime,
     metadata: dict[str, object] | None = None,
 ) -> None:
@@ -22,7 +23,7 @@ async def record_attempt(
             user_id=user_id,
             normalized_code_hash=normalized_code_hash,
             result=result,
-            source="API",
+            source=source,
             attempted_at=now_utc,
             metadata_=metadata or {},
         ),
@@ -34,6 +35,7 @@ async def record_failed_attempt(
     user_id: int,
     normalized_code_hash: str,
     result: str,
+    source: str,
     now_utc: datetime,
     metadata: dict[str, object] | None = None,
 ) -> None:
@@ -43,6 +45,7 @@ async def record_failed_attempt(
             user_id=user_id,
             normalized_code_hash=normalized_code_hash,
             result=result,
+            source=source,
             now_utc=now_utc,
             metadata=metadata,
         )

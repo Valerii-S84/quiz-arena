@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from quizbank_report_paths import csv_sort_key
+
 
 def _norm_level(value: Any) -> str:
     text = str(value or "").strip().upper()
@@ -100,7 +102,10 @@ def main() -> None:
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir)
-    files = sorted(p for p in input_dir.iterdir() if p.is_file() and p.suffix.lower() == ".csv")
+    files = sorted(
+        (p for p in input_dir.iterdir() if p.is_file() and p.suffix.lower() == ".csv"),
+        key=csv_sort_key,
+    )
     per_file = [scan_csv(path) for path in files]
 
     levels_total: Counter[str] = Counter()

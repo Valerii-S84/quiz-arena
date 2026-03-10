@@ -9,11 +9,11 @@ BERLIN_TZ = ZoneInfo("Europe/Berlin")
 CARD_SIZE = (1080, 1080)
 CARD_W, CARD_H = CARD_SIZE
 
-CHAMPION_BG = ("#0D1B2A", "#1B2A3B")
-ARENA_BG = ("#141414", "#101010")
-PARTICIPANT_BG = ("#1A1A2E", "#16213E")
-ARENA_ACCENT = "#39FF14"
-PARTICIPANT_ACCENT = "#E94560"
+CHAMPION_BG = ("#28485D", "#1E3344")
+ARENA_BG = ("#2C5364", "#203A43")
+PARTICIPANT_BG = ("#3C4A66", "#2B3A52")
+ARENA_ACCENT = "#E8C47A"
+PARTICIPANT_ACCENT = "#F29979"
 PLACE_LABELS: dict[int, tuple[str, str]] = {
     1: ("GOLD", "#FFD700"),
     2: ("SILBER", "#C0C8D0"),
@@ -23,6 +23,8 @@ PLACE_LABELS: dict[int, tuple[str, str]] = {
 FONT_BOLD_SEARCH_PATHS = (
     "assets/fonts/Bebas-Neue.ttf",
     "assets/fonts/Montserrat-Bold.ttf",
+    "/usr/share/fonts/truetype/inter/Inter-Bold.ttf",
+    "/usr/share/fonts/truetype/roboto/unhinted/RobotoTTF/Roboto-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
     "C:/Windows/Fonts/arialbd.ttf",
@@ -33,6 +35,8 @@ FONT_BOLD_SEARCH_PATHS = (
 )
 FONT_REGULAR_SEARCH_PATHS = (
     "assets/fonts/Montserrat-Regular.ttf",
+    "/usr/share/fonts/truetype/inter/Inter-Regular.ttf",
+    "/usr/share/fonts/truetype/roboto/unhinted/RobotoTTF/Roboto-Regular.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
     "C:/Windows/Fonts/arial.ttf",

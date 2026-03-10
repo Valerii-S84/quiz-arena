@@ -27,7 +27,7 @@ from app.workers.tasks.daily_cup_config import (
 )
 
 settings = get_settings()
-_ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3", "BRACKET_LIVE"})
+_ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3", "ROUND_4", "BRACKET_LIVE"})
 
 
 class DailyCupUserStatus(str, Enum):

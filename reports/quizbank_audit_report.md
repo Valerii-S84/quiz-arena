@@ -1,6 +1,6 @@
 # QuizBank Audit Report
 
-- Generated at: `2026-02-22T21:02:04.271626+00:00`
+- Generated at: `2026-03-08T16:25:18.101811+00:00`
 - Files audited: `19`
 - Total rows: `5570`
 
@@ -12,8 +12,9 @@
 | Akkusativ_Dativ_Bank_A1_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Antonym_Match_Bank_A1_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Artikel_Sprint_Bank_A1_B2_1000.csv | 1000 | ready | 0 | 0 | 0 | 0 | 0 |
-| LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv | 500 | ready | 0 | 0 | 0 | 0 | 0 |
 | Lexical_Gap_Fill_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
+| LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv | 500 | ready | 0 | 0 | 0 | 0 | 0 |
+| logik_luecke_sheet_template.csv | 0 | ready | 0 | 0 | 0 | 0 | 0 |
 | Mini_Dialog_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Modalverben_Bank_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Negation_Quiz_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
@@ -23,10 +24,9 @@
 | Satzbau_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Synonym_Match_Bank_A1_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Topic_Vocabulary_Themes_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
+| trennbare_verben_210_korrigiert.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | Verb_Conjugation_Bank_A2_B1_210.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 | W_Fragen_Bank_630.csv | 630 | ready | 0 | 0 | 0 | 0 | 0 |
-| logik_luecke_sheet_template.csv | 0 | ready | 0 | 0 | 0 | 0 | 0 |
-| trennbare_verben_210_korrigiert.csv | 210 | ready | 0 | 0 | 0 | 0 | 0 |
 
 ## Per-file action plan
 
@@ -50,15 +50,20 @@
 - Status: `ready` (critical `0`, high `0`, medium `0`)
 - Review question punctuation and end marks.
 
+### Lexical_Gap_Fill_Bank_A2_B1_210.csv
+
+- Status: `ready` (critical `0`, high `0`, medium `0`)
+- Review question punctuation and end marks.
+
 ### LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv
 
 - Status: `ready` (critical `0`, high `0`, medium `0`)
 - Review question punctuation and end marks.
 
-### Lexical_Gap_Fill_Bank_A2_B1_210.csv
+### logik_luecke_sheet_template.csv
 
 - Status: `ready` (critical `0`, high `0`, medium `0`)
-- Review question punctuation and end marks.
+- No blocking issues detected. Keep file under regression QA.
 
 ### Mini_Dialog_Bank_A2_B1_210.csv
 
@@ -105,6 +110,11 @@
 - Status: `ready` (critical `0`, high `0`, medium `0`)
 - Review question punctuation and end marks.
 
+### trennbare_verben_210_korrigiert.csv
+
+- Status: `ready` (critical `0`, high `0`, medium `0`)
+- Review question punctuation and end marks.
+
 ### Verb_Conjugation_Bank_A2_B1_210.csv
 
 - Status: `ready` (critical `0`, high `0`, medium `0`)
@@ -114,13 +124,3 @@
 
 - Status: `ready` (critical `0`, high `0`, medium `0`)
 - No blocking issues detected. Keep file under regression QA.
-
-### logik_luecke_sheet_template.csv
-
-- Status: `ready` (critical `0`, high `0`, medium `0`)
-- No blocking issues detected. Keep file under regression QA.
-
-### trennbare_verben_210_korrigiert.csv
-
-- Status: `ready` (critical `0`, high `0`, medium `0`)
-- Review question punctuation and end marks.

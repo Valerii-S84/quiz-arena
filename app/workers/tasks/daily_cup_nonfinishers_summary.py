@@ -57,17 +57,18 @@ def _collect_nonfinishers(
 ) -> set[int]:
     nonfinishers: set[int] = set()
     for match in matches:
-        if match.user_b is None or match.friend_challenge_id is None:
+        if match.friend_challenge_id is None:
             continue
         challenge = challenges_by_id.get(match.friend_challenge_id)
         if challenge is None:
             continue
         user_a = int(match.user_a)
-        user_b = int(match.user_b)
         if _user_did_not_finish_challenge(challenge=challenge, user_id=user_a):
             nonfinishers.add(user_a)
-        if _user_did_not_finish_challenge(challenge=challenge, user_id=user_b):
-            nonfinishers.add(user_b)
+        if match.user_b is not None:
+            user_b = int(match.user_b)
+            if _user_did_not_finish_challenge(challenge=challenge, user_id=user_b):
+                nonfinishers.add(user_b)
     return nonfinishers
 
 

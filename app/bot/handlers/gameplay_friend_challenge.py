@@ -26,6 +26,7 @@ def _gameplay():
 def register(router: Router) -> None:
     router.callback_query(F.data == "friend:challenge:create")(handle_friend_challenge_create)
     router.callback_query(F.data == "create_tournament_start")(handle_create_tournament_start)
+    # HIDDEN: open challenge disabled for now.
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_CREATE_TYPE_RE))(
         handle_friend_challenge_type_selected
     )
@@ -51,6 +52,12 @@ def register(router: Router) -> None:
     )
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_SHARE_RESULT_RE))(
         handle_friend_challenge_share_result
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_INVITE_SENT_RE))(
+        handle_friend_challenge_invite_sent
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_INVITE_REQUIRED_RE))(
+        handle_friend_challenge_invite_required
     )
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_NEXT_RE))(
         handle_friend_challenge_next
@@ -217,6 +224,18 @@ async def handle_friend_challenge_share_result(callback: CallbackQuery) -> None:
         emit_analytics_event=gameplay.emit_analytics_event,
         event_source_bot=gameplay.EVENT_SOURCE_BOT,
     )
+
+
+async def handle_friend_challenge_invite_sent(callback: CallbackQuery) -> None:
+    await friend_lobby_flow.handle_friend_challenge_invite_sent(
+        callback,
+        friend_invite_sent_re=gameplay_callbacks.FRIEND_INVITE_SENT_RE,
+        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
+    )
+
+
+async def handle_friend_challenge_invite_required(callback: CallbackQuery) -> None:
+    await callback.answer(TEXTS_DE["msg.friend.challenge.invite.confirm.first"])
 
 
 async def handle_friend_challenge_next(callback: CallbackQuery) -> None:

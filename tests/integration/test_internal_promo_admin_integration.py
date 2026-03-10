@@ -15,6 +15,7 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.main import app
 from app.services.promo_codes import hash_promo_code, normalize_promo_code
+from tests.integration.stable_ids import stable_telegram_user_id
 
 UTC = timezone.utc
 
@@ -23,7 +24,7 @@ async def _create_user(seed: str) -> int:
     async with SessionLocal.begin() as session:
         user = await UsersRepo.create(
             session,
-            telegram_user_id=80_000_000_000 + (abs(hash(seed)) % 1_000_000),
+            telegram_user_id=stable_telegram_user_id(prefix=80_000_000_000, seed=seed),
             referral_code=f"P{uuid4().hex[:10]}",
             username=None,
             first_name="PromoAdmin",
@@ -32,7 +33,12 @@ async def _create_user(seed: str) -> int:
         return user.id
 
 
-async def _create_discount_campaign(*, code_id: int, now_utc: datetime) -> PromoCode:
+async def _create_discount_campaign(
+    *,
+    code_id: int,
+    now_utc: datetime,
+    campaign_name: str = "admin-campaign",
+) -> PromoCode:
     raw_code = f"ADMIN-{code_id}"
     normalized = normalize_promo_code(raw_code)
     code_hash = hash_promo_code(
@@ -43,7 +49,7 @@ async def _create_discount_campaign(*, code_id: int, now_utc: datetime) -> Promo
         id=code_id,
         code_hash=code_hash,
         code_prefix=normalized[:8],
-        campaign_name="admin-campaign",
+        campaign_name=campaign_name,
         promo_type="PERCENT_DISCOUNT",
         grant_premium_days=None,
         discount_percent=50,
@@ -74,6 +80,18 @@ async def _post_json(path: str, payload: dict[str, object]) -> tuple[int, dict[s
         response = await client.post(
             path,
             json=payload,
+            headers={"X-Internal-Token": get_settings().internal_api_token},
+        )
+    return response.status_code, response.json()
+
+
+async def _get_json(path: str) -> tuple[int, dict[str, object]]:
+    async with AsyncClient(
+        transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.get(
+            path,
             headers={"X-Internal-Token": get_settings().internal_api_token},
         )
     return response.status_code, response.json()
@@ -133,6 +151,20 @@ async def test_internal_promo_campaign_status_rejects_unpause_from_depleted() ->
 
     assert status_code == 409
     assert payload == {"detail": {"code": "E_PROMO_STATUS_CONFLICT"}}
+
+
+@pytest.mark.asyncio
+async def test_internal_promo_campaign_listing_filters_by_campaign_substring() -> None:
+    now_utc = datetime.now(UTC)
+    await _create_discount_campaign(code_id=9011, now_utc=now_utc, campaign_name="SUMMER2024")
+    await _create_discount_campaign(code_id=9012, now_utc=now_utc, campaign_name="SUMMERSALE")
+    await _create_discount_campaign(code_id=9013, now_utc=now_utc, campaign_name="WINTER")
+
+    status_code, payload = await _get_json("/internal/promo/campaigns?campaign_name=SUMMER")
+
+    assert status_code == 200
+    campaigns = payload["campaigns"]
+    assert {item["campaign_name"] for item in campaigns} == {"SUMMER2024", "SUMMERSALE"}
 
 
 @pytest.mark.asyncio

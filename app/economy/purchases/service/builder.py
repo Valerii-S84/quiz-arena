@@ -19,7 +19,7 @@ def _build_purchase(
     applied_promo_code_id: int | None,
     now_utc: datetime,
 ) -> Purchase:
-    final_stars_amount = max(1, product.stars_amount - discount_stars_amount)
+    final_stars_amount = max(0, product.stars_amount - discount_stars_amount)
     return Purchase(
         id=uuid4(),
         user_id=user_id,

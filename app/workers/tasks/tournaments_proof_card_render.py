@@ -81,7 +81,7 @@ def _render_champion(
         text=f"{rounds} Runden · {format_label} · {format_date(completed_at)}",
         y=898,
         font_obj=load_font(24),
-        fill=(168, 176, 188),
+        fill=(214, 224, 230),
     )
     return image.convert("RGB")
 
@@ -100,14 +100,8 @@ def _render_arena(
     image = Image.new("RGB", CARD_SIZE, color=rgb(ARENA_BG[0]))
     draw_gradient(image, top_hex=ARENA_BG[0], bottom_hex=ARENA_BG[1])
     draw = ImageDraw.Draw(image)
-    for y in range(0, CARD_H, 28):
-        shade = 24 if (y // 28) % 2 == 0 else 30
-        draw.line([(0, y), (CARD_W, y)], fill=(shade, shade, shade), width=1)
-    for y in range(16, CARD_H, 40):
-        for x in range(16, CARD_W, 40):
-            draw.point((x, y), fill=(42, 42, 42))
-
     accent = rgb(ARENA_ACCENT)
+    draw.rectangle([20, 20, CARD_W - 20, CARD_H - 20], outline=(244, 245, 242), width=2)
     subtitle = (
         f"Heute #{place} im Daily Arena Cup"
         if is_daily_arena
@@ -115,11 +109,11 @@ def _render_arena(
     )
     place_fill = accent if place <= 5 else (255, 255, 255)
     draw_centered(draw, text="QUIZ ARENA", y=66, font_obj=load_font(46, bold=True), fill=accent)
-    draw_centered(draw, text="HEUTE", y=130, font_obj=load_font(28), fill=(150, 150, 150))
+    draw_centered(draw, text="HEUTE", y=130, font_obj=load_font(28), fill=(220, 234, 239))
     draw_centered(
         draw, text=f"#{place}", y=210, font_obj=load_font(140, bold=True), fill=place_fill
     )
-    draw_centered(draw, text=subtitle, y=416, font_obj=load_font(36), fill=(255, 255, 255))
+    draw_centered(draw, text=subtitle, y=416, font_obj=load_font(36), fill=(247, 251, 252))
     draw_centered(
         draw,
         text=truncate(player_label, fallback="Spieler", limit=20),
@@ -140,7 +134,7 @@ def _render_arena(
         text=f"{format_date(completed_at)} · {rounds} Runden · {format_label}",
         y=908,
         font_obj=load_font(24),
-        fill=(170, 170, 170),
+        fill=(214, 224, 230),
     )
     return image
 
@@ -166,7 +160,7 @@ def _render_participant(
         if is_daily_arena
         else truncate(tournament_name, fallback="Privates Turnier", limit=34)
     )
-    draw_centered(draw, text=subtitle, y=338, font_obj=load_font(36), fill=(255, 255, 255))
+    draw_centered(draw, text=subtitle, y=338, font_obj=load_font(36), fill=(247, 251, 252))
     draw_centered(
         draw,
         text=truncate(player_label, fallback="Spieler", limit=20),
@@ -174,9 +168,9 @@ def _render_participant(
         font_obj=load_font(68, bold=True),
         fill=(255, 255, 255),
     )
-    draw_centered(draw, text=f"Platz #{place}", y=624, font_obj=load_font(34), fill=(222, 222, 222))
+    draw_centered(draw, text=f"Platz #{place}", y=624, font_obj=load_font(34), fill=(234, 239, 245))
     draw_centered(
-        draw, text=format_date(completed_at), y=700, font_obj=load_font(28), fill=(190, 190, 190)
+        draw, text=format_date(completed_at), y=700, font_obj=load_font(28), fill=(214, 224, 230)
     )
     return image
 

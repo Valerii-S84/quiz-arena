@@ -9,6 +9,12 @@ from app.db.session import SessionLocal
 from app.game.questions.runtime_bank import get_question_by_id
 from app.game.sessions.service import GameSessionService
 from tests.integration.friend_challenge_fixtures import UTC, _create_user
+from tests.integration.friend_challenge_push_harness import (
+    create_joined_duel,
+    run_friend_answer_branch,
+    submit_friend_round_answer,
+    telegram_user_id,
+)
 
 
 @pytest.mark.asyncio
@@ -232,3 +238,170 @@ async def test_friend_challenge_creator_can_continue_without_waiting_for_opponen
 
     assert round_two.start_result is not None
     assert round_two.snapshot.current_round >= 2
+
+
+@pytest.mark.asyncio
+async def test_friend_challenge_creator_can_start_and_progress_before_opponent_joins() -> None:
+    now_utc = datetime(2026, 2, 19, 18, 50, tzinfo=UTC)
+    creator_user_id = await _create_user("fc_pending_creator")
+
+    async with SessionLocal.begin() as session:
+        challenge = await GameSessionService.create_friend_challenge(
+            session,
+            creator_user_id=creator_user_id,
+            mode_code="QUICK_MIX_A1A2",
+            now_utc=now_utc,
+            total_rounds=5,
+        )
+        round_one = await GameSessionService.start_friend_challenge_round(
+            session,
+            user_id=creator_user_id,
+            challenge_id=challenge.challenge_id,
+            idempotency_key="fc:pending:creator:start:1",
+            now_utc=now_utc,
+        )
+        assert round_one.start_result is not None
+
+        question = await get_question_by_id(
+            session,
+            round_one.start_result.session.mode_code,
+            question_id=round_one.start_result.session.question_id,
+            local_date_berlin=now_utc.date(),
+        )
+        assert question is not None
+        first_answer = await GameSessionService.submit_answer(
+            session,
+            user_id=creator_user_id,
+            session_id=round_one.start_result.session.session_id,
+            selected_option=question.correct_option,
+            idempotency_key="fc:pending:creator:answer:1",
+            now_utc=now_utc,
+        )
+        round_two = await GameSessionService.start_friend_challenge_round(
+            session,
+            user_id=creator_user_id,
+            challenge_id=challenge.challenge_id,
+            idempotency_key="fc:pending:creator:start:2",
+            now_utc=now_utc,
+        )
+
+    assert first_answer.friend_challenge is not None
+    assert first_answer.friend_challenge.status == "PENDING"
+    assert first_answer.friend_challenge.creator_score == 1
+    assert first_answer.friend_challenge_waiting_for_opponent is True
+    assert round_two.start_result is not None
+    assert round_two.snapshot.status == "PENDING"
+    assert round_two.snapshot.current_round == 2
+
+
+@pytest.mark.asyncio
+async def test_friend_challenge_opponent_round_one_does_not_send_push() -> None:
+    now_utc = datetime(2026, 2, 19, 19, 0, tzinfo=UTC)
+    _creator_user_id, opponent_user_id, challenge_id = await create_joined_duel(now_utc)
+    opponent_telegram_user_id = await telegram_user_id(opponent_user_id)
+
+    result = await submit_friend_round_answer(
+        user_id=opponent_user_id,
+        challenge_id=challenge_id,
+        round_no=1,
+        now_utc=now_utc,
+        correct=True,
+    )
+    notifications = await run_friend_answer_branch(
+        actor_user_id=opponent_user_id,
+        actor_telegram_user_id=opponent_telegram_user_id,
+        result=result,
+    )
+
+    assert notifications == []
+
+
+@pytest.mark.asyncio
+async def test_friend_challenge_opponent_round_three_does_not_send_push() -> None:
+    now_utc = datetime(2026, 2, 19, 19, 15, tzinfo=UTC)
+    _creator_user_id, opponent_user_id, challenge_id = await create_joined_duel(now_utc)
+    opponent_telegram_user_id = await telegram_user_id(opponent_user_id)
+
+    for round_no in range(1, 4):
+        result = await submit_friend_round_answer(
+            user_id=opponent_user_id,
+            challenge_id=challenge_id,
+            round_no=round_no,
+            now_utc=now_utc,
+            correct=True,
+        )
+    notifications = await run_friend_answer_branch(
+        actor_user_id=opponent_user_id,
+        actor_telegram_user_id=opponent_telegram_user_id,
+        result=result,
+    )
+
+    assert notifications == []
+
+
+@pytest.mark.asyncio
+async def test_friend_challenge_opponent_finish_sends_exactly_one_push_if_creator_not_started() -> (
+    None
+):
+    now_utc = datetime(2026, 2, 19, 19, 30, tzinfo=UTC)
+    creator_user_id, opponent_user_id, challenge_id = await create_joined_duel(now_utc)
+    opponent_telegram_user_id = await telegram_user_id(opponent_user_id)
+
+    notifications: list[tuple[int, str, str | None]] = []
+    for round_no in range(1, 6):
+        result = await submit_friend_round_answer(
+            user_id=opponent_user_id,
+            challenge_id=challenge_id,
+            round_no=round_no,
+            now_utc=now_utc,
+            correct=True,
+        )
+        notifications.extend(
+            await run_friend_answer_branch(
+                actor_user_id=opponent_user_id,
+                actor_telegram_user_id=opponent_telegram_user_id,
+                result=result,
+            )
+        )
+
+    assert notifications == [
+        (
+            creator_user_id,
+            "Dein Freund hat gespielt – du bist dran!",
+            f"friend:next:{challenge_id}",
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_friend_challenge_opponent_finish_skips_push_if_creator_already_started() -> None:
+    now_utc = datetime(2026, 2, 19, 19, 45, tzinfo=UTC)
+    creator_user_id, opponent_user_id, challenge_id = await create_joined_duel(now_utc)
+    opponent_telegram_user_id = await telegram_user_id(opponent_user_id)
+
+    await submit_friend_round_answer(
+        user_id=creator_user_id,
+        challenge_id=challenge_id,
+        round_no=1,
+        now_utc=now_utc,
+        correct=True,
+    )
+
+    notifications: list[tuple[int, str, str | None]] = []
+    for round_no in range(1, 6):
+        result = await submit_friend_round_answer(
+            user_id=opponent_user_id,
+            challenge_id=challenge_id,
+            round_no=round_no,
+            now_utc=now_utc,
+            correct=True,
+        )
+        notifications.extend(
+            await run_friend_answer_branch(
+                actor_user_id=opponent_user_id,
+                actor_telegram_user_id=opponent_telegram_user_id,
+                result=result,
+            )
+        )
+
+    assert notifications == []

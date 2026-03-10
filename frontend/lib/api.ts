@@ -19,6 +19,18 @@ export async function fetchEconomyPurchases() {
   return data;
 }
 
+export async function fetchEconomySubscriptions() {
+  const { data } = await api.get("/admin/economy/subscriptions", {
+    params: { status: "ACTIVE" },
+  });
+  return data;
+}
+
+export async function fetchEconomyCohorts() {
+  const { data } = await api.get("/admin/economy/cohorts");
+  return data;
+}
+
 export async function fetchUsers() {
   const { data } = await api.get("/admin/users", {
     params: { page: 1, limit: 50 },
@@ -26,10 +38,44 @@ export async function fetchUsers() {
   return data;
 }
 
-export async function fetchPromo() {
+export async function fetchPromo(status?: string, query?: string) {
   const { data } = await api.get("/admin/promo", {
-    params: { page: 1, limit: 50 },
+    params: { page: 1, limit: 100, status, query },
   });
+  return data;
+}
+
+export async function fetchPromoDetail(promoId: number, reveal = false) {
+  const { data } = await api.get(`/admin/promo/${promoId}`, {
+    params: { reveal },
+  });
+  return data;
+}
+
+export async function fetchPromoStats(promoId: number) {
+  const { data } = await api.get(`/admin/promo/${promoId}/stats`);
+  return data;
+}
+
+export async function fetchPromoAudit(promoId: number) {
+  const { data } = await api.get(`/admin/promo/${promoId}/audit`);
+  return data;
+}
+
+export async function fetchPromoProducts() {
+  const { data } = await api.get("/admin/promo/products");
+  return data;
+}
+
+export async function fetchPromoCodeAvailability(code: string) {
+  const { data } = await api.get("/admin/promo/check-code", {
+    params: { code },
+  });
+  return data;
+}
+
+export async function fetchAdminSession() {
+  const { data } = await api.get("/admin/auth/session");
   return data;
 }
 

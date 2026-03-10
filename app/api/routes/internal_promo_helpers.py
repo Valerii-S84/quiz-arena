@@ -30,9 +30,12 @@ def _as_response(result: PromoRedeemResult) -> PromoRedeemResponse:
         result_type=result.result_type,
         premium_days=result.premium_days,
         premium_ends_at=result.premium_ends_at,
+        discount_type=result.discount_type,
+        discount_value=result.discount_value,
         discount_percent=result.discount_percent,
         reserved_until=result.reserved_until,
         target_scope=result.target_scope,
+        applicable_products=result.applicable_products,
     )
 
 

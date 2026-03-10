@@ -85,6 +85,7 @@ class UsersRepo:
         session: AsyncSession,
         *,
         berlin_date: date,
+        push_kind: str,
         after_user_id: int | None,
         limit: int,
     ) -> list[tuple[int, int, int]]:
@@ -103,6 +104,7 @@ class UsersRepo:
             .where(
                 DailyPushLog.user_id == User.id,
                 DailyPushLog.berlin_date == berlin_date,
+                DailyPushLog.push_kind == push_kind,
             )
             .exists()
         )

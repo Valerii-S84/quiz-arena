@@ -14,6 +14,7 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.game.sessions.service import GameSessionService
 from app.game.tournaments.constants import (
+    DAILY_CUP_QUESTIONS_PER_MATCH,
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_MATCH_STATUS_WALKOVER,
     TOURNAMENT_MODE_CODE,
@@ -37,11 +38,7 @@ def collect_previous_pairs(*, matches: list[TournamentMatch]) -> set[frozenset[i
 
 
 def collect_bye_history(*, matches: list[TournamentMatch]) -> set[int]:
-    return {
-        int(match.user_a)
-        for match in matches
-        if match.user_b is None and match.status == TOURNAMENT_MATCH_STATUS_WALKOVER
-    }
+    return {int(match.user_a) for match in matches if match.user_b is None}
 
 
 async def create_round_matches(
@@ -69,7 +66,11 @@ async def create_round_matches(
             for pair in swiss_pairs
         ],
     )
-    duel_rounds = rounds_for_tournament_format(format_code=tournament.format)
+    duel_rounds = (
+        DAILY_CUP_QUESTIONS_PER_MATCH
+        if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA
+        else rounds_for_tournament_format(format_code=tournament.format)
+    )
     daily_cup_preferred_levels = (
         resolve_daily_cup_preferred_levels(round_no=round_no, duel_rounds=duel_rounds)
         if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA
@@ -80,6 +81,32 @@ async def create_round_matches(
     for pair in swiss_pairs:
         match_id = uuid4()
         if pair.user_b is None:
+            if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA:
+                challenge = await GameSessionService.create_tournament_match_friend_challenge(
+                    session,
+                    creator_user_id=pair.user_a,
+                    opponent_user_id=pair.user_a,
+                    mode_code=TOURNAMENT_MODE_CODE,
+                    total_rounds=duel_rounds,
+                    tournament_match_id=match_id,
+                    now_utc=now_utc,
+                    expires_at=deadline,
+                    preferred_levels_by_round=daily_cup_preferred_levels,
+                )
+                matches.append(
+                    TournamentMatch(
+                        id=match_id,
+                        tournament_id=tournament.id,
+                        round_no=round_no,
+                        user_a=pair.user_a,
+                        user_b=None,
+                        friend_challenge_id=challenge.challenge_id,
+                        status=TOURNAMENT_MATCH_STATUS_PENDING,
+                        winner_id=None,
+                        deadline=deadline,
+                    )
+                )
+                continue
             await TournamentParticipantsRepo.apply_score_delta(
                 session,
                 tournament_id=tournament.id,
@@ -106,6 +133,8 @@ async def create_round_matches(
             session,
             creator_user_id=pair.user_a,
             opponent_user_id=int(pair.user_b),
+            tournament_id=tournament.id,
+            tournament_round_no=round_no,
             mode_code=TOURNAMENT_MODE_CODE,
             total_rounds=duel_rounds,
             tournament_match_id=match_id,

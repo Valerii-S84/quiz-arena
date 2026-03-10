@@ -7,6 +7,7 @@ import pytest
 
 from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournament_participants import TournamentParticipant
+from app.db.models.tournament_round_scores import TournamentRoundScore
 from app.db.models.tournaments import Tournament
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
@@ -76,12 +77,14 @@ class _DummyWorkerBot:
 
 async def _ensure_tournament_schema() -> None:
     async with engine.begin() as conn:
+        await conn.run_sync(TournamentRoundScore.__table__.drop, checkfirst=True)
         await conn.run_sync(TournamentMatch.__table__.drop, checkfirst=True)
         await conn.run_sync(TournamentParticipant.__table__.drop, checkfirst=True)
         await conn.run_sync(Tournament.__table__.drop, checkfirst=True)
         await conn.run_sync(Tournament.__table__.create, checkfirst=True)
         await conn.run_sync(TournamentParticipant.__table__.create, checkfirst=True)
         await conn.run_sync(TournamentMatch.__table__.create, checkfirst=True)
+        await conn.run_sync(TournamentRoundScore.__table__.create, checkfirst=True)
 
 
 @pytest.mark.asyncio

@@ -124,6 +124,42 @@ async def test_render_daily_cup_lobby_round_active_shows_active_hint() -> None:
 
 
 @pytest.mark.asyncio
+async def test_render_daily_cup_lobby_round_active_shows_arena_bot_for_self_match() -> None:
+    callback = DummyCallback(
+        data="daily:cup:view:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        from_user=SimpleNamespace(id=101),
+        message=DummyMessage(),
+    )
+    lobby = SimpleNamespace(
+        tournament=SimpleNamespace(
+            tournament_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            status="ROUND_1",
+            current_round=1,
+            round_deadline=None,
+        ),
+        participants=(
+            SimpleNamespace(user_id=101, score=Decimal("0"), tie_break=Decimal("0")),
+            SimpleNamespace(user_id=202, score=Decimal("0"), tie_break=Decimal("0")),
+        ),
+        viewer_joined=True,
+        viewer_current_match_challenge_id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+        viewer_current_opponent_user_id=None,
+    )
+
+    await render_daily_cup_lobby(
+        callback,
+        lobby=lobby,
+        user_id=101,
+        labels={101: "Ich", 202: "Max"},
+    )
+
+    response = callback.message.answers[0]
+    text = response.text or ""
+    assert "Dein Duell ist bereit." in text
+    assert "Gegner: Arena Bot" in text
+
+
+@pytest.mark.asyncio
 async def test_render_daily_cup_lobby_round_waiting_shows_next_round_time() -> None:
     callback = DummyCallback(
         data="daily:cup:view:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
@@ -170,8 +206,8 @@ async def test_render_daily_cup_lobby_round_waiting_final_round_shows_completion
     lobby = SimpleNamespace(
         tournament=SimpleNamespace(
             tournament_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-            status="ROUND_3",
-            current_round=3,
+            status="ROUND_4",
+            current_round=4,
             round_deadline=None,
         ),
         participants=(
@@ -233,7 +269,5 @@ async def test_render_daily_cup_lobby_completed_shows_completed_marker() -> None
     assert "TB 9" in text
     assert "TB 4.5" in text
     buttons = [button for row in response.kwargs["reply_markup"].inline_keyboard for button in row]
-    urls = [button.url for button in buttons if button.url]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
-    assert any(url and "https://t.me/share/url" in url for url in urls)
     assert "daily:cup:share:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks

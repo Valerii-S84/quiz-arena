@@ -70,15 +70,19 @@ Retention cleanup defaults:
 ```bash
 .venv/bin/ruff check .
 .venv/bin/mypy .
-DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q
+.venv/bin/pytest -q
 ```
+
+`pytest` explicitly binds `DATABASE_URL` to the local test database
+`quiz_arena_test` in `tests/conftest.py`, so integration tests do not depend on
+shell-specific env assignment.
 
 Safe integration-only flow:
 
 ```bash
 DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test .venv/bin/python -m scripts.ensure_test_db
 DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test .venv/bin/python -m alembic upgrade head
-DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q tests/integration
+.venv/bin/pytest -q tests/integration
 ```
 
 ## 5. Architecture and CI guards
@@ -119,3 +123,12 @@ Verify freshness (CI uses this):
 ```bash
 make check-quizbank-reports
 ```
+
+## 8. Promo surfaces
+
+- `/admin/promo` is the canonical operator surface for promo CRUD:
+  create, edit, activate/deactivate, bulk generation, stats, audit, revoke.
+- `/ops/promo` stays monitoring-only for incident response and rollback checks.
+  Do not add create/edit flows there; promo management belongs in `/admin/promo`.
+- Operator-driven promo redemption cancellation uses status `REVOKED`.
+  This is the final runtime/database term and replaces earlier draft wording such as `CANCELLED`.

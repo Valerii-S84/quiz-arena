@@ -4,6 +4,11 @@ from app.db.models.entitlements import Entitlement
 from app.db.models.promo_redemptions import PromoRedemption
 from app.db.repo.promo_repo import PromoRepo
 from app.economy.promo.errors import PromoInvalidError
+from app.economy.promo.runtime import (
+    resolve_applicable_products,
+    resolve_discount_type,
+    resolve_discount_value,
+)
 from app.economy.promo.types import PromoRedeemResult
 
 
@@ -33,9 +38,12 @@ async def build_idempotent_result(
             redemption_id=redemption.id,
             result_type="PERCENT_DISCOUNT",
             idempotent_replay=True,
+            discount_type=resolve_discount_type(promo_code),
+            discount_value=resolve_discount_value(promo_code),
             discount_percent=promo_code.discount_percent,
             reserved_until=redemption.reserved_until,
             target_scope=promo_code.target_scope,
+            applicable_products=resolve_applicable_products(promo_code),
         )
 
     raise PromoInvalidError

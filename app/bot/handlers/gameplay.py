@@ -8,6 +8,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 
 from app.bot.handlers import (
+    gameplay_analytics,
     gameplay_callbacks,
     gameplay_daily_cup,
     gameplay_friend_challenge,
@@ -39,13 +40,14 @@ from app.db.session import SessionLocal
 from app.economy.offers.constants import TRG_LOCKED_MODE_CLICK
 from app.economy.offers.service import OfferLoggingError, OfferService
 from app.economy.referrals.service import ReferralService
-from app.game.sessions.errors import SessionNotFoundError
+from app.game.sessions.errors import SessionNotFoundError, TournamentSessionStopNotAllowedError
 from app.game.sessions.service import GameSessionService
 from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="gameplay")
 EVENT_SOURCE_BOT = "BOT"
+emit_analytics_event = gameplay_analytics.emit_analytics_event
 
 ANSWER_RE, DAILY_RESULT_RE = gameplay_callbacks.ANSWER_RE, gameplay_callbacks.DAILY_RESULT_RE
 gameplay_friend_challenge.register(router)
@@ -67,13 +69,6 @@ _SESSION_DEPS: dict[str, object] = {
     "user_onboarding_service": UserOnboardingService,
     "game_session_service": GameSessionService,
 }
-
-
-async def emit_analytics_event(*args, **kwargs):
-    from app.core.analytics_events import emit_analytics_event as _emit_analytics_event
-
-    await _emit_analytics_event(*args, **kwargs)
-
 
 _resolve_opponent_label = partial(
     gameplay_helpers._resolve_opponent_label,
@@ -131,6 +126,9 @@ async def handle_game_stop(callback: CallbackQuery) -> None:
                     session_id=session_id,
                     now_utc=now_utc,
                 )
+            except TournamentSessionStopNotAllowedError:
+                await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+                return
             except SessionNotFoundError:
                 pass
     await _send_home_message(cast(Message, callback.message), text=TEXTS_DE["msg.game.stopped"])

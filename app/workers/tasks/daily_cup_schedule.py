@@ -5,15 +5,12 @@ from celery.schedules import crontab
 from app.workers.tasks.daily_cup_config import (
     DAILY_CUP_CLOSE_HOUR,
     DAILY_CUP_CLOSE_MINUTE,
-    DAILY_CUP_INVITE_HOUR,
-    DAILY_CUP_INVITE_MINUTE,
     DAILY_CUP_LAST_CALL_REMINDER_HOUR,
     DAILY_CUP_LAST_CALL_REMINDER_MINUTE,
     DAILY_CUP_OPEN_HOUR,
     DAILY_CUP_OPEN_MINUTE,
     DAILY_CUP_PRESTART_REMINDER_HOUR,
     DAILY_CUP_PRESTART_REMINDER_MINUTE,
-    DAILY_CUP_ROUND_ADVANCE_SLOTS,
     DAILY_ELIMINATION_DEADLINE_HOUR,
     DAILY_ELIMINATION_DEADLINE_MINUTE,
 )
@@ -22,13 +19,8 @@ from app.workers.tasks.daily_cup_config import (
 def configure_daily_cup_schedule(celery_app) -> None:
     celery_app.conf.beat_schedule = celery_app.conf.beat_schedule or {}
     schedule_entries = {
-        "daily-cup-send-invite": {
-            "task": "app.workers.tasks.daily_cup.send_invite",
-            "schedule": crontab(hour=DAILY_CUP_INVITE_HOUR, minute=DAILY_CUP_INVITE_MINUTE),
-            "options": {"queue": "q_normal"},
-        },
-        "daily-cup-open-registration": {
-            "task": "app.workers.tasks.daily_cup.open_registration",
+        "daily-cup-send-invite-registration": {
+            "task": "app.workers.tasks.daily_cup.send_invite_registration",
             "schedule": crontab(hour=DAILY_CUP_OPEN_HOUR, minute=DAILY_CUP_OPEN_MINUTE),
             "options": {"queue": "q_normal"},
         },
@@ -48,9 +40,19 @@ def configure_daily_cup_schedule(celery_app) -> None:
             ),
             "options": {"queue": "q_normal"},
         },
+        "daily-cup-turn-reminders": {
+            "task": "app.workers.tasks.daily_cup.send_turn_reminders",
+            "schedule": crontab(minute="*/10"),
+            "options": {"queue": "q_normal"},
+        },
         "daily-cup-close-registration": {
             "task": "app.workers.tasks.daily_cup.close_registration_and_start",
             "schedule": crontab(hour=DAILY_CUP_CLOSE_HOUR, minute=DAILY_CUP_CLOSE_MINUTE),
+            "options": {"queue": "q_normal"},
+        },
+        "daily-cup-publish-final-results": {
+            "task": "app.workers.tasks.daily_cup.publish_final_results",
+            "schedule": crontab(hour=20, minute=5),
             "options": {"queue": "q_normal"},
         },
         "daily-elimination-final-deadline": {
@@ -62,19 +64,9 @@ def configure_daily_cup_schedule(celery_app) -> None:
             "options": {"queue": "q_normal"},
         },
     }
-    minute_values = {slot[1] for slot in DAILY_CUP_ROUND_ADVANCE_SLOTS}
-    if len(minute_values) == 1:
-        hours = ",".join(str(slot[0]) for slot in DAILY_CUP_ROUND_ADVANCE_SLOTS)
-        schedule_entries["daily-cup-round-advance"] = {
-            "task": "app.workers.tasks.daily_cup.advance_rounds",
-            "schedule": crontab(hour=hours, minute=next(iter(minute_values))),
-            "options": {"queue": "q_normal"},
-        }
-    else:
-        for index, (hour, minute) in enumerate(DAILY_CUP_ROUND_ADVANCE_SLOTS, start=1):
-            schedule_entries[f"daily-cup-round-advance-{index}"] = {
-                "task": "app.workers.tasks.daily_cup.advance_rounds",
-                "schedule": crontab(hour=hour, minute=minute),
-                "options": {"queue": "q_normal"},
-            }
+    schedule_entries["daily-cup-round-advance"] = {
+        "task": "app.workers.tasks.daily_cup.advance_rounds",
+        "schedule": crontab(minute="*"),
+        "options": {"queue": "q_normal"},
+    }
     celery_app.conf.beat_schedule.update(schedule_entries)

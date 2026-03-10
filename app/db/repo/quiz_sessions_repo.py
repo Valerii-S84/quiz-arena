@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.quiz_sessions import QuizSession
@@ -134,3 +134,20 @@ class QuizSessionsRepo:
         )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def sum_completed_duration_ms_for_friend_challenge_user(
+        session: AsyncSession,
+        *,
+        friend_challenge_id: UUID,
+        user_id: int,
+    ) -> int:
+        duration_expr = extract("epoch", QuizSession.completed_at - QuizSession.started_at) * 1000
+        stmt = select(func.coalesce(func.sum(duration_expr), 0)).where(
+            QuizSession.friend_challenge_id == friend_challenge_id,
+            QuizSession.user_id == user_id,
+            QuizSession.status == "COMPLETED",
+            QuizSession.completed_at.is_not(None),
+        )
+        result = await session.execute(stmt)
+        return max(0, int(result.scalar_one() or 0))

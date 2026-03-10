@@ -5,30 +5,23 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import structlog
-from aiogram.types import BufferedInputFile
 
 from app.bot.application import build_bot
-from app.bot.keyboards.daily_cup import build_daily_cup_share_keyboard, build_daily_cup_share_url
-from app.bot.texts.de import TEXTS_DE
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES, TOURNAMENT_STATUS_COMPLETED
+from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
-from app.workers.tasks.daily_cup_proof_cards_text import (
-    build_caption,
-    format_points,
-    format_user_label,
-)
+from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
+from app.workers.tasks.daily_cup_proof_cards_delivery import send_daily_cup_proof_card
+from app.workers.tasks.daily_cup_proof_cards_text import format_points, format_user_label
+from app.workers.tasks.daily_cup_task_helpers import is_celery_task, is_today_daily_cup_tournament
 from app.workers.tasks.tournaments_proof_card_render import render_tournament_proof_card_png
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_proof_cards")
-
-
-def _is_celery_task(task_obj: object) -> bool:
-    return type(task_obj).__module__.startswith("celery.")
 
 
 def _empty_result() -> dict[str, int]:
@@ -46,6 +39,7 @@ async def run_daily_cup_proof_cards_async(
     except ValueError:
         return _empty_result()
 
+    now_utc = datetime.now(timezone.utc)
     async with SessionLocal.begin() as session:
         tournament = await TournamentsRepo.get_by_id(session, parsed_tournament_id)
         if (
@@ -54,13 +48,22 @@ async def run_daily_cup_proof_cards_async(
             or tournament.status != TOURNAMENT_STATUS_COMPLETED
         ):
             return _empty_result()
-
-        all_participants = await TournamentParticipantsRepo.list_for_tournament(
-            session,
-            tournament_id=parsed_tournament_id,
-        )
-        if not all_participants:
+        if not is_today_daily_cup_tournament(
+            registration_deadline=tournament.registration_deadline,
+            now_utc=now_utc,
+            timezone_name=DAILY_CUP_TIMEZONE,
+        ):
+            logger.info(
+                "daily_cup_proof_cards_skipped_stale_tournament",
+                tournament_id=tournament_id,
+                registration_deadline=tournament.registration_deadline.isoformat(),
+            )
             return _empty_result()
+
+        standings = await calculate_daily_cup_standings(session, tournament_id=parsed_tournament_id)
+        if not standings:
+            return _empty_result()
+        all_participants = [item.participant for item in standings]
 
         participants = (
             [item for item in all_participants if int(item.user_id) == user_id]
@@ -88,16 +91,15 @@ async def run_daily_cup_proof_cards_async(
     if initial_delay_seconds > 0:
         await asyncio.sleep(max(0, int(initial_delay_seconds)))
 
-    standings_user_ids = [int(item.user_id) for item in all_participants]
+    standings_user_ids = [item.user_id for item in standings]
     participant_rows = {int(item.user_id): item for item in participants}
     points_by_user = {int(item.user_id): format_points(item.score) for item in all_participants}
     participants_total = len(standings_user_ids)
-    now_utc = datetime.now(timezone.utc)
-
     sent = 0
     cached_reused = 0
     failed = 0
     new_file_ids: dict[int, str] = {}
+    sent_user_ids: set[int] = set()
 
     bot = build_bot()
     try:
@@ -109,54 +111,30 @@ async def run_daily_cup_proof_cards_async(
                 continue
             place = standings_user_ids.index(current_user_id) + 1
             points = points_by_user.get(current_user_id, "0")
-            caption = build_caption(place=place, points=points)
-            share_url = build_daily_cup_share_url(
-                base_link="t.me/QuizArenaBot",
-                share_text=TEXTS_DE["msg.daily_cup.share_template"].format(
-                    place=place,
-                    total=participants_total,
-                    points=points,
-                ),
-            )
-            keyboard = build_daily_cup_share_keyboard(
-                tournament_id=tournament_id,
-                share_url=share_url,
-            )
-            cached_file_id = participant_rows[current_user_id].proof_card_file_id
+            participant_row = participant_rows[current_user_id]
+            if participant_row.proof_card_sent:
+                continue
             try:
-                if cached_file_id:
-                    await bot.send_photo(
-                        chat_id=chat_id,
-                        photo=cached_file_id,
-                        caption=caption,
-                        reply_markup=keyboard,
-                    )
-                    sent += 1
-                    cached_reused += 1
-                    continue
-
-                card_png = render_tournament_proof_card_png(
-                    player_label=user_labels.get(current_user_id, "Spieler"),
+                delivered, reused_cached, file_id = await send_daily_cup_proof_card(
+                    bot=bot,
+                    tournament_id=tournament_id,
+                    user_id=current_user_id,
+                    chat_id=chat_id,
                     place=place,
                     points=points,
-                    format_label="5 Fragen",
-                    completed_at=now_utc,
-                    tournament_name="Daily Arena Cup",
-                    rounds_played=3,
-                    is_daily_arena=True,
+                    participants_total=participants_total,
+                    cached_file_id=participant_row.proof_card_file_id,
+                    player_label=user_labels.get(current_user_id, "Spieler"),
+                    now_utc=now_utc,
+                    render_card_png=render_tournament_proof_card_png,
                 )
-                message = await bot.send_photo(
-                    chat_id=chat_id,
-                    photo=BufferedInputFile(
-                        card_png,
-                        filename=f"daily_cup_{tournament_id}_{current_user_id}.png",
-                    ),
-                    caption=caption,
-                    reply_markup=keyboard,
-                )
+                if not delivered:
+                    continue
                 sent += 1
-                if message.photo:
-                    new_file_ids[current_user_id] = message.photo[-1].file_id
+                cached_reused += int(reused_cached)
+                sent_user_ids.add(current_user_id)
+                if file_id is not None:
+                    new_file_ids[current_user_id] = file_id
             except Exception as exc:
                 logger.warning(
                     "daily_cup_proof_card_send_failed",
@@ -168,8 +146,14 @@ async def run_daily_cup_proof_cards_async(
     finally:
         await bot.session.close()
 
-    if new_file_ids:
+    if new_file_ids or sent_user_ids:
         async with SessionLocal.begin() as session:
+            for current_user_id in sent_user_ids:
+                await TournamentParticipantsRepo.set_proof_card_sent(
+                    session,
+                    tournament_id=parsed_tournament_id,
+                    user_id=current_user_id,
+                )
             for current_user_id, file_id in new_file_ids.items():
                 await TournamentParticipantsRepo.set_proof_card_file_id_if_missing(
                     session,
@@ -194,7 +178,7 @@ def enqueue_daily_cup_proof_cards(
     delay_seconds: int = 2,
 ) -> None:
     try:
-        if _is_celery_task(run_daily_cup_proof_cards):
+        if is_celery_task(run_daily_cup_proof_cards):
             run_daily_cup_proof_cards.apply_async(
                 kwargs={
                     "tournament_id": tournament_id,

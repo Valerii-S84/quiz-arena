@@ -3,9 +3,12 @@ from __future__ import annotations
 from celery.schedules import crontab
 
 from app.workers.tasks.daily_challenge_config import (
+    DAILY_EVENING_REMINDER_HOUR_BERLIN,
+    DAILY_EVENING_REMINDER_MINUTE_BERLIN,
     DAILY_PRECOMPUTE_HOUR_BERLIN,
     DAILY_PRECOMPUTE_MINUTE_BERLIN,
     DAILY_PUSH_HOUR_BERLIN,
+    DAILY_PUSH_KIND_EVENING_REMINDER,
     DAILY_PUSH_MINUTE_BERLIN,
 )
 
@@ -28,6 +31,15 @@ def configure_daily_challenge_schedule(celery_app) -> None:
                     hour=DAILY_PUSH_HOUR_BERLIN,
                     minute=DAILY_PUSH_MINUTE_BERLIN,
                 ),
+                "options": {"queue": "q_low"},
+            },
+            "daily-push-evening-reminder-berlin": {
+                "task": "app.workers.tasks.daily_challenge.run_daily_push_notifications",
+                "schedule": crontab(
+                    hour=DAILY_EVENING_REMINDER_HOUR_BERLIN,
+                    minute=DAILY_EVENING_REMINDER_MINUTE_BERLIN,
+                ),
+                "kwargs": {"push_kind": DAILY_PUSH_KIND_EVENING_REMINDER},
                 "options": {"queue": "q_low"},
             },
         }

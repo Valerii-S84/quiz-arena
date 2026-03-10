@@ -1,6 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from app.bot.texts.de import TEXTS_DE
+from app.game.tournaments.constants import TOURNAMENT_SELF_BOT_LABEL
+from app.game.tournaments.daily_cup_slots import get_round_start
+
+_BERLIN_TZ = ZoneInfo("Europe/Berlin")
 
 
 def build_standings_lines(
@@ -35,17 +42,32 @@ def build_round_text(
     lines = [
         "🏆 Daily Arena Cup",
         "",
-        f"⚔️ Runde {round_no}/3 gestartet",
-        "Format: 5 Fragen",
+        f"⚔️ Runde {round_no}/4 gestartet",
+        "Format: 7 Fragen",
         f"Deadline: {deadline_text} (Berlin)",
     ]
     if opponent_label is None:
-        lines.append("Gegner: Freilos")
-        lines.append("✅ BYE in dieser Runde: dein Duell gilt als Auto-Sieg.")
+        lines.append(f"Gegner: {TOURNAMENT_SELF_BOT_LABEL}")
     else:
         lines.append(f"Gegner: {opponent_label}")
     lines.extend(["", "📊 Tabelle", *standings_lines])
     return "\n".join(lines)
+
+
+def build_next_round_start_text(
+    *,
+    round_no: int,
+    tournament_start: datetime,
+    round_start_time: datetime | None,
+) -> str:
+    resolved_start = round_start_time or get_round_start(
+        round_number=round_no,
+        tournament_start=tournament_start,
+    )
+    formatted_time = resolved_start.astimezone(_BERLIN_TZ).strftime("%H:%M")
+    if round_start_time is None:
+        return f"voraussichtlich {formatted_time}"
+    return f"um {formatted_time}"
 
 
 def build_completed_text(*, place: int, my_points: str, standings_lines: list[str]) -> str:

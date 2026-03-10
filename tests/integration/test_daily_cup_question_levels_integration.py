@@ -14,7 +14,7 @@ from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.service import join_daily_cup_by_id
-from app.workers.tasks import daily_cup_async, daily_cup_rounds
+from app.workers.tasks import daily_cup_async, daily_cup_messaging, daily_cup_rounds
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
 from tests.integration.friend_challenge_fixtures import (
     _create_user,
@@ -155,13 +155,23 @@ async def test_daily_cup_round_2_and_3_question_level_mix(monkeypatch) -> None:
     tournament_id = await _create_daily_cup_registration_tournament(now_utc=now_utc)
     await _join_users(tournament_id=tournament_id, user_ids=user_ids, now_utc=now_utc)
 
+    monkeypatch.setattr(
+        daily_cup_async,
+        "enqueue_daily_cup_round_messaging",
+        lambda *, tournament_id, enqueue_completion_followups=False: None,
+    )
+    monkeypatch.setattr(
+        daily_cup_messaging,
+        "enqueue_daily_cup_round_messaging",
+        lambda *, tournament_id, enqueue_completion_followups=False: None,
+    )
     monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
     await daily_cup_async.close_daily_cup_registration_and_start_async()
 
     await _assert_round_question_levels(
         tournament_id=tournament_id,
         round_no=1,
-        expected_levels=("A1", "A1", "A1", "A2", "A2"),
+        expected_levels=("A1", "A1", "A1", "A1", "A1", "A1", "A1"),
     )
 
     await _expire_round_and_advance(
@@ -173,7 +183,7 @@ async def test_daily_cup_round_2_and_3_question_level_mix(monkeypatch) -> None:
     await _assert_round_question_levels(
         tournament_id=tournament_id,
         round_no=2,
-        expected_levels=("A2", "A2", "A2", "A2", "A2"),
+        expected_levels=("A2", "A2", "A2", "A2", "A2", "A2", "A2"),
     )
 
     await _expire_round_and_advance(
@@ -185,7 +195,7 @@ async def test_daily_cup_round_2_and_3_question_level_mix(monkeypatch) -> None:
     await _assert_round_question_levels(
         tournament_id=tournament_id,
         round_no=3,
-        expected_levels=("A2", "B1", "B1", "B1", "B2"),
+        expected_levels=("A2", "A2", "A2", "A2", "B1", "B1", "B1"),
     )
 
     async with SessionLocal.begin() as session:

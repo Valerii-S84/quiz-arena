@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import os
 import random
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.models.friend_challenges import FriendChallenge
 from app.db.models.tournament_matches import TournamentMatch
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
@@ -16,9 +16,22 @@ from app.game.friend_challenges.constants import (
     DUEL_STATUS_OPPONENT_DONE,
     DUEL_STATUS_WALKOVER,
 )
+from app.game.sessions.service.friend_challenges_tournament_daily_cup import (
+    handle_daily_cup_tournament_progress,
+)
+from app.game.sessions.service.friend_challenges_tournament_self_bot import (
+    is_self_bot_tournament_challenge,
+    maybe_complete_self_bot_match,
+)
 from app.game.tournaments.constants import (
+    TOURNAMENT_SELF_BOT_DEFAULT_CORRECT_ANSWERS,
     TOURNAMENT_TYPE_DAILY_ARENA,
     TOURNAMENT_TYPE_DAILY_ELIMINATION,
+)
+
+_DAILY_CUP_TURN_RESPONSE_GRACE_MINUTES = max(
+    1,
+    int(os.getenv("DAILY_CUP_TURN_RESPONSE_GRACE_MINUTES", "15")),
 )
 
 
@@ -65,29 +78,6 @@ def _ensure_elimination_winner(
     return winner_id, loser_id
 
 
-def _maybe_complete_self_bot_match(
-    *,
-    challenge: FriendChallenge,
-    now_utc: datetime,
-) -> None:
-    if (
-        challenge.status != DUEL_STATUS_CREATOR_DONE
-        or challenge.opponent_user_id is None
-        or int(challenge.opponent_user_id) != int(challenge.creator_user_id)
-    ):
-        return
-    bot_target = max(
-        0, min(int(round(int(challenge.total_rounds) * 0.7)), int(challenge.total_rounds) - 1)
-    )
-    challenge.opponent_score = min(bot_target, max(0, int(challenge.creator_score) - 1))
-    challenge.opponent_answered_round = int(challenge.total_rounds)
-    challenge.opponent_finished_at = now_utc
-    challenge.current_round = int(challenge.total_rounds)
-    challenge.status = DUEL_STATUS_COMPLETED
-    challenge.winner_user_id = int(challenge.creator_user_id)
-    challenge.completed_at = now_utc
-
-
 async def _update_elimination_timeout_state(
     *,
     challenge: FriendChallenge,
@@ -121,12 +111,8 @@ async def handle_tournament_duel_progress(
 ) -> None:
     if challenge.tournament_match_id is None:
         return
-    from app.game.tournaments.lifecycle import (
-        check_and_advance_round,
-        on_elimination_match_complete,
-    )
+    from app.game.tournaments.lifecycle import on_elimination_match_complete
     from app.game.tournaments.settlement import settle_pending_match_from_duel
-    from app.workers.tasks.daily_cup_match_results import send_daily_cup_match_result_messages
 
     tournament_match = await TournamentMatchesRepo.get_by_id_for_update(
         session,
@@ -141,7 +127,7 @@ async def handle_tournament_duel_progress(
     if tournament is None:
         return
     if tournament.type == TOURNAMENT_TYPE_DAILY_ELIMINATION:
-        _maybe_complete_self_bot_match(challenge=challenge, now_utc=now_utc)
+        maybe_complete_self_bot_match(challenge=challenge, now_utc=now_utc)
         await _update_elimination_timeout_state(challenge=challenge, match=tournament_match)
         if challenge.status in {DUEL_STATUS_COMPLETED, DUEL_STATUS_WALKOVER}:
             winner_id, loser_id = _ensure_elimination_winner(
@@ -164,62 +150,18 @@ async def handle_tournament_duel_progress(
         return
     if tournament.type != TOURNAMENT_TYPE_DAILY_ARENA:
         return
-    if challenge.status not in {DUEL_STATUS_COMPLETED, DUEL_STATUS_WALKOVER}:
-        return
-
-    match_settled = await settle_pending_match_from_duel(
+    if is_self_bot_tournament_challenge(challenge=challenge):
+        maybe_complete_self_bot_match(
+            challenge=challenge,
+            now_utc=now_utc,
+            fixed_bot_score=TOURNAMENT_SELF_BOT_DEFAULT_CORRECT_ANSWERS,
+        )
+    await handle_daily_cup_tournament_progress(
         session,
-        match=tournament_match,
-        now_utc=now_utc,
-    )
-    if not match_settled:
-        return
-    transition = await check_and_advance_round(
-        session,
-        tournament_id=tournament_match.tournament_id,
-        now_utc=now_utc,
-    )
-
-    from app.workers.tasks.daily_cup_messaging import enqueue_daily_cup_round_messaging
-
-    await emit_analytics_event(
-        session,
-        event_type="daily_cup_match_completed",
-        source=EVENT_SOURCE_BOT,
-        happened_at=now_utc,
+        challenge=challenge,
         user_id=user_id,
-        payload={
-            "tournament_id": str(tournament_match.tournament_id),
-            "round_no": int(tournament_match.round_no),
-        },
+        now_utc=now_utc,
+        tournament_match=tournament_match,
+        tournament=tournament,
+        grace_minutes=_DAILY_CUP_TURN_RESPONSE_GRACE_MINUTES,
     )
-    if int(transition["round_started"]) > 0:
-        await emit_analytics_event(
-            session,
-            event_type="daily_cup_round_started",
-            source=EVENT_SOURCE_BOT,
-            happened_at=now_utc,
-            user_id=user_id,
-            payload={
-                "tournament_id": str(tournament_match.tournament_id),
-                "round_no": int(tournament.current_round),
-            },
-        )
-        enqueue_daily_cup_round_messaging(tournament_id=str(tournament_match.tournament_id))
-    if int(transition["tournament_completed"]) > 0:
-        enqueue_daily_cup_round_messaging(
-            tournament_id=str(tournament_match.tournament_id),
-            enqueue_completion_followups=True,
-        )
-    if challenge.opponent_user_id is not None and tournament_match.user_b is not None:
-        await send_daily_cup_match_result_messages(
-            session,
-            tournament_id=tournament_match.tournament_id,
-            round_no=int(tournament_match.round_no),
-            user_a=int(tournament_match.user_a),
-            user_b=int(tournament_match.user_b),
-            user_a_points=int(challenge.creator_score),
-            user_b_points=int(challenge.opponent_score),
-            rounds_total=max(1, int(challenge.total_rounds)),
-            next_round_deadline=tournament.round_deadline,
-        )

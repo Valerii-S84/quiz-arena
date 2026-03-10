@@ -8,6 +8,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.application import build_bot
 from app.bot.keyboards.tournament import build_tournament_lobby_keyboard
+from app.core.telegram_links import public_bot_start_link
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
@@ -37,13 +38,12 @@ def _is_celery_task(task_obj: object) -> bool:
 
 def _build_standings_share_url(
     *,
-    bot_username: str,
     invite_code: str,
     tournament_name: str | None,
 ) -> str:
     share_text = urllib.parse.quote(
         f"🏆 Ich spiele im {tournament_name or 'Deutsch-Turnier'}! "
-        f"Komm dazu → t.me/{bot_username}?start=tournament_{invite_code}"
+        f"Komm dazu → {public_bot_start_link(start_param=f'tournament_{invite_code}')}"
     )
     return f"https://t.me/share/url?url={share_text}"
 
@@ -110,14 +110,7 @@ async def run_private_tournament_round_messaging_async(*, tournament_id: str) ->
     replaced_message_ids: dict[int, int] = {}
 
     bot = build_bot()
-    bot_username: str | None = None
     try:
-        try:
-            me = await bot.get_me()
-            if me.username:
-                bot_username = me.username
-        except Exception:
-            bot_username = None
         for user_id in standings_user_ids:
             chat_id = telegram_targets.get(user_id)
             if chat_id is None:
@@ -161,15 +154,13 @@ async def run_private_tournament_round_messaging_async(*, tournament_id: str) ->
                 play_challenge_id=play_challenge_id,
                 show_share_result=tournament.status == TOURNAMENT_STATUS_COMPLETED,
             )
-            if bot_username is not None:
-                keyboard = _with_standings_share_button(
-                    keyboard=keyboard,
-                    share_url=_build_standings_share_url(
-                        bot_username=bot_username,
-                        invite_code=tournament.invite_code,
-                        tournament_name=tournament.name,
-                    ),
-                )
+            keyboard = _with_standings_share_button(
+                keyboard=keyboard,
+                share_url=_build_standings_share_url(
+                    invite_code=tournament.invite_code,
+                    tournament_name=tournament.name,
+                ),
+            )
             existing_message_id = participant_rows[user_id].standings_message_id
             if existing_message_id is None:
                 message = await bot.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)

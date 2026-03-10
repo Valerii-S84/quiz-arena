@@ -8,8 +8,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.purchases import Purchase
 
+from .purchases_repo_metrics import (
+    count_paid_purchases,
+    sum_paid_stars_amount,
+    sum_paid_stars_amount_by_product,
+)
+
 
 class PurchasesRepo:
+    count_paid_purchases = staticmethod(count_paid_purchases)
+    sum_paid_stars_amount = staticmethod(sum_paid_stars_amount)
+    sum_paid_stars_amount_by_product = staticmethod(sum_paid_stars_amount_by_product)
+
     @staticmethod
     async def get_by_id(session: AsyncSession, purchase_id: UUID) -> Purchase | None:
         return await session.get(Purchase, purchase_id)
@@ -65,6 +75,27 @@ class PurchasesRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_active_invoice_for_user_product_for_update(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        product_code: str,
+    ) -> Purchase | None:
+        stmt = (
+            select(Purchase)
+            .where(
+                Purchase.user_id == user_id,
+                Purchase.product_code == product_code,
+                Purchase.status.in_(("CREATED", "INVOICE_SENT", "PRECHECKOUT_OK")),
+            )
+            .order_by(Purchase.created_at.desc())
+            .limit(1)
+            .with_for_update()
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_for_credit_lock(session: AsyncSession, purchase_id: UUID) -> Purchase | None:
         stmt = select(Purchase).where(Purchase.id == purchase_id).with_for_update()
         result = await session.execute(stmt)
@@ -89,33 +120,6 @@ class PurchasesRepo:
         )
         result = await session.execute(stmt)
         return list(result.scalars().all())
-
-    @staticmethod
-    async def count_paid_purchases(session: AsyncSession) -> int:
-        stmt = select(func.count(Purchase.id)).where(Purchase.paid_at.is_not(None))
-        result = await session.execute(stmt)
-        return int(result.scalar_one() or 0)
-
-    @staticmethod
-    async def sum_paid_stars_amount(session: AsyncSession) -> int:
-        stmt = select(func.coalesce(func.sum(Purchase.stars_amount), 0)).where(
-            Purchase.paid_at.is_not(None)
-        )
-        result = await session.execute(stmt)
-        return int(result.scalar_one() or 0)
-
-    @staticmethod
-    async def sum_paid_stars_amount_by_product(session: AsyncSession) -> dict[str, int]:
-        stmt = (
-            select(
-                Purchase.product_code,
-                func.coalesce(func.sum(Purchase.stars_amount), 0),
-            )
-            .where(Purchase.paid_at.is_not(None))
-            .group_by(Purchase.product_code)
-        )
-        result = await session.execute(stmt)
-        return {product_code: int(total or 0) for product_code, total in result.all()}
 
     @staticmethod
     async def count_by_user(session: AsyncSession, *, user_id: int) -> int:

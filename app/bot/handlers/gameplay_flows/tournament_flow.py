@@ -123,6 +123,12 @@ async def handle_tournament_share_result(
                 "score": points,
             },
         )
+    from app.workers.tasks.tournaments_proof_cards import enqueue_private_tournament_proof_cards
+
+    enqueue_private_tournament_proof_cards(
+        tournament_id=str(tournament_id),
+        user_id=snapshot.user_id,
+    )
     share_url = await build_tournament_share_result_url(
         callback,
         share_text=f"🏆 Turnier beendet! Ich bin #{place} mit {points} Pkt.",

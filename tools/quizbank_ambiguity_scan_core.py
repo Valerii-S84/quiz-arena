@@ -8,6 +8,7 @@ from typing import Any
 
 from quizbank_ambiguity_constants import OPTION_COLUMNS
 from quizbank_ambiguity_io import read_table
+from quizbank_report_paths import report_path
 from quizbank_ambiguity_text import key_family, norm, question_signature
 from rapidfuzz import fuzz
 
@@ -16,7 +17,7 @@ def scan_file(path: Path) -> dict[str, Any]:
     columns, rows = read_table(path)
     if "question" not in columns:
         return {
-            "file": str(path),
+            "file": report_path(path),
             "row_count": len(rows),
             "exact_duplicate_groups": [],
             "exact_conflict_groups": [],
@@ -126,7 +127,7 @@ def scan_file(path: Path) -> dict[str, Any]:
     fuzzy_conflicts = sorted(fuzzy_conflicts, key=lambda x: x["score"], reverse=True)[:100]
 
     return {
-        "file": str(path),
+        "file": report_path(path),
         "row_count": len(rows),
         "exact_duplicate_groups": repeats_same_answer,
         "exact_conflict_groups": exact_conflicts,

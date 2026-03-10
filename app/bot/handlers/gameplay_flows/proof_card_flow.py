@@ -97,6 +97,12 @@ async def handle_friend_challenge_share_result(
                 "total_rounds": challenge.total_rounds,
             },
         )
+    from app.bot.handlers.gameplay_proof_cards import enqueue_duel_proof_cards
+
+    enqueue_duel_proof_cards(
+        challenge_id=str(challenge.challenge_id),
+        user_id=snapshot.user_id,
+    )
 
     await callback.message.answer(
         "\n".join([TEXTS_DE["msg.friend.challenge.proof.share.ready"], proof_card_text]),

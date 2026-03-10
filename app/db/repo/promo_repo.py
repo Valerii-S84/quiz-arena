@@ -21,8 +21,8 @@ from app.db.repo.promo_repo_codes import (
     pause_active_codes_by_hashes,
 )
 from app.db.repo.promo_repo_redemptions import (
-    count_discount_redemptions_by_status,
-    count_redemptions_by_status,
+    count_active_reserved_redemptions,
+    count_redemptions_by_code_and_user,
     create_redemption,
     expire_reserved_redemptions,
     get_redemption_by_applied_purchase_id_for_update,
@@ -32,7 +32,12 @@ from app.db.repo.promo_repo_redemptions import (
     get_redemption_by_idempotency_key,
     get_redemption_by_idempotency_key_for_update,
     get_refunded_purchase_ids_with_pending_redemption_revoke,
+    list_redemptions_by_code_and_user_for_update,
     revoke_redemption_for_refund,
+)
+from app.db.repo.promo_repo_redemptions_analytics import (
+    count_discount_redemptions_by_status,
+    count_redemptions_by_status,
 )
 
 
@@ -59,7 +64,12 @@ class PromoRepo:
     get_redemption_by_code_and_user_for_update = staticmethod(
         get_redemption_by_code_and_user_for_update
     )
+    list_redemptions_by_code_and_user_for_update = staticmethod(
+        list_redemptions_by_code_and_user_for_update
+    )
+    count_redemptions_by_code_and_user = staticmethod(count_redemptions_by_code_and_user)
     create_redemption = staticmethod(create_redemption)
+    count_active_reserved_redemptions = staticmethod(count_active_reserved_redemptions)
 
     create_attempt = staticmethod(create_attempt)
     count_user_attempts = staticmethod(count_user_attempts)

@@ -68,6 +68,7 @@ async def emit_standard_duel_created_events(
         happened_at=happened_at,
         user_id=creator_user_id,
         payload={
+            "challenge_id": str(challenge.id),
             "type": challenge.challenge_type,
             "format": challenge.total_rounds,
         },

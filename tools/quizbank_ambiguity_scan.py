@@ -11,6 +11,7 @@ from pathlib import Path
 from quizbank_ambiguity_constants import CUE_PREFIXES, OPTION_COLUMNS
 from quizbank_ambiguity_io import read_csv, read_table, read_xlsx
 from quizbank_ambiguity_report import build_md
+from quizbank_report_paths import csv_sort_key
 from quizbank_ambiguity_scan_core import scan_file
 from quizbank_ambiguity_text import key_family, norm, question_signature
 
@@ -40,7 +41,8 @@ def main() -> None:
             p
             for p in Path(args.input_dir).iterdir()
             if p.is_file() and p.suffix.lower() in {".csv", ".xlsx", ".xlsm"}
-        ]
+        ],
+        key=csv_sort_key,
     )
     results = [scan_file(p) for p in files]
     summary = {

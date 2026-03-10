@@ -2,17 +2,20 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 
 from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, ForceReply, Message
+from aiogram.types import CallbackQuery, Message
 
+from app.bot.handlers.promo_view_helpers import (
+    format_berlin_time,
+    resolve_discount_label,
+    resolve_scope_label,
+)
 from app.bot.keyboards.promo import build_promo_discount_keyboard
 from app.bot.keyboards.shop import build_shop_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
-from app.economy.energy.constants import BERLIN_TIMEZONE
 from app.economy.promo.errors import (
     PromoAlreadyUsedError,
     PromoExpiredError,
@@ -22,33 +25,11 @@ from app.economy.promo.errors import (
     PromoRateLimitedError,
 )
 from app.economy.promo.service import PromoService
-from app.economy.purchases.catalog import get_product
 from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="promo")
 PROMO_INPUT_RE = re.compile(r"^/?promo\s+(.+)$", re.IGNORECASE)
 PROMO_PLAIN_RE = re.compile(r"^[A-Z0-9][A-Z0-9_-]{1,63}$")
-
-
-def _format_berlin_time(at_utc: datetime | None) -> str:
-    if at_utc is None:
-        return "unbekannt"
-    return at_utc.astimezone(ZoneInfo(BERLIN_TIMEZONE)).strftime("%d.%m %H:%M")
-
-
-def _resolve_scope_label(target_scope: str | None) -> str:
-    if target_scope is None:
-        return "deine Auswahl"
-    if target_scope == "ANY":
-        return "alle Pakete"
-    if target_scope == "MICRO_ANY":
-        return "Mikro-Pakete"
-    if target_scope == "PREMIUM_ANY":
-        return "Premium-Plaene"
-    product = get_product(target_scope)
-    if product is not None:
-        return product.title
-    return target_scope
 
 
 def _is_reply_to_promo_prompt(message: Message) -> bool:
@@ -83,11 +64,17 @@ def _extract_promo_code(message: Message) -> str | None:
     return None
 
 
+def _resolve_attempt_source(message: Message) -> str:
+    text = (message.text or "").strip()
+    if PROMO_INPUT_RE.match(text) is not None:
+        return "COMMAND"
+    if _is_reply_to_promo_prompt(message):
+        return "BUTTON"
+    return "COMMAND"
+
+
 async def _prompt_for_promo_input(message: Message) -> None:
-    await message.answer(
-        TEXTS_DE["msg.promo.input.hint"],
-        reply_markup=ForceReply(selective=True, input_field_placeholder="WILLKOMMEN-50"),
-    )
+    await message.answer(TEXTS_DE["msg.promo.input.hint"])
 
 
 @router.callback_query(F.data == "promo:open")
@@ -137,6 +124,7 @@ async def _redeem_promo_from_text(message: Message) -> None:
                 user_id=snapshot.user_id,
                 promo_code=promo_code,
                 idempotency_key=f"promo:{snapshot.user_id}:{message.message_id}",
+                source=_resolve_attempt_source(message),
                 now_utc=now_utc,
             )
     except PromoInvalidError:
@@ -171,7 +159,7 @@ async def _redeem_promo_from_text(message: Message) -> None:
         await message.answer(
             TEXTS_DE["msg.promo.success.grant.details"].format(
                 premium_days=result.premium_days or 0,
-                premium_ends_at=_format_berlin_time(result.premium_ends_at),
+                premium_ends_at=format_berlin_time(result.premium_ends_at),
             )
         )
         return
@@ -179,16 +167,28 @@ async def _redeem_promo_from_text(message: Message) -> None:
     discount_keyboard = build_promo_discount_keyboard(
         redemption_id=result.redemption_id,
         target_scope=result.target_scope,
-        discount_percent=result.discount_percent,
+        discount_type=result.discount_type,
+        discount_value=result.discount_value,
+        applicable_products=result.applicable_products,
     )
+    if discount_keyboard is None:
+        await message.answer(
+            TEXTS_DE["msg.promo.discount.unavailable"],
+            reply_markup=build_shop_keyboard(),
+        )
+        return
+
     await message.answer(
         TEXTS_DE["msg.promo.success.discount"],
-        reply_markup=discount_keyboard or build_shop_keyboard(),
+        reply_markup=discount_keyboard,
     )
     await message.answer(
         TEXTS_DE["msg.promo.success.discount.details"].format(
-            discount_percent=result.discount_percent or 0,
-            scope_label=_resolve_scope_label(result.target_scope),
-            reserved_until=_format_berlin_time(result.reserved_until),
+            discount_label=resolve_discount_label(result),
+            scope_label=resolve_scope_label(
+                result.target_scope,
+                applicable_products=result.applicable_products,
+            ),
+            reserved_until=format_berlin_time(result.reserved_until),
         )
     )

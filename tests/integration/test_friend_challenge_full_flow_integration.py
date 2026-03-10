@@ -326,5 +326,6 @@ async def test_meine_duelle_prioritizes_my_turn_before_waiting_and_open() -> Non
     my_turn_pos = text.find(TEXTS_DE["msg.friend.challenge.my.my_turn"])
     waiting_pos = text.find(TEXTS_DE["msg.friend.challenge.my.waiting"])
     open_pos = text.find(TEXTS_DE["msg.friend.challenge.my.open"])
-    assert -1 not in {my_turn_pos, waiting_pos, open_pos}
-    assert my_turn_pos < waiting_pos < open_pos
+    assert -1 not in {my_turn_pos, waiting_pos}
+    assert open_pos == -1
+    assert my_turn_pos < waiting_pos

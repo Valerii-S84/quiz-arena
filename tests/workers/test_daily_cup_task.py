@@ -11,6 +11,16 @@ def test_send_invite_task_wrapper(monkeypatch) -> None:
     assert result == {"processed": 1, "sent_total": 10}
 
 
+def test_send_invite_registration_task_wrapper(monkeypatch) -> None:
+    async def fake_async() -> dict[str, int]:
+        return {"processed": 1, "sent_total": 7}
+
+    monkeypatch.setattr(daily_cup, "send_daily_cup_invite_registration_async", fake_async)
+
+    result = daily_cup.send_invite_registration()
+    assert result == {"processed": 1, "sent_total": 7}
+
+
 def test_open_registration_task_wrapper(monkeypatch) -> None:
     async def fake_async() -> dict[str, int]:
         return {"processed": 1, "sent_total": 5}
@@ -39,6 +49,16 @@ def test_send_prestart_reminder_task_wrapper(monkeypatch) -> None:
 
     result = daily_cup.send_prestart_reminder()
     assert result == {"processed": 1, "sent_total": 3}
+
+
+def test_send_turn_reminders_task_wrapper(monkeypatch) -> None:
+    async def fake_async() -> dict[str, int]:
+        return {"processed": 1, "sent_total": 2, "queued_total": 2}
+
+    monkeypatch.setattr(daily_cup, "run_daily_cup_turn_reminders_async", fake_async)
+
+    result = daily_cup.send_turn_reminders()
+    assert result == {"processed": 1, "sent_total": 2, "queued_total": 2}
 
 
 def test_close_registration_and_start_task_wrapper(monkeypatch) -> None:

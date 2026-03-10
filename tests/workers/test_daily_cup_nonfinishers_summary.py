@@ -53,3 +53,28 @@ def test_collect_nonfinishers_skips_bye_and_keeps_only_incomplete_users() -> Non
     }
     nonfinishers = _collect_nonfinishers(matches=matches, challenges_by_id=challenges_by_id)
     assert nonfinishers == {101}
+
+
+def test_collect_nonfinishers_includes_incomplete_self_bot_match() -> None:
+    challenge_id = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
+    matches = [
+        SimpleNamespace(
+            user_a=101,
+            user_b=None,
+            friend_challenge_id=challenge_id,
+        )
+    ]
+    challenges_by_id = {
+        challenge_id: SimpleNamespace(
+            id=challenge_id,
+            creator_user_id=101,
+            opponent_user_id=101,
+            total_rounds=5,
+            creator_finished_at=None,
+            opponent_finished_at=None,
+            creator_answered_round=2,
+            opponent_answered_round=0,
+        )
+    }
+    nonfinishers = _collect_nonfinishers(matches=matches, challenges_by_id=challenges_by_id)
+    assert nonfinishers == {101}

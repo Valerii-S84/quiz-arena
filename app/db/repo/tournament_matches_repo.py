@@ -3,10 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models.friend_challenges import FriendChallenge
 from app.db.models.tournament_matches import TournamentMatch
+from app.db.models.tournaments import Tournament
 
 
 class TournamentMatchesRepo:
@@ -128,6 +130,39 @@ class TournamentMatchesRepo:
         )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def list_daily_cup_turn_reminder_candidates_for_update(
+        session: AsyncSession,
+        *,
+        now_utc: datetime,
+        remind_before_utc: datetime,
+        limit: int,
+    ) -> list[tuple[TournamentMatch, FriendChallenge]]:
+        resolved_limit = max(1, int(limit))
+        stmt = (
+            select(TournamentMatch, FriendChallenge)
+            .join(Tournament, Tournament.id == TournamentMatch.tournament_id)
+            .join(FriendChallenge, FriendChallenge.id == TournamentMatch.friend_challenge_id)
+            .where(
+                Tournament.type == "DAILY_ARENA",
+                Tournament.status.in_(("ROUND_1", "ROUND_2", "ROUND_3", "ROUND_4")),
+                Tournament.current_round == TournamentMatch.round_no,
+                TournamentMatch.status == "PENDING",
+                TournamentMatch.deadline > now_utc,
+                FriendChallenge.status.in_(("ACCEPTED", "CREATOR_DONE", "OPPONENT_DONE")),
+                FriendChallenge.opponent_user_id.is_not(None),
+                or_(
+                    FriendChallenge.expires_last_chance_notified_at.is_(None),
+                    FriendChallenge.expires_last_chance_notified_at <= remind_before_utc,
+                ),
+            )
+            .order_by(TournamentMatch.deadline.asc(), TournamentMatch.id.asc())
+            .limit(resolved_limit)
+            .with_for_update(of=FriendChallenge, skip_locked=True)
+        )
+        result = await session.execute(stmt)
+        return [(match, challenge) for match, challenge in result.all()]
 
     @staticmethod
     async def list_pending_due_for_update(

@@ -155,12 +155,6 @@ async def handle_answer(
         response_lines.append(
             TEXTS_DE["msg.game.answer.correct_label"].format(answer=result.correct_answer_text)
         )
-    response_lines.append(
-        TEXTS_DE["msg.game.streak"].format(
-            current_streak=result.current_streak,
-            best_streak=result.best_streak,
-        )
-    )
     await callback.message.answer("\n".join(response_lines))
 
     if result.source == "FRIEND_CHALLENGE":

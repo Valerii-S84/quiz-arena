@@ -12,11 +12,6 @@ from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import (
     DailyChallengeAlreadyPlayedError,
     EnergyInsufficientError,
-    FriendChallengeAccessError,
-    FriendChallengeCompletedError,
-    FriendChallengeExpiredError,
-    FriendChallengeFullError,
-    FriendChallengeNotFoundError,
     ModeLockedError,
 )
 from app.game.sessions.types import AnswerSessionResult, FriendChallengeRoundStartResult
@@ -111,6 +106,7 @@ async def start_mode(
         reply_markup=build_quiz_keyboard(
             session_id=str(result.session.session_id),
             options=result.session.options,
+            is_tournament=result.session.source == "TOURNAMENT",
         ),
         parse_mode="HTML",
     )
@@ -138,6 +134,7 @@ async def send_friend_round_question(
         reply_markup=build_quiz_keyboard(
             session_id=str(round_start.start_result.session.session_id),
             options=round_start.start_result.session.options,
+            is_tournament=round_start.snapshot.tournament_match_id is not None,
         ),
         parse_mode="HTML",
     )
@@ -207,13 +204,3 @@ async def continue_regular_mode_after_answer(
         parse_mode="HTML",
     )
     await callback.answer()
-
-
-FRIEND_CHALLENGE_START_ERRORS = (
-    FriendChallengeNotFoundError,
-    FriendChallengeAccessError,
-    FriendChallengeCompletedError,
-    FriendChallengeFullError,
-)
-
-FRIEND_CHALLENGE_EXPIRED_ERROR = FriendChallengeExpiredError

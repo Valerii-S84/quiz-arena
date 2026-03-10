@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any, cast
 
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery
@@ -9,6 +10,7 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
     build_friend_challenge_format_keyboard,
     build_friend_challenge_limit_keyboard,
+    build_friend_challenge_share_confirmed_keyboard,
     build_friend_challenge_share_keyboard,
 )
 from app.bot.keyboards.tournament import build_tournament_format_keyboard
@@ -105,6 +107,12 @@ async def handle_friend_challenge_create_selected(
         await callback.answer()
         return
     welcome_image_file_id = get_settings().resolved_welcome_image_file_id
+    photo_sent = False
+    share_keyboard = build_friend_challenge_share_keyboard(
+        invite_link=invite_link,
+        challenge_id=str(challenge.challenge_id),
+        total_rounds=challenge.total_rounds,
+    )
     if welcome_image_file_id:
         bot = callback.bot
         assert bot is not None
@@ -112,29 +120,49 @@ async def handle_friend_challenge_create_selected(
             await bot.send_photo(
                 chat_id=callback.from_user.id,
                 photo=welcome_image_file_id,
-                caption=(
-                    "⚔️ Ich fordere dich heraus! Kannst du mich schlagen?\n\n" f"👉 {invite_link}"
-                ),
+                caption=TEXTS_DE["msg.friend.challenge.invite.caption"],
+                parse_mode="HTML",
+                reply_markup=share_keyboard,
             )
-        except TelegramAPIError:
-            welcome_image_file_id = ""
-    body_lines = [
-        TEXTS_DE["msg.friend.challenge.created"],
-        build_friend_plan_text(total_rounds=challenge.total_rounds),
-        TEXTS_DE["msg.friend.challenge.created.short"],
-    ]
-    ttl_text = build_friend_ttl_text(challenge=challenge, now_utc=now_utc)
-    if ttl_text is not None:
-        body_lines.append(ttl_text)
-    await callback.message.answer(
-        "\n".join(body_lines),
-        reply_markup=build_friend_challenge_share_keyboard(
-            invite_link=invite_link,
-            challenge_id=str(challenge.challenge_id),
-            total_rounds=challenge.total_rounds,
-        ),
-    )
+            photo_sent = True
+        except TelegramAPIError as e:
+            import logging
+
+            logging.getLogger(__name__).error(
+                "send_photo failed for friend challenge: user=%s file_id=%s error=%s",
+                callback.from_user.id,
+                welcome_image_file_id,
+                e,
+            )
+    if not photo_sent:
+        await callback.message.answer(
+            TEXTS_DE["msg.friend.challenge.invite.caption"],
+            parse_mode="HTML",
+            reply_markup=share_keyboard,
+        )
     await callback.answer()
+
+
+async def handle_friend_challenge_invite_sent(
+    callback: CallbackQuery,
+    *,
+    friend_invite_sent_re,
+    parse_uuid_callback,
+) -> None:
+    if callback.message is None or callback.data is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    if not hasattr(callback.message, "edit_reply_markup"):
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    challenge_id = parse_uuid_callback(pattern=friend_invite_sent_re, callback_data=callback.data)
+    if challenge_id is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    await cast(Any, callback.message).edit_reply_markup(
+        reply_markup=build_friend_challenge_share_confirmed_keyboard(challenge_id=str(challenge_id))
+    )
+    await callback.answer(TEXTS_DE["msg.friend.challenge.invite.waiting"])
 
 
 async def handle_friend_copy_link(

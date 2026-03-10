@@ -18,6 +18,7 @@ from app.economy.streak.service import StreakService
 from app.game.questions.runtime_bank import get_question_by_id
 from app.game.sessions.errors import DailyChallengeAlreadyPlayedError
 from app.game.sessions.service import GameSessionService
+from tests.integration.stable_ids import stable_telegram_user_id
 
 UTC = timezone.utc
 
@@ -26,7 +27,7 @@ async def _create_user(seed: str) -> int:
     async with SessionLocal.begin() as session:
         user = await UsersRepo.create(
             session,
-            telegram_user_id=81_000_000_000 + (abs(hash(seed)) % 1_000_000),
+            telegram_user_id=stable_telegram_user_id(prefix=81_000_000_000, seed=seed),
             referral_code=f"E{uuid4().hex[:10].upper()}",
             username=None,
             first_name="AnalyticsEvents",

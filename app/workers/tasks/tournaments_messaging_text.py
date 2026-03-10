@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 from app.game.tournaments.constants import TOURNAMENT_MATCH_STATUS_PENDING
 
-ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3"})
+ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3", "ROUND_4"})
 _BERLIN_TZ = ZoneInfo("Europe/Berlin")
 
 
@@ -46,6 +46,12 @@ def resolve_match_context(*, round_matches, viewer_user_id: int) -> tuple[str | 
         if user_a != viewer_user_id and user_b != viewer_user_id:
             continue
         opponent_id = user_b if user_a == viewer_user_id else user_a
+        if (
+            user_b is None
+            and match.status == TOURNAMENT_MATCH_STATUS_PENDING
+            and match.friend_challenge_id is not None
+        ):
+            return str(match.friend_challenge_id), None
         if (
             user_b is not None
             and match.status == TOURNAMENT_MATCH_STATUS_PENDING
