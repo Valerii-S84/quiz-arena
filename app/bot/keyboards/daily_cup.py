@@ -25,6 +25,7 @@ def build_daily_cup_lobby_keyboard(
     tournament_id: str,
     can_join: bool,
     play_challenge_id: str | None,
+    play_button_text: str = "▶️ Jetzt spielen!",
     show_share_result: bool,
     show_proof_card: bool = False,
     share_url: str | None = None,
@@ -43,7 +44,7 @@ def build_daily_cup_lobby_keyboard(
         rows.append(
             [
                 InlineKeyboardButton(
-                    text="▶️ Jetzt spielen!",
+                    text=play_button_text,
                     callback_data=f"friend:next:{play_challenge_id}",
                 )
             ]

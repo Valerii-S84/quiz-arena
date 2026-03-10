@@ -77,3 +77,18 @@ def test_daily_cup_lobby_keyboard_shows_proof_card_button_when_enabled() -> None
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert "daily:cup:proof:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
+
+
+def test_daily_cup_lobby_keyboard_uses_custom_round_start_label() -> None:
+    keyboard = build_daily_cup_lobby_keyboard(
+        tournament_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        can_join=False,
+        play_challenge_id="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        play_button_text="Runde starten",
+        show_share_result=False,
+    )
+
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    start_button = next(button for button in buttons if button.callback_data)
+    assert start_button.text == "Runde starten"
+    assert start_button.callback_data == "friend:next:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"

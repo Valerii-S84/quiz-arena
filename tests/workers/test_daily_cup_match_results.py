@@ -65,7 +65,6 @@ async def test_send_match_result_messages_sends_for_both_participants(monkeypatc
     monkeypatch.setattr(daily_cup_match_results, "build_bot", lambda: bot)
 
     tournament_id = uuid4()
-    next_round_deadline = datetime(2026, 3, 3, 19, 0, tzinfo=UTC)
     await daily_cup_match_results.send_daily_cup_match_result_messages(
         session=SimpleNamespace(),  # type: ignore[arg-type]
         tournament_id=tournament_id,
@@ -75,7 +74,8 @@ async def test_send_match_result_messages_sends_for_both_participants(monkeypatc
         user_a_points=4,
         user_b_points=3,
         rounds_total=3,
-        next_round_deadline=next_round_deadline,
+        tournament_registration_deadline=datetime(2026, 3, 3, 17, 0, tzinfo=UTC),
+        next_round_start_time=datetime(2026, 3, 3, 18, 0, tzinfo=UTC),
     )
 
     assert bot.session.closed is True
@@ -83,8 +83,54 @@ async def test_send_match_result_messages_sends_for_both_participants(monkeypatc
     by_chat = {int(item["chat_id"]): str(item["text"]) for item in bot.messages}
     assert 1011 in by_chat
     assert 1022 in by_chat
-    assert "Runde 3 startet um" in by_chat[1011]
-    assert "Runde 3 startet um" in by_chat[1022]
+    assert "Runde 3 startet um 19:00 (Berlin)" in by_chat[1011]
+    assert "Runde 3 startet um 19:00 (Berlin)" in by_chat[1022]
+
+
+@pytest.mark.asyncio
+async def test_send_match_result_messages_uses_planned_slot_when_next_round_not_started(
+    monkeypatch,
+) -> None:
+    participants = [
+        SimpleNamespace(user_id=11, score=Decimal("2.5")),
+        SimpleNamespace(user_id=22, score=Decimal("2.0")),
+    ]
+    users = [
+        SimpleNamespace(id=11, telegram_user_id=1011),
+        SimpleNamespace(id=22, telegram_user_id=1022),
+    ]
+    bot = _RecordingBot()
+
+    async def _fake_list_for_tournament(*args, **kwargs):
+        return participants
+
+    async def _fake_list_by_ids(*args, **kwargs):
+        return users
+
+    monkeypatch.setattr(
+        daily_cup_match_results.TournamentParticipantsRepo,
+        "list_for_tournament",
+        _fake_list_for_tournament,
+    )
+    monkeypatch.setattr(daily_cup_match_results.UsersRepo, "list_by_ids", _fake_list_by_ids)
+    monkeypatch.setattr(daily_cup_match_results, "build_bot", lambda: bot)
+
+    await daily_cup_match_results.send_daily_cup_match_result_messages(
+        session=SimpleNamespace(),  # type: ignore[arg-type]
+        tournament_id=uuid4(),
+        round_no=3,
+        user_a=11,
+        user_b=22,
+        user_a_points=4,
+        user_b_points=3,
+        rounds_total=4,
+        tournament_registration_deadline=datetime(2026, 3, 3, 17, 0, tzinfo=UTC),
+        next_round_start_time=None,
+    )
+
+    by_chat = {int(item["chat_id"]): str(item["text"]) for item in bot.messages}
+    assert "Runde 4 startet voraussichtlich 19:30 (Berlin)" in by_chat[1011]
+    assert "Runde 4 startet voraussichtlich 19:30 (Berlin)" in by_chat[1022]
 
 
 @pytest.mark.asyncio
@@ -122,7 +168,8 @@ async def test_send_match_result_messages_ignores_forbidden_and_continues(monkey
         user_a_points=2,
         user_b_points=2,
         rounds_total=3,
-        next_round_deadline=None,
+        tournament_registration_deadline=None,
+        next_round_start_time=None,
     )
 
     assert bot.session.closed is True
