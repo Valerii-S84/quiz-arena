@@ -10,29 +10,31 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.tournaments.constants import (
-    DAILY_CUP_MAX_ROUNDS,
     TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS,
     TOURNAMENT_MATCH_STATUS_PENDING,
-    TOURNAMENT_MAX_ROUNDS,
     TOURNAMENT_MIN_PARTICIPANTS,
-    TOURNAMENT_STATUS_CANCELED,
-    TOURNAMENT_STATUS_COMPLETED,
     TOURNAMENT_STATUS_REGISTRATION,
     TOURNAMENT_STATUS_ROUND_1,
     TOURNAMENT_STATUS_ROUND_2,
     TOURNAMENT_STATUS_ROUND_3,
     TOURNAMENT_STATUS_ROUND_4,
     TOURNAMENT_TYPE_DAILY_ARENA,
-    status_for_round,
 )
-from app.game.tournaments.daily_cup_slots import get_round_deadline
 from app.game.tournaments.elimination_lifecycle import (
     complete_elimination_tournament as _complete_elimination_tournament,
 )
 from app.game.tournaments.elimination_lifecycle import (
     on_elimination_match_complete as _on_elimination_match_complete,
 )
-from app.game.tournaments.internal import resolve_round_deadline
+from app.game.tournaments.lifecycle_state import (
+    build_transition_result,
+    enqueue_daily_cup_round_messaging,
+    mark_round_started,
+    mark_tournament_canceled,
+    mark_tournament_completed,
+    max_rounds_for_tournament,
+    resolve_deadline_for_tournament,
+)
 from app.game.tournaments.rounds import (
     collect_bye_history,
     collect_previous_pairs,
@@ -50,30 +52,6 @@ _ACTIVE_ROUND_STATUSES = frozenset(
 )
 
 
-def _resolve_deadline_for_tournament(
-    *,
-    tournament: Tournament,
-    next_round: int,
-    now_utc: datetime,
-    round_duration_hours: int,
-) -> datetime:
-    if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA:
-        return get_round_deadline(
-            round_number=next_round,
-            tournament_start=tournament.registration_deadline,
-        )
-    return resolve_round_deadline(
-        now_utc=now_utc,
-        round_duration_hours=round_duration_hours,
-    )
-
-
-def _max_rounds_for_tournament(*, tournament: Tournament) -> int:
-    if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA:
-        return DAILY_CUP_MAX_ROUNDS
-    return TOURNAMENT_MAX_ROUNDS
-
-
 async def close_expired_registration(
     session: AsyncSession,
     *,
@@ -87,8 +65,7 @@ async def close_expired_registration(
     )
     if participants_total >= TOURNAMENT_MIN_PARTICIPANTS:
         return False
-    tournament.status = TOURNAMENT_STATUS_CANCELED
-    tournament.round_deadline = None
+    mark_tournament_canceled(tournament=tournament)
     return True
 
 
@@ -113,22 +90,11 @@ async def settle_round_and_advance(
 
     pending_left = any(match.status == TOURNAMENT_MATCH_STATUS_PENDING for match in round_matches)
     if pending_left:
-        return {
-            "matches_settled": matches_settled,
-            "matches_created": 0,
-            "round_started": 0,
-            "tournament_completed": 0,
-        }
+        return build_transition_result(matches_settled=matches_settled)
 
-    if current_round >= _max_rounds_for_tournament(tournament=tournament):
-        tournament.status = TOURNAMENT_STATUS_COMPLETED
-        tournament.round_deadline = None
-        return {
-            "matches_settled": matches_settled,
-            "matches_created": 0,
-            "round_started": 0,
-            "tournament_completed": 1,
-        }
+    if current_round >= max_rounds_for_tournament(tournament=tournament):
+        mark_tournament_completed(tournament=tournament)
+        return build_transition_result(matches_settled=matches_settled, tournament_completed=1)
 
     participants = await TournamentParticipantsRepo.list_for_tournament_for_update(
         session,
@@ -139,7 +105,7 @@ async def settle_round_and_advance(
         tournament_id=tournament.id,
     )
     next_round = current_round + 1
-    next_deadline = _resolve_deadline_for_tournament(
+    next_deadline = resolve_deadline_for_tournament(
         tournament=tournament,
         next_round=next_round,
         now_utc=now_utc,
@@ -155,15 +121,19 @@ async def settle_round_and_advance(
         deadline=next_deadline,
         now_utc=now_utc,
     )
-    tournament.current_round = next_round
-    tournament.status = status_for_round(round_no=next_round)
-    tournament.round_deadline = next_deadline
-    return {
-        "matches_settled": matches_settled,
-        "matches_created": matches_created,
-        "round_started": 1,
-        "tournament_completed": 0,
-    }
+    mark_round_started(
+        tournament=tournament,
+        round_no=next_round,
+        deadline=next_deadline,
+        now_utc=now_utc,
+    )
+    if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA:
+        enqueue_daily_cup_round_messaging(tournament_id=tournament.id)
+    return build_transition_result(
+        matches_settled=matches_settled,
+        matches_created=matches_created,
+        round_started=1,
+    )
 
 
 async def check_and_advance_round(
@@ -175,24 +145,14 @@ async def check_and_advance_round(
 ) -> dict[str, int]:
     tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
     if tournament is None or tournament.status not in _ACTIVE_ROUND_STATUSES:
-        return {
-            "matches_settled": 0,
-            "matches_created": 0,
-            "round_started": 0,
-            "tournament_completed": 0,
-        }
+        return build_transition_result()
     pending_matches = await TournamentMatchesRepo.count_pending_for_tournament_round(
         session,
         tournament_id=tournament.id,
         round_no=max(1, int(tournament.current_round)),
     )
     if pending_matches != 0:
-        return {
-            "matches_settled": 0,
-            "matches_created": 0,
-            "round_started": 0,
-            "tournament_completed": 0,
-        }
+        return build_transition_result()
     return await settle_round_and_advance(
         session,
         tournament=tournament,

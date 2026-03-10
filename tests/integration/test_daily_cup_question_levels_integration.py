@@ -14,7 +14,7 @@ from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.service import join_daily_cup_by_id
-from app.workers.tasks import daily_cup_async, daily_cup_rounds
+from app.workers.tasks import daily_cup_async, daily_cup_messaging, daily_cup_rounds
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
 from tests.integration.friend_challenge_fixtures import (
     _create_user,
@@ -161,7 +161,7 @@ async def test_daily_cup_round_2_and_3_question_level_mix(monkeypatch) -> None:
         lambda *, tournament_id, enqueue_completion_followups=False: None,
     )
     monkeypatch.setattr(
-        daily_cup_rounds,
+        daily_cup_messaging,
         "enqueue_daily_cup_round_messaging",
         lambda *, tournament_id, enqueue_completion_followups=False: None,
     )

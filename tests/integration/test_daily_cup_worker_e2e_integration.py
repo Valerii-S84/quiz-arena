@@ -7,7 +7,7 @@ import pytest
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
-from app.workers.tasks import daily_cup_async, daily_cup_rounds
+from app.workers.tasks import daily_cup_async, daily_cup_messaging, daily_cup_rounds
 from tests.integration.friend_challenge_fixtures import (
     _create_user,
     _seed_friend_challenge_questions,
@@ -57,7 +57,7 @@ async def test_daily_cup_e2e_with_6_participants_reaches_completed(monkeypatch) 
     round_enqueued: list[tuple[str, bool]] = []
     monkeypatch.setattr(daily_cup_rounds, "_now_utc", lambda: now_state["value"])
     monkeypatch.setattr(
-        daily_cup_rounds,
+        daily_cup_messaging,
         "enqueue_daily_cup_round_messaging",
         lambda *, tournament_id, enqueue_completion_followups=False: round_enqueued.append(
             (tournament_id, bool(enqueue_completion_followups))

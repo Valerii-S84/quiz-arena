@@ -20,7 +20,6 @@ from app.game.tournaments.constants import (
 from app.game.tournaments.lifecycle import settle_round_and_advance
 from app.workers.tasks.daily_cup_core import emit_daily_cup_events, now_utc
 from app.workers.tasks.daily_cup_match_results import send_daily_cup_match_result_messages
-from app.workers.tasks.daily_cup_messaging import enqueue_daily_cup_round_messaging
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup")
 
@@ -38,7 +37,8 @@ class WalkoverNotification:
     user_a_points: int
     user_b_points: int
     rounds_total: int
-    next_round_deadline: datetime | None
+    tournament_registration_deadline: datetime
+    next_round_start_time: datetime | None
 
 
 def _match_scores_from_challenge(*, match, challenge) -> tuple[int, int]:
@@ -70,7 +70,6 @@ async def advance_daily_cup_rounds_async() -> dict[str, int]:
     tournaments_completed_total = 0
     matches_settled_total = 0
     matches_created_total = 0
-    started_ids: list[tuple[str, int]] = []
     completed_ids: list[str] = []
     walkover_notifications: list[WalkoverNotification] = []
     events: list[dict[str, object]] = []
@@ -115,7 +114,6 @@ async def advance_daily_cup_rounds_async() -> dict[str, int]:
                     }
                 )
             if started_count > 0:
-                started_ids.append((str(tournament.id), int(tournament.current_round)))
                 events.append(
                     {
                         "event_type": "daily_cup_round_started",
@@ -162,7 +160,12 @@ async def advance_daily_cup_rounds_async() -> dict[str, int]:
                             user_a_points=user_a_points,
                             user_b_points=user_b_points,
                             rounds_total=DAILY_CUP_MAX_ROUNDS,
-                            next_round_deadline=tournament.round_deadline,
+                            tournament_registration_deadline=tournament.registration_deadline,
+                            next_round_start_time=(
+                                tournament.round_start_time
+                                if int(tournament.current_round) == int(match.round_no) + 1
+                                else None
+                            ),
                         )
                     )
 
@@ -178,11 +181,12 @@ async def advance_daily_cup_rounds_async() -> dict[str, int]:
                 user_a_points=notification.user_a_points,
                 user_b_points=notification.user_b_points,
                 rounds_total=notification.rounds_total,
-                next_round_deadline=notification.next_round_deadline,
+                tournament_registration_deadline=notification.tournament_registration_deadline,
+                next_round_start_time=notification.next_round_start_time,
             )
-    for tournament_id, _round_no in started_ids:
-        enqueue_daily_cup_round_messaging(tournament_id=tournament_id)
     for tournament_id in completed_ids:
+        from app.workers.tasks.daily_cup_messaging import enqueue_daily_cup_round_messaging
+
         enqueue_daily_cup_round_messaging(
             tournament_id=tournament_id,
             enqueue_completion_followups=True,

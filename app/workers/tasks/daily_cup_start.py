@@ -35,3 +35,4 @@ async def start_daily_arena_round_one(
     tournament.current_round = 1
     tournament.status = TOURNAMENT_STATUS_ROUND_1
     tournament.round_deadline = next_round_deadline
+    tournament.round_start_time = now_utc.replace(microsecond=0)
