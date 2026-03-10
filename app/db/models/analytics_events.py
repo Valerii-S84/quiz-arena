@@ -20,6 +20,19 @@ class AnalyticsEvent(Base):
         Index("idx_analytics_events_type_time", "event_type", "happened_at"),
         Index("idx_analytics_events_user_time", "user_id", "happened_at"),
         Index("idx_analytics_events_local_date_type", "local_date_berlin", "event_type"),
+        Index(
+            "uq_analytics_events_daily_cup_push_once",
+            "event_type",
+            "user_id",
+            text("(payload ->> 'tournament_id')"),
+            unique=True,
+            postgresql_where=text(
+                "user_id IS NOT NULL "
+                "AND payload ? 'tournament_id' "
+                "AND event_type IN "
+                "('daily_cup_invite_registration_push_sent','daily_cup_last_call_reminder_sent')"
+            ),
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
