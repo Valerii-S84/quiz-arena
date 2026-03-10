@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 
 from aiogram.types import BufferedInputFile
@@ -23,6 +24,7 @@ async def send_daily_cup_proof_card(
     cached_file_id: str | None,
     player_label: str,
     now_utc: datetime,
+    render_card_png: Callable[..., bytes] = render_tournament_proof_card_png,
 ) -> tuple[bool, bool, str | None]:
     caption = build_caption(place=place, points=points)
     share_url = build_daily_cup_share_url(
@@ -43,7 +45,7 @@ async def send_daily_cup_proof_card(
         )
         return True, True, None
 
-    card_png = render_tournament_proof_card_png(
+    card_png = render_card_png(
         player_label=player_label,
         place=place,
         points=points,

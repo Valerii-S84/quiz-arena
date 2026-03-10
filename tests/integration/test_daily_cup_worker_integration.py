@@ -18,7 +18,7 @@ from app.game.tournaments.errors import TournamentFullError
 from app.game.tournaments.lifecycle import check_and_advance_round
 from app.game.tournaments.service import join_daily_cup_by_id
 from app.game.tournaments.settlement import settle_pending_match_from_duel
-from app.workers.tasks import daily_cup_async, daily_cup_rounds
+from app.workers.tasks import daily_cup_async, daily_cup_messaging, daily_cup_rounds
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
 from tests.integration.friend_challenge_fixtures import (
     _create_user,
@@ -195,7 +195,7 @@ async def test_daily_cup_round_advance_on_deadline(monkeypatch) -> None:
     enqueued_proofs: list[str] = []
     monkeypatch.setattr(daily_cup_rounds, "_now_utc", lambda: deadline_now)
     monkeypatch.setattr(
-        daily_cup_rounds,
+        daily_cup_messaging,
         "enqueue_daily_cup_round_messaging",
         lambda *, tournament_id: enqueued_rounds.append(tournament_id),
     )

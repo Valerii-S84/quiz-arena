@@ -12,7 +12,7 @@ from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.lifecycle import check_and_advance_round
 from app.game.tournaments.service import join_daily_cup_by_id
-from app.workers.tasks import daily_cup_async, daily_cup_rounds
+from app.workers.tasks import daily_cup_async, daily_cup_messaging, daily_cup_rounds
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
 from tests.integration.friend_challenge_fixtures import (
     _create_user,
@@ -90,7 +90,7 @@ async def test_concurrent_daily_cup_deadline_workers_advance_once(monkeypatch) -
     enqueued_rounds: list[tuple[str, bool]] = []
     monkeypatch.setattr(daily_cup_rounds, "_now_utc", lambda: run_at)
     monkeypatch.setattr(
-        daily_cup_rounds,
+        daily_cup_messaging,
         "enqueue_daily_cup_round_messaging",
         lambda *, tournament_id, enqueue_completion_followups=False: enqueued_rounds.append(
             (tournament_id, bool(enqueue_completion_followups))
@@ -138,6 +138,7 @@ async def test_concurrent_check_and_advance_round_starts_once(monkeypatch) -> No
 
     monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
     monkeypatch.setattr(daily_cup_async, "enqueue_daily_cup_round_messaging", lambda **kwargs: None)
+    monkeypatch.setattr(daily_cup_messaging, "enqueue_daily_cup_round_messaging", lambda **kwargs: None)
     started = await daily_cup_async.close_daily_cup_registration_and_start_async()
     assert int(started["started"]) == 1
 

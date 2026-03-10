@@ -144,6 +144,7 @@ async def run_daily_cup_round_messaging_async_with_followups(
                 tournament_id=str(tournament.id),
                 can_join=False,
                 play_challenge_id=play_challenge_id,
+                play_button_text="Runde starten",
                 show_share_result=tournament.status == "COMPLETED",
                 show_proof_card=tournament.status == "COMPLETED",
                 share_url=(

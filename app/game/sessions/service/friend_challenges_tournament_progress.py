@@ -184,8 +184,6 @@ async def handle_tournament_duel_progress(
         now_utc=now_utc,
     )
 
-    from app.workers.tasks.daily_cup_messaging import enqueue_daily_cup_round_messaging
-
     await emit_analytics_event(
         session,
         event_type="daily_cup_match_completed",
@@ -209,8 +207,9 @@ async def handle_tournament_duel_progress(
                 "round_no": int(tournament.current_round),
             },
         )
-        enqueue_daily_cup_round_messaging(tournament_id=str(tournament_match.tournament_id))
     if int(transition["tournament_completed"]) > 0:
+        from app.workers.tasks.daily_cup_messaging import enqueue_daily_cup_round_messaging
+
         enqueue_daily_cup_round_messaging(
             tournament_id=str(tournament_match.tournament_id),
             enqueue_completion_followups=True,
@@ -225,5 +224,10 @@ async def handle_tournament_duel_progress(
             user_a_points=int(challenge.creator_score),
             user_b_points=int(challenge.opponent_score),
             rounds_total=DAILY_CUP_MAX_ROUNDS,
-            next_round_deadline=tournament.round_deadline,
+            tournament_registration_deadline=tournament.registration_deadline,
+            next_round_start_time=(
+                tournament.round_start_time
+                if int(tournament.current_round) == int(tournament_match.round_no) + 1
+                else None
+            ),
         )
