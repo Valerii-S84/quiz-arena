@@ -28,7 +28,6 @@ export const dynamicParams = false;
 export function generateStaticParams() {
   return Object.keys(ARTICLE_EMBEDS).map((slug) => ({ slug }));
 }
-
 function applyEmbeddedTheme(html: string): string {
   const embedThemeOverride = `
 <style id="embedded-article-theme-override">
