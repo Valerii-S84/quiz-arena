@@ -10,9 +10,9 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.tournaments.constants import (
-    TOURNAMENT_MAX_ROUNDS,
     TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS,
     TOURNAMENT_MATCH_STATUS_PENDING,
+    TOURNAMENT_MAX_ROUNDS,
     TOURNAMENT_MIN_PARTICIPANTS,
     TOURNAMENT_STATUS_REGISTRATION,
     TOURNAMENT_STATUS_ROUND_1,
