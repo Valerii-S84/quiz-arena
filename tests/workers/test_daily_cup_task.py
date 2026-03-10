@@ -11,6 +11,16 @@ def test_send_invite_task_wrapper(monkeypatch) -> None:
     assert result == {"processed": 1, "sent_total": 10}
 
 
+def test_send_invite_registration_task_wrapper(monkeypatch) -> None:
+    async def fake_async() -> dict[str, int]:
+        return {"processed": 1, "sent_total": 7}
+
+    monkeypatch.setattr(daily_cup, "send_daily_cup_invite_registration_async", fake_async)
+
+    result = daily_cup.send_invite_registration()
+    assert result == {"processed": 1, "sent_total": 7}
+
+
 def test_open_registration_task_wrapper(monkeypatch) -> None:
     async def fake_async() -> dict[str, int]:
         return {"processed": 1, "sent_total": 5}

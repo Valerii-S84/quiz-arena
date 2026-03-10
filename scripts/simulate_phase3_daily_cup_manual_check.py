@@ -78,7 +78,7 @@ async def check_3_schedule_config() -> None:
 
     schedule = celery_app.conf.beat_schedule or {}
     required = {
-        "daily-cup-open-registration",
+        "daily-cup-send-invite-registration",
         "daily-cup-close-registration",
         "daily-cup-round-advance",
     }

@@ -6,6 +6,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from aiogram.exceptions import TelegramForbiddenError
+from sqlalchemy import text
 
 from app.bot.application import build_bot
 from app.bot.texts.de import TEXTS_DE
@@ -32,6 +33,18 @@ def now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
+async def _lock_daily_cup_registration_slot(
+    *,
+    session,
+    tournament_type: str,
+    registration_deadline: datetime,
+) -> None:
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
+        {"lock_key": f"{tournament_type}:{registration_deadline.isoformat()}"},
+    )
+
+
 async def ensure_daily_cup_registration_tournament(
     *,
     session,
@@ -42,6 +55,11 @@ async def ensure_daily_cup_registration_tournament(
         get_daily_elimination_window(now_utc=now_utc_value)
         if tournament_type == TOURNAMENT_TYPE_DAILY_ELIMINATION
         else get_daily_cup_window(now_utc=now_utc_value)
+    )
+    await _lock_daily_cup_registration_slot(
+        session=session,
+        tournament_type=tournament_type,
+        registration_deadline=window.close_at_utc,
     )
     tournament = await TournamentsRepo.get_by_type_and_registration_deadline_for_update(
         session,

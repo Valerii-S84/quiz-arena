@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import date, datetime
 
+import sqlalchemy as sa
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models.analytics_daily import AnalyticsDaily
 from app.db.models.analytics_events import AnalyticsEvent
 from app.db.repo.analytics_models import AnalyticsDailyUpsert
+
+DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES = (
+    "daily_cup_invite_registration_push_sent",
+    "daily_cup_last_call_reminder_sent",
+)
 
 
 async def create_event(
@@ -33,6 +39,45 @@ async def create_event(
     session.add(event)
     await session.flush()
     return event
+
+
+async def create_daily_cup_push_event_once(
+    session: AsyncSession,
+    *,
+    event_type: str,
+    source: str,
+    user_id: int,
+    local_date_berlin: date,
+    payload: dict[str, object],
+    happened_at: datetime,
+) -> bool:
+    stmt = (
+        insert(AnalyticsEvent)
+        .values(
+            event_type=event_type,
+            source=source,
+            user_id=user_id,
+            local_date_berlin=local_date_berlin,
+            payload=payload,
+            happened_at=happened_at,
+        )
+        .on_conflict_do_nothing(
+            index_elements=[
+                AnalyticsEvent.event_type,
+                AnalyticsEvent.user_id,
+                sa.text("(payload ->> 'tournament_id')"),
+            ],
+            index_where=sa.text(
+                "user_id IS NOT NULL "
+                "AND payload ? 'tournament_id' "
+                "AND event_type IN "
+                "('daily_cup_invite_registration_push_sent','daily_cup_last_call_reminder_sent')"
+            ),
+        )
+        .returning(AnalyticsEvent.id)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none() is not None
 
 
 async def upsert_daily(session: AsyncSession, *, row: AnalyticsDailyUpsert) -> None:

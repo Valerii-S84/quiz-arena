@@ -37,22 +37,7 @@ logger = structlog.get_logger("app.workers.tasks.daily_cup")
 _now_utc = now_utc
 
 
-async def send_daily_cup_invite_async() -> dict[str, int]:
-    return await send_daily_cup_registration_push_async(
-        now_utc_factory=_now_utc,
-        bot_factory=build_bot,
-        text_key=(
-            "msg.elimination.invite_push"
-            if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ELIMINATION
-            else "msg.daily_cup.invite_push"
-        ),
-        log_event="daily_cup_invite_push_processed",
-        sent_event_type="daily_cup_invite_push_sent",
-        logger=logger,
-    )
-
-
-async def open_daily_cup_registration_async() -> dict[str, int]:
+async def send_daily_cup_invite_registration_async() -> dict[str, int]:
     return await send_daily_cup_registration_push_async(
         now_utc_factory=_now_utc,
         bot_factory=build_bot,
@@ -61,10 +46,18 @@ async def open_daily_cup_registration_async() -> dict[str, int]:
             if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ELIMINATION
             else "msg.daily_cup.push.registration"
         ),
-        log_event="daily_cup_registration_push_processed",
-        sent_event_type="daily_cup_registration_push_sent",
+        log_event="daily_cup_invite_registration_push_processed",
+        sent_event_type="daily_cup_invite_registration_push_sent",
         logger=logger,
     )
+
+
+async def send_daily_cup_invite_async() -> dict[str, int]:
+    return await send_daily_cup_invite_registration_async()
+
+
+async def open_daily_cup_registration_async() -> dict[str, int]:
+    return await send_daily_cup_invite_registration_async()
 
 
 async def send_daily_cup_last_call_reminder_async() -> dict[str, int]:
