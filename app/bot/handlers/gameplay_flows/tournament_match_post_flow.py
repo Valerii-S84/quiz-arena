@@ -11,6 +11,12 @@ from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES
 from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
 
 
+def _build_view_callback_data(*, tournament_id: str, tournament_type: str) -> str:
+    if tournament_type in DAILY_CUP_TOURNAMENT_TYPES:
+        return f"daily:cup:view:{tournament_id}"
+    return f"friend:tournament:view:{tournament_id}"
+
+
 def build_tournament_post_match_text(
     *,
     challenge,
@@ -43,14 +49,21 @@ def build_tournament_post_match_text(
     )
 
 
-def build_tournament_post_match_keyboard(*, tournament_id: str | None) -> InlineKeyboardMarkup:
+def build_tournament_post_match_keyboard(
+    *,
+    tournament_id: str | None = None,
+    tournament_view_callback_data: str | None = None,
+) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
-    if tournament_id is not None:
+    callback_data = tournament_view_callback_data
+    if callback_data is None and tournament_id is not None:
+        callback_data = f"friend:tournament:view:{tournament_id}"
+    if callback_data is not None:
         rows.append(
             [
                 InlineKeyboardButton(
                     text="📊 Turnier-Tabelle",
-                    callback_data=f"friend:tournament:view:{tournament_id}",
+                    callback_data=callback_data,
                 )
             ]
         )
@@ -71,6 +84,27 @@ async def resolve_tournament_id_for_match(
     if match is None:
         return None
     return str(match.tournament_id)
+
+
+async def resolve_tournament_view_callback_data_for_match(
+    *,
+    session_local,
+    tournament_match_id: UUID,
+) -> str | None:
+    async with session_local.begin() as session:
+        match = await TournamentMatchesRepo.get_by_id_for_update(
+            session,
+            tournament_match_id,
+        )
+        if match is None:
+            return None
+        tournament = await TournamentsRepo.get_by_id(session, match.tournament_id)
+    if tournament is None:
+        return None
+    return _build_view_callback_data(
+        tournament_id=str(match.tournament_id),
+        tournament_type=tournament.type,
+    )
 
 
 async def resolve_tournament_place_for_user(
