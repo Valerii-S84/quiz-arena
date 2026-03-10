@@ -79,7 +79,7 @@ def test_build_question_text_contains_theme_counter_and_energy() -> None:
             options=("A", "B", "C", "D"),
             mode_code="QUICK_MIX_A1A2",
             source="MENU",
-            category="Wortschatz - Alltag",
+            category="B2 Wortschatz - Alltag",
             question_number=1,
             total_questions=1,
         ),
@@ -95,8 +95,9 @@ def test_build_question_text_contains_theme_counter_and_energy() -> None:
     )
     assert "⚡" in text
     assert "🔋 Energie:" in text
-    assert "📚 Thema:" in text
+    assert "📚 Thema: Wortschatz - Alltag" in text
     assert "❓ Frage 1/1" in text
+    assert "B2" not in text
 
 
 @pytest.mark.asyncio
@@ -254,7 +255,14 @@ async def test_handle_start_sends_home_and_offer_when_available(monkeypatch) -> 
     monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
-        return SimpleNamespace(user_id=8, free_energy=12, paid_energy=3, current_streak=4)
+        return SimpleNamespace(
+            user_id=8,
+            free_energy=12,
+            paid_energy=3,
+            current_streak=4,
+            best_streak=9,
+            global_best_streak=27,
+        )
 
     async def _fake_offer(*args, **kwargs):
         return OfferSelection(
@@ -278,6 +286,7 @@ async def test_handle_start_sends_home_and_offer_when_available(monkeypatch) -> 
 
     assert len(message.answers) == 2
     assert TEXTS_DE["msg.home.title"] in (message.answers[0].text or "")
+    assert "Serie: 4 | Beste: 27" in (message.answers[0].text or "")
     assert message.answers[1].text == TEXTS_DE["msg.offer.energy.low"]
 
 

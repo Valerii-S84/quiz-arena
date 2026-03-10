@@ -2,13 +2,19 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.streak_state import StreakState
 
 
 class StreakRepo:
+    @staticmethod
+    async def get_global_best_streak(session: AsyncSession) -> int:
+        stmt = select(func.coalesce(func.max(StreakState.best_streak), 0))
+        result = await session.execute(stmt)
+        return int(result.scalar_one())
+
     @staticmethod
     async def get_by_user_id(session: AsyncSession, user_id: int) -> StreakState | None:
         return await session.get(StreakState, user_id)

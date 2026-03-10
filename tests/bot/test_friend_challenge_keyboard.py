@@ -1,3 +1,4 @@
+from app.bot.keyboards import friend_challenge as friend_challenge_keyboard
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
     build_friend_challenge_create_keyboard,
@@ -5,8 +6,10 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_limit_keyboard,
     build_friend_challenge_next_keyboard,
     build_friend_challenge_result_share_keyboard,
+    build_friend_challenge_share_confirmed_keyboard,
     build_friend_challenge_share_keyboard,
     build_friend_challenge_share_url,
+    build_friend_challenge_start_keyboard,
 )
 
 
@@ -25,22 +28,31 @@ def test_friend_challenge_back_keyboard_contains_home_only() -> None:
     assert callbacks == ["home:open"]
 
 
-def test_friend_challenge_create_keyboard_contains_type_options() -> None:
+def test_friend_challenge_create_keyboard_hides_tournament_by_default() -> None:
     keyboard = build_friend_challenge_create_keyboard()
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == [
         "👤 Freund herausfordern",
-        "🏆 Turnier mit Freunden",
         "🥊 Arena Cup",
         "↩️ Zurück",
     ]
     callbacks = [button.callback_data for button in buttons]
     assert callbacks == [
         "friend:challenge:type:direct",
-        "friend:challenge:type:tournament",
         "daily:cup:menu",
         "home:open",
     ]
+
+
+def test_friend_challenge_create_keyboard_can_show_tournament_when_enabled(monkeypatch) -> None:
+    monkeypatch.setattr(
+        friend_challenge_keyboard,
+        "get_settings",
+        lambda: type("Settings", (), {"tournament_friends_enabled": True})(),
+    )
+    keyboard = build_friend_challenge_create_keyboard()
+    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert "friend:challenge:type:tournament" in callbacks
 
 
 def test_friend_challenge_finished_keyboard_contains_rematch_and_back() -> None:
@@ -85,23 +97,39 @@ def test_friend_challenge_limit_keyboard_contains_buy_options_and_back() -> None
     assert "home:open" in callbacks
 
 
-def test_friend_challenge_share_keyboard_contains_inline_share_and_back() -> None:
+def test_friend_challenge_share_keyboard_contains_share_and_copy_without_accept_url() -> None:
     keyboard = build_friend_challenge_share_keyboard(
         invite_link="https://t.me/quizarena_bot?start=fc_token",
         challenge_id="00000000-0000-0000-0000-000000000001",
         total_rounds=5,
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
+    assert all(button.url is None for button in buttons)
+    assert [button.text for button in buttons] == [
+        "📤 Teilen ->",
+        "📋 Link kopieren",
+        "✅ Einladung gesendet",
+        "⚔️ Jetzt spielen",
+        "⏳ Auf Freund warten",
+    ]
     inline_queries = [
         button.switch_inline_query for button in buttons if button.switch_inline_query
     ]
     assert inline_queries == ["invite:duel:00000000-0000-0000-0000-000000000001"]
     assert any(
+        button.callback_data == "friend:invite:sent:00000000-0000-0000-0000-000000000001"
+        for button in buttons
+    )
+    assert any(
         button.callback_data == "friend:copy:00000000-0000-0000-0000-000000000001"
         for button in buttons
     )
-    assert any(button.callback_data == "friend:my:duels" for button in buttons)
-    assert any(button.callback_data == "home:open" for button in buttons)
+    assert any(
+        button.callback_data == "friend:invite:required:00000000-0000-0000-0000-000000000001"
+        for button in buttons
+    )
+    assert not any(button.text == "⚔️ Herausforderung annehmen" for button in buttons)
+    assert any(button.callback_data == "menu:main" for button in buttons)
 
 
 def test_friend_challenge_share_keyboard_without_link_contains_back_only() -> None:
@@ -113,6 +141,37 @@ def test_friend_challenge_share_keyboard_without_link_contains_back_only() -> No
     assert all(button.url is None for button in buttons)
     callbacks = [button.callback_data for button in buttons]
     assert callbacks == ["friend:my:duels", "home:open"]
+
+
+def test_friend_challenge_start_keyboard_contains_single_cta() -> None:
+    keyboard = build_friend_challenge_start_keyboard(
+        challenge_id="00000000-0000-0000-0000-000000000001"
+    )
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    assert [button.text for button in buttons] == ["⚔️ Jetzt spielen"]
+    assert [button.callback_data for button in buttons] == [
+        "friend:next:00000000-0000-0000-0000-000000000001"
+    ]
+
+
+def test_friend_challenge_share_confirmed_keyboard_contains_unlocked_choices() -> None:
+    keyboard = build_friend_challenge_share_confirmed_keyboard(
+        challenge_id="00000000-0000-0000-0000-000000000001"
+    )
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    assert [button.text for button in buttons] == [
+        "📤 Teilen ->",
+        "📋 Link kopieren",
+        "✅ Einladung gesendet",
+        "⚔️ Jetzt spielen",
+        "⏳ Auf Freund warten",
+    ]
+    assert [button.callback_data for button in buttons if button.callback_data] == [
+        "friend:copy:00000000-0000-0000-0000-000000000001",
+        "friend:invite:sent:00000000-0000-0000-0000-000000000001",
+        "friend:next:00000000-0000-0000-0000-000000000001",
+        "menu:main",
+    ]
 
 
 def test_friend_challenge_share_url_builder_encodes_target_and_text() -> None:

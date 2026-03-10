@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.tournament_participants import TournamentParticipant
 from app.db.models.tournaments import Tournament
+from app.db.repo.tournament_participants_updates import update_participant
 
 
 class TournamentParticipantsRepo:
@@ -31,6 +32,7 @@ class TournamentParticipantsRepo:
                 joined_at=joined_at,
                 standings_message_id=None,
                 proof_card_file_id=None,
+                proof_card_sent=False,
             )
             .on_conflict_do_nothing(
                 index_elements=[
@@ -130,18 +132,13 @@ class TournamentParticipantsRepo:
         user_id: int,
         message_id: int,
     ) -> int:
-        stmt = (
-            update(TournamentParticipant)
-            .where(
-                TournamentParticipant.tournament_id == tournament_id,
-                TournamentParticipant.user_id == user_id,
-                TournamentParticipant.standings_message_id.is_(None),
-            )
-            .values(standings_message_id=message_id)
-            .returning(TournamentParticipant.user_id)
+        return await update_participant(
+            session,
+            tournament_id=tournament_id,
+            user_id=user_id,
+            values={"standings_message_id": message_id},
+            extra_filters=(TournamentParticipant.standings_message_id.is_(None),),
         )
-        result = await session.execute(stmt)
-        return int(result.scalar_one_or_none() is not None)
 
     @staticmethod
     async def set_standings_message_id(
@@ -151,17 +148,12 @@ class TournamentParticipantsRepo:
         user_id: int,
         message_id: int,
     ) -> int:
-        stmt = (
-            update(TournamentParticipant)
-            .where(
-                TournamentParticipant.tournament_id == tournament_id,
-                TournamentParticipant.user_id == user_id,
-            )
-            .values(standings_message_id=message_id)
-            .returning(TournamentParticipant.user_id)
+        return await update_participant(
+            session,
+            tournament_id=tournament_id,
+            user_id=user_id,
+            values={"standings_message_id": message_id},
         )
-        result = await session.execute(stmt)
-        return int(result.scalar_one_or_none() is not None)
 
     @staticmethod
     async def set_proof_card_file_id_if_missing(
@@ -171,18 +163,27 @@ class TournamentParticipantsRepo:
         user_id: int,
         file_id: str,
     ) -> int:
-        stmt = (
-            update(TournamentParticipant)
-            .where(
-                TournamentParticipant.tournament_id == tournament_id,
-                TournamentParticipant.user_id == user_id,
-                TournamentParticipant.proof_card_file_id.is_(None),
-            )
-            .values(proof_card_file_id=file_id)
-            .returning(TournamentParticipant.user_id)
+        return await update_participant(
+            session,
+            tournament_id=tournament_id,
+            user_id=user_id,
+            values={"proof_card_file_id": file_id},
+            extra_filters=(TournamentParticipant.proof_card_file_id.is_(None),),
         )
-        result = await session.execute(stmt)
-        return int(result.scalar_one_or_none() is not None)
+
+    @staticmethod
+    async def set_proof_card_sent(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+        user_id: int,
+    ) -> int:
+        return await update_participant(
+            session,
+            tournament_id=tournament_id,
+            user_id=user_id,
+            values={"proof_card_sent": True},
+        )
 
     @staticmethod
     async def list_joined_at_for_user_by_tournament_type(

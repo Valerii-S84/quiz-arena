@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
-from zoneinfo import ZoneInfo
 
 from aiogram.exceptions import TelegramForbiddenError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,9 +10,9 @@ from app.bot.application import build_bot
 from app.bot.texts.de import TEXTS_DE
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.users_repo import UsersRepo
+from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
+from app.workers.tasks.daily_cup_messaging_text import build_next_round_start_text
 from app.workers.tasks.tournaments_messaging_text import format_points
-
-_BERLIN_TZ = ZoneInfo("Europe/Berlin")
 
 
 def _result_key(*, my_points: int, opponent_points: int, final_round: bool) -> str:
@@ -36,12 +35,6 @@ def _result_key(*, my_points: int, opponent_points: int, final_round: bool) -> s
     )
 
 
-def _format_next_round_time(*, next_round_deadline: datetime | None) -> str:
-    if next_round_deadline is None:
-        return "-"
-    return next_round_deadline.astimezone(_BERLIN_TZ).strftime("%H:%M")
-
-
 def _build_result_text(
     *,
     round_no: int,
@@ -51,7 +44,7 @@ def _build_result_text(
     place: int,
     total_players: int,
     total_score: str,
-    next_round_deadline: datetime | None,
+    next_round_start_text: str | None,
 ) -> str:
     rounds_left = max(0, rounds_total - round_no)
     is_final_round = rounds_left == 0
@@ -71,7 +64,7 @@ def _build_result_text(
         score=total_score,
         rounds_left=rounds_left,
         next_round_no=next_round_no,
-        next_round_time=_format_next_round_time(next_round_deadline=next_round_deadline),
+        next_round_start_text=next_round_start_text or "-",
     )
 
 
@@ -85,38 +78,62 @@ async def send_daily_cup_match_result_messages(
     user_a_points: int,
     user_b_points: int,
     rounds_total: int,
-    next_round_deadline: datetime | None,
+    tournament_registration_deadline: datetime | None,
+    next_round_start_time: datetime | None,
 ) -> None:
-    participants = await TournamentParticipantsRepo.list_for_tournament(
-        session,
-        tournament_id=tournament_id,
-    )
-    place_by_user = {int(item.user_id): index for index, item in enumerate(participants, start=1)}
-    score_by_user = {int(item.user_id): format_points(item.score) for item in participants}
+    try:
+        standings = await calculate_daily_cup_standings(session, tournament_id=tournament_id)
+    except AttributeError:
+        participants = await TournamentParticipantsRepo.list_for_tournament(
+            session,
+            tournament_id=tournament_id,
+        )
+        standings = []
+        for place, participant in enumerate(participants, start=1):
+            standings.append(
+                type(
+                    "_Standing",
+                    (),
+                    {
+                        "user_id": int(participant.user_id),
+                        "place": place,
+                        "participant": participant,
+                    },
+                )()
+            )
+    place_by_user = {item.user_id: item.place for item in standings}
+    score_by_user = {item.user_id: format_points(item.participant.score) for item in standings}
     users = await UsersRepo.list_by_ids(session, [user_a, user_b])
     telegram_by_user = {int(item.id): int(item.telegram_user_id) for item in users}
-    total_players = len(participants)
+    total_players = len(standings)
 
     notifications = (
         (user_a, user_a_points, user_b_points),
         (user_b, user_b_points, user_a_points),
     )
+    next_round_start_text = None
+    if round_no < rounds_total and tournament_registration_deadline is not None:
+        next_round_start_text = build_next_round_start_text(
+            round_no=round_no + 1,
+            tournament_start=tournament_registration_deadline,
+            round_start_time=next_round_start_time,
+        )
     bot = build_bot()
     try:
         for viewer_user_id, my_points, opponent_points in notifications:
             chat_id = telegram_by_user.get(viewer_user_id)
-            place = place_by_user.get(viewer_user_id)
-            if chat_id is None or place is None:
+            place_value = place_by_user.get(viewer_user_id)
+            if chat_id is None or place_value is None:
                 continue
             text = _build_result_text(
                 round_no=round_no,
                 rounds_total=rounds_total,
                 my_points=my_points,
                 opponent_points=opponent_points,
-                place=place,
+                place=place_value,
                 total_players=total_players,
                 total_score=score_by_user.get(viewer_user_id, "0"),
-                next_round_deadline=next_round_deadline,
+                next_round_start_text=next_round_start_text,
             )
             try:
                 await bot.send_message(chat_id=chat_id, text=text)

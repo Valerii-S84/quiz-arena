@@ -11,6 +11,7 @@ from app.game.tournaments import TournamentServiceFacade
 from app.game.tournaments.errors import (
     TournamentAccessError,
     TournamentClosedError,
+    TournamentFullError,
     TournamentNotFoundError,
 )
 
@@ -40,6 +41,8 @@ def register(router: Router) -> None:
 def _daily_cup_error_key(exc: Exception) -> str:
     if isinstance(exc, TournamentNotFoundError | TournamentAccessError):
         return "msg.tournament.not_found"
+    if isinstance(exc, TournamentFullError):
+        return "msg.daily_cup.full"
     if isinstance(exc, TournamentClosedError):
         return "msg.daily_cup.closed"
     return "msg.system.error"

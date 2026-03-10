@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
 from aiogram.exceptions import TelegramForbiddenError
+from sqlalchemy import text
 
 from app.bot.application import build_bot
 from app.bot.texts.de import TEXTS_DE
@@ -22,8 +23,8 @@ from app.game.tournaments.constants import (
 )
 from app.game.tournaments.internal import generate_invite_code
 from app.workers.tasks.daily_cup_config import (
-    DAILY_CUP_ROUND_DURATION_MINUTES,
     DAILY_CUP_TOURNAMENT_TYPE,
+    TOURNAMENT_MAX_PARTICIPANTS,
 )
 from app.workers.tasks.daily_cup_time import get_daily_cup_window, get_daily_elimination_window
 
@@ -32,11 +33,16 @@ def now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def round_deadline(*, now_utc_value: datetime) -> datetime:
-    # Normalize to second precision so cron-based round advancement at HH:MM:00
-    # does not miss deadlines by sub-second drift (e.g. HH:MM:00.005).
-    deadline = now_utc_value + timedelta(minutes=max(1, int(DAILY_CUP_ROUND_DURATION_MINUTES)))
-    return deadline.replace(microsecond=0)
+async def _lock_daily_cup_registration_slot(
+    *,
+    session,
+    tournament_type: str,
+    registration_deadline: datetime,
+) -> None:
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:lock_key, 0))"),
+        {"lock_key": f"{tournament_type}:{registration_deadline.isoformat()}"},
+    )
 
 
 async def ensure_daily_cup_registration_tournament(
@@ -49,6 +55,11 @@ async def ensure_daily_cup_registration_tournament(
         get_daily_elimination_window(now_utc=now_utc_value)
         if tournament_type == TOURNAMENT_TYPE_DAILY_ELIMINATION
         else get_daily_cup_window(now_utc=now_utc_value)
+    )
+    await _lock_daily_cup_registration_slot(
+        session=session,
+        tournament_type=tournament_type,
+        registration_deadline=window.close_at_utc,
     )
     tournament = await TournamentsRepo.get_by_type_and_registration_deadline_for_update(
         session,
@@ -77,7 +88,11 @@ async def ensure_daily_cup_registration_tournament(
             ),
             status=TOURNAMENT_STATUS_REGISTRATION,
             format=TOURNAMENT_FORMAT_QUICK_5,
-            max_participants=1024 if tournament_type == TOURNAMENT_TYPE_DAILY_ELIMINATION else 8,
+            max_participants=(
+                1024
+                if tournament_type == TOURNAMENT_TYPE_DAILY_ELIMINATION
+                else TOURNAMENT_MAX_PARTICIPANTS
+            ),
             current_round=0,
             registration_deadline=window.close_at_utc,
             round_deadline=None,

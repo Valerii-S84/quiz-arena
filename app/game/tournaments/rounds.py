@@ -14,6 +14,7 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.game.sessions.service import GameSessionService
 from app.game.tournaments.constants import (
+    DAILY_CUP_QUESTIONS_PER_MATCH,
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_MATCH_STATUS_WALKOVER,
     TOURNAMENT_MODE_CODE,
@@ -65,7 +66,11 @@ async def create_round_matches(
             for pair in swiss_pairs
         ],
     )
-    duel_rounds = rounds_for_tournament_format(format_code=tournament.format)
+    duel_rounds = (
+        DAILY_CUP_QUESTIONS_PER_MATCH
+        if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA
+        else rounds_for_tournament_format(format_code=tournament.format)
+    )
     daily_cup_preferred_levels = (
         resolve_daily_cup_preferred_levels(round_no=round_no, duel_rounds=duel_rounds)
         if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA

@@ -13,3 +13,14 @@ def test_quiz_keyboard_contains_answer_callbacks_and_stop_button() -> None:
     assert "answer:00000000-0000-0000-0000-000000000001:2" in callbacks
     assert "answer:00000000-0000-0000-0000-000000000001:3" in callbacks
     assert "game:stop:00000000-0000-0000-0000-000000000001" in callbacks
+
+
+def test_quiz_keyboard_omits_stop_button_for_tournament() -> None:
+    keyboard = build_quiz_keyboard(
+        session_id="00000000-0000-0000-0000-000000000001",
+        options=("A", "B", "C", "D"),
+        is_tournament=True,
+    )
+    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+
+    assert "game:stop:00000000-0000-0000-0000-000000000001" not in callbacks

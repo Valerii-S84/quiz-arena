@@ -146,7 +146,7 @@ class TournamentMatchesRepo:
             .join(FriendChallenge, FriendChallenge.id == TournamentMatch.friend_challenge_id)
             .where(
                 Tournament.type == "DAILY_ARENA",
-                Tournament.status.in_(("ROUND_1", "ROUND_2", "ROUND_3")),
+                Tournament.status.in_(("ROUND_1", "ROUND_2", "ROUND_3", "ROUND_4")),
                 Tournament.current_round == TournamentMatch.round_no,
                 TournamentMatch.status == "PENDING",
                 TournamentMatch.deadline > now_utc,

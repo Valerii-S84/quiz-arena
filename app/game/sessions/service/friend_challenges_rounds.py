@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.analytics_events import EVENT_SOURCE_BOT
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
+from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
+from app.db.repo.tournaments_repo import TournamentsRepo
 from app.economy.streak.time import berlin_local_date
-from app.game.friend_challenges.constants import is_duel_playable_status, normalize_duel_status
+from app.game.friend_challenges.constants import is_duel_playable_for_user, normalize_duel_status
 from app.game.sessions.errors import (
     FriendChallengeAccessError,
     FriendChallengeCompletedError,
@@ -18,6 +20,7 @@ from app.game.sessions.errors import (
     FriendChallengeNotFoundError,
 )
 from app.game.sessions.types import FriendChallengeRoundStartResult
+from app.game.tournaments.constants import TOURNAMENT_TYPE_DAILY_ARENA
 
 from .friend_challenges_internal import (
     _build_friend_challenge_snapshot,
@@ -27,6 +30,24 @@ from .friend_challenges_internal import (
 from .levels import _friend_challenge_level_for_round
 from .question_loading import _build_start_result_from_existing_session
 from .sessions_start import start_session
+
+
+async def _resolve_question_header_override(
+    session: AsyncSession,
+    *,
+    tournament_match_id: UUID | None,
+) -> str | None:
+    if tournament_match_id is None:
+        return None
+    tournament_match = await TournamentMatchesRepo.get_by_id_for_update(
+        session, tournament_match_id
+    )
+    if tournament_match is None:
+        return None
+    tournament = await TournamentsRepo.get_by_id(session, tournament_match.tournament_id)
+    if tournament is None or tournament.type != TOURNAMENT_TYPE_DAILY_ARENA:
+        return None
+    return "Daily Arena Cup"
 
 
 async def start_friend_challenge_round(
@@ -53,24 +74,32 @@ async def start_friend_challenge_round(
         )
     if challenge.status == "EXPIRED":
         raise FriendChallengeExpiredError
-    if not is_duel_playable_status(challenge.status):
-        raise FriendChallengeCompletedError
-    if challenge.opponent_user_id is None:
-        raise FriendChallengeFullError
-    if user_id not in {challenge.creator_user_id, challenge.opponent_user_id}:
+    is_creator = challenge.creator_user_id == user_id
+    if not is_creator and challenge.opponent_user_id != user_id:
         raise FriendChallengeAccessError
+    has_opponent = challenge.opponent_user_id is not None
+    if not is_duel_playable_for_user(
+        status=challenge.status,
+        has_opponent=has_opponent,
+        is_creator=is_creator,
+    ):
+        if not has_opponent:
+            raise FriendChallengeFullError
+        raise FriendChallengeCompletedError
 
     participant_answered_round = (
-        challenge.creator_answered_round
-        if user_id == challenge.creator_user_id
-        else challenge.opponent_answered_round
+        challenge.creator_answered_round if is_creator else challenge.opponent_answered_round
     )
     next_round = participant_answered_round + 1
     if next_round > challenge.total_rounds:
         return FriendChallengeRoundStartResult(
             snapshot=_build_friend_challenge_snapshot(challenge),
             start_result=None,
-            waiting_for_opponent=is_duel_playable_status(challenge.status),
+            waiting_for_opponent=is_duel_playable_for_user(
+                status=challenge.status,
+                has_opponent=has_opponent,
+                is_creator=is_creator,
+            ),
             already_answered_current_round=True,
         )
 
@@ -85,6 +114,10 @@ async def start_friend_challenge_round(
             session,
             existing=existing_round_session,
             idempotent_replay=True,
+        )
+        start_result.session.header_mode_label_override = await _resolve_question_header_override(
+            session,
+            tournament_match_id=challenge.tournament_match_id,
         )
         return FriendChallengeRoundStartResult(
             snapshot=_build_friend_challenge_snapshot(challenge),
@@ -141,6 +174,10 @@ async def start_friend_challenge_round(
         friend_challenge_id=challenge.id,
         friend_challenge_round=next_round,
         friend_challenge_total_rounds=challenge.total_rounds,
+    )
+    start_result.session.header_mode_label_override = await _resolve_question_header_override(
+        session,
+        tournament_match_id=challenge.tournament_match_id,
     )
     return FriendChallengeRoundStartResult(
         snapshot=_build_friend_challenge_snapshot(challenge),

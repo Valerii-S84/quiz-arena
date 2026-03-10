@@ -11,6 +11,7 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.main import app
 from app.services.promo_codes import hash_promo_code, normalize_promo_code
+from tests.integration.stable_ids import stable_int_id, stable_telegram_user_id
 
 UTC = timezone.utc
 
@@ -19,7 +20,7 @@ async def create_user(seed: str) -> int:
     async with SessionLocal.begin() as session:
         user = await UsersRepo.create(
             session,
-            telegram_user_id=40_000_000_000 + (abs(hash(seed)) % 1_000_000),
+            telegram_user_id=stable_telegram_user_id(prefix=40_000_000_000, seed=seed),
             referral_code=f"R{uuid4().hex[:10]}",
             username=None,
             first_name="PromoAPI",
@@ -44,7 +45,7 @@ async def create_promo_code(
         normalized_code=normalized,
         pepper=get_settings().promo_secret_pepper,
     )
-    promo_id = abs(hash((raw_code, promo_type, target_scope))) % 1_000_000_000 + 1
+    promo_id = stable_int_id(raw_code, promo_type, target_scope)
     promo_code = PromoCode(
         id=promo_id,
         code_hash=code_hash,

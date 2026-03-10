@@ -21,6 +21,10 @@ TRUNCATE_TABLES = (
     "quiz_questions",
     "quiz_sessions",
     "friend_challenges",
+    "tournament_round_scores",
+    "tournament_matches",
+    "tournament_participants",
+    "tournaments",
     "mode_access",
     "mode_progress",
     "entitlements",
@@ -38,12 +42,24 @@ TRUNCATE_TABLES = (
     "users",
 )
 
-TRUNCATE_SQL = f"TRUNCATE TABLE {', '.join(TRUNCATE_TABLES)} RESTART IDENTITY CASCADE"
-
 
 @pytest.fixture(scope="session", autouse=True)
 def guard_integration_db_target() -> None:
     assert_safe_integration_db(str(engine.url))
+
+
+async def _existing_truncate_sql() -> str | None:
+    quoted_tables = ", ".join(f"'{table_name}'" for table_name in TRUNCATE_TABLES)
+    stmt = text(
+        "SELECT tablename FROM pg_tables "
+        "WHERE schemaname = 'public' AND tablename IN (" + quoted_tables + ")"
+    )
+    async with engine.connect() as conn:
+        result = await conn.execute(stmt)
+    existing_tables = [str(value) for value in result.scalars().all()]
+    if not existing_tables:
+        return None
+    return f"TRUNCATE TABLE {', '.join(existing_tables)} RESTART IDENTITY CASCADE"
 
 
 @pytest.fixture(autouse=True)
@@ -57,8 +73,10 @@ async def cleanup_db() -> None:
     except Exception as exc:  # pragma: no cover - environment-dependent
         pytest.skip(f"Postgres is required for integration tests: {exc}")
 
-    async with engine.begin() as conn:
-        await conn.execute(text(TRUNCATE_SQL))
+    truncate_sql = await _existing_truncate_sql()
+    if truncate_sql is not None:
+        async with engine.begin() as conn:
+            await conn.execute(text(truncate_sql))
 
     yield
 

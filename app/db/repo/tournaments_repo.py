@@ -121,7 +121,7 @@ class TournamentsRepo:
         stmt = (
             select(Tournament)
             .where(
-                Tournament.status.in_(("ROUND_1", "ROUND_2", "ROUND_3", "BRACKET_LIVE")),
+                Tournament.status.in_(("ROUND_1", "ROUND_2", "ROUND_3", "ROUND_4", "BRACKET_LIVE")),
                 Tournament.round_deadline.is_not(None),
                 due_condition,
             )

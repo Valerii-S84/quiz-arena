@@ -13,6 +13,7 @@ class SessionQuestionView:
     options: tuple[str, str, str, str]
     mode_code: str
     source: str
+    header_mode_label_override: str | None = None
     category: str | None = None
     question_number: int | None = None
     total_questions: int | None = None

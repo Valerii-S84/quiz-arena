@@ -11,10 +11,11 @@ from app.bot.handlers.gameplay_flows.friend_challenge_push_quota import reserve_
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
     build_friend_challenge_finished_keyboard,
-    build_friend_challenge_next_keyboard,
+    build_friend_challenge_start_keyboard,
 )
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.game.sessions.errors import (
     FriendChallengeAccessError,
     FriendChallengeCompletedError,
@@ -23,6 +24,22 @@ from app.game.sessions.errors import (
     FriendChallengeNotFoundError,
 )
 from app.game.sessions.types import AnswerSessionResult
+
+
+async def _should_notify_creator_after_opponent_finished(
+    *,
+    session_local,
+    challenge_id,
+    target_user_id: int,
+) -> bool:
+    async with session_local.begin() as session:
+        challenge_row = await FriendChallengesRepo.get_by_id(session, challenge_id)
+    return bool(
+        challenge_row is not None
+        and challenge_row.creator_user_id == target_user_id
+        and challenge_row.opponent_answered_round == challenge_row.total_rounds
+        and challenge_row.creator_answered_round == 0
+    )
 
 
 async def handle_friend_answer_branch(
@@ -90,7 +107,12 @@ async def handle_friend_answer_branch(
     if (
         not result.idempotent_replay
         and opponent_user_id is not None
-        and challenge.status in {"CREATOR_DONE", "OPPONENT_DONE"}
+        and opponent_user_id == challenge.creator_user_id
+        and await _should_notify_creator_after_opponent_finished(
+            session_local=session_local,
+            challenge_id=challenge.challenge_id,
+            target_user_id=opponent_user_id,
+        )
     ):
         push_reserved = await reserve_duel_push_slot(
             session_local=session_local,
@@ -99,17 +121,11 @@ async def handle_friend_answer_branch(
             now_utc=now_utc,
         )
         if push_reserved:
-            actor_label_for_target = await resolve_opponent_label(
-                challenge=challenge,
-                user_id=opponent_user_id,
-            )
             await notify_opponent(
                 callback,
                 opponent_user_id=opponent_user_id,
-                text=TEXTS_DE["msg.friend.challenge.turn.reminder"].format(
-                    opponent_label=actor_label_for_target
-                ),
-                reply_markup=build_friend_challenge_next_keyboard(
+                text=TEXTS_DE["msg.friend.challenge.turn.reminder"],
+                reply_markup=build_friend_challenge_start_keyboard(
                     challenge_id=str(challenge.challenge_id)
                 ),
             )

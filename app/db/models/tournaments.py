@@ -21,7 +21,7 @@ class Tournament(Base):
         CheckConstraint(
             (
                 "status IN ("
-                "'REGISTRATION','ROUND_1','ROUND_2','ROUND_3','BRACKET_LIVE',"
+                "'REGISTRATION','ROUND_1','ROUND_2','ROUND_3','ROUND_4','BRACKET_LIVE',"
                 "'COMPLETED','CANCELED'"
                 ")"
             ),
@@ -56,6 +56,9 @@ class Tournament(Base):
     current_round: Mapped[int] = mapped_column(Integer, nullable=False)
     registration_deadline: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     round_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    round_start_time: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
     bracket: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
     invite_code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

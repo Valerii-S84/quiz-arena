@@ -31,7 +31,7 @@ async def _create_tournament_duel(
             tournament_id=tournament_id,
             tournament_round_no=tournament_round_no,
             mode_code="QUICK_MIX_A1A2",
-            total_rounds=5,
+            total_rounds=7,
             tournament_match_id=uuid4(),
             now_utc=now_utc,
             preferred_levels_by_round=None,
@@ -72,6 +72,7 @@ async def test_daily_cup_uniform_question_ids_for_same_tournament_round(
     ]
     expected_question_ids = tournament_duels[0].question_ids
     assert expected_question_ids
+    assert len(expected_question_ids) == 7
     assert tournament_duels[1].question_ids == expected_question_ids
     assert tournament_duels[2].question_ids == expected_question_ids
     next_round_duel = await _create_tournament_duel(
@@ -108,3 +109,29 @@ async def test_daily_cup_uniform_question_ids_for_same_tournament_round(
         tournament_round_no=None,
     )
     assert fallback_duel_a.question_ids != fallback_duel_b.question_ids
+
+
+@pytest.mark.asyncio
+async def test_daily_cup_uniform_question_ids_for_ten_pairs_in_same_round() -> None:
+    now_utc = datetime(2026, 3, 7, 10, 0, tzinfo=UTC)
+    await _seed_friend_challenge_questions(now_utc=now_utc)
+    user_ids = [await _create_user(f"daily_uniform_ten_{idx}") for idx in range(1, 21)]
+
+    tournament_id = uuid4()
+    duels = []
+    for index in range(0, 20, 2):
+        duels.append(
+            await _create_tournament_duel(
+                creator_user_id=user_ids[index],
+                opponent_user_id=user_ids[index + 1],
+                now_utc=now_utc,
+                tournament_id=tournament_id,
+                tournament_round_no=1,
+            )
+        )
+
+    expected_question_ids = duels[0].question_ids
+    assert expected_question_ids
+    assert len(expected_question_ids) == 7
+    assert len(duels) == 10
+    assert all(duel.question_ids == expected_question_ids for duel in duels)

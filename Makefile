@@ -53,6 +53,9 @@ type-check:
 
 check: lint format-check type-check test
 
+local-ci:
+	bash scripts/local_ci.sh
+
 test:
 	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m scripts.ensure_test_db
 	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m alembic upgrade head

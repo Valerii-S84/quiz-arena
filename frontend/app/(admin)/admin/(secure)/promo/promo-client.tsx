@@ -301,13 +301,19 @@ function ModalFrame({
   children,
   onClose,
   wide = false,
+  position = "center",
 }: {
   children: ReactNode;
   onClose: () => void;
   wide?: boolean;
+  position?: "center" | "top";
 }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-[#1d160f]/55 p-4">
+    <div
+      className={`fixed inset-0 z-40 flex justify-center bg-[#1d160f]/55 p-4 ${
+        position === "top" ? "items-start pt-12 sm:pt-16" : "items-center"
+      }`}
+    >
       <div
         className={`surface max-h-[90vh] w-full overflow-y-auto rounded-[28px] border border-white/60 p-5 shadow-2xl ${
           wide ? "max-w-5xl" : "max-w-3xl"
@@ -372,7 +378,7 @@ function PromoFormModal({
   }
 
   return (
-    <ModalFrame onClose={onClose} wide>
+    <ModalFrame onClose={onClose} wide position="top">
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-5">
           <header>

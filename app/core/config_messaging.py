@@ -48,11 +48,12 @@ class MessagingSettingsMixin:
     duel_max_active_per_user: int = Field(default=10, alias="DUEL_MAX_ACTIVE_PER_USER")
     duel_max_new_per_day: int = Field(default=20, alias="DUEL_MAX_NEW_PER_DAY")
     duel_max_push_per_user: int = Field(default=2, alias="DUEL_MAX_PUSH_PER_USER")
+    tournament_friends_enabled: bool = Field(default=False, alias="TOURNAMENT_FRIENDS_ENABLED")
     tournament_round_ttl_hours: int = Field(default=24, alias="TOURNAMENT_ROUND_TTL_HOURS")
     tournament_max_participants: int = Field(default=8, alias="TOURNAMENT_MAX_PARTICIPANTS")
     tournament_min_participants: int = Field(default=2, alias="TOURNAMENT_MIN_PARTICIPANTS")
     tournament_rounds: int = Field(default=3, alias="TOURNAMENT_ROUNDS")
-    daily_cup_registration_open: str = Field(default="17:00", alias="DAILY_CUP_REGISTRATION_OPEN")
+    daily_cup_registration_open: str = Field(default="16:00", alias="DAILY_CUP_REGISTRATION_OPEN")
     daily_cup_registration_close: str = Field(default="18:00", alias="DAILY_CUP_REGISTRATION_CLOSE")
     daily_cup_round_duration_minutes: int = Field(
         default=60,

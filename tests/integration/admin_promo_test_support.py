@@ -13,6 +13,7 @@ from app.main import app
 from app.services.admin.auth import build_access_token
 from app.services.promo_codes import hash_promo_code, normalize_promo_code
 from app.services.promo_encryption import encrypt_promo_code
+from tests.integration.stable_ids import stable_telegram_user_id
 
 UTC = timezone.utc
 
@@ -31,7 +32,7 @@ async def create_user(seed: str) -> int:
     async with SessionLocal.begin() as session:
         user = await UsersRepo.create(
             session,
-            telegram_user_id=90_000_000_000 + (abs(hash(seed)) % 1_000_000),
+            telegram_user_id=stable_telegram_user_id(prefix=90_000_000_000, seed=seed),
             referral_code=f"A{uuid4().hex[:10]}",
             username=None,
             first_name="AdminPromo",

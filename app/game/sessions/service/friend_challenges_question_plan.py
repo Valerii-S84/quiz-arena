@@ -13,7 +13,7 @@ from app.game.sessions.errors import FriendChallengeAccessError
 
 from .levels import _friend_challenge_level_for_round
 
-_DUEL_FORMAT_ROUNDS: frozenset[int] = frozenset({5, 12})
+_DUEL_FORMAT_ROUNDS: frozenset[int] = frozenset({5, 7, 12})
 
 
 def resolve_duel_rounds(*, total_rounds: int) -> int:

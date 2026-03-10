@@ -16,11 +16,12 @@ from app.game.tournaments.constants import (
     TOURNAMENT_STATUS_REGISTRATION,
     TOURNAMENT_TYPE_PRIVATE,
 )
+from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
 from app.game.tournaments.errors import TournamentAccessError, TournamentNotFoundError
 from app.game.tournaments.internal import build_tournament_snapshot
 from app.game.tournaments.types import TournamentLobbySnapshot, TournamentParticipantSnapshot
 
-_ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3", "BRACKET_LIVE"})
+_ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3", "ROUND_4", "BRACKET_LIVE"})
 
 
 def _participant_snapshot(row: TournamentParticipant) -> TournamentParticipantSnapshot:
@@ -63,10 +64,14 @@ async def _build_lobby_snapshot(
     tournament: Tournament,
     viewer_user_id: int,
 ) -> TournamentLobbySnapshot:
-    participants = await TournamentParticipantsRepo.list_for_tournament(
-        session,
-        tournament_id=tournament.id,
-    )
+    if tournament.type in DAILY_CUP_TOURNAMENT_TYPES:
+        standings = await calculate_daily_cup_standings(session, tournament_id=tournament.id)
+        participants = [item.participant for item in standings]
+    else:
+        participants = await TournamentParticipantsRepo.list_for_tournament(
+            session,
+            tournament_id=tournament.id,
+        )
     participant_snapshots = tuple(_participant_snapshot(item) for item in participants)
     participant_ids = {item.user_id for item in participant_snapshots}
     viewer_joined = viewer_user_id in participant_ids
