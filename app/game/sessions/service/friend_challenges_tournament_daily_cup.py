@@ -8,7 +8,11 @@ from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.models.friend_challenges import FriendChallenge
 from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournaments import Tournament
-from app.game.tournaments.constants import DAILY_CUP_MAX_ROUNDS, TOURNAMENT_MATCH_STATUS_PENDING
+from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
+from app.game.tournaments.constants import (
+    TOURNAMENT_MATCH_STATUS_PENDING,
+    daily_cup_max_rounds_for_participants,
+)
 
 
 def _tighten_daily_cup_deadline(
@@ -99,6 +103,10 @@ async def handle_daily_cup_tournament_progress(
         )
     if challenge.opponent_user_id is None or tournament_match.user_b is None:
         return
+    participants_total = await TournamentParticipantsRepo.count_for_tournament(
+        session,
+        tournament_id=tournament_match.tournament_id,
+    )
     await send_daily_cup_match_result_messages(
         session,
         tournament_id=tournament_match.tournament_id,
@@ -107,7 +115,7 @@ async def handle_daily_cup_tournament_progress(
         user_b=int(tournament_match.user_b),
         user_a_points=int(challenge.creator_score),
         user_b_points=int(challenge.opponent_score),
-        rounds_total=DAILY_CUP_MAX_ROUNDS,
+        rounds_total=daily_cup_max_rounds_for_participants(participants_total=participants_total),
         tournament_registration_deadline=tournament.registration_deadline,
         next_round_start_time=(
             tournament.round_start_time

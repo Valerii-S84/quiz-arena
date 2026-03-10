@@ -118,6 +118,7 @@ async def test_render_daily_cup_lobby_round_active_shows_active_hint() -> None:
     text = response.text or ""
     assert "Dein Duell ist bereit." in text
     assert "Gegner: Max" in text
+    assert "Runde 2/3" in text
     buttons = [button for row in response.kwargs["reply_markup"].inline_keyboard for button in row]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert "friend:next:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" in callbacks
@@ -206,8 +207,8 @@ async def test_render_daily_cup_lobby_round_waiting_final_round_shows_completion
     lobby = SimpleNamespace(
         tournament=SimpleNamespace(
             tournament_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-            status="ROUND_4",
-            current_round=4,
+            status="ROUND_3",
+            current_round=3,
             round_deadline=None,
         ),
         participants=(
@@ -228,6 +229,7 @@ async def test_render_daily_cup_lobby_round_waiting_final_round_shows_completion
 
     response = callback.message.answers[0]
     text = response.text or ""
+    assert "Runde 3/3" in text
     assert "Warte auf den Abschluss des Cups." in text
 
 

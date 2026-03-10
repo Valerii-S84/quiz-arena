@@ -188,7 +188,7 @@ async def test_handle_daily_cup_view_shows_active_standings() -> None:
 
     response = callback.message.answers[0]
     text = response.text or ""
-    assert "Runde 2/4" in text
+    assert "Runde 2/3" in text
     assert "1. 🥇 Ich (Du) - 2 Pkt" in text
     assert "2. 🥈 Max - 1 Pkt" in text
 

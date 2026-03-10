@@ -8,6 +8,7 @@ from app.core.telegram_links import public_bot_link
 from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournament_participants import TournamentParticipant
 from app.db.models.tournaments import Tournament
+from app.game.tournaments.constants import daily_cup_max_rounds_for_participants
 from app.workers.tasks.daily_cup_messaging_text import (
     build_completed_text,
     build_round_text,
@@ -37,6 +38,7 @@ async def deliver_daily_cup_messages(
     sent = edited = failed = 0
     new_message_ids: dict[int, int] = {}
     replaced_message_ids: dict[int, int] = {}
+    rounds_total = daily_cup_max_rounds_for_participants(participants_total=participants_total)
 
     for user_id in standings_user_ids:
         chat_id = telegram_targets.get(user_id)
@@ -64,6 +66,7 @@ async def deliver_daily_cup_messages(
         else:
             text = build_round_text(
                 round_no=max(1, int(tournament.current_round)),
+                rounds_total=rounds_total,
                 deadline_text=format_deadline(tournament.round_deadline),
                 opponent_label=(
                     labels.get(opponent_user_id) if opponent_user_id is not None else None

@@ -35,6 +35,7 @@ def build_standings_lines(
 def build_round_text(
     *,
     round_no: int,
+    rounds_total: int,
     deadline_text: str,
     opponent_label: str | None,
     standings_lines: list[str],
@@ -42,7 +43,7 @@ def build_round_text(
     lines = [
         "🏆 Daily Arena Cup",
         "",
-        f"⚔️ Runde {round_no}/4 gestartet",
+        f"⚔️ Runde {round_no}/{rounds_total} gestartet",
         "Format: 7 Fragen",
         f"Deadline: {deadline_text} (Berlin)",
     ]

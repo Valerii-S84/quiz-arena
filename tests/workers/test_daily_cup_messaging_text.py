@@ -38,11 +38,13 @@ def test_build_standings_lines_with_tie_break() -> None:
 def test_build_round_text_uses_arena_bot_label_for_self_match() -> None:
     text = build_round_text(
         round_no=2,
+        rounds_total=3,
         deadline_text="03.03 20:00",
         opponent_label=None,
         standings_lines=["1. 🥇 Ich (Du) - 2 Pkt", "2. 🥈 Max - 1 Pkt"],
     )
 
+    assert "⚔️ Runde 2/3 gestartet" in text
     assert "Gegner: Arena Bot" in text
     assert "Auto-Sieg" not in text
 
