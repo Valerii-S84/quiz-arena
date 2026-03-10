@@ -7,6 +7,7 @@ from uuid import UUID
 import structlog
 
 from app.bot.application import build_bot
+from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
@@ -82,6 +83,10 @@ async def run_daily_cup_proof_cards_async(
         users = await UsersRepo.list_by_ids(
             session, [int(item.user_id) for item in all_participants]
         )
+        rounds_played = await TournamentMatchesRepo.get_max_round_no(
+            session,
+            tournament_id=parsed_tournament_id,
+        )
         user_labels = {
             int(user.id): format_user_label(username=user.username, first_name=user.first_name)
             for user in users
@@ -126,6 +131,7 @@ async def run_daily_cup_proof_cards_async(
                     cached_file_id=participant_row.proof_card_file_id,
                     player_label=user_labels.get(current_user_id, "Spieler"),
                     now_utc=now_utc,
+                    rounds_played=rounds_played,
                     render_card_png=render_tournament_proof_card_png,
                 )
                 if not delivered:

@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournament_round_scores_repo import (
@@ -25,6 +26,37 @@ from tests.integration.test_private_tournament_worker_integration import (
 )
 
 UTC = timezone.utc
+
+
+def _build_round_matches(
+    *,
+    tournament_id: UUID,
+    user_ids: list[int],
+    rounds_played: int,
+    now_utc: datetime,
+) -> list[TournamentMatch]:
+    matches: list[TournamentMatch] = []
+    for round_number in range(1, rounds_played + 1):
+        matches.append(
+            TournamentMatch(
+                id=uuid4(),
+                tournament_id=tournament_id,
+                round_no=round_number,
+                round_number=None,
+                user_a=user_ids[0],
+                user_b=user_ids[1] if len(user_ids) > 1 else None,
+                bracket_slot_a=None,
+                bracket_slot_b=None,
+                friend_challenge_id=None,
+                match_timeout_task_id=None,
+                player_a_finished_at=None,
+                player_b_finished_at=None,
+                status="COMPLETED",
+                winner_id=user_ids[0],
+                deadline=now_utc - timedelta(minutes=round_number),
+            )
+        )
+    return matches
 
 
 async def _create_completed_daily_cup(*, now_utc: datetime, user_ids: list[int]) -> str:
@@ -53,6 +85,14 @@ async def _create_completed_daily_cup(*, now_utc: datetime, user_ids: list[int])
                 user_id=user_id,
                 joined_at=now_utc - timedelta(hours=4),
             )
+        session.add_all(
+            _build_round_matches(
+                tournament_id=tournament.id,
+                user_ids=user_ids,
+                rounds_played=3,
+                now_utc=now_utc,
+            )
+        )
         participants = await TournamentParticipantsRepo.list_for_tournament_for_update(
             session,
             tournament_id=tournament.id,
@@ -140,6 +180,14 @@ async def _create_completed_daily_cup_with_seeded_scores(
             assert participant is not None
             participant.score = total_points
             participant.tie_break = total_correct
+        session.add_all(
+            _build_round_matches(
+                tournament_id=tournament.id,
+                user_ids=user_ids,
+                rounds_played=4,
+                now_utc=now_utc,
+            )
+        )
 
         return str(tournament.id)
 
@@ -157,9 +205,15 @@ async def test_daily_cup_proof_cards_send_only_once_per_participant(monkeypatch)
 
     user_ids = [await _create_user(f"daily_cup_proof_{idx}") for idx in range(4)]
     tournament_id = await _create_completed_daily_cup(now_utc=now_utc, user_ids=user_ids)
+    render_calls: list[dict[str, object]] = []
+
+    def _fake_render(**kwargs) -> bytes:
+        render_calls.append(kwargs)
+        return b"png"
 
     bot = _DummyWorkerBot()
     monkeypatch.setattr(daily_cup_proof_cards, "build_bot", lambda: bot)
+    monkeypatch.setattr(daily_cup_proof_cards, "render_tournament_proof_card_png", _fake_render)
 
     first = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
         tournament_id=tournament_id,
@@ -184,6 +238,8 @@ async def test_daily_cup_proof_cards_send_only_once_per_participant(monkeypatch)
     ]
     assert len(first_batch_buttons) == 4
     assert all(query and query.startswith("proof:daily:") for query in first_batch_buttons)
+    assert len(render_calls) == 4
+    assert all(call["rounds_played"] == 3 for call in render_calls)
 
     first_batch = len(bot.send_photos)
     parsed_tournament_id = UUID(tournament_id)
@@ -317,3 +373,44 @@ async def test_daily_cup_proof_cards_send_nine_cards_with_expected_places_and_po
         for item, points in zip(standings, expected_points, strict=False)
     ]
     assert [str(item.get("caption")) for item in bot.send_photos] == expected_captions
+
+
+@pytest.mark.asyncio
+async def test_daily_cup_proof_cards_use_four_rounds_for_twenty_one_players(monkeypatch) -> None:
+    now_utc = (
+        datetime.now(UTC)
+        .astimezone(ZoneInfo(DAILY_CUP_TIMEZONE))
+        .replace(hour=12, minute=0, second=0, microsecond=0)
+        .astimezone(UTC)
+    )
+    await _ensure_tournament_schema()
+
+    user_ids = [await _create_user(f"daily_cup_proof_large_{idx}") for idx in range(21)]
+    tournament_id = await _create_completed_daily_cup_with_seeded_scores(
+        now_utc=now_utc,
+        user_ids=user_ids,
+    )
+    render_calls: list[dict[str, object]] = []
+
+    def _fake_render(**kwargs) -> bytes:
+        render_calls.append(kwargs)
+        return b"png"
+
+    bot = _DummyWorkerBot()
+    monkeypatch.setattr(daily_cup_proof_cards, "build_bot", lambda: bot)
+    monkeypatch.setattr(daily_cup_proof_cards, "render_tournament_proof_card_png", _fake_render)
+
+    result = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
+        tournament_id=tournament_id,
+        initial_delay_seconds=0,
+    )
+
+    assert result == {
+        "processed": 1,
+        "participants_total": 21,
+        "sent": 21,
+        "cached_reused": 0,
+        "failed": 0,
+    }
+    assert len(render_calls) == 21
+    assert all(call["rounds_played"] == 4 for call in render_calls)

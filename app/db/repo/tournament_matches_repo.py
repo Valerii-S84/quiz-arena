@@ -76,6 +76,18 @@ class TournamentMatchesRepo:
         return list(result.scalars().all())
 
     @staticmethod
+    async def get_max_round_no(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+    ) -> int:
+        stmt = select(func.max(TournamentMatch.round_no)).where(
+            TournamentMatch.tournament_id == tournament_id
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
     async def list_by_tournament_round_for_update(
         session: AsyncSession,
         *,

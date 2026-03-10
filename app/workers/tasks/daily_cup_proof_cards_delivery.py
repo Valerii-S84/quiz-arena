@@ -24,6 +24,7 @@ async def send_daily_cup_proof_card(
     cached_file_id: str | None,
     player_label: str,
     now_utc: datetime,
+    rounds_played: int,
     render_card_png: Callable[..., bytes] = render_tournament_proof_card_png,
 ) -> tuple[bool, bool, str | None]:
     caption = build_caption(place=place, points=points)
@@ -52,7 +53,7 @@ async def send_daily_cup_proof_card(
         format_label="7 Fragen",
         completed_at=now_utc,
         tournament_name="Daily Arena Cup",
-        rounds_played=4,
+        rounds_played=rounds_played,
         is_daily_arena=True,
     )
     message = await bot.send_photo(
