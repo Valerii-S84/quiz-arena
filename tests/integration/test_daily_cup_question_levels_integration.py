@@ -42,6 +42,7 @@ def _build_b2_question(*, question_id: str, now_utc: datetime) -> QuizQuestion:
         explanation="Seed",
         key=question_id,
         status="ACTIVE",
+        quick_mix_eligible=True,
         created_at=now_utc,
         updated_at=now_utc,
     )

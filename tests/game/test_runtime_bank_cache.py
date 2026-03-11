@@ -25,6 +25,7 @@ async def test_select_question_for_mode_reuses_cached_pool_between_calls(
         *,
         exclude_question_ids=None,
         preferred_levels=None,
+        require_quick_mix_eligible=False,
     ):
         return []
 
@@ -86,6 +87,7 @@ async def test_select_question_for_mode_refreshes_stale_cache_if_selected_id_mis
         *,
         exclude_question_ids=None,
         preferred_levels=None,
+        require_quick_mix_eligible=False,
     ):
         return []
 
@@ -148,6 +150,7 @@ async def test_select_question_for_mode_refresh_uses_incremental_changes(
         *,
         exclude_question_ids=None,
         preferred_levels=None,
+        require_quick_mix_eligible=False,
     ):
         return []
 
@@ -176,6 +179,7 @@ async def test_select_question_for_mode_refresh_uses_incremental_changes(
                 mode_code="ARTIKEL_SPRINT",
                 level="A1",
                 status="DISABLED",
+                quick_mix_eligible=False,
                 updated_at=datetime(2026, 2, 20, 10, 0, tzinfo=timezone.utc),
             ),
             SimpleNamespace(
@@ -183,6 +187,7 @@ async def test_select_question_for_mode_refresh_uses_incremental_changes(
                 mode_code="ARTIKEL_SPRINT",
                 level="A1",
                 status="ACTIVE",
+                quick_mix_eligible=False,
                 updated_at=datetime(2026, 2, 20, 10, 1, tzinfo=timezone.utc),
             ),
         ]

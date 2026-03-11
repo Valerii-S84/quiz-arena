@@ -44,6 +44,7 @@ def _build_mode_question(
         explanation="Seed",
         key=question_id,
         status="ACTIVE",
+        quick_mix_eligible=mode_code == "QUICK_MIX_A1A2",
         created_at=now_utc,
         updated_at=now_utc,
     )

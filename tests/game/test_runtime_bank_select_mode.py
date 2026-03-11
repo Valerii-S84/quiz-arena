@@ -22,6 +22,7 @@ async def test_select_question_for_mode_uses_db_pool_before_fallback(
         *,
         exclude_question_ids=None,
         preferred_levels=None,
+        require_quick_mix_eligible=False,
     ):
         return []
 
@@ -74,8 +75,10 @@ async def test_select_question_for_mode_daily_uses_quick_mix_source_mode(
         *,
         exclude_question_ids=None,
         preferred_levels=None,
+        require_quick_mix_eligible=False,
     ):
         nonlocal called_all_active
+        assert require_quick_mix_eligible is True
         called_all_active += 1
         return ["q_a", "q_b"]
 
@@ -124,7 +127,7 @@ async def test_select_question_for_mode_daily_uses_quick_mix_source_mode(
 
 
 @pytest.mark.asyncio
-async def test_select_question_for_quick_mix_uses_all_modes_pool(
+async def test_select_question_for_quick_mix_uses_only_eligible_active_pool(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     called_all_active = 0
@@ -135,8 +138,10 @@ async def test_select_question_for_quick_mix_uses_all_modes_pool(
         *,
         exclude_question_ids=None,
         preferred_levels=None,
+        require_quick_mix_eligible=False,
     ):
         nonlocal called_all_active
+        assert require_quick_mix_eligible is True
         called_all_active += 1
         return ["mix_q_1"]
 
@@ -190,6 +195,7 @@ async def test_select_question_for_mode_prefers_requested_level(
         *,
         exclude_question_ids=None,
         preferred_levels=None,
+        require_quick_mix_eligible=False,
     ):
         return []
 
@@ -247,6 +253,7 @@ async def test_select_question_for_mode_relaxes_only_within_allowed_levels(
         *,
         exclude_question_ids=None,
         preferred_levels=None,
+        require_quick_mix_eligible=False,
     ):
         return []
 
@@ -293,3 +300,54 @@ async def test_select_question_for_mode_relaxes_only_within_allowed_levels(
     assert ("C2",) in recorded_levels
     assert ("A1", "A2") in recorded_levels
     assert None not in recorded_levels
+
+
+@pytest.mark.asyncio
+async def test_select_question_for_quick_mix_excludes_recent_ids_after_filtering(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_list_question_ids_all_active(  # noqa: ANN001
+        session,
+        *,
+        exclude_question_ids=None,
+        preferred_levels=None,
+        require_quick_mix_eligible=False,
+    ):
+        assert require_quick_mix_eligible is True
+        del session, exclude_question_ids, preferred_levels
+        return ["mix_recent", "mix_fresh"]
+
+    async def fake_list_question_ids_for_mode(  # noqa: ANN001
+        session,
+        *,
+        mode_code,
+        exclude_question_ids=None,
+        preferred_levels=None,
+    ):
+        return ["unexpected"]
+
+    async def fake_get_by_id(session, question_id):  # noqa: ANN001
+        return _fake_record(question_id)
+
+    monkeypatch.setattr(
+        "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
+        fake_list_question_ids_all_active,
+    )
+    monkeypatch.setattr(
+        "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_for_mode",
+        fake_list_question_ids_for_mode,
+    )
+    monkeypatch.setattr(
+        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
+        fake_get_by_id,
+    )
+
+    selected = await select_question_for_mode(
+        object(),
+        "QUICK_MIX_A1A2",
+        local_date_berlin=date(2026, 2, 19),
+        recent_question_ids=["mix_recent"],
+        selection_seed="seed-mix-anti-repeat",
+    )
+
+    assert selected.question_id == "mix_fresh"

@@ -10,11 +10,17 @@ from app.db.models.quiz_questions import QuizQuestion as QuizQuestionModel
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.energy.service import EnergyService
+from app.game.questions.runtime_bank import clear_question_pool_cache
 from app.game.sessions.service import GameSessionService
 from app.game.sessions.service.progression import select_level_weighted
 from tests.integration.stable_ids import stable_telegram_user_id
 
 UTC = timezone.utc
+
+
+@pytest.fixture(autouse=True)
+def clear_runtime_pool_cache() -> None:
+    clear_question_pool_cache()
 
 
 def _build_question(
@@ -40,6 +46,7 @@ def _build_question(
         explanation="Seed",
         key=question_id,
         status="ACTIVE",
+        quick_mix_eligible=mode_code == "QUICK_MIX_A1A2",
         created_at=now_utc,
         updated_at=now_utc,
     )

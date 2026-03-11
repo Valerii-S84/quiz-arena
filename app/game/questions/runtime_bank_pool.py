@@ -8,7 +8,8 @@ from time import monotonic
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.game.questions.runtime_bank_models import ALL_ACTIVE_SCOPE_CODE, QUICK_MIX_MODE_CODE
+from app.game.questions.catalog import mode_requires_quick_mix_eligible
+from app.game.questions.runtime_bank_models import QUICK_MIX_MODE_CODE, QUICK_MIX_SCOPE_CODE
 
 
 @dataclass(slots=True)
@@ -37,11 +38,18 @@ def clear_question_pool_cache() -> None:
 
 
 def _pool_cache_scope(mode_code: str) -> str:
-    return ALL_ACTIVE_SCOPE_CODE if mode_code == QUICK_MIX_MODE_CODE else mode_code
+    return QUICK_MIX_SCOPE_CODE if mode_code == QUICK_MIX_MODE_CODE else mode_code
 
 
-def _pool_matches_mode(mode_code: str, *, question_mode_code: str) -> bool:
-    return mode_code == QUICK_MIX_MODE_CODE or question_mode_code == mode_code
+def _pool_matches_mode(
+    mode_code: str,
+    *,
+    question_mode_code: str,
+    question_quick_mix_eligible: bool,
+) -> bool:
+    if mode_code == QUICK_MIX_MODE_CODE:
+        return question_quick_mix_eligible
+    return question_mode_code == mode_code
 
 
 def _pool_matches_level(
@@ -59,10 +67,15 @@ def _pool_includes_question(
     question_mode_code: str,
     question_level: str,
     question_status: str,
+    question_quick_mix_eligible: bool,
 ) -> bool:
     return (
         question_status == "ACTIVE"
-        and _pool_matches_mode(mode_code, question_mode_code=question_mode_code)
+        and _pool_matches_mode(
+            mode_code,
+            question_mode_code=question_mode_code,
+            question_quick_mix_eligible=question_quick_mix_eligible,
+        )
         and _pool_matches_level(preferred_levels, question_level=question_level)
     )
 
@@ -74,11 +87,12 @@ async def _load_pool_ids(
     preferred_levels: tuple[str, ...] | None,
 ) -> tuple[str, ...]:
     repo = _repo()
-    if mode_code == QUICK_MIX_MODE_CODE:
+    if mode_requires_quick_mix_eligible(mode_code):
         pool_ids = await repo.list_question_ids_all_active(
             session,
             exclude_question_ids=None,
             preferred_levels=preferred_levels,
+            require_quick_mix_eligible=True,
         )
     else:
         pool_ids = await repo.list_question_ids_for_mode(
@@ -135,6 +149,7 @@ async def _build_incremental_pool_entry(
             question_mode_code=change.mode_code,
             question_level=change.level,
             question_status=change.status,
+            question_quick_mix_eligible=change.quick_mix_eligible,
         )
         if include_question:
             refreshed_ids.add(change.question_id)

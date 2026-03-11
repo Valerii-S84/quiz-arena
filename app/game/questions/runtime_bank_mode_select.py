@@ -5,14 +5,14 @@ from typing import Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.game.questions.catalog import DAILY_CHALLENGE_SOURCE_MODE
+from app.game.questions.catalog import DAILY_CHALLENGE_SOURCE_MODE, mode_requires_quick_mix_eligible
 from app.game.questions.runtime_bank_fallback import (
     fallback_get_question_by_id,
     fallback_get_question_for_mode,
     fallback_select_question_for_mode,
 )
 from app.game.questions.runtime_bank_filters import pick_from_pool
-from app.game.questions.runtime_bank_models import QUICK_MIX_MODE_CODE, to_quiz_question
+from app.game.questions.runtime_bank_models import to_quiz_question
 from app.game.questions.runtime_bank_pool import _get_pool_ids, _repo, clear_question_pool_cache
 from app.game.questions.types import QuizQuestion
 
@@ -38,11 +38,12 @@ async def _list_candidate_ids_for_mode(
     preferred_levels: Sequence[str] | None,
 ) -> list[str]:
     repo = _repo()
-    if mode_code == QUICK_MIX_MODE_CODE:
+    if mode_requires_quick_mix_eligible(mode_code):
         return await repo.list_question_ids_all_active(
             session,
             exclude_question_ids=exclude_question_ids,
             preferred_levels=preferred_levels,
+            require_quick_mix_eligible=True,
         )
     return await repo.list_question_ids_for_mode(
         session,

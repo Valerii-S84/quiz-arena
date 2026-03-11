@@ -16,6 +16,7 @@ class QuizQuestionPoolChange:
     mode_code: str
     level: str
     status: str
+    quick_mix_eligible: bool
     updated_at: datetime
 
 
@@ -53,12 +54,15 @@ class QuizQuestionsRepo:
         *,
         exclude_question_ids: Sequence[str] | None = None,
         preferred_levels: Sequence[str] | None = None,
+        require_quick_mix_eligible: bool = False,
     ) -> list[str]:
         stmt = (
             select(QuizQuestion.question_id)
             .where(QuizQuestion.status == "ACTIVE")
             .order_by(QuizQuestion.question_id.asc())
         )
+        if require_quick_mix_eligible:
+            stmt = stmt.where(QuizQuestion.quick_mix_eligible.is_(True))
         if preferred_levels:
             stmt = stmt.where(QuizQuestion.level.in_(tuple(preferred_levels)))
         if exclude_question_ids:
@@ -93,6 +97,7 @@ class QuizQuestionsRepo:
                 QuizQuestion.mode_code,
                 QuizQuestion.level,
                 QuizQuestion.status,
+                QuizQuestion.quick_mix_eligible,
                 QuizQuestion.updated_at,
             )
             .where(QuizQuestion.updated_at > since_updated_at)
@@ -105,7 +110,8 @@ class QuizQuestionsRepo:
                 mode_code=mode_code,
                 level=level,
                 status=status,
+                quick_mix_eligible=quick_mix_eligible,
                 updated_at=updated_at,
             )
-            for question_id, mode_code, level, status, updated_at in result.all()
+            for question_id, mode_code, level, status, quick_mix_eligible, updated_at in result.all()
         ]
