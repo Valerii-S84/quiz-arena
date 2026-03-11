@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 from app.game.questions.static_bank import (
+    _question_pool_for_mode,
     get_question_by_id,
     get_question_for_mode,
     select_question_for_mode,
@@ -10,33 +11,28 @@ from app.game.questions.static_bank import (
 
 
 def test_select_question_for_mode_uses_anti_repeat_candidates() -> None:
+    recent_question_ids = ["qm_a1a2_001", "qm_a1a2_002", "qm_a1a2_003"]
     selected = select_question_for_mode(
         "QUICK_MIX_A1A2",
         local_date_berlin=date(2026, 2, 18),
-        recent_question_ids=["qm_a1a2_001", "qm_a1a2_002", "qm_a1a2_003"],
+        recent_question_ids=recent_question_ids,
         selection_seed="seed-1",
     )
-    assert selected.question_id == "qm_a1a2_004"
+    assert selected.question_id not in recent_question_ids
+    assert selected in _question_pool_for_mode("QUICK_MIX_A1A2")
 
 
 def test_select_question_for_mode_falls_back_to_full_pool_when_all_recent() -> None:
+    recent_question_ids = [
+        question.question_id for question in _question_pool_for_mode("ARTIKEL_SPRINT")
+    ]
     selected = select_question_for_mode(
         "ARTIKEL_SPRINT",
         local_date_berlin=date(2026, 2, 18),
-        recent_question_ids=[
-            "artikel_001",
-            "artikel_002",
-            "artikel_003",
-            "artikel_004",
-        ],
+        recent_question_ids=recent_question_ids,
         selection_seed="seed-2",
     )
-    assert selected.question_id in {
-        "artikel_001",
-        "artikel_002",
-        "artikel_003",
-        "artikel_004",
-    }
+    assert selected.question_id in set(recent_question_ids)
 
 
 def test_select_question_for_mode_is_seed_deterministic() -> None:
