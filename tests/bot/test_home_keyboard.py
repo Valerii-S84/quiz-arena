@@ -32,6 +32,18 @@ def test_home_keyboard_contains_shop_button_without_direct_buy_buttons() -> None
     assert "promo:open" not in callbacks
 
 
+def test_home_keyboard_mode_callbacks_use_unified_labels() -> None:
+    keyboard = build_home_keyboard()
+    button_by_callback = {
+        button.callback_data: button.text
+        for row in keyboard.inline_keyboard
+        for button in row
+    }
+
+    assert button_by_callback["mode:ARTIKEL_SPRINT"] == "📚 Artikel-Training"
+    assert button_by_callback["play"] == "🎯 Schnell-Runde"
+
+
 def test_home_keyboard_does_not_include_liga_or_removed_modes() -> None:
     keyboard = build_home_keyboard()
     buttons = [button for row in keyboard.inline_keyboard for button in row]

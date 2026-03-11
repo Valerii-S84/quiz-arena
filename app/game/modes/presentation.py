@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 MODE_LABELS: dict[str, str] = {
-    "QUICK_MIX_A1A2": "QUICK MIX",
-    "ARTIKEL_SPRINT": "ARTIKEL SPRINT",
+    "QUICK_MIX_A1A2": "Schnell-Runde",
+    "ARTIKEL_SPRINT": "Artikel-Training",
     "DAILY_CHALLENGE": "DAILY CHALLENGE",
     "CASES_PRACTICE": "CASES PRACTICE",
     "TRENNBARE_VERBEN": "TRENNBARE VERBEN",
