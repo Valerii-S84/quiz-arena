@@ -110,15 +110,17 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
     invite_buttons = [
         button for row in invite_message.kwargs["reply_markup"].inline_keyboard for button in row
     ]
-    assert all(button.url is None for button in invite_buttons)
-    assert not any(button.text == "⚔️ Herausforderung annehmen" for button in invite_buttons)
     assert [button.text for button in invite_buttons] == [
+        "⚔️ Herausforderung annehmen",
         "📤 Teilen ->",
-        "📋 Link kopieren",
         "✅ Einladung gesendet",
         "⚔️ Jetzt spielen",
         "⏳ Auf Freund warten",
     ]
+    assert (
+        invite_buttons[0].url
+        == "https://t.me/testbot?start=duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    )
     assert len(callback.message.answers) == 1
 
 
@@ -142,16 +144,18 @@ async def test_handle_friend_challenge_invite_sent_answers_with_waiting_toast() 
         if button.callback_data
     ]
     assert edited_callbacks == [
-        "friend:copy:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "friend:next:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "menu:main",
     ]
+    assert edited_markup.inline_keyboard[0][0].text == "⚔️ Herausforderung annehmen"
+    assert (
+        edited_markup.inline_keyboard[0][0].url
+        == "https://t.me/Deine_Deutsch_Quiz_bot?start=duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    )
     assert callback.answer_calls == [
         {"text": TEXTS_DE["msg.friend.challenge.invite.waiting"], "show_alert": False}
     ]
-
-
 @pytest.mark.asyncio
 async def test_handle_friend_challenge_invite_required_answers_with_confirmation_hint() -> None:
     callback = DummyCallback(

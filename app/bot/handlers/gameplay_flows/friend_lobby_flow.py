@@ -178,6 +178,7 @@ async def handle_friend_copy_link(
     if callback.from_user is None or callback.message is None or callback.data is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
+    del build_friend_invite_link
     challenge_id = parse_uuid_callback(pattern=friend_copy_link_re, callback_data=callback.data)
     if challenge_id is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
@@ -199,12 +200,7 @@ async def handle_friend_copy_link(
             await callback.message.answer(TEXTS_DE["msg.friend.challenge.invalid"])
             await callback.answer()
             return
-    invite_link = await build_friend_invite_link(callback, challenge_id=str(challenge_id))
-    if invite_link is None:
-        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
-        return
-    await callback.message.answer(invite_link)
-    await callback.answer(TEXTS_DE["msg.friend.challenge.link.copied"])
+    await callback.answer(TEXTS_DE["msg.friend.challenge.link.share.inline"])
 
 
 async def handle_friend_my_duels(

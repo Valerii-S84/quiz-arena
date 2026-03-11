@@ -15,6 +15,7 @@ from app.bot.keyboards.proof_card_share import (
     FRIEND_CHALLENGE_INLINE_SHARE_PREFIX,
     FRIEND_CHALLENGE_INVITE_INLINE_SHARE_PREFIX,
 )
+from app.bot.texts.de import TEXTS_DE
 from app.core.config import get_settings
 from app.core.telegram_links import public_bot_link, public_bot_start_link
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
@@ -44,6 +45,14 @@ def _parse_query_id(*, query: str, prefix: str) -> UUID | None:
 def _build_shared_result_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="🤖 Im Bot spielen", url=public_bot_link())]]
+    )
+
+
+def _build_friend_challenge_invite_keyboard(*, invite_link: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="⚔️ Herausforderung annehmen", url=invite_link)]
+        ]
     )
 
 
@@ -130,7 +139,8 @@ async def _build_friend_challenge_invite_result(*, session, user_id: int, challe
         photo_file_id=file_id,
         title="Duell Einladung",
         description="Teile deine Duell-Einladung als Bild.",
-        caption=f"⚔️ Ich fordere dich heraus! Kannst du mich schlagen?\n\n👉 {invite_link}",
+        caption=TEXTS_DE["msg.friend.challenge.invite.caption"],
+        reply_markup=_build_friend_challenge_invite_keyboard(invite_link=invite_link),
     )
 
 

@@ -201,8 +201,10 @@ async def test_handle_proof_card_inline_share_returns_invite_photo_for_creator(m
     answer = inline_query.answer_calls[0]
     result = answer["results"][0]
     assert result.photo_file_id == "invite-photo-file-id"
-    assert "Ich fordere dich heraus" in (result.caption or "")
+    assert result.caption == "Du wurdest zu einem Duell herausgefordert! Kannst du gewinnen?"
+    assert "https://t.me/" not in (result.caption or "")
+    assert result.reply_markup.inline_keyboard[0][0].text == "⚔️ Herausforderung annehmen"
     assert (
-        "https://t.me/Deine_Deutsch_Quiz_bot?start=duel_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-        in (result.caption or "")
+        result.reply_markup.inline_keyboard[0][0].url
+        == "https://t.me/Deine_Deutsch_Quiz_bot?start=duel_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
     )
