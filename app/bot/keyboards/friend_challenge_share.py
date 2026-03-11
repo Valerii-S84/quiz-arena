@@ -8,6 +8,8 @@ from app.bot.keyboards.proof_card_share import (
     build_friend_challenge_inline_share_query,
     build_friend_challenge_invite_inline_share_query,
 )
+
+
 def _build_share_url(*, invite_link: str, share_text: str) -> str:
     return (
         "https://t.me/share/url" f"?url={quote_plus(invite_link)}" f"&text={quote_plus(share_text)}"

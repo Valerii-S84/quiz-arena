@@ -97,16 +97,10 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert not any(button.url and "duel_" in button.url for button in buttons)
     inline_queries = [
-        button.switch_inline_query
-        for button in buttons
-        if button.switch_inline_query
+        button.switch_inline_query for button in buttons if button.switch_inline_query
     ]
     assert inline_queries == ["invite:duel:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
-    callbacks = [
-        button.callback_data
-        for button in buttons
-        if button.callback_data
-    ]
+    callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert callbacks == [
         "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "friend:invite:required:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
