@@ -111,16 +111,12 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
         button for row in invite_message.kwargs["reply_markup"].inline_keyboard for button in row
     ]
     assert [button.text for button in invite_buttons] == [
-        "⚔️ Herausforderung annehmen",
         "📤 Teilen ->",
         "✅ Einladung gesendet",
         "⚔️ Jetzt spielen",
         "⏳ Auf Freund warten",
     ]
-    assert (
-        invite_buttons[0].url
-        == "https://t.me/testbot?start=duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    )
+    assert not any(button.url and "duel_" in button.url for button in invite_buttons)
     assert len(callback.message.answers) == 1
 
 
@@ -148,11 +144,8 @@ async def test_handle_friend_challenge_invite_sent_answers_with_waiting_toast() 
         "friend:next:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "menu:main",
     ]
-    assert edited_markup.inline_keyboard[0][0].text == "⚔️ Herausforderung annehmen"
-    assert (
-        edited_markup.inline_keyboard[0][0].url
-        == "https://t.me/Deine_Deutsch_Quiz_bot?start=duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-    )
+    edited_buttons = [button for row in edited_markup.inline_keyboard for button in row]
+    assert not any(button.url and "duel_" in button.url for button in edited_buttons)
     assert callback.answer_calls == [
         {"text": TEXTS_DE["msg.friend.challenge.invite.waiting"], "show_alert": False}
     ]

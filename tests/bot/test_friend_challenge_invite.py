@@ -75,13 +75,12 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
     assert "http" not in photo_call["caption"]
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == [
-        "⚔️ Herausforderung annehmen",
         "📤 Teilen ->",
         "✅ Einladung gesendet",
         "⚔️ Jetzt spielen",
         "⏳ Auf Freund warten",
     ]
-    assert buttons[0].url == "https://t.me/testbot?start=duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    assert not any(button.url and "duel_" in button.url for button in buttons)
     assert [button.switch_inline_query for button in buttons if button.switch_inline_query] == [
         "invite:duel:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     ]
