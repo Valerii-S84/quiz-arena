@@ -50,9 +50,7 @@ def _build_shared_result_keyboard() -> InlineKeyboardMarkup:
 
 def _build_friend_challenge_invite_keyboard(*, invite_link: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="⚔️ Herausforderung annehmen", url=invite_link)]
-        ]
+        inline_keyboard=[[InlineKeyboardButton(text="⚔️ Herausforderung annehmen", url=invite_link)]]
     )
 
 

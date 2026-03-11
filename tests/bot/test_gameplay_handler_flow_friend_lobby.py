@@ -156,6 +156,8 @@ async def test_handle_friend_challenge_invite_sent_answers_with_waiting_toast() 
     assert callback.answer_calls == [
         {"text": TEXTS_DE["msg.friend.challenge.invite.waiting"], "show_alert": False}
     ]
+
+
 @pytest.mark.asyncio
 async def test_handle_friend_challenge_invite_required_answers_with_confirmation_hint() -> None:
     callback = DummyCallback(
