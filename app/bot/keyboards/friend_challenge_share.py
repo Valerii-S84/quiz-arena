@@ -8,9 +8,6 @@ from app.bot.keyboards.proof_card_share import (
     build_friend_challenge_inline_share_query,
     build_friend_challenge_invite_inline_share_query,
 )
-from app.core.telegram_links import public_bot_start_link
-
-
 def _build_share_url(*, invite_link: str, share_text: str) -> str:
     return (
         "https://t.me/share/url" f"?url={quote_plus(invite_link)}" f"&text={quote_plus(share_text)}"
@@ -37,7 +34,6 @@ def build_friend_challenge_share_keyboard(
         )
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="⚔️ Herausforderung annehmen", url=invite_link)],
             [
                 InlineKeyboardButton(
                     text="📤 Teilen ->",
@@ -64,10 +60,8 @@ def build_friend_challenge_share_keyboard(
 
 
 def build_friend_challenge_share_confirmed_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:
-    invite_link = public_bot_start_link(start_param=f"duel_{challenge_id}")
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="⚔️ Herausforderung annehmen", url=invite_link)],
             [
                 InlineKeyboardButton(
                     text="📤 Teilen ->",

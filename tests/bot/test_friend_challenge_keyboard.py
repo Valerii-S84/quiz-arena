@@ -97,7 +97,7 @@ def test_friend_challenge_limit_keyboard_contains_buy_options_and_back() -> None
     assert "home:open" in callbacks
 
 
-def test_friend_challenge_share_keyboard_puts_accept_url_first() -> None:
+def test_friend_challenge_share_keyboard_omits_accept_url_for_creator() -> None:
     keyboard = build_friend_challenge_share_keyboard(
         invite_link="https://t.me/quizarena_bot?start=fc_token",
         challenge_id="00000000-0000-0000-0000-000000000001",
@@ -105,13 +105,12 @@ def test_friend_challenge_share_keyboard_puts_accept_url_first() -> None:
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == [
-        "⚔️ Herausforderung annehmen",
         "📤 Teilen ->",
         "✅ Einladung gesendet",
         "⚔️ Jetzt spielen",
         "⏳ Auf Freund warten",
     ]
-    assert buttons[0].url == "https://t.me/quizarena_bot?start=fc_token"
+    assert not any(button.url and "duel_" in button.url for button in buttons)
     inline_queries = [
         button.switch_inline_query for button in buttons if button.switch_inline_query
     ]
@@ -155,16 +154,12 @@ def test_friend_challenge_share_confirmed_keyboard_contains_unlocked_choices() -
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == [
-        "⚔️ Herausforderung annehmen",
         "📤 Teilen ->",
         "✅ Einladung gesendet",
         "⚔️ Jetzt spielen",
         "⏳ Auf Freund warten",
     ]
-    assert (
-        buttons[0].url
-        == "https://t.me/Deine_Deutsch_Quiz_bot?start=duel_00000000-0000-0000-0000-000000000001"
-    )
+    assert not any(button.url and "duel_" in button.url for button in buttons)
     assert [button.callback_data for button in buttons if button.callback_data] == [
         "friend:invite:sent:00000000-0000-0000-0000-000000000001",
         "friend:next:00000000-0000-0000-0000-000000000001",
