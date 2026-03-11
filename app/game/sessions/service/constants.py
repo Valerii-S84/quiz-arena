@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from app.core.config import get_settings
 
 FRIEND_CHALLENGE_TOTAL_ROUNDS = 12
@@ -31,4 +33,30 @@ LEVEL_ORDER: tuple[str, ...] = ("A1", "A2", "B1", "B2", "C1", "C2")
 PERSISTENT_ADAPTIVE_MODE_BOUNDS: dict[str, tuple[str, str]] = {
     "ARTIKEL_SPRINT": ("A1", "B2"),
     "QUICK_MIX_A1A2": ("A1", "B2"),
+}
+PERSISTENT_ADAPTIVE_LEVEL_CHAIN: tuple[str, ...] = ("A1", "A2", "B1", "B2")
+MIX_STEP_WEIGHTS: dict[int, float] = {
+    1: 0.25,
+    2: 0.50,
+    3: 0.75,
+}
+PROGRESSION_WARM_UP_THRESHOLD = 30
+PROGRESSION_ACCURACY_THRESHOLD = 0.75
+PROGRESSION_CORRECT_PER_STEP = 10
+
+
+@dataclass(frozen=True, slots=True)
+class ModeProgressionConfig:
+    warm_up_threshold: int
+    accuracy_threshold: float
+    correct_per_step: int
+
+
+DEFAULT_MODE_PROGRESSION_CONFIG = ModeProgressionConfig(
+    warm_up_threshold=PROGRESSION_WARM_UP_THRESHOLD,
+    accuracy_threshold=PROGRESSION_ACCURACY_THRESHOLD,
+    correct_per_step=PROGRESSION_CORRECT_PER_STEP,
+)
+MODE_PROGRESSION_CONFIGS: dict[str, ModeProgressionConfig] = {
+    mode_code: DEFAULT_MODE_PROGRESSION_CONFIG for mode_code in PERSISTENT_ADAPTIVE_MODE_BOUNDS
 }

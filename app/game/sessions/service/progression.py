@@ -10,18 +10,15 @@ from app.db.models.quiz_attempts import QuizAttempt
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.mode_progress_repo import ModeProgressRepo
 
+from .constants import MIX_STEP_WEIGHTS, MODE_PROGRESSION_CONFIGS, PERSISTENT_ADAPTIVE_LEVEL_CHAIN
 from .levels import _clamp_level_for_mode
 from .question_loading import _infer_preferred_level_from_recent_attempt
 
-LEVEL_CHAIN: tuple[str, ...] = ("A1", "A2", "B1", "B2")
-ROLLING_WINDOW_SIZE = 30
-ROLLING_ACCURACY_THRESHOLD = 0.75
-MIX_CORRECT_STEP_SIZE = 10
-MIX_STEPS_WITH_WEIGHTS: dict[int, float] = {
-    1: 0.25,
-    2: 0.50,
-    3: 0.75,
-}
+LEVEL_CHAIN = PERSISTENT_ADAPTIVE_LEVEL_CHAIN
+
+
+def _mode_progression_config(mode: str):  # type: ignore[no-untyped-def]
+    return MODE_PROGRESSION_CONFIGS[mode]
 
 
 def _normalize_chain_level(level: str | None) -> str:
@@ -70,11 +67,12 @@ def get_allowed_levels(current_level: str, mix_step: int = 0) -> tuple[str, ...]
 
 
 async def get_rolling_accuracy(user_id: int, mode: str, db: AsyncSession) -> float:
+    mode_config = _mode_progression_config(mode)
     recent_results = await _recent_attempt_results(
         db,
         user_id=user_id,
         mode=mode,
-        limit=ROLLING_WINDOW_SIZE,
+        limit=mode_config.warm_up_threshold,
     )
     if not recent_results:
         return 0.0
@@ -90,6 +88,7 @@ async def check_and_advance(
     now_utc: datetime | None = None,
 ) -> tuple[str, int, int]:
     effective_now = now_utc or datetime.now(timezone.utc)
+    mode_config = _mode_progression_config(mode)
     progress = await ModeProgressRepo.get_by_user_mode_for_update(
         db,
         user_id=user_id,
@@ -123,14 +122,14 @@ async def check_and_advance(
         db,
         user_id=user_id,
         mode=mode,
-        limit=ROLLING_WINDOW_SIZE,
+        limit=mode_config.warm_up_threshold,
     )
 
     if progress.mix_step <= 0:
-        if len(recent_results) < ROLLING_WINDOW_SIZE:
+        if len(recent_results) < mode_config.warm_up_threshold:
             return (current_level, 0, 0)
         accuracy = await get_rolling_accuracy(user_id, mode, db)
-        if accuracy >= ROLLING_ACCURACY_THRESHOLD:
+        if accuracy >= mode_config.accuracy_threshold:
             progress.mix_step = 1
             progress.correct_in_mix = 0
             progress.updated_at = effective_now
@@ -144,8 +143,8 @@ async def check_and_advance(
     progress.correct_in_mix += 1
     progress.updated_at = effective_now
 
-    if progress.correct_in_mix >= MIX_CORRECT_STEP_SIZE:
-        if progress.mix_step < max(MIX_STEPS_WITH_WEIGHTS):
+    if progress.correct_in_mix >= mode_config.correct_per_step:
+        if progress.mix_step < max(MIX_STEP_WEIGHTS):
             progress.mix_step += 1
             progress.correct_in_mix = 0
         else:
@@ -169,7 +168,7 @@ def select_level_weighted(
     if next_level is None:
         return normalized
 
-    next_weight = MIX_STEPS_WITH_WEIGHTS.get(mix_step, 0.0)
+    next_weight = MIX_STEP_WEIGHTS.get(mix_step, 0.0)
     if next_weight <= 0:
         return normalized
 
