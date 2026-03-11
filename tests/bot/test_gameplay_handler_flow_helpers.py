@@ -4,8 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.bot.handlers import gameplay
-from app.bot.handlers import gameplay_views_question
+from app.bot.handlers import gameplay, gameplay_views_question
 from app.bot.texts.de import TEXTS_DE
 from tests.bot.gameplay_flow_fixtures import _challenge_snapshot, _start_result
 from tests.bot.helpers import DummyCallback, DummyMessage
@@ -113,7 +112,9 @@ def test_build_question_text_uses_unified_mode_labels(
         assert legacy_label not in text
 
 
-def test_build_question_text_reads_mode_label_from_presentation(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_question_text_reads_mode_label_from_presentation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     start_result = _start_result()
     start_result.session.mode_code = "ARTIKEL_SPRINT"
 

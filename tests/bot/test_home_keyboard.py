@@ -35,9 +35,7 @@ def test_home_keyboard_contains_shop_button_without_direct_buy_buttons() -> None
 def test_home_keyboard_mode_callbacks_use_unified_labels() -> None:
     keyboard = build_home_keyboard()
     button_by_callback = {
-        button.callback_data: button.text
-        for row in keyboard.inline_keyboard
-        for button in row
+        button.callback_data: button.text for row in keyboard.inline_keyboard for button in row
     }
 
     assert button_by_callback["mode:ARTIKEL_SPRINT"] == "📚 Artikel-Training"
