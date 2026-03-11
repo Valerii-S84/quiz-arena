@@ -66,30 +66,28 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
     await gameplay.handle_friend_challenge_create_selected(callback)
 
     assert len(callback.bot.sent_photos) == 1
+    assert callback.message.answers == []
     photo_call = callback.bot.sent_photos[0]
     keyboard = photo_call["reply_markup"]
     assert keyboard is not None
     assert photo_call["caption"] == TEXTS_DE["msg.friend.challenge.invite.caption"]
     assert "https://t.me/" not in photo_call["caption"]
+    assert "http" not in photo_call["caption"]
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == [
+        "⚔️ Herausforderung annehmen",
         "📤 Teilen ->",
-        "📋 Link kopieren",
         "✅ Einladung gesendet",
         "⚔️ Jetzt spielen",
         "⏳ Auf Freund warten",
     ]
-    assert all(button.url is None for button in buttons)
+    assert buttons[0].url == "https://t.me/testbot?start=duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     assert [button.switch_inline_query for button in buttons if button.switch_inline_query] == [
         "invite:duel:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     ]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert callbacks == [
-        "friend:copy:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "friend:invite:required:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "menu:main",
-    ]
-    assert "⚔️ Herausforderung annehmen" not in [
-        button.text for row in keyboard.inline_keyboard for button in row
     ]
