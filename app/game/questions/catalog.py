@@ -35,6 +35,7 @@ def mode_requires_quick_mix_eligible(mode_code: str) -> bool:
 def is_quick_mix_eligible_source_file(source_file: str) -> bool:
     return source_file in QUICK_MIX_ELIGIBLE_SOURCE_FILES
 
+
 QUIZBANK_FILE_TO_MODE_CODE: dict[str, str] = {
     "Adjektivendungen_Beginner_Bank_A1_A2_210.csv": QUICK_MIX_MODE_CODE,
     "Akkusativ_Dativ_Bank_A1_B1_210.csv": "CASES_PRACTICE",

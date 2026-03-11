@@ -6,8 +6,7 @@ from pathlib import Path
 import pytest
 
 from app.game.questions.catalog import QUICK_MIX_ELIGIBLE_SOURCE_FILES
-from scripts.quizbank_import_tool import _build_records
-from scripts.quizbank_import_tool import _validate_replace_all_safety
+from scripts.quizbank_import_tool import _build_records, _validate_replace_all_safety
 
 PROD_DB_URL = "postgresql+asyncpg://quiz:secret@db:5432/quiz_arena"
 EXPECTED_QUICK_MIX_SOURCE_FILES = {
