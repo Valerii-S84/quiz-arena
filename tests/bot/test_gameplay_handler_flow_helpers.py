@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.bot.handlers import gameplay
+from app.bot.handlers import gameplay, gameplay_views_question
 from app.bot.texts.de import TEXTS_DE
 from tests.bot.gameplay_flow_fixtures import _challenge_snapshot, _start_result
 from tests.bot.helpers import DummyCallback, DummyMessage
@@ -75,6 +75,63 @@ def test_build_question_text_contains_theme_counter_and_energy() -> None:
     assert "📚 Thema: Artikel - Nominativ" in text
     assert "❓ Frage 3/12" in text
     assert "A1" not in text
+
+
+@pytest.mark.parametrize(
+    ("mode_code", "expected_label", "legacy_labels"),
+    [
+        (
+            "ARTIKEL_SPRINT",
+            "Artikel-Training",
+            ("ARTIKEL SPRINT", "Artikel Sprint"),
+        ),
+        (
+            "QUICK_MIX_A1A2",
+            "Schnell-Runde",
+            ("QUICK MIX", "Quick Mix"),
+        ),
+    ],
+)
+def test_build_question_text_uses_unified_mode_labels(
+    mode_code: str,
+    expected_label: str,
+    legacy_labels: tuple[str, str],
+) -> None:
+    start_result = _start_result()
+    start_result.session.mode_code = mode_code
+
+    text = gameplay._build_question_text(
+        source="MENU",
+        snapshot_free_energy=18,
+        snapshot_paid_energy=2,
+        start_result=start_result,
+    )
+
+    assert f"<b>⚡ {expected_label}</b>" in text
+    for legacy_label in legacy_labels:
+        assert legacy_label not in text
+
+
+def test_build_question_text_reads_mode_label_from_presentation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    start_result = _start_result()
+    start_result.session.mode_code = "ARTIKEL_SPRINT"
+
+    monkeypatch.setattr(
+        gameplay_views_question,
+        "display_mode_label",
+        lambda mode_code: f"presentation:{mode_code}",
+    )
+
+    text = gameplay._build_question_text(
+        source="MENU",
+        snapshot_free_energy=18,
+        snapshot_paid_energy=2,
+        start_result=start_result,
+    )
+
+    assert "<b>⚡ presentation:ARTIKEL_SPRINT</b>" in text
 
 
 def test_build_question_text_uses_daily_arena_cup_header_override() -> None:
