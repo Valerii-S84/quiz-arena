@@ -18,7 +18,7 @@ from sqlalchemy.engine import make_url
 from app.core.config import get_settings
 from app.db.models.quiz_questions import QuizQuestion
 from app.db.session import SessionLocal
-from app.game.questions.catalog import QUIZBANK_FILE_TO_MODE_CODE
+from app.game.questions.catalog import QUIZBANK_FILE_TO_MODE_CODE, is_quick_mix_eligible_source_file
 
 SKIP_FILES = {"logik_luecke_sheet_template.csv"}
 REQUIRED_COLUMNS = {
@@ -181,6 +181,7 @@ def _build_records(
                     "explanation": explanation,
                     "key": key,
                     "status": "ACTIVE",
+                    "quick_mix_eligible": is_quick_mix_eligible_source_file(path.name),
                     "created_at": now_utc,
                     "updated_at": now_utc,
                 }
@@ -273,6 +274,7 @@ async def _persist_records(records: list[dict[str, Any]], *, replace_all: bool) 
                     "explanation": stmt.excluded.explanation,
                     "key": stmt.excluded.key,
                     "status": stmt.excluded.status,
+                    "quick_mix_eligible": stmt.excluded.quick_mix_eligible,
                     "updated_at": stmt.excluded.updated_at,
                 },
             )

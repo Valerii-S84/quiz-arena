@@ -4,7 +4,8 @@ from app.db.models.quiz_questions import QuizQuestion as QuizQuestionRecord
 from app.game.questions.types import QuizQuestion
 
 QUICK_MIX_MODE_CODE = "QUICK_MIX_A1A2"
-ALL_ACTIVE_SCOPE_CODE = "__ALL_ACTIVE__"
+QUICK_MIX_SCOPE_CODE = "__QUICK_MIX_ELIGIBLE__"
+ALL_ACTIVE_SCOPE_CODE = QUICK_MIX_SCOPE_CODE
 
 
 def to_quiz_question(record: QuizQuestionRecord) -> QuizQuestion:

@@ -32,7 +32,9 @@ async def test_select_friend_challenge_question_prefers_less_used_category(
         *,
         exclude_question_ids=None,
         preferred_levels=None,
+        require_quick_mix_eligible=False,
     ):
+        assert require_quick_mix_eligible is True
         if preferred_levels == ("A2",):
             return ["q_a2_heavy", "q_a2_light"]
         return []

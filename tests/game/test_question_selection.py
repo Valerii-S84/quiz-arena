@@ -74,3 +74,12 @@ def test_get_question_by_id_returns_none_for_unknown_question() -> None:
         local_date_berlin=date(2026, 2, 18),
     )
     assert resolved is None
+
+
+def test_quick_mix_static_bank_does_not_return_other_mode_questions() -> None:
+    resolved = get_question_by_id(
+        "QUICK_MIX_A1A2",
+        question_id="artikel_001",
+        local_date_berlin=date(2026, 2, 18),
+    )
+    assert resolved is None

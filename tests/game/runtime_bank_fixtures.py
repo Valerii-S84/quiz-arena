@@ -26,4 +26,5 @@ def _fake_record(
         explanation="Erklärung.",
         key=question_id,
         status="ACTIVE",
+        quick_mix_eligible=mode_code == "QUICK_MIX_A1A2",
     )
