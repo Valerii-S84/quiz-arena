@@ -4,6 +4,8 @@ import hashlib
 from datetime import date
 from typing import Sequence
 
+from app.game.questions.static_bank_artikel_pool import build_artikel_sprint_pool
+from app.game.questions.static_bank_quick_mix_pool import build_quick_mix_pool
 from app.game.questions.types import QuizQuestion
 
 
@@ -17,88 +19,8 @@ def _daily_challenge_question(local_date_berlin: date) -> QuizQuestion:
     )
 
 
-_QUICK_MIX_A1A2_POOL: tuple[QuizQuestion, ...] = (
-    QuizQuestion(
-        question_id="qm_a1a2_001",
-        text="Wähle den korrekten Satz:",
-        options=(
-            "Ich gehe heute zur Arbeit.",
-            "Ich geht heute zur Arbeit.",
-            "Ich gehen heute zur Arbeit.",
-            "Ich gehst heute zur Arbeit.",
-        ),
-        correct_option=0,
-        level="A1",
-    ),
-    QuizQuestion(
-        question_id="qm_a1a2_002",
-        text="Welche Form ist korrekt?",
-        options=(
-            "Wir lernt heute Deutsch.",
-            "Wir lernen heute Deutsch.",
-            "Wir lernst heute Deutsch.",
-            "Wir gelernen heute Deutsch.",
-        ),
-        correct_option=1,
-        level="A2",
-    ),
-    QuizQuestion(
-        question_id="qm_a1a2_003",
-        text="Welcher Satz ist grammatisch richtig?",
-        options=(
-            "Er haben Zeit.",
-            "Er hat Zeit.",
-            "Er bist Zeit.",
-            "Er sein Zeit.",
-        ),
-        correct_option=1,
-        level="B1",
-    ),
-    QuizQuestion(
-        question_id="qm_a1a2_004",
-        text="Welche Variante passt?",
-        options=(
-            "Heute ich spiele Fußball.",
-            "Heute spiele ich Fußball.",
-            "Heute spielt ich Fußball.",
-            "Heute spielen ich Fußball.",
-        ),
-        correct_option=1,
-        level="B2",
-    ),
-)
-
-
-_ARTIKEL_SPRINT_POOL: tuple[QuizQuestion, ...] = (
-    QuizQuestion(
-        question_id="artikel_001",
-        text="Welcher Artikel passt zu 'Auto'?",
-        options=("die", "das", "der", "den"),
-        correct_option=1,
-        level="A1",
-    ),
-    QuizQuestion(
-        question_id="artikel_002",
-        text="Welcher Artikel passt zu 'Bahnhof'?",
-        options=("die", "dem", "das", "der"),
-        correct_option=3,
-        level="A2",
-    ),
-    QuizQuestion(
-        question_id="artikel_003",
-        text="Welcher Artikel passt zu 'Prüfung'?",
-        options=("der", "die", "das", "den"),
-        correct_option=1,
-        level="B1",
-    ),
-    QuizQuestion(
-        question_id="artikel_004",
-        text="Welcher Artikel passt zu 'Film'?",
-        options=("das", "die", "den", "der"),
-        correct_option=3,
-        level="B2",
-    ),
-)
+_QUICK_MIX_A1A2_POOL: tuple[QuizQuestion, ...] = build_quick_mix_pool()
+_ARTIKEL_SPRINT_POOL: tuple[QuizQuestion, ...] = build_artikel_sprint_pool()
 
 
 _GENERIC_POOL: tuple[QuizQuestion, ...] = (
