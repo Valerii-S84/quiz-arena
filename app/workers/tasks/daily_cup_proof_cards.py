@@ -132,8 +132,7 @@ async def run_daily_cup_proof_cards_async(
                 )
                 if not delivered:
                     continue
-                sent += 1
-                cached_reused += int(reused_cached)
+                sent, cached_reused = sent + 1, cached_reused + int(reused_cached)
                 sent_user_ids.add(current_user_id)
                 if file_id is not None:
                     new_file_ids[current_user_id] = file_id
