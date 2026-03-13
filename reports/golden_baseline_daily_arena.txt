@@ -1,0 +1,27 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-8.4.2, pluggy-1.6.0 -- /mnt/c/Users/User/Desktop/Quiz Arena/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /mnt/c/Users/User/Desktop/Quiz Arena
+configfile: pyproject.toml
+plugins: anyio-4.12.1, asyncio-0.26.0, cov-5.0.0
+asyncio: mode=Mode.AUTO, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 16 items
+
+tests/game/test_daily_arena_golden.py::test_daily_arena_constants_include_current_daily_types[daily_arena] PASSED [  6%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_constants_include_current_daily_types[daily_elimination] PASSED [ 12%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_config_resolves_to_arena[default_env] PASSED [ 18%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_config_resolves_to_arena[explicit_arena_env] PASSED [ 25%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_core_unknown_type_falls_back_to_arena_window_defaults PASSED [ 31%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_status_returns_round_active_for_pending_match PASSED [ 37%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_status_returns_no_tournament_when_row_not_found PASSED [ 43%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_status_registration_variants[registered_user] PASSED [ 50%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_status_registration_variants[unregistered_user] PASSED [ 56%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_join_does_not_raise_for_valid_data PASSED [ 62%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_lobby_query_returns_requested_arena_tournament_only PASSED [ 68%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_join_raises_when_registration_is_already_closed PASSED [ 75%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_schedule_snapshot_keeps_elimination_and_arena_entries PASSED [ 81%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_task_names_are_registered_in_celery_app PASSED [ 87%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_messaging_accepts_arena_tournament_id_without_exception PASSED [ 93%]
+tests/game/test_daily_arena_golden.py::test_daily_arena_proof_card_generation_does_not_fail_for_arena_type PASSED [100%]
+
+============================= 16 passed in 24.06s ==============================

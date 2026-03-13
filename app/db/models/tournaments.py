@@ -15,7 +15,7 @@ class Tournament(Base):
     __tablename__ = "tournaments"
     __table_args__ = (
         CheckConstraint(
-            "type IN ('PRIVATE','DAILY_ARENA','DAILY_ELIMINATION')",
+            "type IN ('PRIVATE','DAILY_ARENA')",
             name="ck_tournaments_type",
         ),
         CheckConstraint(

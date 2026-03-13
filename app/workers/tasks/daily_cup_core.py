@@ -19,14 +19,10 @@ from app.game.tournaments.constants import (
     TOURNAMENT_FORMAT_QUICK_5,
     TOURNAMENT_STATUS_REGISTRATION,
     TOURNAMENT_TYPE_DAILY_ARENA,
-    TOURNAMENT_TYPE_DAILY_ELIMINATION,
 )
 from app.game.tournaments.internal import generate_invite_code
-from app.workers.tasks.daily_cup_config import (
-    DAILY_CUP_TOURNAMENT_TYPE,
-    TOURNAMENT_MAX_PARTICIPANTS,
-)
-from app.workers.tasks.daily_cup_time import get_daily_cup_window, get_daily_elimination_window
+from app.workers.tasks.daily_cup_config import TOURNAMENT_MAX_PARTICIPANTS
+from app.workers.tasks.daily_cup_time import get_daily_cup_window
 
 
 def now_utc() -> datetime:
@@ -50,12 +46,8 @@ async def ensure_daily_cup_registration_tournament(
     session,
     now_utc_value: datetime,
 ) -> Tournament:
-    tournament_type = DAILY_CUP_TOURNAMENT_TYPE
-    window = (
-        get_daily_elimination_window(now_utc=now_utc_value)
-        if tournament_type == TOURNAMENT_TYPE_DAILY_ELIMINATION
-        else get_daily_cup_window(now_utc=now_utc_value)
-    )
+    tournament_type = TOURNAMENT_TYPE_DAILY_ARENA
+    window = get_daily_cup_window(now_utc=now_utc_value)
     await _lock_daily_cup_registration_slot(
         session=session,
         tournament_type=tournament_type,
@@ -66,12 +58,6 @@ async def ensure_daily_cup_registration_tournament(
         tournament_type=tournament_type,
         registration_deadline=window.close_at_utc,
     )
-    if tournament is None and tournament_type == TOURNAMENT_TYPE_DAILY_ELIMINATION:
-        tournament = await TournamentsRepo.get_by_type_and_registration_deadline_for_update(
-            session,
-            tournament_type=TOURNAMENT_TYPE_DAILY_ARENA,
-            registration_deadline=window.close_at_utc,
-        )
     if tournament is not None:
         return tournament
     invite_code = await generate_invite_code(session)
@@ -81,18 +67,10 @@ async def ensure_daily_cup_registration_tournament(
             id=uuid4(),
             type=tournament_type,
             created_by=None,
-            name=(
-                "Daily Elimination Cup"
-                if tournament_type == TOURNAMENT_TYPE_DAILY_ELIMINATION
-                else "Daily Arena Cup"
-            ),
+            name="Daily Arena Cup",
             status=TOURNAMENT_STATUS_REGISTRATION,
             format=TOURNAMENT_FORMAT_QUICK_5,
-            max_participants=(
-                1024
-                if tournament_type == TOURNAMENT_TYPE_DAILY_ELIMINATION
-                else TOURNAMENT_MAX_PARTICIPANTS
-            ),
+            max_participants=TOURNAMENT_MAX_PARTICIPANTS,
             current_round=0,
             registration_deadline=window.close_at_utc,
             round_deadline=None,

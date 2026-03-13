@@ -11,8 +11,6 @@ from app.workers.tasks.daily_cup_config import (
     DAILY_CUP_OPEN_MINUTE,
     DAILY_CUP_PRESTART_REMINDER_HOUR,
     DAILY_CUP_PRESTART_REMINDER_MINUTE,
-    DAILY_ELIMINATION_DEADLINE_HOUR,
-    DAILY_ELIMINATION_DEADLINE_MINUTE,
 )
 
 
@@ -53,14 +51,6 @@ def configure_daily_cup_schedule(celery_app) -> None:
         "daily-cup-publish-final-results": {
             "task": "app.workers.tasks.daily_cup.publish_final_results",
             "schedule": crontab(hour=20, minute=5),
-            "options": {"queue": "q_normal"},
-        },
-        "daily-elimination-final-deadline": {
-            "task": "app.workers.tasks.daily_cup.final_deadline",
-            "schedule": crontab(
-                hour=DAILY_ELIMINATION_DEADLINE_HOUR,
-                minute=DAILY_ELIMINATION_DEADLINE_MINUTE,
-            ),
             "options": {"queue": "q_normal"},
         },
     }
