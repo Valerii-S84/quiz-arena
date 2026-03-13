@@ -11,11 +11,11 @@ from app.game.tournaments import daily_cup_user_status
 from app.game.tournaments.constants import (
     DAILY_CUP_TOURNAMENT_TYPES,
     TOURNAMENT_TYPE_DAILY_ARENA,
-    TOURNAMENT_TYPE_DAILY_ELIMINATION,
+    TOURNAMENT_TYPE_PRIVATE,
 )
 from app.game.tournaments.create_join import join_daily_cup_by_id
 from app.game.tournaments.daily_cup_user_status import DailyCupUserStatus
-from app.game.tournaments.errors import TournamentClosedError
+from app.game.tournaments.errors import TournamentAccessError, TournamentClosedError
 from app.game.tournaments.queries import get_daily_cup_lobby_by_id
 from app.workers.celery_app import celery_app
 from app.workers.tasks import daily_cup_core, daily_cup_messaging, daily_cup_proof_cards
@@ -27,21 +27,16 @@ from tests.game.daily_arena_golden_support import (
     create_daily_tournament,
     create_user,
     create_users,
-    join_daily_users,
     patch_status_window,
     prepare_tournament_db,
     reload_daily_cup_config,
     status_tournament,
 )
 
-@pytest.mark.parametrize(
-    ("tournament_type"),
-    [TOURNAMENT_TYPE_DAILY_ARENA, TOURNAMENT_TYPE_DAILY_ELIMINATION],
-    ids=["daily_arena", "daily_elimination"],
-)
-def test_daily_arena_constants_include_current_daily_types(tournament_type: str) -> None:
-    # GOLDEN: фіксує поточну поведінку, не змінювати без рев'ю
-    assert tournament_type in DAILY_CUP_TOURNAMENT_TYPES
+def test_daily_arena_constants_include_only_arena_type() -> None:
+    # GOLDEN: оновлено після видалення Elimination (крок 8)
+    # DAILY_CUP_TOURNAMENT_TYPES містить тільки DAILY_ARENA
+    assert TOURNAMENT_TYPE_DAILY_ARENA in DAILY_CUP_TOURNAMENT_TYPES
 
 
 @pytest.mark.parametrize(
@@ -59,10 +54,11 @@ def test_daily_arena_config_resolves_to_arena(
 
 
 @pytest.mark.asyncio
-async def test_daily_arena_core_unknown_type_falls_back_to_arena_window_defaults(
+async def test_daily_arena_core_always_uses_arena_type_no_fallback_needed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # GOLDEN: фіксує поточну поведінку, не змінювати без рев'ю
+    # GOLDEN: оновлено після видалення Elimination fallback (крок 4)
+    # DAILY_ARENA єдиний тип, fallback логіка свідомо видалена
     created = {}
     now_utc = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
     window = SimpleNamespace(close_at_utc=now_utc)
@@ -83,14 +79,8 @@ async def test_daily_arena_core_unknown_type_falls_back_to_arena_window_defaults
         del session
         return "golden-invite"
 
-    monkeypatch.setattr(daily_cup_core, "DAILY_CUP_TOURNAMENT_TYPE", "UNKNOWN_TYPE")
     monkeypatch.setattr(daily_cup_core, "_lock_daily_cup_registration_slot", _fake_lock)
     monkeypatch.setattr(daily_cup_core, "get_daily_cup_window", lambda *, now_utc: window)
-    monkeypatch.setattr(
-        daily_cup_core,
-        "get_daily_elimination_window",
-        lambda *, now_utc: pytest.fail(f"unexpected elimination branch for {now_utc!r}"),
-    )
     monkeypatch.setattr(
         daily_cup_core.TournamentsRepo,
         "get_by_type_and_registration_deadline_for_update",
@@ -104,7 +94,7 @@ async def test_daily_arena_core_unknown_type_falls_back_to_arena_window_defaults
         now_utc_value=now_utc,
     )
 
-    assert tournament.type == "UNKNOWN_TYPE"
+    assert tournament.type == TOURNAMENT_TYPE_DAILY_ARENA
     assert tournament.name == "Daily Arena Cup"
     assert created["tournament"].max_participants == daily_cup_core.TOURNAMENT_MAX_PARTICIPANTS
 
@@ -226,44 +216,31 @@ async def test_daily_arena_join_does_not_raise_for_valid_data() -> None:
 
 
 @pytest.mark.asyncio
-async def test_daily_arena_lobby_query_returns_requested_arena_tournament_only() -> None:
-    # GOLDEN: фіксує поточну поведінку, не змінювати без рев'ю
+async def test_daily_arena_lobby_query_returns_only_daily_arena_tournaments() -> None:
+    # GOLDEN: оновлено після видалення Elimination (крок 8)
+    # Lobby query ізольована від інших типів турнірів
     now_utc = datetime(2026, 3, 1, 11, 0, tzinfo=UTC)
     await prepare_tournament_db()
-    viewer_user_id, arena_peer_id = await create_users("golden_daily_arena_lobby", 2)
-    elimination_user_id = await create_user("golden_daily_arena_lobby_elimination")
+    viewer_user_id = await create_user("golden_daily_arena_lobby")
     arena_id = await create_daily_tournament(
         tournament_type=TOURNAMENT_TYPE_DAILY_ARENA,
         now_utc=now_utc,
     )
-    elimination_id = await create_daily_tournament(
-        tournament_type=TOURNAMENT_TYPE_DAILY_ELIMINATION,
-        now_utc=now_utc,
-    )
-
-    await join_daily_users(
-        tournament_id=arena_id,
-        user_ids=[viewer_user_id, arena_peer_id],
-        now_utc=now_utc,
-    )
-    await join_daily_users(
-        tournament_id=elimination_id,
-        user_ids=[elimination_user_id],
+    private_id = await create_daily_tournament(
+        tournament_type=TOURNAMENT_TYPE_PRIVATE,
         now_utc=now_utc,
     )
 
     async with SessionLocal.begin() as session:
-        lobby = await get_daily_cup_lobby_by_id(
-            session,
-            tournament_id=arena_id,
-            viewer_user_id=viewer_user_id,
-        )
+        arena_lobby = await get_daily_cup_lobby_by_id(session, tournament_id=arena_id, viewer_user_id=viewer_user_id)
+        with pytest.raises(TournamentAccessError):
+            await get_daily_cup_lobby_by_id(
+                session,
+                tournament_id=private_id,
+                viewer_user_id=viewer_user_id,
+            )
 
-    assert lobby.tournament.type == TOURNAMENT_TYPE_DAILY_ARENA
-    assert {participant.user_id for participant in lobby.participants} == {
-        viewer_user_id,
-        arena_peer_id,
-    }
+    assert arena_lobby.tournament.type == TOURNAMENT_TYPE_DAILY_ARENA
 
 
 @pytest.mark.asyncio
@@ -292,12 +269,12 @@ async def test_daily_arena_join_raises_when_registration_is_already_closed() -> 
             )
 
 
-def test_daily_arena_schedule_snapshot_keeps_elimination_and_arena_entries() -> None:
-    # GOLDEN: фіксує поточну поведінку, не змінювати без рев'ю
+def test_daily_arena_schedule_snapshot_contains_only_arena_entries() -> None:
+    # GOLDEN: оновлено після видалення Elimination (крок 1 рефакторингу)
+    # daily-elimination-final-deadline свідомо видалений з beat schedule
     celery_app_stub = SimpleNamespace(conf=SimpleNamespace(beat_schedule={}))
     configure_daily_cup_schedule(celery_app_stub)
     schedule = celery_app_stub.conf.beat_schedule
-    assert "daily-elimination-final-deadline" in schedule
     assert "daily-cup-send-invite-registration" in schedule
     assert "daily-cup-last-call-reminder" in schedule
     assert "daily-cup-prestart-reminder" in schedule

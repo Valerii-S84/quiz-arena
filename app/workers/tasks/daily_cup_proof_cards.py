@@ -91,7 +91,13 @@ async def run_daily_cup_proof_cards_async(
             int(user.id): format_user_label(username=user.username, first_name=user.first_name)
             for user in users
         }
-        telegram_targets = {int(user.id): int(user.telegram_user_id) for user in users}
+        telegram_targets: dict[int, int | None] = {}
+        for user in users:
+            telegram_user_id = user.telegram_user_id
+            if telegram_user_id is None:
+                telegram_targets[int(user.id)] = None
+                continue
+            telegram_targets[int(user.id)] = int(telegram_user_id)
 
     if initial_delay_seconds > 0:
         await asyncio.sleep(max(0, int(initial_delay_seconds)))

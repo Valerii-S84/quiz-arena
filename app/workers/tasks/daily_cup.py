@@ -33,12 +33,6 @@ from app.workers.tasks.daily_cup_schedule import configure_daily_cup_schedule
 from app.workers.tasks.daily_cup_turn_reminder import (
     run_daily_cup_turn_reminders_async as _run_daily_cup_turn_reminders_async,
 )
-from app.workers.tasks.daily_elimination_async import (
-    run_daily_elimination_final_deadline_async as _run_daily_elimination_final_deadline_async,
-)
-from app.workers.tasks.daily_elimination_async import (
-    run_elimination_match_timeout_async as _run_elimination_match_timeout_async,
-)
 
 open_daily_cup_registration_async = _open_daily_cup_registration_async
 close_daily_cup_registration_and_start_async = _close_daily_cup_registration_and_start_async
@@ -49,8 +43,6 @@ send_daily_cup_last_call_reminder_async = _send_daily_cup_last_call_reminder_asy
 publish_daily_cup_final_results_async = _publish_daily_cup_final_results_async
 send_daily_cup_prestart_reminder_async = _send_daily_cup_prestart_reminder_async
 run_daily_cup_turn_reminders_async = _run_daily_cup_turn_reminders_async
-run_elimination_match_timeout_async = _run_elimination_match_timeout_async
-run_daily_elimination_final_deadline_async = _run_daily_elimination_final_deadline_async
 
 __all__ = [
     "advance_rounds",
@@ -65,8 +57,6 @@ __all__ = [
     "run_daily_cup_round_messaging",
     "run_daily_cup_nonfinishers_summary",
     "run_daily_cup_turn_reminders_async",
-    "run_daily_elimination_final_deadline",
-    "run_elimination_match_timeout",
     "send_invite_registration",
     "send_daily_cup_invite_registration_async",
     "send_daily_cup_invite_async",
@@ -129,16 +119,6 @@ def close_registration_and_start() -> dict[str, int]:
 @celery_app.task(name="app.workers.tasks.daily_cup.advance_rounds")
 def advance_rounds() -> dict[str, int]:
     return run_async_job(advance_daily_cup_rounds_async())
-
-
-@celery_app.task(name="app.workers.tasks.daily_cup.match_timeout")
-def run_elimination_match_timeout(match_id: str) -> dict[str, int]:
-    return run_async_job(run_elimination_match_timeout_async(match_id=match_id))
-
-
-@celery_app.task(name="app.workers.tasks.daily_cup.final_deadline")
-def run_daily_elimination_final_deadline() -> dict[str, int]:
-    return run_async_job(run_daily_elimination_final_deadline_async())
 
 
 configure_daily_cup_schedule(celery_app)

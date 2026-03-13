@@ -17,14 +17,8 @@ from app.game.tournaments.constants import (
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_STATUS_COMPLETED,
     TOURNAMENT_STATUS_REGISTRATION,
-    TOURNAMENT_TYPE_DAILY_ARENA,
-    TOURNAMENT_TYPE_DAILY_ELIMINATION,
 )
-from app.workers.tasks.daily_cup_config import (
-    DAILY_CUP_TOURNAMENT_TYPE,
-    DAILY_ELIMINATION_CLOSE_HOUR,
-    DAILY_ELIMINATION_CLOSE_MINUTE,
-)
+from app.workers.tasks.daily_cup_config import DAILY_CUP_TOURNAMENT_TYPE
 
 settings = get_settings()
 _ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3", "ROUND_4", "BRACKET_LIVE"})
@@ -81,12 +75,6 @@ def _invite_open_at_utc(*, now_utc: datetime) -> datetime:
 
 
 def _close_at_utc(*, now_utc: datetime) -> datetime:
-    if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ELIMINATION:
-        return _local_daily_cup_anchor(
-            now_utc=now_utc,
-            hour=DAILY_ELIMINATION_CLOSE_HOUR,
-            minute=DAILY_ELIMINATION_CLOSE_MINUTE,
-        ).astimezone(timezone.utc)
     close_time_value = os.getenv("DAILY_CUP_CLOSE_TIME", settings.daily_cup_registration_close)
     close_hour, close_minute = _parse_hhmm(close_time_value, default_hour=18, default_minute=0)
     return _local_daily_cup_anchor(
@@ -104,13 +92,8 @@ def _has_pending_round_match_for_user(*, user_id: int, matches: list) -> bool:
     return False
 
 
-def _daily_cup_type_priority() -> tuple[str, str]:
-    fallback = (
-        TOURNAMENT_TYPE_DAILY_ELIMINATION
-        if DAILY_CUP_TOURNAMENT_TYPE == TOURNAMENT_TYPE_DAILY_ARENA
-        else TOURNAMENT_TYPE_DAILY_ARENA
-    )
-    return DAILY_CUP_TOURNAMENT_TYPE, fallback
+def _daily_cup_type_priority() -> tuple[str]:
+    return (DAILY_CUP_TOURNAMENT_TYPE,)
 
 
 async def get_daily_cup_status_for_user(
@@ -172,6 +155,11 @@ async def get_daily_cup_status_for_user(
         )
 
     if tournament.status == TOURNAMENT_STATUS_COMPLETED:
+        # TODO: completed Arena не розрізняє winner від інших учасників
+        # Технічно можливо через daily_cup_standings.py (place == 1)
+        # але потребує додавання WINNER статусу в DailyCupUserStatus enum
+        # і окремого запиту standings — це окрема задача, не cleanup
+        # Зараз: будь-який учасник completed турніру отримує COMPLETED
         return DailyCupUserStatusSnapshot(
             status=(
                 DailyCupUserStatus.COMPLETED

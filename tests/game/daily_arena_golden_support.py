@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import importlib
+from decimal import Decimal
 from datetime import datetime, timedelta, timezone
 from types import ModuleType, SimpleNamespace
+from collections.abc import Coroutine
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -23,6 +26,7 @@ from tests.integration.friend_challenge_fixtures import _create_user
 from tests.integration.test_private_tournament_service_integration import _ensure_tournament_schema
 
 UTC = timezone.utc
+_DEFAULT_TELEGRAM_USER_ID = object()
 
 
 class DummyBotSession:
@@ -36,6 +40,66 @@ class DummyBotSession:
 class DummyBot:
     def __init__(self) -> None:
         self.session = DummyBotSession()
+
+
+class WorkerDummyPhoto:
+    def __init__(self, file_id: str) -> None:
+        self.file_id = file_id
+
+
+class WorkerDummyMessage:
+    def __init__(self, *, message_id: int, file_id: str | None = None) -> None:
+        self.message_id = message_id
+        self.photo = [WorkerDummyPhoto(file_id)] if file_id is not None else []
+
+
+class RecordingWorkerBot(DummyBot):
+    def __init__(self) -> None:
+        super().__init__()
+        self.send_messages: list[dict[str, Any]] = []
+        self.edit_messages: list[dict[str, Any]] = []
+        self.send_photos: list[dict[str, Any]] = []
+        self._message_id = 1000
+        self._file_id = 0
+
+    async def send_message(self, **kwargs) -> WorkerDummyMessage:
+        self.send_messages.append(kwargs)
+        self._message_id += 1
+        return WorkerDummyMessage(message_id=self._message_id)
+
+    async def edit_message_text(self, **kwargs) -> None:
+        self.edit_messages.append(kwargs)
+
+    async def send_photo(self, **kwargs) -> WorkerDummyMessage:
+        self.send_photos.append(kwargs)
+        photo_payload = kwargs.get("photo")
+        if isinstance(photo_payload, str):
+            resolved_file_id = photo_payload
+        else:
+            self._file_id += 1
+            resolved_file_id = f"worker-photo-{self._file_id}"
+        return WorkerDummyMessage(message_id=0, file_id=resolved_file_id)
+
+
+class _AsyncBeginContext:
+    def __init__(self, session: object) -> None:
+        self._session = session
+
+    async def __aenter__(self) -> object:
+        return self._session
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        del exc_type, exc, tb
+        return None
+
+
+def session_local_with_sessions(*sessions: object) -> SimpleNamespace:
+    remaining = list(sessions)
+
+    def _begin() -> _AsyncBeginContext:
+        return _AsyncBeginContext(remaining.pop(0))
+
+    return SimpleNamespace(begin=_begin)
 
 
 def async_return(value):
@@ -84,6 +148,60 @@ def status_tournament(
         current_round=current_round,
         registration_deadline=datetime(2026, 3, 1, 18, 0, tzinfo=UTC),
     )
+
+
+def make_standing_row(
+    *,
+    user_id: int,
+    place: int,
+    score: str = "0",
+    tie_break: str = "0",
+    standings_message_id: int | None = None,
+    proof_card_sent: bool = False,
+    proof_card_file_id: str | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        user_id=user_id,
+        place=place,
+        participant=SimpleNamespace(
+            user_id=user_id,
+            score=Decimal(score),
+            tie_break=Decimal(tie_break),
+            standings_message_id=standings_message_id,
+            proof_card_sent=proof_card_sent,
+            proof_card_file_id=proof_card_file_id,
+        ),
+    )
+
+
+def make_worker_user(
+    *,
+    user_id: int,
+    telegram_user_id: int | None | object = _DEFAULT_TELEGRAM_USER_ID,
+    username: str | None = None,
+    first_name: str | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=user_id,
+        telegram_user_id=(
+            900000 + user_id
+            if telegram_user_id is _DEFAULT_TELEGRAM_USER_ID
+            else telegram_user_id
+        ),
+        username=username,
+        first_name=first_name,
+    )
+
+
+def close_coroutine_with_name(coroutine: Coroutine[Any, Any, Any]) -> str:
+    code_name = coroutine.cr_code.co_name
+    coroutine.close()
+    return str(code_name)
+
+
+def close_coroutine_and_raise(coroutine: Coroutine[Any, Any, Any], exc: Exception) -> None:
+    coroutine.close()
+    raise exc
 
 
 def patch_status_window(monkeypatch: pytest.MonkeyPatch) -> None:
