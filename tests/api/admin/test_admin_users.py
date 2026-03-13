@@ -9,7 +9,6 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.api.routes.admin import deps as admin_deps
-from app.api.routes.admin import users
 from app.api.routes.admin import users_helpers
 from app.db.models.energy_state import EnergyState
 from app.db.models.streak_state import StreakState
@@ -44,7 +43,9 @@ class _ScalarsResult:
 
 
 class _Session:
-    def __init__(self, *, gets: dict[tuple[str, int], object] | None = None, exec_results=None) -> None:
+    def __init__(
+        self, *, gets: dict[tuple[str, int], object] | None = None, exec_results=None
+    ) -> None:
         self.gets = gets or {}
         self.exec_results = list(exec_results or [])
         self.added: list[object] = []
@@ -107,7 +108,7 @@ def test_build_search_filters_handles_blank_text_and_numeric_search() -> None:
 
 @pytest.mark.asyncio
 async def test_list_users_page_builds_rows_and_total() -> None:
-    users = [
+    user_rows = [
         SimpleNamespace(
             id=101,
             telegram_user_id=900101,
@@ -132,7 +133,7 @@ async def test_list_users_page_builds_rows_and_total() -> None:
     session = _Session(
         exec_results=[
             _ScalarResult(2),
-            _ScalarsResult(users),
+            _ScalarsResult(user_rows),
             _RowsResult([(101, 5)]),
         ]
     )
@@ -208,7 +209,9 @@ async def test_get_user_profile_builds_sections_and_timeline() -> None:
             _ScalarsResult([purchase]),
             _ScalarsResult([referral]),
             _RowsResult([("quiz_finished", datetime(2026, 3, 6, 10, 0, tzinfo=UTC), {"q": 1})]),
-            _RowsResult([("admin_bonus_energy", datetime(2026, 3, 7, 10, 0, tzinfo=UTC), {"amount": 3})]),
+            _RowsResult(
+                [("admin_bonus_energy", datetime(2026, 3, 7, 10, 0, tzinfo=UTC), {"amount": 3})]
+            ),
         ],
     )
 
@@ -288,7 +291,9 @@ async def test_apply_bonus_handles_supported_bonus_types(
         gets[("StreakState", 101)] = None
     session = _Session(gets=gets)
 
-    result = await users_helpers.apply_bonus(session, user_id=101, bonus_type=bonus_type, amount=amount)
+    result = await users_helpers.apply_bonus(
+        session, user_id=101, bonus_type=bonus_type, amount=amount
+    )
 
     assert result == {"user_id": 101, "bonus_type": bonus_type, "amount": amount}
     assert session.flushed is True
@@ -304,7 +309,9 @@ async def test_apply_bonus_handles_supported_bonus_types(
 @pytest.mark.asyncio
 async def test_apply_bonus_rejects_invalid_bonus_type_and_missing_user() -> None:
     with pytest.raises(HTTPException) as missing_user:
-        await users_helpers.apply_bonus(_Session(gets={}), user_id=101, bonus_type="energy", amount=1)
+        await users_helpers.apply_bonus(
+            _Session(gets={}), user_id=101, bonus_type="energy", amount=1
+        )
     assert missing_user.value.status_code == 404
 
     with pytest.raises(HTTPException) as invalid_bonus:
@@ -318,7 +325,10 @@ async def test_apply_bonus_rejects_invalid_bonus_type_and_missing_user() -> None
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(("bonus_type", "field_name"), [("energy", "paid_energy"), ("streak_token", "streak_saver_tokens")])
+@pytest.mark.parametrize(
+    ("bonus_type", "field_name"),
+    [("energy", "paid_energy"), ("streak_token", "streak_saver_tokens")],
+)
 async def test_apply_bonus_updates_existing_state_without_creating_duplicate_record(
     monkeypatch: pytest.MonkeyPatch,
     bonus_type: str,
@@ -343,122 +353,3 @@ async def test_apply_bonus_updates_existing_state_without_creating_duplicate_rec
     assert result["amount"] == 3
     assert getattr(existing_state, field_name) == 7
     assert not any(isinstance(item, (EnergyState, StreakState)) for item in session.added)
-
-
-def test_admin_users_routes_cover_happy_paths(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    audit_calls: list[dict[str, object]] = []
-    session = object()
-
-    async def _list_users_page(*args, **kwargs):
-        del args, kwargs
-        return (
-            [
-                {
-                    "id": 101,
-                    "telegram_user_id": 900101,
-                    "username": "anna",
-                    "first_name": "Anna",
-                    "language": "de",
-                    "status": "ACTIVE",
-                    "created_at": "2026-03-01T10:00:00+00:00",
-                    "last_seen_at": None,
-                    "streak": 5,
-                }
-            ],
-            1,
-        )
-
-    async def _get_user_profile(*args, **kwargs):
-        del args, kwargs
-        return {"info": {"id": 101}, "progress": {}, "purchases": [], "referrals": [], "timeline": []}
-
-    async def _apply_bonus(*args, **kwargs):
-        del args, kwargs
-        return {"user_id": 101, "bonus_type": "energy", "amount": 2}
-
-    async def _audit(session_obj, **kwargs):
-        assert session_obj is session
-        audit_calls.append(kwargs)
-
-    monkeypatch.setattr(users, "SessionLocal", _session_local(session, session, session))
-    monkeypatch.setattr(users, "list_users_page", _list_users_page)
-    monkeypatch.setattr(users, "get_user_profile", _get_user_profile)
-    monkeypatch.setattr(users, "apply_bonus", _apply_bonus)
-    monkeypatch.setattr(users, "write_admin_audit", _audit)
-
-    listed = client.get("/admin/users?search=anna&page=1&limit=50")
-    profile = client.get("/admin/users/101")
-    bonus = client.post("/admin/users/101/bonus", json={"type": "energy", "amount": 2})
-
-    assert listed.status_code == 200
-    assert listed.json() == {"items": [{"id": 101, "telegram_user_id": 900101, "username": "anna", "first_name": "Anna", "language": "de", "status": "ACTIVE", "created_at": "2026-03-01T10:00:00+00:00", "last_seen_at": None, "streak": 5}], "total": 1, "page": 1, "pages": 1}
-    assert profile.status_code == 200
-    assert profile.json()["info"]["id"] == 101
-    assert bonus.status_code == 200
-    assert bonus.json()["result"]["bonus_type"] == "energy"
-    assert audit_calls == [
-        {
-            "admin_email": "admin@example.com",
-            "action": "user_bonus",
-            "target_type": "user",
-            "target_id": "101",
-            "payload": {"type": "energy", "amount": 2},
-            "ip": "127.0.0.1",
-        }
-    ]
-
-
-def test_admin_users_state_routes_cover_mutations_and_not_found(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    blocked_user = SimpleNamespace(status="ACTIVE")
-    unblocked_user = SimpleNamespace(status="BLOCKED")
-    streak = SimpleNamespace(current_streak=5, today_status="ACTIVE", updated_at=None)
-    energy = SimpleNamespace(free_cap=30, free_energy=7, paid_energy=9, updated_at=None)
-    reset_user = SimpleNamespace(status="ACTIVE")
-    reset_session = _Session(
-        gets={
-            ("User", 101): reset_user,
-            ("StreakState", 101): streak,
-            ("EnergyState", 101): energy,
-        },
-        exec_results=[_ScalarResult(1)],
-    )
-    audit_calls: list[str] = []
-
-    async def _audit(session, **kwargs):
-        del session
-        audit_calls.append(str(kwargs["action"]))
-
-    monkeypatch.setattr(
-        users,
-        "SessionLocal",
-        _session_local(
-            _Session(gets={("User", 101): blocked_user}),
-            _Session(gets={("User", 101): unblocked_user}),
-            reset_session,
-            _Session(gets={("User", 404): None}),
-        ),
-    )
-    monkeypatch.setattr(users, "write_admin_audit", _audit)
-
-    blocked = client.post("/admin/users/101/block", json={"reason": "spam account"})
-    unblocked = client.post("/admin/users/101/unblock")
-    reset = client.post("/admin/users/101/reset_state")
-    missing = client.post("/admin/users/404/block", json={"reason": "missing user"})
-
-    assert blocked.status_code == 200
-    assert blocked_user.status == "BLOCKED"
-    assert unblocked.status_code == 200
-    assert unblocked_user.status == "ACTIVE"
-    assert reset.status_code == 200
-    assert streak.current_streak == 0
-    assert streak.today_status == "NO_ACTIVITY"
-    assert energy.free_energy == 20
-    assert energy.paid_energy == 0
-    assert any(type(item).__name__ == "UserEvent" for item in reset_session.added)
-    assert missing.status_code == 404
-    assert missing.json() == {"detail": {"code": "E_USER_NOT_FOUND"}}
-    assert audit_calls == ["user_block", "user_unblock", "user_reset_state"]

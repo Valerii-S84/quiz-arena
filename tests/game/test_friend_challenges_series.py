@@ -97,7 +97,9 @@ async def test_create_friend_challenge_best_of_three_rejects_invalid_access(
         "get_by_id_for_update",
         _async_return(_challenge(status=status)),
     )
-    monkeypatch.setattr(friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: False)
+    monkeypatch.setattr(
+        friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: False
+    )
 
     with pytest.raises(FriendChallengeAccessError):
         await friend_challenges_series.create_friend_challenge_best_of_three(
@@ -133,10 +135,14 @@ async def test_create_friend_challenge_best_of_three_creates_series_duel_and_emi
         analytics_events.append(kwargs)
 
     monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo, "get_by_id_for_update", _async_return(challenge)
+        friend_challenges_series.FriendChallengesRepo,
+        "get_by_id_for_update",
+        _async_return(challenge),
     )
     monkeypatch.setattr(friend_challenges_series, "uuid4", lambda: fixed_series_id)
-    monkeypatch.setattr(friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: True)
+    monkeypatch.setattr(
+        friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: True
+    )
     monkeypatch.setattr(
         friend_challenges_series, "_emit_friend_challenge_expired_event", _fake_emit_expired_event
     )
@@ -144,9 +150,13 @@ async def test_create_friend_challenge_best_of_three_creates_series_duel_and_emi
         friend_challenges_series, "_resolve_friend_challenge_access_type", _async_return("FREE")
     )
     monkeypatch.setattr(friend_challenges_series, "_create_friend_challenge_row", _fake_create_row)
-    monkeypatch.setattr(friend_challenges_series, "emit_analytics_event", _fake_emit_analytics_event)
     monkeypatch.setattr(
-        friend_challenges_series, "_build_friend_challenge_snapshot", lambda challenge_row: {"challenge_id": challenge_row.id}
+        friend_challenges_series, "emit_analytics_event", _fake_emit_analytics_event
+    )
+    monkeypatch.setattr(
+        friend_challenges_series,
+        "_build_friend_challenge_snapshot",
+        lambda challenge_row: {"challenge_id": challenge_row.id},
     )
 
     result = await friend_challenges_series.create_friend_challenge_best_of_three(
@@ -158,7 +168,13 @@ async def test_create_friend_challenge_best_of_three_creates_series_duel_and_emi
     )
 
     assert result == {"challenge_id": duel.id}
-    assert expired_events == [{"challenge": challenge, "happened_at": NOW_UTC, "source": friend_challenges_series.EVENT_SOURCE_BOT}]
+    assert expired_events == [
+        {
+            "challenge": challenge,
+            "happened_at": NOW_UTC,
+            "source": friend_challenges_series.EVENT_SOURCE_BOT,
+        }
+    ]
     assert create_calls == [
         {
             "creator_user_id": 101,
@@ -193,9 +209,13 @@ async def test_create_friend_challenge_series_next_game_rejects_without_series_m
         pytest.fail("series lookup should not happen without valid series metadata")
 
     monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo, "get_by_id_for_update", _async_return(challenge)
+        friend_challenges_series.FriendChallengesRepo,
+        "get_by_id_for_update",
+        _async_return(challenge),
     )
-    monkeypatch.setattr(friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: False)
+    monkeypatch.setattr(
+        friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: False
+    )
     monkeypatch.setattr(
         friend_challenges_series.FriendChallengesRepo,
         "list_by_series_id_for_update",
@@ -217,14 +237,29 @@ async def test_create_friend_challenge_series_next_game_rejects_without_series_m
     [
         (
             [
-                _challenge(series_id=SERIES_A_ID, series_game_number=1, series_best_of=3, winner_user_id=101),
-                _challenge(series_id=SERIES_A_ID, series_game_number=2, series_best_of=3, winner_user_id=101),
+                _challenge(
+                    series_id=SERIES_A_ID,
+                    series_game_number=1,
+                    series_best_of=3,
+                    winner_user_id=101,
+                ),
+                _challenge(
+                    series_id=SERIES_A_ID,
+                    series_game_number=2,
+                    series_best_of=3,
+                    winner_user_id=101,
+                ),
             ],
             _challenge(series_id=SERIES_A_ID, series_game_number=2, series_best_of=3),
         ),
         (
             [
-                _challenge(series_id=SERIES_B_ID, series_game_number=1, series_best_of=3, winner_user_id=101),
+                _challenge(
+                    series_id=SERIES_B_ID,
+                    series_game_number=1,
+                    series_best_of=3,
+                    winner_user_id=101,
+                ),
                 _challenge(
                     status="WALKOVER",
                     series_id=SERIES_B_ID,
@@ -244,9 +279,13 @@ async def test_create_friend_challenge_series_next_game_rejects_finished_series(
     challenge: SimpleNamespace,
 ) -> None:
     monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo, "get_by_id_for_update", _async_return(challenge)
+        friend_challenges_series.FriendChallengesRepo,
+        "get_by_id_for_update",
+        _async_return(challenge),
     )
-    monkeypatch.setattr(friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: False)
+    monkeypatch.setattr(
+        friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: False
+    )
     monkeypatch.setattr(
         friend_challenges_series.FriendChallengesRepo,
         "list_by_series_id_for_update",
@@ -288,19 +327,31 @@ async def test_create_friend_challenge_series_next_game_creates_followup_duel_an
         analytics_events.append(kwargs)
 
     monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo, "get_by_id_for_update", _async_return(challenge)
-    )
-    monkeypatch.setattr(friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: False)
-    monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo, "list_by_series_id_for_update", _async_return([challenge])
+        friend_challenges_series.FriendChallengesRepo,
+        "get_by_id_for_update",
+        _async_return(challenge),
     )
     monkeypatch.setattr(
-        friend_challenges_series, "_resolve_friend_challenge_access_type", _async_return("PAID_TICKET")
+        friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: False
+    )
+    monkeypatch.setattr(
+        friend_challenges_series.FriendChallengesRepo,
+        "list_by_series_id_for_update",
+        _async_return([challenge]),
+    )
+    monkeypatch.setattr(
+        friend_challenges_series,
+        "_resolve_friend_challenge_access_type",
+        _async_return("PAID_TICKET"),
     )
     monkeypatch.setattr(friend_challenges_series, "_create_friend_challenge_row", _fake_create_row)
-    monkeypatch.setattr(friend_challenges_series, "emit_analytics_event", _fake_emit_analytics_event)
     monkeypatch.setattr(
-        friend_challenges_series, "_build_friend_challenge_snapshot", lambda challenge_row: {"challenge_id": challenge_row.id}
+        friend_challenges_series, "emit_analytics_event", _fake_emit_analytics_event
+    )
+    monkeypatch.setattr(
+        friend_challenges_series,
+        "_build_friend_challenge_snapshot",
+        lambda challenge_row: {"challenge_id": challenge_row.id},
     )
 
     result = await friend_challenges_series.create_friend_challenge_series_next_game(

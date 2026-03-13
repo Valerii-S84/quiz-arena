@@ -96,18 +96,27 @@ async def test_overview_metrics_helpers_compute_expected_values() -> None:
     }
     assert overview_metrics.build_kpi(current=0.0, previous=0.0)["delta_pct"] == 0.0
 
-    session = _SessionWithExec(_ScalarResult(11), _ScalarResult(7), _ScalarResult(99), _ScalarResult(5))
+    session = _SessionWithExec(
+        _ScalarResult(11), _ScalarResult(7), _ScalarResult(99), _ScalarResult(5)
+    )
     now_utc = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
 
-    assert await overview_metrics.count_distinct_users(session, from_utc=now_utc, to_utc=now_utc) == 11
-    assert await overview_metrics.count_purchase_users(session, from_utc=now_utc, to_utc=now_utc) == 7
+    assert (
+        await overview_metrics.count_distinct_users(session, from_utc=now_utc, to_utc=now_utc) == 11
+    )
+    assert (
+        await overview_metrics.count_purchase_users(session, from_utc=now_utc, to_utc=now_utc) == 7
+    )
     assert await overview_metrics.sum_revenue_stars(session, from_utc=now_utc, to_utc=now_utc) == 99
-    assert await overview_metrics.count_distinct_event_users(
-        session,
-        event_type="bot_start_pressed",
-        from_utc=now_utc,
-        to_utc=now_utc,
-    ) == 5
+    assert (
+        await overview_metrics.count_distinct_event_users(
+            session,
+            event_type="bot_start_pressed",
+            from_utc=now_utc,
+            to_utc=now_utc,
+        )
+        == 5
+    )
 
 
 @pytest.mark.asyncio
@@ -226,7 +235,9 @@ async def test_build_overview_payload_builds_kpis_and_alerts() -> None:
 
     assert payload["period"] == "7d"
     assert payload["kpis"]["dau"]["current"] == 100.0
-    assert payload["kpis"]["revenue_eur"]["current"] == float(Decimal(200) * overview_metrics.STAR_TO_EUR_RATE)
+    assert payload["kpis"]["revenue_eur"]["current"] == float(
+        Decimal(200) * overview_metrics.STAR_TO_EUR_RATE
+    )
     assert payload["feature_usage"]["duel_created_users"]["current"] == 10.0
     assert payload["funnel"][2] == {"step": "Streak 3+", "value": 7}
     assert [item["type"] for item in payload["alerts"]] == [
@@ -237,7 +248,9 @@ async def test_build_overview_payload_builds_kpis_and_alerts() -> None:
 
 
 @pytest.mark.asyncio
-async def test_admin_cache_service_handles_success_and_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_admin_cache_service_handles_success_and_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class _RedisClient:
         def __init__(self) -> None:
             self.payload = '{"ok":true}'
@@ -259,7 +272,9 @@ async def test_admin_cache_service_handles_success_and_failures(monkeypatch: pyt
 
     resolved = await admin_cache.get_redis_client(_settings())
     cached = await admin_cache.get_json_cache(settings=_settings(), key="cache-key")
-    await admin_cache.set_json_cache(settings=_settings(), key="cache-key", value={"v": 1}, ttl_seconds=5)
+    await admin_cache.set_json_cache(
+        settings=_settings(), key="cache-key", value={"v": 1}, ttl_seconds=5
+    )
 
     assert resolved is client
     assert cached == {"ok": True}
@@ -275,7 +290,9 @@ async def test_admin_cache_service_handles_success_and_failures(monkeypatch: pyt
     assert await admin_cache.get_redis_client(_settings()) is None
 
 
-def test_admin_overview_route_uses_cache_hit(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_admin_overview_route_uses_cache_hit(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     payload = {
         "period": "30d",
         "generated_at": "2026-03-10T12:00:00+00:00",

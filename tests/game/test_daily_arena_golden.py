@@ -33,6 +33,7 @@ from tests.game.daily_arena_golden_support import (
     status_tournament,
 )
 
+
 def test_daily_arena_constants_include_only_arena_type() -> None:
     # GOLDEN: оновлено після видалення Elimination (крок 8)
     # DAILY_CUP_TOURNAMENT_TYPES містить тільки DAILY_ARENA
@@ -232,7 +233,9 @@ async def test_daily_arena_lobby_query_returns_only_daily_arena_tournaments() ->
     )
 
     async with SessionLocal.begin() as session:
-        arena_lobby = await get_daily_cup_lobby_by_id(session, tournament_id=arena_id, viewer_user_id=viewer_user_id)
+        arena_lobby = await get_daily_cup_lobby_by_id(
+            session, tournament_id=arena_id, viewer_user_id=viewer_user_id
+        )
         with pytest.raises(TournamentAccessError):
             await get_daily_cup_lobby_by_id(
                 session,

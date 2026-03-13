@@ -61,7 +61,12 @@ def test_daily_arena_status_time_helpers_keep_current_parsing_rules(
     monkeypatch.setenv("DAILY_CUP_INVITE_TIME", "broken")
     monkeypatch.setenv("DAILY_CUP_CLOSE_TIME", "25:99")
 
-    assert daily_cup_user_status._parse_hhmm(raw_value, default_hour=defaults[0], default_minute=defaults[1]) == expected
+    assert (
+        daily_cup_user_status._parse_hhmm(
+            raw_value, default_hour=defaults[0], default_minute=defaults[1]
+        )
+        == expected
+    )
 
     now_utc = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
     anchor = daily_cup_user_status._local_daily_cup_anchor(now_utc=now_utc, hour=16, minute=0)
@@ -87,6 +92,7 @@ async def test_daily_arena_status_returns_no_tournament_before_invite_window(
         "_invite_open_at_utc",
         lambda *, now_utc: now_utc + timedelta(minutes=1),
     )
+
     async def _unexpected_lookup(*args, **kwargs):
         del args, kwargs
         pytest.fail("unexpected tournament lookup before invite window")
@@ -219,7 +225,11 @@ async def test_daily_arena_messaging_returns_empty_for_invalid_tournament_id() -
     ("tournament", "standings", "expected"),
     [
         (None, [make_standing_row(user_id=101, place=1)], _empty_daily_cup_result()),
-        (_arena_tournament(status=TOURNAMENT_STATUS_REGISTRATION), [make_standing_row(user_id=101, place=1)], _empty_daily_cup_result()),
+        (
+            _arena_tournament(status=TOURNAMENT_STATUS_REGISTRATION),
+            [make_standing_row(user_id=101, place=1)],
+            _empty_daily_cup_result(),
+        ),
         (_arena_tournament(status=TOURNAMENT_STATUS_COMPLETED), [], _empty_daily_cup_result()),
     ],
     ids=["missing_tournament", "registration_state", "empty_participants"],
@@ -237,7 +247,9 @@ async def test_daily_arena_messaging_short_circuits_when_pipeline_has_no_work(
         session_local_with_sessions(SimpleNamespace()),
     )
     monkeypatch.setattr(daily_cup_messaging.TournamentsRepo, "get_by_id", async_return(tournament))
-    monkeypatch.setattr(daily_cup_messaging, "calculate_daily_cup_standings", async_return(standings))
+    monkeypatch.setattr(
+        daily_cup_messaging, "calculate_daily_cup_standings", async_return(standings)
+    )
 
     result = await daily_cup_messaging.run_daily_cup_round_messaging_async(
         tournament_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
@@ -283,7 +295,9 @@ async def test_daily_arena_messaging_round_pipeline_fetches_round_matches_for_ar
         session_local_with_sessions(SimpleNamespace()),
     )
     monkeypatch.setattr(daily_cup_messaging.TournamentsRepo, "get_by_id", async_return(tournament))
-    monkeypatch.setattr(daily_cup_messaging, "calculate_daily_cup_standings", async_return(standings))
+    monkeypatch.setattr(
+        daily_cup_messaging, "calculate_daily_cup_standings", async_return(standings)
+    )
     monkeypatch.setattr(
         daily_cup_messaging.UsersRepo,
         "list_by_ids",
@@ -324,7 +338,11 @@ def test_daily_arena_messaging_enqueue_paths_and_wrapper(monkeypatch: pytest.Mon
     # GOLDEN: фіксує поточну поведінку, не змінювати без рев'ю
     enqueued: dict[str, object] = {}
 
-    monkeypatch.setattr(daily_cup_messaging, "is_celery_task", lambda task: task is daily_cup_messaging.run_daily_cup_round_messaging)
+    monkeypatch.setattr(
+        daily_cup_messaging,
+        "is_celery_task",
+        lambda task: task is daily_cup_messaging.run_daily_cup_round_messaging,
+    )
     monkeypatch.setattr(
         daily_cup_messaging.run_daily_cup_round_messaging,
         "delay",
@@ -343,7 +361,9 @@ def test_daily_arena_messaging_enqueue_paths_and_wrapper(monkeypatch: pytest.Mon
     monkeypatch.setattr(
         daily_cup_messaging,
         "run_async_job",
-        lambda coroutine: enqueued.setdefault("run_async_job", close_coroutine_with_name(coroutine)),
+        lambda coroutine: enqueued.setdefault(
+            "run_async_job", close_coroutine_with_name(coroutine)
+        ),
     )
     daily_cup_messaging.enqueue_daily_cup_round_messaging(tournament_id="arena-id-async")
     assert enqueued["run_async_job"] == "run_daily_cup_round_messaging_async_with_followups"

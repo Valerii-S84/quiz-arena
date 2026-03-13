@@ -58,9 +58,15 @@ async def test_daily_arena_proof_cards_short_circuit_for_invalid_inputs(
         "SessionLocal",
         session_local_with_sessions(SimpleNamespace()),
     )
-    monkeypatch.setattr(daily_cup_proof_cards.TournamentsRepo, "get_by_id", async_return(tournament))
-    monkeypatch.setattr(daily_cup_proof_cards, "is_today_daily_cup_tournament", lambda **kwargs: True)
-    monkeypatch.setattr(daily_cup_proof_cards, "calculate_daily_cup_standings", async_return(standings))
+    monkeypatch.setattr(
+        daily_cup_proof_cards.TournamentsRepo, "get_by_id", async_return(tournament)
+    )
+    monkeypatch.setattr(
+        daily_cup_proof_cards, "is_today_daily_cup_tournament", lambda **kwargs: True
+    )
+    monkeypatch.setattr(
+        daily_cup_proof_cards, "calculate_daily_cup_standings", async_return(standings)
+    )
 
     result = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
         tournament_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
@@ -68,10 +74,13 @@ async def test_daily_arena_proof_cards_short_circuit_for_invalid_inputs(
     )
 
     assert result == expected
-    assert await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
-        tournament_id="not-a-uuid",
-        initial_delay_seconds=0,
-    ) == daily_cup_proof_cards._empty_result()
+    assert (
+        await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
+            tournament_id="not-a-uuid",
+            initial_delay_seconds=0,
+        )
+        == daily_cup_proof_cards._empty_result()
+    )
 
 
 @pytest.mark.asyncio
@@ -86,20 +95,26 @@ async def test_daily_arena_proof_cards_skip_stale_tournament_and_empty_selected_
         "SessionLocal",
         session_local_with_sessions(SimpleNamespace(), SimpleNamespace()),
     )
-    monkeypatch.setattr(daily_cup_proof_cards.TournamentsRepo, "get_by_id", async_return(tournament))
+    monkeypatch.setattr(
+        daily_cup_proof_cards.TournamentsRepo, "get_by_id", async_return(tournament)
+    )
     monkeypatch.setattr(
         daily_cup_proof_cards.logger,
         "info",
         lambda event, **kwargs: stale_logs.append({"event": event, **kwargs}),
     )
-    monkeypatch.setattr(daily_cup_proof_cards, "is_today_daily_cup_tournament", lambda **kwargs: False)
+    monkeypatch.setattr(
+        daily_cup_proof_cards, "is_today_daily_cup_tournament", lambda **kwargs: False
+    )
 
     stale = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
         tournament_id=str(tournament.id),
         initial_delay_seconds=0,
     )
 
-    monkeypatch.setattr(daily_cup_proof_cards, "is_today_daily_cup_tournament", lambda **kwargs: True)
+    monkeypatch.setattr(
+        daily_cup_proof_cards, "is_today_daily_cup_tournament", lambda **kwargs: True
+    )
     monkeypatch.setattr(
         daily_cup_proof_cards,
         "calculate_daily_cup_standings",
@@ -176,9 +191,15 @@ async def test_daily_arena_proof_cards_pipeline_handles_delivery_edge_cases(
         "SessionLocal",
         session_local_with_sessions(SimpleNamespace(), SimpleNamespace()),
     )
-    monkeypatch.setattr(daily_cup_proof_cards.TournamentsRepo, "get_by_id", async_return(tournament))
-    monkeypatch.setattr(daily_cup_proof_cards, "is_today_daily_cup_tournament", lambda **kwargs: True)
-    monkeypatch.setattr(daily_cup_proof_cards, "calculate_daily_cup_standings", async_return(standings))
+    monkeypatch.setattr(
+        daily_cup_proof_cards.TournamentsRepo, "get_by_id", async_return(tournament)
+    )
+    monkeypatch.setattr(
+        daily_cup_proof_cards, "is_today_daily_cup_tournament", lambda **kwargs: True
+    )
+    monkeypatch.setattr(
+        daily_cup_proof_cards, "calculate_daily_cup_standings", async_return(standings)
+    )
     monkeypatch.setattr(
         daily_cup_proof_cards.UsersRepo,
         "list_by_ids",
@@ -191,7 +212,9 @@ async def test_daily_arena_proof_cards_pipeline_handles_delivery_edge_cases(
             ]
         ),
     )
-    monkeypatch.setattr(daily_cup_proof_cards.TournamentMatchesRepo, "get_max_round_no", async_return(3))
+    monkeypatch.setattr(
+        daily_cup_proof_cards.TournamentMatchesRepo, "get_max_round_no", async_return(3)
+    )
     monkeypatch.setattr(daily_cup_proof_cards, "build_bot", lambda: bot)
     monkeypatch.setattr(daily_cup_proof_cards, "send_daily_cup_proof_card", _fake_send_proof_card)
     monkeypatch.setattr(daily_cup_proof_cards.asyncio, "sleep", _fake_sleep)
@@ -216,7 +239,13 @@ async def test_daily_arena_proof_cards_pipeline_handles_delivery_edge_cases(
         initial_delay_seconds=2,
     )
 
-    assert result == {"processed": 1, "participants_total": 5, "sent": 1, "cached_reused": 0, "failed": 2}
+    assert result == {
+        "processed": 1,
+        "participants_total": 5,
+        "sent": 1,
+        "cached_reused": 0,
+        "failed": 2,
+    }
     assert sleep_calls == [2]
     assert [call["user_id"] for call in send_calls] == [101, 404, 505]
     assert send_calls[0]["place"] == 1
@@ -249,8 +278,12 @@ async def test_proof_card_skips_user_with_none_telegram_id(
         "SessionLocal",
         session_local_with_sessions(SimpleNamespace()),
     )
-    monkeypatch.setattr(daily_cup_proof_cards.TournamentsRepo, "get_by_id", async_return(tournament))
-    monkeypatch.setattr(daily_cup_proof_cards, "is_today_daily_cup_tournament", lambda **kwargs: True)
+    monkeypatch.setattr(
+        daily_cup_proof_cards.TournamentsRepo, "get_by_id", async_return(tournament)
+    )
+    monkeypatch.setattr(
+        daily_cup_proof_cards, "is_today_daily_cup_tournament", lambda **kwargs: True
+    )
     monkeypatch.setattr(
         daily_cup_proof_cards,
         "calculate_daily_cup_standings",
@@ -261,7 +294,9 @@ async def test_proof_card_skips_user_with_none_telegram_id(
         "list_by_ids",
         async_return([make_worker_user(user_id=101, telegram_user_id=None)]),
     )
-    monkeypatch.setattr(daily_cup_proof_cards.TournamentMatchesRepo, "get_max_round_no", async_return(3))
+    monkeypatch.setattr(
+        daily_cup_proof_cards.TournamentMatchesRepo, "get_max_round_no", async_return(3)
+    )
     monkeypatch.setattr(daily_cup_proof_cards, "build_bot", lambda: bot)
     monkeypatch.setattr(
         daily_cup_proof_cards,
@@ -288,7 +323,11 @@ def test_daily_arena_proof_cards_enqueue_paths_and_wrapper(monkeypatch: pytest.M
     # GOLDEN: фіксує поточну поведінку, не змінювати без рев'ю
     enqueued: dict[str, object] = {}
 
-    monkeypatch.setattr(daily_cup_proof_cards, "is_celery_task", lambda task: task is daily_cup_proof_cards.run_daily_cup_proof_cards)
+    monkeypatch.setattr(
+        daily_cup_proof_cards,
+        "is_celery_task",
+        lambda task: task is daily_cup_proof_cards.run_daily_cup_proof_cards,
+    )
     monkeypatch.setattr(
         daily_cup_proof_cards.run_daily_cup_proof_cards,
         "apply_async",
@@ -312,7 +351,9 @@ def test_daily_arena_proof_cards_enqueue_paths_and_wrapper(monkeypatch: pytest.M
     monkeypatch.setattr(
         daily_cup_proof_cards,
         "run_async_job",
-        lambda coroutine: enqueued.setdefault("run_async_job", close_coroutine_with_name(coroutine)),
+        lambda coroutine: enqueued.setdefault(
+            "run_async_job", close_coroutine_with_name(coroutine)
+        ),
     )
     daily_cup_proof_cards.enqueue_daily_cup_proof_cards(
         tournament_id="arena-proof-async",

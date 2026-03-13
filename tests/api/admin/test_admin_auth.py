@@ -41,15 +41,23 @@ def client() -> TestClient:
     app.dependency_overrides.clear()
 
 
-def test_admin_login_rejects_invalid_credentials(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_admin_login_rejects_invalid_credentials(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     failures: list[tuple[str, int]] = []
     app.dependency_overrides[auth.get_settings] = lambda: _settings(two_fa_required=True)
     monkeypatch.setattr(auth, "rate_limit_bucket", lambda **kwargs: "bucket")
     monkeypatch.setattr(auth, "is_rate_limited", lambda **kwargs: False)
     monkeypatch.setattr(auth, "verify_login_credentials", lambda **kwargs: False)
-    monkeypatch.setattr(auth, "record_failure", lambda *, bucket, window_seconds: failures.append((bucket, window_seconds)))
+    monkeypatch.setattr(
+        auth,
+        "record_failure",
+        lambda *, bucket, window_seconds: failures.append((bucket, window_seconds)),
+    )
 
-    response = client.post("/admin/auth/login", json={"email": "admin@example.com", "password": "secret123"})
+    response = client.post(
+        "/admin/auth/login", json={"email": "admin@example.com", "password": "secret123"}
+    )
 
     assert response.status_code == 401
     assert response.json() == {"detail": {"code": "E_INVALID_CREDENTIALS"}}
@@ -63,7 +71,9 @@ def test_admin_login_rejects_rate_limited_requests(
     monkeypatch.setattr(auth, "rate_limit_bucket", lambda **kwargs: "bucket")
     monkeypatch.setattr(auth, "is_rate_limited", lambda **kwargs: True)
 
-    response = client.post("/admin/auth/login", json={"email": "admin@example.com", "password": "secret123"})
+    response = client.post(
+        "/admin/auth/login", json={"email": "admin@example.com", "password": "secret123"}
+    )
 
     assert response.status_code == 429
     assert response.json() == {"detail": {"code": "E_RATE_LIMITED"}}
@@ -91,7 +101,9 @@ def test_admin_login_without_2fa_sets_full_auth_cookies(
         ),
     )
 
-    response = client.post("/admin/auth/login", json={"email": "admin@example.com", "password": "secret123"})
+    response = client.post(
+        "/admin/auth/login", json={"email": "admin@example.com", "password": "secret123"}
+    )
 
     assert response.status_code == 200
     assert response.json() == {"requires_2fa": False}
@@ -109,10 +121,14 @@ def test_admin_login_with_2fa_sets_partial_cookie(
     monkeypatch.setattr(auth, "clear_failures", lambda **kwargs: None)
     monkeypatch.setattr(auth, "build_access_token", lambda **kwargs: "partial-access")
     monkeypatch.setattr(
-        auth, "set_partial_access_cookie", lambda **kwargs: partial_cookie_calls.append(kwargs["access_token"])
+        auth,
+        "set_partial_access_cookie",
+        lambda **kwargs: partial_cookie_calls.append(kwargs["access_token"]),
     )
 
-    response = client.post("/admin/auth/login", json={"email": "admin@example.com", "password": "secret123"})
+    response = client.post(
+        "/admin/auth/login", json={"email": "admin@example.com", "password": "secret123"}
+    )
 
     assert response.status_code == 200
     assert response.json() == {"requires_2fa": True}
@@ -123,7 +139,9 @@ def test_admin_verify_2fa_rejects_rate_limited_requests(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     app.dependency_overrides[auth.get_settings] = lambda: _settings(two_fa_required=True)
-    app.dependency_overrides[admin_deps.get_pending_admin] = lambda: _principal(two_factor_verified=False)
+    app.dependency_overrides[admin_deps.get_pending_admin] = lambda: _principal(
+        two_factor_verified=False
+    )
     monkeypatch.setattr(auth, "rate_limit_bucket", lambda **kwargs: "bucket")
     monkeypatch.setattr(auth, "is_rate_limited", lambda **kwargs: True)
 
@@ -133,14 +151,24 @@ def test_admin_verify_2fa_rejects_rate_limited_requests(
     assert response.json() == {"detail": {"code": "E_RATE_LIMITED"}}
 
 
-def test_admin_verify_2fa_rejects_invalid_code(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_admin_verify_2fa_rejects_invalid_code(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     failures: list[tuple[str, int]] = []
     app.dependency_overrides[auth.get_settings] = lambda: _settings(two_fa_required=True)
-    app.dependency_overrides[admin_deps.get_pending_admin] = lambda: _principal(two_factor_verified=False)
+    app.dependency_overrides[admin_deps.get_pending_admin] = lambda: _principal(
+        two_factor_verified=False
+    )
     monkeypatch.setattr(auth, "rate_limit_bucket", lambda **kwargs: "bucket")
     monkeypatch.setattr(auth, "is_rate_limited", lambda **kwargs: False)
-    monkeypatch.setattr(auth, "record_failure", lambda *, bucket, window_seconds: failures.append((bucket, window_seconds)))
-    monkeypatch.setattr(auth, "verify_totp_code", lambda **kwargs: auth.verify_totp_code.__class__(None))
+    monkeypatch.setattr(
+        auth,
+        "record_failure",
+        lambda *, bucket, window_seconds: failures.append((bucket, window_seconds)),
+    )
+    monkeypatch.setattr(
+        auth, "verify_totp_code", lambda **kwargs: auth.verify_totp_code.__class__(None)
+    )
 
     async def _false_totp(**kwargs) -> bool:
         del kwargs
@@ -165,7 +193,9 @@ def test_admin_verify_2fa_success_sets_full_auth_cookies(
         return True
 
     app.dependency_overrides[auth.get_settings] = lambda: _settings(two_fa_required=True)
-    app.dependency_overrides[admin_deps.get_pending_admin] = lambda: _principal(two_factor_verified=False)
+    app.dependency_overrides[admin_deps.get_pending_admin] = lambda: _principal(
+        two_factor_verified=False
+    )
     monkeypatch.setattr(auth, "rate_limit_bucket", lambda **kwargs: "bucket")
     monkeypatch.setattr(auth, "is_rate_limited", lambda **kwargs: False)
     monkeypatch.setattr(auth, "clear_failures", lambda **kwargs: None)
@@ -191,7 +221,9 @@ def test_admin_verify_2fa_success_sets_full_auth_cookies(
         "role": "admin",
         "two_factor_verified": True,
     }
-    assert cookie_calls == [{"access_token": "verified-access", "refresh_token": "verified-refresh"}]
+    assert cookie_calls == [
+        {"access_token": "verified-access", "refresh_token": "verified-refresh"}
+    ]
 
 
 def test_admin_verify_2fa_skips_totp_check_when_2fa_disabled(
@@ -206,7 +238,9 @@ def test_admin_verify_2fa_skips_totp_check_when_2fa_disabled(
         return False
 
     app.dependency_overrides[auth.get_settings] = lambda: _settings(two_fa_required=False)
-    app.dependency_overrides[admin_deps.get_pending_admin] = lambda: _principal(two_factor_verified=False)
+    app.dependency_overrides[admin_deps.get_pending_admin] = lambda: _principal(
+        two_factor_verified=False
+    )
     monkeypatch.setattr(auth, "rate_limit_bucket", lambda **kwargs: "bucket")
     monkeypatch.setattr(auth, "is_rate_limited", lambda **kwargs: False)
     monkeypatch.setattr(auth, "clear_failures", lambda **kwargs: None)
@@ -225,10 +259,14 @@ def test_admin_verify_2fa_skips_totp_check_when_2fa_disabled(
 
     assert response.status_code == 200
     assert called == []
-    assert cookie_calls == [{"access_token": "verified-access", "refresh_token": "verified-refresh"}]
+    assert cookie_calls == [
+        {"access_token": "verified-access", "refresh_token": "verified-refresh"}
+    ]
 
 
-def test_admin_auth_setup_refresh_logout_and_session(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_admin_auth_setup_refresh_logout_and_session(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     clear_calls: list[bool] = []
 
     async def _setup(**kwargs) -> dict[str, str]:
@@ -236,9 +274,13 @@ def test_admin_auth_setup_refresh_logout_and_session(client: TestClient, monkeyp
         return {"secret": "abc", "otpauth_url": "otpauth://x"}
 
     app.dependency_overrides[auth.get_settings] = lambda: _settings(two_fa_required=True)
-    app.dependency_overrides[admin_deps.get_pending_admin] = lambda: _principal(two_factor_verified=True)
+    app.dependency_overrides[admin_deps.get_pending_admin] = lambda: _principal(
+        two_factor_verified=True
+    )
     monkeypatch.setattr(auth, "get_totp_setup_payload", _setup)
-    monkeypatch.setattr(auth, "decode_refresh_token", lambda **kwargs: _principal(two_factor_verified=True))
+    monkeypatch.setattr(
+        auth, "decode_refresh_token", lambda **kwargs: _principal(two_factor_verified=True)
+    )
     monkeypatch.setattr(auth, "build_access_token", lambda **kwargs: "refresh-access")
     monkeypatch.setattr(auth, "build_refresh_token", lambda **kwargs: "refresh-refresh")
     monkeypatch.setattr(auth, "apply_auth_cookies", lambda **kwargs: None)

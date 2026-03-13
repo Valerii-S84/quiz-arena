@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import importlib
-from decimal import Decimal
-from datetime import datetime, timedelta, timezone
-from types import ModuleType, SimpleNamespace
 from collections.abc import Coroutine
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
+from types import ModuleType, SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -184,9 +184,7 @@ def make_worker_user(
     return SimpleNamespace(
         id=user_id,
         telegram_user_id=(
-            900000 + user_id
-            if telegram_user_id is _DEFAULT_TELEGRAM_USER_ID
-            else telegram_user_id
+            900000 + user_id if telegram_user_id is _DEFAULT_TELEGRAM_USER_ID else telegram_user_id
         ),
         username=username,
         first_name=first_name,

@@ -94,7 +94,9 @@ async def test_start_mode_sends_first_question_for_happy_path() -> None:
         del args, kwargs
         return _start_result()
 
-    user_onboarding_service, game_session_service = _services_for_start(start_session=_start_session)
+    user_onboarding_service, game_session_service = _services_for_start(
+        start_session=_start_session
+    )
     callback = _build_callback()
 
     await play_flow.start_mode(
@@ -125,13 +127,19 @@ async def test_start_mode_handles_locked_mode_with_offer() -> None:
 
     async def _evaluate_offer(*args, **kwargs):
         del args, kwargs
-        return SimpleNamespace(text_key="msg.locked.mode", impression_id="imp", cta_product_codes=())
+        return SimpleNamespace(
+            text_key="msg.locked.mode", impression_id="imp", cta_product_codes=()
+        )
 
-    user_onboarding_service, game_session_service = _services_for_start(start_session=_start_session)
+    user_onboarding_service, game_session_service = _services_for_start(
+        start_session=_start_session
+    )
     callback = _build_callback()
 
     with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(play_flow, "build_offer_keyboard", lambda selection: {"offer": selection.impression_id})
+        monkeypatch.setattr(
+            play_flow, "build_offer_keyboard", lambda selection: {"offer": selection.impression_id}
+        )
 
         await play_flow.start_mode(
             callback,
@@ -163,7 +171,9 @@ async def test_start_mode_handles_locked_mode_when_offer_logging_fails() -> None
         del args, kwargs
         raise RuntimeError("offer logging failed")
 
-    user_onboarding_service, game_session_service = _services_for_start(start_session=_start_session)
+    user_onboarding_service, game_session_service = _services_for_start(
+        start_session=_start_session
+    )
     callback = _build_callback()
 
     with pytest.MonkeyPatch.context() as monkeypatch:
@@ -200,7 +210,9 @@ async def test_start_mode_delegates_energy_insufficient_handling() -> None:
         del callback_obj
         captured.append(kwargs)
 
-    user_onboarding_service, game_session_service = _services_for_start(start_session=_start_session)
+    user_onboarding_service, game_session_service = _services_for_start(
+        start_session=_start_session
+    )
     callback = _build_callback()
 
     with pytest.MonkeyPatch.context() as monkeypatch:
@@ -232,7 +244,9 @@ async def test_start_mode_handles_daily_challenge_already_played() -> None:
         del args, kwargs
         raise DailyChallengeAlreadyPlayedError()
 
-    user_onboarding_service, game_session_service = _services_for_start(start_session=_start_session)
+    user_onboarding_service, game_session_service = _services_for_start(
+        start_session=_start_session
+    )
     callback = _build_callback()
 
     with pytest.MonkeyPatch.context() as monkeypatch:

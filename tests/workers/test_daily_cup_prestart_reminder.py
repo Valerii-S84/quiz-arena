@@ -144,7 +144,9 @@ async def test_prestart_reminder_sends_in_batches_and_logs_summary(
     monkeypatch.setattr(
         daily_cup_prestart_reminder,
         "SessionLocal",
-        _session_local_with_sessions(SimpleNamespace(), SimpleNamespace(), SimpleNamespace(), SimpleNamespace()),
+        _session_local_with_sessions(
+            SimpleNamespace(), SimpleNamespace(), SimpleNamespace(), SimpleNamespace()
+        ),
     )
     monkeypatch.setattr(
         daily_cup_prestart_reminder,
@@ -182,7 +184,10 @@ async def test_prestart_reminder_sends_in_batches_and_logs_summary(
         "skipped_total": 0,
     }
     assert [call["after_user_id"] for call in target_calls] == [None, 20, 30]
-    assert all(call["limit"] == daily_cup_prestart_reminder.DAILY_CUP_PUSH_BATCH_SIZE for call in target_calls)
+    assert all(
+        call["limit"] == daily_cup_prestart_reminder.DAILY_CUP_PUSH_BATCH_SIZE
+        for call in target_calls
+    )
     assert [int(message["chat_id"]) for message in bot.messages] == [10010, 10020, 10030]
     assert all(message["reply_markup"] is keyboard for message in bot.messages)
     assert bot.session.closed is True

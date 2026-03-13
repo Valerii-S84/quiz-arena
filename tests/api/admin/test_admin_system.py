@@ -78,16 +78,26 @@ def client() -> TestClient:
 
 
 @pytest.mark.asyncio
-async def test_system_service_status_handles_celery_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(system, "SessionLocal", _session_local(_Session(_RowsResult([]), _ScalarResult(0))))
-    monkeypatch.setattr(system, "get_redis_client", lambda settings: system.get_redis_client.__class__(None))
+async def test_system_service_status_handles_celery_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        system, "SessionLocal", _session_local(_Session(_RowsResult([]), _ScalarResult(0)))
+    )
+    monkeypatch.setattr(
+        system, "get_redis_client", lambda settings: system.get_redis_client.__class__(None)
+    )
 
     async def _no_redis(settings):
         del settings
         return None
 
     monkeypatch.setattr(system, "get_redis_client", _no_redis)
-    monkeypatch.setattr(system.celery_app.control, "inspect", lambda timeout=1.0: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(
+        system.celery_app.control,
+        "inspect",
+        lambda timeout=1.0: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
 
     status = await system._service_status(settings=_settings())
 

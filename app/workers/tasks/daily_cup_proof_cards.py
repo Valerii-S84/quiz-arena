@@ -72,32 +72,22 @@ async def run_daily_cup_proof_cards_async(
             else all_participants
         )
         if not participants:
-            return {
-                "processed": 1,
-                "participants_total": 0,
-                "sent": 0,
-                "cached_reused": 0,
-                "failed": 0,
-            }
+            return {**_empty_result(), "processed": 1}
 
         users = await UsersRepo.list_by_ids(
             session, [int(item.user_id) for item in all_participants]
         )
         rounds_played = await TournamentMatchesRepo.get_max_round_no(
-            session,
-            tournament_id=parsed_tournament_id,
+            session, tournament_id=parsed_tournament_id
         )
         user_labels = {
             int(user.id): format_user_label(username=user.username, first_name=user.first_name)
             for user in users
         }
-        telegram_targets: dict[int, int | None] = {}
-        for user in users:
-            telegram_user_id = user.telegram_user_id
-            if telegram_user_id is None:
-                telegram_targets[int(user.id)] = None
-                continue
-            telegram_targets[int(user.id)] = int(telegram_user_id)
+        telegram_targets = {
+            int(user.id): None if user.telegram_user_id is None else int(user.telegram_user_id)
+            for user in users
+        }
 
     if initial_delay_seconds > 0:
         await asyncio.sleep(max(0, int(initial_delay_seconds)))

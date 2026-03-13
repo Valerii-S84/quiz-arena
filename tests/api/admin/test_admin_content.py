@@ -193,7 +193,10 @@ def test_admin_content_review_routes_update_payload_and_write_audit(
     assert approve_event.payload["review"] == "approved"
     assert reject_event.payload["review"] == "rejected"
     assert reject_event.payload["reason"] == "spam"
-    assert [call["action"] for call in audit_calls] == ["content_flag_approve", "content_flag_reject"]
+    assert [call["action"] for call in audit_calls] == [
+        "content_flag_approve",
+        "content_flag_reject",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -209,7 +212,9 @@ def test_admin_content_review_routes_return_not_found(
     path: str,
     query: str,
 ) -> None:
-    monkeypatch.setattr(content, "SessionLocal", _session_local(_Session(gets={("UserEvent", 404): None})))
+    monkeypatch.setattr(
+        content, "SessionLocal", _session_local(_Session(gets={("UserEvent", 404): None}))
+    )
 
     response = client.post(f"{path}{query}")
 

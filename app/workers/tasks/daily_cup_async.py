@@ -12,9 +12,7 @@ from app.game.tournaments.constants import (
     TOURNAMENT_STATUS_REGISTRATION,
     TOURNAMENT_TYPE_DAILY_ARENA,
 )
-from app.workers.tasks.daily_cup_config import (
-    TOURNAMENT_MIN_PARTICIPANTS,
-)
+from app.workers.tasks.daily_cup_config import TOURNAMENT_MIN_PARTICIPANTS
 from app.workers.tasks.daily_cup_core import (
     emit_daily_cup_events,
     ensure_daily_cup_registration_tournament,

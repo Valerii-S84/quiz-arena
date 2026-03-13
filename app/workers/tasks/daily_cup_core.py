@@ -21,9 +21,7 @@ from app.game.tournaments.constants import (
     TOURNAMENT_TYPE_DAILY_ARENA,
 )
 from app.game.tournaments.internal import generate_invite_code
-from app.workers.tasks.daily_cup_config import (
-    TOURNAMENT_MAX_PARTICIPANTS,
-)
+from app.workers.tasks.daily_cup_config import TOURNAMENT_MAX_PARTICIPANTS
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
 
 
