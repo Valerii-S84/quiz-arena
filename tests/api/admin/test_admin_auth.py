@@ -287,7 +287,8 @@ def test_admin_auth_setup_refresh_logout_and_session(
     monkeypatch.setattr(auth, "clear_auth_cookies", lambda response: clear_calls.append(True))
 
     setup = client.get("/admin/auth/2fa/setup")
-    refresh = client.post("/admin/auth/refresh", cookies={"qa_admin_refresh": "refresh-cookie"})
+    client.cookies.set("qa_admin_refresh", "refresh-cookie")
+    refresh = client.post("/admin/auth/refresh")
     session = client.get("/admin/auth/session")
     logout = client.post("/admin/auth/logout")
 
@@ -328,7 +329,8 @@ def test_admin_refresh_rejects_invalid_or_unverified_tokens(
         )
     monkeypatch.setattr(auth, "decode_refresh_token", lambda **kwargs: role_payload)
 
-    response = client.post("/admin/auth/refresh", cookies={"qa_admin_refresh": "refresh-cookie"})
+    client.cookies.set("qa_admin_refresh", "refresh-cookie")
+    response = client.post("/admin/auth/refresh")
 
     assert response.status_code == 401
     assert response.json() == {"detail": {"code": "E_UNAUTHORIZED"}}
