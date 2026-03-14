@@ -66,6 +66,9 @@ line_length = 100
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+filterwarnings = [
+  "ignore:'crypt' is deprecated and slated for removal in Python 3.13:DeprecationWarning",
+]
 
 [tool.mypy]
 python_version = "3.12"
