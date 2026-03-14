@@ -81,6 +81,12 @@ class UsersRepo:
         return result.rowcount or 0
 
     @staticmethod
+    async def get_global_best_streak(session: AsyncSession) -> int:
+        stmt = select(func.coalesce(func.max(StreakState.best_streak), 0))
+        result = await session.execute(stmt)
+        return int(result.scalar_one())
+
+    @staticmethod
     async def list_daily_push_targets(
         session: AsyncSession,
         *,

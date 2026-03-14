@@ -8,11 +8,9 @@ from sqlalchemy import func, select
 
 from app.db.models.entitlements import Entitlement
 from app.db.models.ledger_entries import LedgerEntry
-from app.db.models.mode_access import ModeAccess
 from app.db.models.purchases import Purchase
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.session import SessionLocal
-from app.economy.purchases.catalog import MEGA_PACK_MODE_CODES
 from app.economy.purchases.errors import PurchaseRefundValidationError
 from app.economy.purchases.service import PurchaseService
 from app.workers.tasks.payments_reliability import recover_paid_uncredited_async
@@ -180,49 +178,6 @@ async def test_refund_revokes_entitlements_for_source_purchase() -> None:
         )
         assert int(active_after or 0) == 0
         assert int(revoked_after or 0) >= 1
-
-
-@pytest.mark.asyncio
-async def test_refund_revokes_mode_access_for_source_purchase() -> None:
-    created_at = datetime(2026, 2, 18, 13, 45, tzinfo=UTC)
-    refunded_at = created_at + timedelta(hours=1)
-    user_id = await _create_user("inv-b-refund-mode-access")
-    purchase_id = await _create_credited_purchase(
-        user_id=user_id,
-        product_code="MEGA_PACK_15",
-        idempotency_prefix="inv-b-refund-mode-access",
-        now_utc=created_at,
-    )
-
-    async with SessionLocal.begin() as session:
-        active_before = await session.scalar(
-            select(func.count(ModeAccess.id)).where(
-                ModeAccess.source_purchase_id == purchase_id,
-                ModeAccess.status == "ACTIVE",
-            )
-        )
-    assert int(active_before or 0) == len(MEGA_PACK_MODE_CODES)
-
-    async with SessionLocal.begin() as session:
-        await PurchaseService.refund_purchase(
-            session,
-            purchase_id=purchase_id,
-            now_utc=refunded_at,
-        )
-
-    async with SessionLocal.begin() as session:
-        rows = list(
-            (
-                await session.execute(
-                    select(ModeAccess.status, ModeAccess.ends_at).where(
-                        ModeAccess.source_purchase_id == purchase_id
-                    )
-                )
-            ).all()
-        )
-        assert len(rows) == len(MEGA_PACK_MODE_CODES)
-        assert all(status == "REVOKED" for status, _ in rows)
-        assert all(ends_at is not None and ends_at <= refunded_at for _, ends_at in rows)
 
 
 @pytest.mark.asyncio

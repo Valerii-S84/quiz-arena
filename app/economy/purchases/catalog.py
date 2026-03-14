@@ -13,15 +13,8 @@ class ProductSpec:
     energy_credit: int
     premium_days: int = 0
     grants_streak_saver: bool = False
-    grants_mega_mode_access: bool = False
     friend_challenge_tickets: int = 0
 
-
-MEGA_PACK_MODE_CODES = (
-    "CASES_PRACTICE",
-    "TRENNBARE_VERBEN",
-    "WORD_ORDER",
-)
 
 PRODUCTS: dict[str, ProductSpec] = {
     "ENERGY_10": ProductSpec(
@@ -31,15 +24,6 @@ PRODUCTS: dict[str, ProductSpec] = {
         description="Sofort weiterspielen mit +10 Energie.",
         stars_amount=5,
         energy_credit=10,
-    ),
-    "MEGA_PACK_15": ProductSpec(
-        product_code="MEGA_PACK_15",
-        product_type="MICRO",
-        title="Mega Pack",
-        description="+15 Energie und 3 Modi für 24 Stunden.",
-        stars_amount=15,
-        energy_credit=15,
-        grants_mega_mode_access=True,
     ),
     "STREAK_SAVER_20": ProductSpec(
         product_code="STREAK_SAVER_20",
@@ -99,7 +83,6 @@ PRODUCTS: dict[str, ProductSpec] = {
 
 SOFT_DISABLED_PRODUCT_CODES: frozenset[str] = frozenset(
     {
-        "MEGA_PACK_15",
         "PREMIUM_SEASON",
         "PREMIUM_YEAR",
     }

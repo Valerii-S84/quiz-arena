@@ -6,18 +6,15 @@ from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.quiz_sessions import QuizSession
-from app.db.repo.entitlements_repo import EntitlementsRepo
-from app.db.repo.mode_access_repo import ModeAccessRepo
 from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.economy.energy.service import EnergyService
 from app.economy.streak.time import berlin_local_date
-from app.game.modes.rules import is_mode_allowed, is_zero_cost_source
+from app.game.modes.rules import is_zero_cost_source
 from app.game.questions.types import QuizQuestion
 from app.game.sessions.errors import (
     EnergyInsufficientError,
     FriendChallengeAccessError,
-    ModeLockedError,
     SessionNotFoundError,
 )
 from app.game.sessions.types import SessionQuestionView, StartSessionResult
@@ -65,20 +62,6 @@ async def start_session(
             local_date=local_date,
             now_utc=now_utc,
         )
-
-    premium_active = await EntitlementsRepo.has_active_premium(session, user_id, now_utc)
-    has_mode_access = await ModeAccessRepo.has_active_access(
-        session,
-        user_id=user_id,
-        mode_code=mode_code,
-        now_utc=now_utc,
-    )
-    if not is_mode_allowed(
-        mode_code=mode_code,
-        premium_active=premium_active,
-        has_mode_access=has_mode_access,
-    ):
-        raise ModeLockedError
 
     energy_free = 0
     energy_paid = 0

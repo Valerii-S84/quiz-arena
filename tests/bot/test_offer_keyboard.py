@@ -26,7 +26,7 @@ def test_offer_keyboard_skips_soft_disabled_products() -> None:
         trigger_code="TRG_ENERGY_ZERO",
         priority=100,
         text_key="msg.offer.energy.zero",
-        cta_product_codes=("MEGA_PACK_15", "PREMIUM_SEASON", "PREMIUM_YEAR", "PREMIUM_MONTH"),
+        cta_product_codes=("UNKNOWN_PRODUCT", "PREMIUM_SEASON", "PREMIUM_YEAR", "PREMIUM_MONTH"),
         idempotent_replay=False,
     )
 

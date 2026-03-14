@@ -8,7 +8,6 @@ from app.db.repo.referrals_repo import ReferralsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.economy.referrals.constants import (
     REFERRAL_REWARDS_PER_MONTH_CAP,
-    REWARD_CODE_MEGA_PACK,
     REWARD_CODE_PREMIUM_STARTER,
     REWARD_DELAY,
 )
@@ -27,10 +26,7 @@ async def claim_next_reward_choice(
     now_utc: datetime,
 ) -> ReferralClaimResult | None:
     normalized_reward_code = reward_code.strip().upper()
-    if normalized_reward_code not in {
-        REWARD_CODE_MEGA_PACK,
-        REWARD_CODE_PREMIUM_STARTER,
-    }:
+    if normalized_reward_code != REWARD_CODE_PREMIUM_STARTER:
         raise ValueError(f"unsupported reward code: {reward_code}")
 
     user = await UsersRepo.get_by_id(session, user_id)

@@ -7,8 +7,7 @@ from uuid import UUID
 import pytest
 
 from app.bot.handlers.gameplay_flows import play_flow
-from app.bot.texts.de import TEXTS_DE
-from app.game.sessions.errors import EnergyInsufficientError, ModeLockedError
+from app.game.sessions.errors import EnergyInsufficientError
 from app.game.sessions.types import AnswerSessionResult
 from tests.bot.gameplay_flow_fixtures import _start_result
 from tests.bot.helpers import DummyCallback, DummyMessage
@@ -83,38 +82,6 @@ async def test_continue_regular_mode_after_answer_sends_next_question() -> None:
     assert callback.message.answers[0].text == "next-question"
     assert callback.message.answers[0].kwargs["parse_mode"] == "HTML"
     assert callback.answer_calls == [{"text": None, "show_alert": False}]
-
-
-@pytest.mark.asyncio
-async def test_continue_regular_mode_after_answer_handles_locked_mode() -> None:
-    async def _ensure_home_snapshot(session, *, telegram_user):
-        del session, telegram_user
-        return _snapshot()
-
-    async def _start_session(*args, **kwargs):
-        del args, kwargs
-        raise ModeLockedError()
-
-    callback = _callback()
-
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(play_flow, "build_home_keyboard", lambda: {"home": True})
-
-        await play_flow.continue_regular_mode_after_answer(
-            callback,
-            result=_answer_result(),
-            now_utc=datetime(2026, 3, 13, 12, 0, tzinfo=UTC),
-            session_local=_SessionLocal(object()),
-            user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_ensure_home_snapshot),
-            game_session_service=SimpleNamespace(start_session=_start_session),
-            offer_service=SimpleNamespace(),
-            offer_logging_error=RuntimeError,
-            channel_bonus_service=SimpleNamespace(),
-            build_question_text=lambda **kwargs: "unused",
-        )
-
-    assert callback.message.answers[0].text == TEXTS_DE["msg.locked.mode"]
-    assert callback.message.answers[0].kwargs["reply_markup"] == {"home": True}
 
 
 @pytest.mark.asyncio

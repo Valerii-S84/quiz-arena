@@ -11,7 +11,6 @@ from app.db.models.energy_state import EnergyState
 from app.db.models.entitlements import Entitlement
 from app.db.models.friend_challenges import FriendChallenge
 from app.db.models.ledger_entries import LedgerEntry
-from app.db.models.mode_access import ModeAccess
 from app.db.models.mode_progress import ModeProgress
 from app.db.models.offers_impressions import OfferImpression
 from app.db.models.outbox_events import OutboxEvent
@@ -50,7 +49,6 @@ __all__ = [
     "Entitlement",
     "LedgerEntry",
     "ModeProgress",
-    "ModeAccess",
     "OfferImpression",
     "OutboxEvent",
     "ProcessedUpdate",

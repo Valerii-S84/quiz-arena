@@ -178,7 +178,7 @@ async def test_init_purchase_rejects_not_applicable_scope() -> None:
     user_id = await create_user("promo-scope-mismatch")
     _, redemption_id = await create_discount_promo_redemption(
         user_id=user_id,
-        product_code="MEGA_PACK_15",
+        product_code="PREMIUM_STARTER",
         discount_percent=50,
         now_utc=now_utc,
     )

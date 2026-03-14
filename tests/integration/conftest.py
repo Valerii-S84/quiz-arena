@@ -25,7 +25,6 @@ TRUNCATE_TABLES = (
     "tournament_matches",
     "tournament_participants",
     "tournaments",
-    "mode_access",
     "mode_progress",
     "entitlements",
     "ledger_entries",

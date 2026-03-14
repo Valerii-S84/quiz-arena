@@ -76,7 +76,7 @@ async def _seed_offer_dashboard_dataset(now_utc: datetime) -> None:
     purchase_2 = _purchase(
         purchase_id="p2",
         user_id=user_3,
-        product_code="MEGA_PACK_15",
+        product_code="PREMIUM_STARTER",
         created_at=now_utc - timedelta(hours=1),
     )
 
@@ -112,8 +112,8 @@ async def _seed_offer_dashboard_dataset(now_utc: datetime) -> None:
                 ),
                 OfferImpression(
                     user_id=user_2,
-                    offer_code="OFFER_LOCKED_MODE_MEGA",
-                    trigger_code="TRG_LOCKED_MODE_CLICK",
+                    offer_code="OFFER_PREMIUM_STARTER",
+                    trigger_code="TRG_ENERGY10_SECOND_BUY",
                     priority=90,
                     shown_at=now_utc - timedelta(minutes=80),
                     local_date_berlin=date(2026, 2, 19),
@@ -124,8 +124,8 @@ async def _seed_offer_dashboard_dataset(now_utc: datetime) -> None:
                 ),
                 OfferImpression(
                     user_id=user_3,
-                    offer_code="OFFER_LOCKED_MODE_MEGA",
-                    trigger_code="TRG_LOCKED_MODE_CLICK",
+                    offer_code="OFFER_PREMIUM_STARTER",
+                    trigger_code="TRG_ENERGY10_SECOND_BUY",
                     priority=90,
                     shown_at=now_utc - timedelta(minutes=70),
                     local_date_berlin=date(2026, 2, 19),
@@ -208,7 +208,7 @@ async def test_internal_offers_dashboard_returns_funnel_metrics_and_alert_flags(
     assert payload["top_offer_codes"] == {
         "OFFER_COMEBACK_3D": 2,
         "OFFER_ENERGY_ZERO": 2,
-        "OFFER_LOCKED_MODE_MEGA": 2,
+        "OFFER_PREMIUM_STARTER": 2,
     }
 
     assert payload["thresholds"] == {

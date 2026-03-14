@@ -7,7 +7,7 @@ import pytest
 
 from app.bot.handlers import referral
 from app.bot.texts.de import TEXTS_DE
-from app.economy.referrals.constants import REWARD_CODE_MEGA_PACK, REWARD_CODE_PREMIUM_STARTER
+from app.economy.referrals.constants import REWARD_CODE_PREMIUM_STARTER
 from app.economy.referrals.service import ReferralClaimResult, ReferralOverview
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
@@ -34,10 +34,12 @@ def _overview(*, claimable: int = 0) -> ReferralOverview:
 
 def test_build_claim_status_text_variants() -> None:
     claim = ReferralClaimResult(
-        status="CLAIMED", reward_code=REWARD_CODE_MEGA_PACK, overview=_overview()
+        status="CLAIMED",
+        reward_code=REWARD_CODE_PREMIUM_STARTER,
+        overview=_overview(),
     )
     assert (
-        referral._build_claim_status_text(claim) == TEXTS_DE["msg.referral.reward.claimed.megapack"]
+        referral._build_claim_status_text(claim) == TEXTS_DE["msg.referral.reward.claimed.premium"]
     )
 
     claim = ReferralClaimResult(status="TOO_EARLY", reward_code=None, overview=_overview())
@@ -124,7 +126,7 @@ async def test_handle_referral_reward_choice_success(monkeypatch) -> None:
     monkeypatch.setattr(referral, "emit_analytics_event", _fake_emit)
 
     callback = DummyCallback(
-        data="referral:reward:MEGA_PACK_15",
+        data="referral:reward:PREMIUM_STARTER",
         from_user=SimpleNamespace(id=9),
     )
     await referral.handle_referral_reward_choice(callback)
@@ -133,10 +135,6 @@ async def test_handle_referral_reward_choice_success(monkeypatch) -> None:
     assert TEXTS_DE["msg.referral.reward.claimed.premium"] in (response.text or "")
     assert "https://t.me/" not in (response.text or "")
     assert "referral_reward_claimed" in emitted_events
-
-
-def test_normalize_reward_choice_maps_legacy_mega_pack() -> None:
-    assert referral._normalize_reward_choice("MEGA_PACK_15") == REWARD_CODE_PREMIUM_STARTER
 
 
 @pytest.mark.asyncio

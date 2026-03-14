@@ -123,5 +123,5 @@ async def test_home_menu_shows_current_user_streak_and_global_best_streak(monkey
     await start.handle_start(message)
 
     home_text = message.answers[0].text or ""
-    assert "Serie: 14 | Beste: 27" in home_text
-    assert "Beste: 14" not in home_text
+    assert "Serie: 14 | Beste: 14 | 🏆 Rekord: 27" in home_text
+    assert "💎" not in home_text

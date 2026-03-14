@@ -8,6 +8,7 @@ QUICK_MIX_MODE_CODE = "QUICK_MIX_A1A2"
 QUICK_MIX_ELIGIBLE_SOURCE_FILES: Final[frozenset[str]] = frozenset(
     {
         "Adjektivendungen_Beginner_Bank_A1_A2_210.csv",
+        "Akkusativ_Dativ_Bank_A1_B1_210.csv",
         "Antonym_Match_Bank_A1_B1_210.csv",
         "LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv",
         "Lexical_Gap_Fill_Bank_A2_B1_210.csv",
@@ -17,10 +18,12 @@ QUICK_MIX_ELIGIBLE_SOURCE_FILES: Final[frozenset[str]] = frozenset(
         "Plural_Check_Bank_500.csv",
         "Possessive_Adjectives_Bank_A2_B1_210.csv",
         "Preposition_Selection_Bank_A2_B1_210.csv",
+        "Satzbau_Bank_A2_B1_210.csv",
         "Synonym_Match_Bank_A1_B1_210.csv",
         "Topic_Vocabulary_Themes_Bank_A2_B1_210.csv",
         "Verb_Conjugation_Bank_A2_B1_210.csv",
         "W_Fragen_Bank_630.csv",
+        "trennbare_verben_210_korrigiert.csv",
     }
 )
 MODE_POOL_FILTERS: Final[dict[str, dict[str, bool]]] = {

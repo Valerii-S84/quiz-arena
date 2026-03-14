@@ -11,6 +11,7 @@ from scripts.quizbank_import_tool import _build_records, _validate_replace_all_s
 PROD_DB_URL = "postgresql+asyncpg://quiz:secret@db:5432/quiz_arena"
 EXPECTED_QUICK_MIX_SOURCE_FILES = {
     "Adjektivendungen_Beginner_Bank_A1_A2_210.csv",
+    "Akkusativ_Dativ_Bank_A1_B1_210.csv",
     "Antonym_Match_Bank_A1_B1_210.csv",
     "LOGIK_LUECKE_Denken_auf_Deutsch_Bank_500.csv",
     "Lexical_Gap_Fill_Bank_A2_B1_210.csv",
@@ -20,10 +21,12 @@ EXPECTED_QUICK_MIX_SOURCE_FILES = {
     "Plural_Check_Bank_500.csv",
     "Possessive_Adjectives_Bank_A2_B1_210.csv",
     "Preposition_Selection_Bank_A2_B1_210.csv",
+    "Satzbau_Bank_A2_B1_210.csv",
     "Synonym_Match_Bank_A1_B1_210.csv",
     "Topic_Vocabulary_Themes_Bank_A2_B1_210.csv",
     "Verb_Conjugation_Bank_A2_B1_210.csv",
     "W_Fragen_Bank_630.csv",
+    "trennbare_verben_210_korrigiert.csv",
 }
 
 
@@ -113,6 +116,18 @@ def test_build_records_marks_only_quick_mix_whitelist_sources_as_eligible(tmp_pa
         question_id="qm_seed_1",
     )
     _write_quizbank_csv(
+        tmp_path / "Akkusativ_Dativ_Bank_A1_B1_210.csv",
+        question_id="cases_seed_1",
+    )
+    _write_quizbank_csv(
+        tmp_path / "Satzbau_Bank_A2_B1_210.csv",
+        question_id="word_order_seed_1",
+    )
+    _write_quizbank_csv(
+        tmp_path / "trennbare_verben_210_korrigiert.csv",
+        question_id="verbs_seed_1",
+    )
+    _write_quizbank_csv(
         tmp_path / "Artikel_Sprint_Bank_A1_B2_1000.csv",
         question_id="artikel_seed_1",
     )
@@ -126,13 +141,19 @@ def test_build_records_marks_only_quick_mix_whitelist_sources_as_eligible(tmp_pa
         )
     )
 
-    assert summary.total_rows_imported == 2
+    assert summary.total_rows_imported == 5
     assert by_mode["QUICK_MIX_A1A2"] == 1
+    assert by_mode["CASES_PRACTICE"] == 1
+    assert by_mode["WORD_ORDER"] == 1
+    assert by_mode["TRENNBARE_VERBEN"] == 1
     assert by_mode["ARTIKEL_SPRINT"] == 1
     eligibility_by_source = {
         str(record["source_file"]): bool(record["quick_mix_eligible"]) for record in records
     }
     assert eligibility_by_source == {
         "Adjektivendungen_Beginner_Bank_A1_A2_210.csv": True,
+        "Akkusativ_Dativ_Bank_A1_B1_210.csv": True,
+        "Satzbau_Bank_A2_B1_210.csv": True,
+        "trennbare_verben_210_korrigiert.csv": True,
         "Artikel_Sprint_Bank_A1_B2_1000.csv": False,
     }

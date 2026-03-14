@@ -37,15 +37,17 @@ def _build_home_text(
     paid_energy: int,
     current_streak: int,
     best_streak: int,
+    global_best_streak: int,
+    premium_active: bool,
     daily_cup_badge_unlocked: bool = False,
 ) -> str:
-    stats_line = TEXTS_DE["msg.home.stats.summary"].format(
-        current_streak=current_streak,
-        best_streak=best_streak,
-        free_energy=free_energy,
-        paid_energy=paid_energy,
-    )
-    lines = [TEXTS_DE["msg.home.title"], stats_line]
+    del paid_energy
+    stats_line = f"Serie: {current_streak} | Beste: {best_streak} | 🏆 Rekord: {global_best_streak}"
+    energy_line = f"⚡ {free_energy}/20"
+    if premium_active:
+        energy_line = f"{energy_line} | 💎 Premium aktiv"
+
+    lines = [stats_line, energy_line]
     if daily_cup_badge_unlocked:
         lines.append(TEXTS_DE["msg.home.badge.daily_cup_5"])
     lines.append(TEXTS_DE["msg.home.hint"])

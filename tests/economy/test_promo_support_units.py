@@ -94,7 +94,7 @@ async def test_build_idempotent_result_returns_premium_grant_without_entitlement
 async def test_build_idempotent_result_returns_percent_discount_snapshot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    promo_code = _promo_code(applicable_products=["ENERGY_10", "MEGA_PACK_15"])
+    promo_code = _promo_code(applicable_products=["ENERGY_10", "PREMIUM_STARTER"])
 
     async def _fake_get_code_by_id(_session, _promo_code_id):
         return promo_code
@@ -115,7 +115,7 @@ async def test_build_idempotent_result_returns_percent_discount_snapshot(
     assert result.discount_type == "PERCENT"
     assert result.discount_value == 40
     assert result.reserved_until == reserved_until
-    assert result.applicable_products == ["ENERGY_10", "MEGA_PACK_15"]
+    assert result.applicable_products == ["ENERGY_10", "PREMIUM_STARTER"]
 
 
 @pytest.mark.asyncio

@@ -38,6 +38,13 @@ def test_quick_mix_static_bank_questions_are_eligible_when_flag_exists() -> None
         assert getattr(question, "quick_mix_eligible", True) is True
 
 
+def test_quick_mix_static_bank_includes_newly_opened_mode_categories() -> None:
+    categories = {question.category for question in _question_pool_for_mode("QUICK_MIX_A1A2")}
+    assert "Cases_Practice" in categories
+    assert "Trennbare_Verben" in categories
+    assert "Word_Order" in categories
+
+
 def test_artikel_sprint_static_bank_questions_are_not_quick_mix_eligible() -> None:
     for question in _question_pool_for_mode("ARTIKEL_SPRINT"):
         assert getattr(question, "quick_mix_eligible", False) is False

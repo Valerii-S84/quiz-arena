@@ -38,6 +38,21 @@ from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
 
 
+def _build_home_response_text(snapshot: object) -> str:
+    current_streak = getattr(snapshot, "current_streak", 0)
+    best_streak = getattr(snapshot, "best_streak", current_streak)
+    global_best_streak = getattr(snapshot, "global_best_streak", best_streak)
+    return _build_home_text(
+        free_energy=getattr(snapshot, "free_energy", 0),
+        paid_energy=getattr(snapshot, "paid_energy", 0),
+        current_streak=current_streak,
+        best_streak=best_streak,
+        global_best_streak=global_best_streak,
+        premium_active=getattr(snapshot, "premium_active", False),
+        daily_cup_badge_unlocked=getattr(snapshot, "daily_cup_badge_unlocked", False),
+    )
+
+
 async def handle_start_message(message: Message) -> None:
     if message.from_user is None:
         await message.answer(TEXTS_DE["msg.system.error"])
@@ -123,17 +138,7 @@ async def handle_start_message(message: Message) -> None:
                 )
         return
 
-    response_text = _build_home_text(
-        free_energy=snapshot.free_energy,
-        paid_energy=snapshot.paid_energy,
-        current_streak=snapshot.current_streak,
-        best_streak=getattr(
-            snapshot,
-            "global_best_streak",
-            getattr(snapshot, "best_streak", snapshot.current_streak),
-        ),
-        daily_cup_badge_unlocked=getattr(snapshot, "daily_cup_badge_unlocked", False),
-    )
+    response_text = _build_home_response_text(snapshot)
     await _send_home_message(
         message,
         text=response_text,
@@ -178,17 +183,7 @@ async def handle_home_open(callback: CallbackQuery) -> None:
             telegram_user=callback.from_user,
         )
 
-    response_text = _build_home_text(
-        free_energy=snapshot.free_energy,
-        paid_energy=snapshot.paid_energy,
-        current_streak=snapshot.current_streak,
-        best_streak=getattr(
-            snapshot,
-            "global_best_streak",
-            getattr(snapshot, "best_streak", snapshot.current_streak),
-        ),
-        daily_cup_badge_unlocked=getattr(snapshot, "daily_cup_badge_unlocked", False),
-    )
+    response_text = _build_home_response_text(snapshot)
     await _send_home_message(
         callback.message,
         text=response_text,

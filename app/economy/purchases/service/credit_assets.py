@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.ledger_entries import LedgerEntry
-from app.db.models.mode_access import ModeAccess
 from app.db.models.purchases import Purchase
 from app.db.repo.ledger_repo import LedgerRepo
-from app.db.repo.mode_access_repo import ModeAccessRepo
 from app.db.repo.streak_repo import StreakRepo
 from app.economy.energy.service import EnergyService
-from app.economy.purchases.catalog import MEGA_PACK_MODE_CODES, ProductSpec
+from app.economy.purchases.catalog import ProductSpec
 
 from .entitlements import _apply_premium_entitlement
 from .events import _emit_purchase_event
@@ -24,8 +22,6 @@ def build_asset_breakdown(product: ProductSpec) -> dict[str, object]:
         breakdown["paid_energy"] = product.energy_credit
     if product.premium_days > 0:
         breakdown["premium_days"] = product.premium_days
-    if product.grants_mega_mode_access:
-        breakdown["mode_codes"] = list(MEGA_PACK_MODE_CODES)
     if product.grants_streak_saver:
         breakdown["streak_saver_tokens"] = 1
     if product.friend_challenge_tickets > 0:
@@ -62,32 +58,6 @@ async def credit_purchase_assets(
 
     if product.grants_streak_saver:
         await StreakRepo.add_streak_saver_token(session, user_id=user_id, now_utc=now_utc)
-
-    if product.grants_mega_mode_access:
-        for mode_code in MEGA_PACK_MODE_CODES:
-            latest_end = await ModeAccessRepo.get_latest_active_end(
-                session,
-                user_id=user_id,
-                mode_code=mode_code,
-                source="MEGA_PACK",
-                now_utc=now_utc,
-            )
-            starts_at = latest_end if latest_end is not None and latest_end > now_utc else now_utc
-            ends_at = starts_at + timedelta(hours=24)
-            await ModeAccessRepo.create(
-                session,
-                mode_access=ModeAccess(
-                    user_id=user_id,
-                    mode_code=mode_code,
-                    source="MEGA_PACK",
-                    starts_at=starts_at,
-                    ends_at=ends_at,
-                    status="ACTIVE",
-                    source_purchase_id=purchase.id,
-                    idempotency_key=f"mode_access:{purchase.id}:{mode_code}",
-                    created_at=now_utc,
-                ),
-            )
 
     if purchase.applied_promo_code_id is not None:
         promo_redemption, promo_code = await _validate_reserved_discount_for_purchase(
