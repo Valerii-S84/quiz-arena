@@ -68,7 +68,7 @@ async def test_telegram_webhook_smoke_referral_reward_choice_duplicate_replay(
                 update_id=1_010_001,
                 telegram_user_id=referrer.telegram_user_id,
                 callback_query_id="cb-ref-reward-1",
-                data="referral:reward:MEGA_PACK_15",
+                data="referral:reward:PREMIUM_STARTER",
             ),
         )
         await queue.drain()
@@ -79,7 +79,7 @@ async def test_telegram_webhook_smoke_referral_reward_choice_duplicate_replay(
                 update_id=1_010_002,
                 telegram_user_id=referrer.telegram_user_id,
                 callback_query_id="cb-ref-reward-dup-1",
-                data="referral:reward:MEGA_PACK_15",
+                data="referral:reward:PREMIUM_STARTER",
             ),
         )
         await queue.drain()

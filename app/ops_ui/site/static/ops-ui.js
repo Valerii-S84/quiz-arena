@@ -84,9 +84,6 @@
     if (value === "ENERGY_10") {
       return "+10 Energie";
     }
-    if (value === "MEGA_PACK_15") {
-      return "Mega-Paket";
-    }
     if (value === "STREAK_SAVER_20") {
       return "Serien-Schutz";
     }

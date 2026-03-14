@@ -4,7 +4,6 @@ from app.economy.purchases.catalog import get_product
 
 PROMO_PRODUCT_LABELS = {
     "ENERGY_10": "+10 Energie",
-    "MEGA_PACK_15": "Mega-Paket",
     "STREAK_SAVER_20": "Serien-Schutz",
     "FRIEND_CHALLENGE_5": "Duell-Ticket",
     "PREMIUM_STARTER": "Premium Start",

@@ -122,11 +122,22 @@ async def test_quick_mix_pool_excludes_noneligible_active_questions() -> None:
 
 
 @pytest.mark.asyncio
-async def test_quick_mix_anti_repeat_still_excludes_recent_eligible_ids() -> None:
+@pytest.mark.parametrize(
+    ("cross_mode_code", "source_file"),
+    [
+        ("CASES_PRACTICE", "quick_mix_cases_seed.csv"),
+        ("TRENNBARE_VERBEN", "quick_mix_trennbare_seed.csv"),
+        ("WORD_ORDER", "quick_mix_word_order_seed.csv"),
+    ],
+)
+async def test_quick_mix_anti_repeat_still_excludes_recent_eligible_cross_mode_ids(
+    cross_mode_code: str,
+    source_file: str,
+) -> None:
     now_utc = datetime(2026, 3, 11, 10, 30, tzinfo=UTC)
     suffix = uuid4().hex[:8]
     recent_question_id = f"qm_recent_{suffix}"
-    fresh_question_id = f"qm_fresh_{suffix}"
+    fresh_question_id = f"{cross_mode_code.lower()}_{suffix}"
 
     async with SessionLocal.begin() as session:
         session.add_all(
@@ -141,9 +152,9 @@ async def test_quick_mix_anti_repeat_still_excludes_recent_eligible_ids() -> Non
                 ),
                 _build_question(
                     question_id=fresh_question_id,
-                    mode_code="WORD_ORDER",
+                    mode_code=cross_mode_code,
                     level="A1",
-                    source_file="quick_mix_cross_mode_seed.csv",
+                    source_file=source_file,
                     quick_mix_eligible=True,
                     now_utc=now_utc,
                 ),

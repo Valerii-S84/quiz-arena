@@ -7,11 +7,7 @@ import pytest
 
 from app.bot.handlers.gameplay_flows import play_flow
 from app.bot.texts.de import TEXTS_DE
-from app.game.sessions.errors import (
-    DailyChallengeAlreadyPlayedError,
-    EnergyInsufficientError,
-    ModeLockedError,
-)
+from app.game.sessions.errors import DailyChallengeAlreadyPlayedError, EnergyInsufficientError
 from app.game.sessions.types import FriendChallengeRoundStartResult
 from tests.bot.gameplay_flow_fixtures import _challenge_snapshot, _start_result
 from tests.bot.helpers import DummyCallback, DummyMessage
@@ -81,7 +77,6 @@ async def test_start_mode_shows_system_error_when_callback_is_incomplete(
         offer_service=SimpleNamespace(),
         offer_logging_error=RuntimeError,
         channel_bonus_service=SimpleNamespace(),
-        trg_locked_mode_click="locked",
         build_question_text=lambda **kwargs: str(kwargs),
     )
 
@@ -110,92 +105,12 @@ async def test_start_mode_sends_first_question_for_happy_path() -> None:
         offer_service=SimpleNamespace(),
         offer_logging_error=RuntimeError,
         channel_bonus_service=SimpleNamespace(),
-        trg_locked_mode_click="locked",
         build_question_text=lambda **kwargs: "question-text",
     )
 
     assert callback.message.answers[0].text == "question-text"
     assert callback.message.answers[0].kwargs["parse_mode"] == "HTML"
     assert callback.answer_calls == [{"text": None, "show_alert": False}]
-
-
-@pytest.mark.asyncio
-async def test_start_mode_handles_locked_mode_with_offer() -> None:
-    async def _start_session(*args, **kwargs):
-        del args, kwargs
-        raise ModeLockedError()
-
-    async def _evaluate_offer(*args, **kwargs):
-        del args, kwargs
-        return SimpleNamespace(
-            text_key="msg.locked.mode", impression_id="imp", cta_product_codes=()
-        )
-
-    user_onboarding_service, game_session_service = _services_for_start(
-        start_session=_start_session
-    )
-    callback = _build_callback()
-
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(
-            play_flow, "build_offer_keyboard", lambda selection: {"offer": selection.impression_id}
-        )
-
-        await play_flow.start_mode(
-            callback,
-            mode_code="ARTIKEL_SPRINT",
-            source="MENU",
-            idempotency_key="start:2",
-            session_local=_SessionLocal(object()),
-            user_onboarding_service=user_onboarding_service,
-            game_session_service=game_session_service,
-            offer_service=SimpleNamespace(evaluate_and_log_offer=_evaluate_offer),
-            offer_logging_error=RuntimeError,
-            channel_bonus_service=SimpleNamespace(),
-            trg_locked_mode_click="locked",
-            build_question_text=lambda **kwargs: "unused",
-        )
-
-    assert callback.message.answers[0].text == TEXTS_DE["msg.locked.mode"]
-    assert callback.message.answers[0].kwargs["reply_markup"] == {"offer": "imp"}
-    assert callback.answer_calls == [{"text": None, "show_alert": False}]
-
-
-@pytest.mark.asyncio
-async def test_start_mode_handles_locked_mode_when_offer_logging_fails() -> None:
-    async def _start_session(*args, **kwargs):
-        del args, kwargs
-        raise ModeLockedError()
-
-    async def _evaluate_offer(*args, **kwargs):
-        del args, kwargs
-        raise RuntimeError("offer logging failed")
-
-    user_onboarding_service, game_session_service = _services_for_start(
-        start_session=_start_session
-    )
-    callback = _build_callback()
-
-    with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(play_flow, "build_home_keyboard", lambda: {"home": True})
-
-        await play_flow.start_mode(
-            callback,
-            mode_code="ARTIKEL_SPRINT",
-            source="MENU",
-            idempotency_key="start:3",
-            session_local=_SessionLocal(object()),
-            user_onboarding_service=user_onboarding_service,
-            game_session_service=game_session_service,
-            offer_service=SimpleNamespace(evaluate_and_log_offer=_evaluate_offer),
-            offer_logging_error=RuntimeError,
-            channel_bonus_service=SimpleNamespace(),
-            trg_locked_mode_click="locked",
-            build_question_text=lambda **kwargs: "unused",
-        )
-
-    assert callback.message.answers[0].text == TEXTS_DE["msg.locked.mode"]
-    assert callback.message.answers[0].kwargs["reply_markup"] == {"home": True}
 
 
 @pytest.mark.asyncio
@@ -229,7 +144,6 @@ async def test_start_mode_delegates_energy_insufficient_handling() -> None:
             offer_service=SimpleNamespace(),
             offer_logging_error=RuntimeError,
             channel_bonus_service=SimpleNamespace(),
-            trg_locked_mode_click="locked",
             build_question_text=lambda **kwargs: "unused",
         )
 
@@ -263,7 +177,6 @@ async def test_start_mode_handles_daily_challenge_already_played() -> None:
             offer_service=SimpleNamespace(),
             offer_logging_error=RuntimeError,
             channel_bonus_service=SimpleNamespace(),
-            trg_locked_mode_click="locked",
             build_question_text=lambda **kwargs: "unused",
         )
 

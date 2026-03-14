@@ -4,9 +4,9 @@ MODE_LABELS: dict[str, str] = {
     "QUICK_MIX_A1A2": "Schnell-Runde",
     "ARTIKEL_SPRINT": "Artikel-Training",
     "DAILY_CHALLENGE": "DAILY CHALLENGE",
-    "CASES_PRACTICE": "CASES PRACTICE",
-    "TRENNBARE_VERBEN": "TRENNBARE VERBEN",
-    "WORD_ORDER": "WORD ORDER",
+    "CASES_PRACTICE": "Fälle-Training",
+    "TRENNBARE_VERBEN": "Trennbare Verben",
+    "WORD_ORDER": "Wortstellung",
 }
 
 

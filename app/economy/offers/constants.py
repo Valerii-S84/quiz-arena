@@ -7,12 +7,10 @@ from app.economy.offers.types import OfferTemplate
 TRG_ENERGY_ZERO = "TRG_ENERGY_ZERO"
 TRG_ENERGY_LOW = "TRG_ENERGY_LOW"
 TRG_ENERGY10_SECOND_BUY = "TRG_ENERGY10_SECOND_BUY"
-TRG_LOCKED_MODE_CLICK = "TRG_LOCKED_MODE_CLICK"
 TRG_STREAK_GT7 = "TRG_STREAK_GT7"
 TRG_STREAK_RISK_22 = "TRG_STREAK_RISK_22"
 TRG_STREAK_MILESTONE_30 = "TRG_STREAK_MILESTONE_30"
 TRG_COMEBACK_3D = "TRG_COMEBACK_3D"
-TRG_MEGA_THIRD_BUY = "TRG_MEGA_THIRD_BUY"
 TRG_STARTER_EXPIRED = "TRG_STARTER_EXPIRED"
 TRG_MONTH_EXPIRING = "TRG_MONTH_EXPIRING"
 TRG_WEEKEND_FLASH = "TRG_WEEKEND_FLASH"
@@ -20,11 +18,9 @@ TRG_WEEKEND_FLASH = "TRG_WEEKEND_FLASH"
 TRIGGER_RESOLUTION_ORDER: tuple[str, ...] = (
     TRG_ENERGY_ZERO,
     TRG_STREAK_RISK_22,
-    TRG_LOCKED_MODE_CLICK,
     TRG_STARTER_EXPIRED,
     TRG_COMEBACK_3D,
     TRG_ENERGY10_SECOND_BUY,
-    TRG_MEGA_THIRD_BUY,
     TRG_MONTH_EXPIRING,
     TRG_ENERGY_LOW,
     TRG_STREAK_GT7,
@@ -40,7 +36,6 @@ OFFER_REPEAT_COOLDOWN = timedelta(hours=24)
 OFFER_MUTE_WINDOW = timedelta(hours=72)
 
 ENERGY10_SECOND_BUY_WINDOW = timedelta(days=7)
-MEGA_THIRD_BUY_WINDOW = timedelta(days=14)
 COMEBACK_WINDOW_DAYS = 3
 STARTER_EXPIRED_WINDOW = timedelta(hours=48)
 MONTH_EXPIRING_WINDOW = timedelta(hours=72)
@@ -51,7 +46,7 @@ OFFER_TEMPLATES: dict[str, OfferTemplate] = {
         trigger_code=TRG_ENERGY_ZERO,
         priority=100,
         text_key="msg.offer.energy.zero",
-        cta_product_codes=("ENERGY_10", "MEGA_PACK_15", "PREMIUM_MONTH"),
+        cta_product_codes=("ENERGY_10", "PREMIUM_MONTH"),
         blocking_modal=True,
     ),
     TRG_ENERGY_LOW: OfferTemplate(
@@ -67,15 +62,7 @@ OFFER_TEMPLATES: dict[str, OfferTemplate] = {
         trigger_code=TRG_ENERGY10_SECOND_BUY,
         priority=80,
         text_key="msg.offer.mega.after_second_energy",
-        cta_product_codes=("MEGA_PACK_15",),
-        blocking_modal=True,
-    ),
-    TRG_LOCKED_MODE_CLICK: OfferTemplate(
-        offer_code="OFFER_LOCKED_MODE_MEGA",
-        trigger_code=TRG_LOCKED_MODE_CLICK,
-        priority=90,
-        text_key="msg.offer.locked.mode",
-        cta_product_codes=("MEGA_PACK_15",),
+        cta_product_codes=("PREMIUM_STARTER",),
         blocking_modal=True,
     ),
     TRG_STREAK_GT7: OfferTemplate(
@@ -83,7 +70,7 @@ OFFER_TEMPLATES: dict[str, OfferTemplate] = {
         trigger_code=TRG_STREAK_GT7,
         priority=50,
         text_key="msg.offer.streak.gt7",
-        cta_product_codes=("MEGA_PACK_15",),
+        cta_product_codes=("PREMIUM_STARTER",),
         blocking_modal=True,
     ),
     TRG_STREAK_RISK_22: OfferTemplate(
@@ -107,14 +94,6 @@ OFFER_TEMPLATES: dict[str, OfferTemplate] = {
         trigger_code=TRG_COMEBACK_3D,
         priority=85,
         text_key="msg.offer.comeback",
-        cta_product_codes=("MEGA_PACK_15",),
-        blocking_modal=True,
-    ),
-    TRG_MEGA_THIRD_BUY: OfferTemplate(
-        offer_code="OFFER_PREMIUM_STARTER",
-        trigger_code=TRG_MEGA_THIRD_BUY,
-        priority=88,
-        text_key="msg.offer.mega.third.buy",
         cta_product_codes=("PREMIUM_STARTER",),
         blocking_modal=True,
     ),
@@ -139,7 +118,7 @@ OFFER_TEMPLATES: dict[str, OfferTemplate] = {
         trigger_code=TRG_WEEKEND_FLASH,
         priority=40,
         text_key="msg.offer.weekend.flash",
-        cta_product_codes=("MEGA_PACK_15",),
+        cta_product_codes=("PREMIUM_STARTER",),
         blocking_modal=False,
     ),
 }

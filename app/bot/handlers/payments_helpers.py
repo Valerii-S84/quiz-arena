@@ -50,7 +50,6 @@ def success_text_key(product_code: str) -> str:
     return {
         "ENERGY_10": "msg.purchase.success.energy10",
         "FRIEND_CHALLENGE_5": "msg.purchase.success.friend_challenge_ticket",
-        "MEGA_PACK_15": "msg.purchase.success.megapack",
         "STREAK_SAVER_20": "msg.purchase.success.streaksaver",
         "PREMIUM_STARTER": "msg.purchase.success.premium",
         "PREMIUM_MONTH": "msg.purchase.success.premium",

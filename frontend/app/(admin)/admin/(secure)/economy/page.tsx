@@ -9,7 +9,6 @@ import { fetchEconomyCohorts, fetchEconomyPurchases, fetchEconomySubscriptions }
 const palette = ["#295065", "#89f5c7", "#f58d74", "#e6bc77", "#5f8ea8"];
 const PRODUCT_LABELS: Record<string, string> = {
   ENERGY_10: "Energie +10",
-  MEGA_PACK_15: "Mega Pack",
   STREAK_SAVER_20: "Streak Saver",
   FRIEND_CHALLENGE_5: "Duell-Ticket",
   PREMIUM_STARTER: "Premium Starter",

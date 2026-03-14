@@ -9,7 +9,6 @@ from app.db.models.ledger_entries import LedgerEntry
 from app.db.repo.energy_repo import EnergyRepo
 from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.ledger_repo import LedgerRepo
-from app.db.repo.mode_access_repo import ModeAccessRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.streak_repo import StreakRepo
 from app.economy.energy.time import berlin_local_date
@@ -149,12 +148,6 @@ async def refund_purchase(
             purchase_id=purchase.id,
             now_utc=now_utc,
         )
-        await ModeAccessRepo.revoke_active_by_purchase(
-            session,
-            purchase_id=purchase.id,
-            now_utc=now_utc,
-        )
-
     purchase.status = "REFUNDED"
     purchase.refunded_at = purchase.refunded_at or now_utc
 

@@ -99,6 +99,23 @@ def test_transition_at_risk_to_active_today_on_activity() -> None:
     assert classify_streak_state(state_after) == StreakStateLabel.ACTIVE_TODAY
 
 
+def test_record_activity_updates_best_streak_when_new_record_is_reached() -> None:
+    day = date(2026, 2, 18)
+    state_before = snapshot(
+        current_streak=5,
+        best_streak=5,
+        today_status=StreakTodayStatus.NO_ACTIVITY,
+        updated_at=datetime(2026, 2, 18, 1, 0, tzinfo=UTC),
+        last_activity_local_date=date(2026, 2, 17),
+    )
+
+    state_after, counted = record_activity(state_before, local_date=day)
+
+    assert counted is True
+    assert state_after.current_streak == 6
+    assert state_after.best_streak == 6
+
+
 def test_transition_at_risk_to_frozen_today_with_saver() -> None:
     state_before = snapshot(
         current_streak=8,

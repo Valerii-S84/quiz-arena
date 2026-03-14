@@ -13,11 +13,7 @@ from app.db.models.streak_state import StreakState
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.energy.constants import BERLIN_TIMEZONE
-from app.economy.offers.constants import (
-    OFFER_NOT_SHOW_DISMISS_REASON,
-    TRG_ENERGY_ZERO,
-    TRG_LOCKED_MODE_CLICK,
-)
+from app.economy.offers.constants import OFFER_NOT_SHOW_DISMISS_REASON, TRG_ENERGY_ZERO
 from app.economy.offers.service import OfferService
 from tests.integration.stable_ids import stable_telegram_user_id
 
@@ -109,7 +105,7 @@ async def _insert_offer_impression(
 
 
 @pytest.mark.asyncio
-async def test_offer_priority_prefers_energy_zero_over_locked_mode_click() -> None:
+async def test_offer_priority_prefers_energy_zero_over_other_trigger_event() -> None:
     now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
     user_id = await _create_user_with_state(
         seed="offer-priority",
@@ -124,7 +120,7 @@ async def test_offer_priority_prefers_energy_zero_over_locked_mode_click() -> No
             user_id=user_id,
             idempotency_key="offer-priority-1",
             now_utc=now_utc,
-            trigger_event=TRG_LOCKED_MODE_CLICK,
+            trigger_event="ignored",
         )
 
     assert selection is not None
@@ -179,8 +175,8 @@ async def test_offer_blocking_modal_cap_blocks_new_blocking_offer_for_6h() -> No
     await _insert_offer_impression(
         user_id=user_id,
         now_utc=now_utc.replace(hour=11),
-        offer_code="OFFER_LOCKED_MODE_MEGA",
-        trigger_code=TRG_LOCKED_MODE_CLICK,
+        offer_code="OFFER_ENERGY_ZERO",
+        trigger_code=TRG_ENERGY_ZERO,
         priority=90,
     )
 

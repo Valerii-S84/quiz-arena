@@ -9,7 +9,7 @@ from .queries import get_referrer_overview
 from .registration import extract_referral_code_from_start_payload, register_start_for_new_user
 from .rewards_claim import claim_next_reward_choice
 from .rewards_distribution import run_reward_distribution
-from .rewards_grant import _grant_mega_pack_reward, _grant_premium_starter_reward, _grant_reward
+from .rewards_grant import _grant_premium_starter_reward, _grant_reward
 from .time_utils import _berlin_datetime, _berlin_day_bounds_utc, _berlin_month_bounds_utc
 
 
@@ -26,7 +26,6 @@ class ReferralService:
     register_start_for_new_user = staticmethod(register_start_for_new_user)
     reserve_post_game_prompt = staticmethod(reserve_post_game_prompt)
     run_qualification_checks = staticmethod(run_qualification_checks)
-    _grant_mega_pack_reward = staticmethod(_grant_mega_pack_reward)
     _grant_premium_starter_reward = staticmethod(_grant_premium_starter_reward)
     _grant_reward = staticmethod(_grant_reward)
     claim_next_reward_choice = staticmethod(claim_next_reward_choice)

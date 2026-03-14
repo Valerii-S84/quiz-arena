@@ -12,7 +12,6 @@ from app.db.repo.energy_repo import EnergyRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.session import SessionLocal
 from app.economy.energy.time import berlin_local_date
-from app.economy.purchases.catalog import MEGA_PACK_MODE_CODES
 from app.economy.purchases.service import PurchaseService
 from tests.integration.payments_idempotency_fixtures import UTC, _create_user
 
@@ -58,7 +57,7 @@ async def test_credit_creates_single_ledger_entry_per_purchase() -> None:
     user_id = await _create_user("inv-a-credit-single-entry")
     purchase_id, final_stars_amount = await _create_credited_purchase(
         user_id=user_id,
-        product_code="MEGA_PACK_15",
+        product_code="ENERGY_10",
         idempotency_prefix="inv-a-credit-single-entry",
         now_utc=now_utc,
     )
@@ -81,10 +80,9 @@ async def test_credit_creates_single_ledger_entry_per_purchase() -> None:
         )
         assert entry is not None
         assert entry.amount == final_stars_amount
-        assert entry.metadata_["product_code"] == "MEGA_PACK_15"
+        assert entry.metadata_["product_code"] == "ENERGY_10"
         assert entry.metadata_["asset_breakdown"] == {
-            "paid_energy": 15,
-            "mode_codes": list(MEGA_PACK_MODE_CODES),
+            "paid_energy": 10,
         }
 
 

@@ -7,7 +7,6 @@ from sqlalchemy import func, select
 
 from app.db.models.ledger_entries import LedgerEntry
 from app.db.session import SessionLocal
-from app.economy.purchases.catalog import MEGA_PACK_MODE_CODES
 from app.economy.purchases.service import PurchaseService
 from tests.integration.payments_idempotency_fixtures import UTC, _create_user
 
@@ -17,10 +16,6 @@ from tests.integration.payments_idempotency_fixtures import UTC, _create_user
     ("product_code", "expected_breakdown"),
     [
         ("ENERGY_10", {"paid_energy": 10}),
-        (
-            "MEGA_PACK_15",
-            {"paid_energy": 15, "mode_codes": list(MEGA_PACK_MODE_CODES)},
-        ),
         ("PREMIUM_MONTH", {"premium_days": 30}),
         ("STREAK_SAVER_20", {"streak_saver_tokens": 1}),
     ],

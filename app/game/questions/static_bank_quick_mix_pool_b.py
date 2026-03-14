@@ -121,4 +121,33 @@ _QUICK_MIX_ITEMS_B: tuple[tuple[str, str, tuple[str, str, str, str], int, str, s
         "B2",
         "Adjektivendungen",
     ),
+    (
+        "qm_a1a2_031",
+        "Ich gebe ___ Mann den Schlüssel.",
+        ("dem", "den", "des", "der"),
+        0,
+        "A2",
+        "Cases_Practice",
+    ),
+    (
+        "qm_a1a2_032",
+        "Der Zug ___ um 7 Uhr ab.",
+        ("fährt", "steht", "nimmt", "geht"),
+        0,
+        "A2",
+        "Trennbare_Verben",
+    ),
+    (
+        "qm_a1a2_033",
+        'Ordne richtig: "morgen / ich / arbeite / im Büro"',
+        (
+            "Ich arbeite morgen im Büro.",
+            "Morgen ich arbeite im Büro.",
+            "Ich morgen arbeite im Büro.",
+            "Im Büro arbeite ich morgen.",
+        ),
+        0,
+        "A2",
+        "Word_Order",
+    ),
 )

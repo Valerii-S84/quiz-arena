@@ -43,7 +43,7 @@ def test_compute_reconciliation_diff_clamps_negative_stale_count() -> None:
 
 def test_compute_product_stars_mismatch_count() -> None:
     mismatch_count = compute_product_stars_mismatch_count(
-        paid_stars_by_product={"ENERGY_10": 100, "MEGA_PACK_15": 30},
+        paid_stars_by_product={"ENERGY_10": 100, "PREMIUM_STARTER": 30},
         credited_stars_by_product={"ENERGY_10": 100, "PREMIUM_MONTH": 99},
     )
     assert mismatch_count == 2

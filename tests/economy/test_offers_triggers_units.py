@@ -66,13 +66,12 @@ async def test_build_trigger_codes_returns_energy_and_purchase_triggers_for_non_
         object(),
         user_id=5,
         now_utc=now_utc,
-        trigger_event=offer_triggers.TRG_LOCKED_MODE_CLICK,
+        trigger_event="ignored",
     )
 
     assert result == {
         offer_triggers.TRG_ENERGY_LOW,
         offer_triggers.TRG_ENERGY10_SECOND_BUY,
-        offer_triggers.TRG_LOCKED_MODE_CLICK,
     }
 
 
@@ -95,9 +94,7 @@ async def test_build_trigger_codes_returns_streak_and_comeback_triggers(
     async def _fake_has_active_premium(_session, _user_id, _now_utc):
         return False
 
-    async def _fake_count_paid_product_since(_session, *, product_code: str, **_kwargs):
-        if product_code == "MEGA_PACK_15":
-            return 3
+    async def _fake_count_paid_product_since(_session, **_kwargs):
         return 0
 
     async def _fake_has_recently_ended_premium_scope(_session, **_kwargs):
@@ -143,7 +140,6 @@ async def test_build_trigger_codes_returns_streak_and_comeback_triggers(
         offer_triggers.TRG_STREAK_RISK_22,
         offer_triggers.TRG_STREAK_MILESTONE_30,
         offer_triggers.TRG_COMEBACK_3D,
-        offer_triggers.TRG_MEGA_THIRD_BUY,
         offer_triggers.TRG_STARTER_EXPIRED,
         offer_triggers.TRG_WEEKEND_FLASH,
     }
@@ -202,7 +198,7 @@ async def test_build_trigger_codes_keeps_month_expiring_for_premium_user_only(
         object(),
         user_id=5,
         now_utc=now_utc,
-        trigger_event=offer_triggers.TRG_LOCKED_MODE_CLICK,
+        trigger_event="ignored",
     )
 
     assert result == {offer_triggers.TRG_MONTH_EXPIRING}

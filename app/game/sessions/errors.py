@@ -6,10 +6,6 @@ class EnergyInsufficientError(GameSessionError):
     pass
 
 
-class ModeLockedError(GameSessionError):
-    pass
-
-
 class DailyChallengeAlreadyPlayedError(GameSessionError):
     pass
 

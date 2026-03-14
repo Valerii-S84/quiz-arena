@@ -12,15 +12,12 @@ from app.economy.energy.constants import FREE_ENERGY_START
 from app.economy.offers.constants import (
     COMEBACK_WINDOW_DAYS,
     ENERGY10_SECOND_BUY_WINDOW,
-    MEGA_THIRD_BUY_WINDOW,
     MONTH_EXPIRING_WINDOW,
     STARTER_EXPIRED_WINDOW,
     TRG_COMEBACK_3D,
     TRG_ENERGY10_SECOND_BUY,
     TRG_ENERGY_LOW,
     TRG_ENERGY_ZERO,
-    TRG_LOCKED_MODE_CLICK,
-    TRG_MEGA_THIRD_BUY,
     TRG_MONTH_EXPIRING,
     TRG_STARTER_EXPIRED,
     TRG_STREAK_GT7,
@@ -72,9 +69,6 @@ async def build_trigger_codes(
     if not premium_active and energy10_count >= 2:
         trigger_codes.add(TRG_ENERGY10_SECOND_BUY)
 
-    if trigger_event == TRG_LOCKED_MODE_CLICK and not premium_active:
-        trigger_codes.add(TRG_LOCKED_MODE_CLICK)
-
     if current_streak > 7:
         trigger_codes.add(TRG_STREAK_GT7)
     if current_streak > 14 and berlin_now_dt.hour >= 22 and today_status == "NO_ACTIVITY":
@@ -85,15 +79,6 @@ async def build_trigger_codes(
     if last_activity_local_date is not None:
         if (berlin_today - last_activity_local_date).days >= COMEBACK_WINDOW_DAYS:
             trigger_codes.add(TRG_COMEBACK_3D)
-
-    mega_count = await PurchasesRepo.count_paid_product_since(
-        session,
-        user_id=user_id,
-        product_code="MEGA_PACK_15",
-        since_utc=now_utc - MEGA_THIRD_BUY_WINDOW,
-    )
-    if not premium_active and mega_count >= 3:
-        trigger_codes.add(TRG_MEGA_THIRD_BUY)
 
     starter_expired_recently = await EntitlementsRepo.has_recently_ended_premium_scope(
         session,

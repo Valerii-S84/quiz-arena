@@ -5,7 +5,6 @@ from zoneinfo import ZoneInfo
 
 from app.bot.texts.de import TEXTS_DE
 from app.economy.energy.constants import BERLIN_TIMEZONE
-from app.economy.referrals.constants import REWARD_CODE_MEGA_PACK
 from app.economy.referrals.service import ReferralClaimResult, ReferralOverview
 
 
@@ -67,8 +66,6 @@ def _build_overview_text(*, overview: ReferralOverview, invite_link: str | None)
 
 def _build_claim_status_text(claim: ReferralClaimResult) -> str:
     if claim.status == "CLAIMED":
-        if claim.reward_code == REWARD_CODE_MEGA_PACK:
-            return TEXTS_DE["msg.referral.reward.claimed.megapack"]
         return TEXTS_DE["msg.referral.reward.claimed.premium"]
     if claim.status == "TOO_EARLY":
         return TEXTS_DE["msg.referral.reward.too_early"]

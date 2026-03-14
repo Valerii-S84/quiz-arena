@@ -11,78 +11,6 @@ UTC = timezone.utc
 
 
 @pytest.mark.asyncio
-async def test_grant_mega_pack_reward_credits_energy_and_creates_only_missing_modes(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    now_utc = datetime.now(UTC)
-    credited: list[dict[str, object]] = []
-    ledger_entries: list[object] = []
-    mode_accesses: list[object] = []
-    existing_key = f"referral:reward:mode:33:{rewards_grant.MEGA_PACK_MODE_CODES[0]}"
-
-    async def _fake_credit_paid_energy(_session, **payload):
-        credited.append(payload)
-
-    async def _fake_create_ledger(_session, *, entry):
-        ledger_entries.append(entry)
-
-    async def _fake_get_by_idempotency_key(_session, *, idempotency_key: str):
-        if idempotency_key == existing_key:
-            return SimpleNamespace(id=1)
-        return None
-
-    async def _fake_get_latest_active_end(
-        _session, *, user_id: int, mode_code: str, source: str, now_utc: datetime
-    ):
-        if mode_code == rewards_grant.MEGA_PACK_MODE_CODES[1]:
-            return now_utc + timedelta(hours=3)
-        return None
-
-    async def _fake_create_mode_access(_session, *, mode_access):
-        mode_accesses.append(mode_access)
-
-    monkeypatch.setattr(rewards_grant.EnergyService, "credit_paid_energy", _fake_credit_paid_energy)
-    monkeypatch.setattr(rewards_grant.LedgerRepo, "create", _fake_create_ledger)
-    monkeypatch.setattr(
-        rewards_grant.ModeAccessRepo,
-        "get_by_idempotency_key",
-        _fake_get_by_idempotency_key,
-    )
-    monkeypatch.setattr(
-        rewards_grant.ModeAccessRepo,
-        "get_latest_active_end",
-        _fake_get_latest_active_end,
-    )
-    monkeypatch.setattr(rewards_grant.ModeAccessRepo, "create", _fake_create_mode_access)
-
-    await rewards_grant._grant_mega_pack_reward(
-        object(),
-        user_id=5,
-        referral_id=33,
-        now_utc=now_utc,
-    )
-
-    assert credited == [
-        {
-            "user_id": 5,
-            "amount": 15,
-            "idempotency_key": "referral:reward:energy:33",
-            "now_utc": now_utc,
-            "source": "REFERRAL",
-        }
-    ]
-    assert ledger_entries[0].idempotency_key == "referral:reward:mode_access:33"
-    assert ledger_entries[0].metadata_ == {"reward_code": rewards_grant.REWARD_CODE_MEGA_PACK}
-    assert len(mode_accesses) == 2
-    assert {item.mode_code for item in mode_accesses} == set(rewards_grant.MEGA_PACK_MODE_CODES[1:])
-    second_mode = next(
-        item for item in mode_accesses if item.mode_code == rewards_grant.MEGA_PACK_MODE_CODES[1]
-    )
-    assert second_mode.starts_at == now_utc + timedelta(hours=3)
-    assert second_mode.ends_at == now_utc + timedelta(hours=27)
-
-
-@pytest.mark.asyncio
 async def test_grant_premium_starter_reward_extends_active_entitlement(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -167,17 +95,15 @@ async def test_grant_premium_starter_reward_creates_new_entitlement_when_missing
 
 
 @pytest.mark.asyncio
-async def test_grant_reward_dispatches_by_reward_code(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_grant_reward_dispatches_premium_starter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: list[str] = []
 
     async def _fake_premium(*_args, **_kwargs):
         calls.append("premium")
 
-    async def _fake_mega(*_args, **_kwargs):
-        calls.append("mega")
-
     monkeypatch.setattr(rewards_grant, "_grant_premium_starter_reward", _fake_premium)
-    monkeypatch.setattr(rewards_grant, "_grant_mega_pack_reward", _fake_mega)
 
     await rewards_grant._grant_reward(
         object(),
@@ -186,12 +112,5 @@ async def test_grant_reward_dispatches_by_reward_code(monkeypatch: pytest.Monkey
         reward_code=rewards_grant.REWARD_CODE_PREMIUM_STARTER,
         now_utc=datetime.now(UTC),
     )
-    await rewards_grant._grant_reward(
-        object(),
-        user_id=1,
-        referral_id=2,
-        reward_code=rewards_grant.REWARD_CODE_MEGA_PACK,
-        now_utc=datetime.now(UTC),
-    )
 
-    assert calls == ["premium", "mega"]
+    assert calls == ["premium"]

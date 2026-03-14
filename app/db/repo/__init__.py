@@ -5,7 +5,6 @@ from app.db.repo.energy_repo import EnergyRepo
 from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.ledger_repo import LedgerRepo
-from app.db.repo.mode_access_repo import ModeAccessRepo
 from app.db.repo.mode_progress_repo import ModeProgressRepo
 from app.db.repo.offers_repo import OffersRepo
 from app.db.repo.processed_updates_repo import ProcessedUpdatesRepo
@@ -30,7 +29,6 @@ __all__ = [
     "EntitlementsRepo",
     "FriendChallengesRepo",
     "LedgerRepo",
-    "ModeAccessRepo",
     "ModeProgressRepo",
     "OffersRepo",
     "ProcessedUpdatesRepo",

@@ -241,18 +241,18 @@ async def test_claim_next_reward_choice_claims_reward_and_updates_anchor(
     result = await rewards_claim.claim_next_reward_choice(
         object(),
         user_id=7,
-        reward_code=rewards_claim.REWARD_CODE_MEGA_PACK,
+        reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
         now_utc=now_utc,
     )
 
     assert result is not None
     assert result.status == "CLAIMED"
-    assert result.reward_code == rewards_claim.REWARD_CODE_MEGA_PACK
+    assert result.reward_code == rewards_claim.REWARD_CODE_PREMIUM_STARTER
     assert granted == [
         {
             "user_id": 7,
             "referral_id": 43,
-            "reward_code": rewards_claim.REWARD_CODE_MEGA_PACK,
+            "reward_code": rewards_claim.REWARD_CODE_PREMIUM_STARTER,
             "now_utc": now_utc,
         }
     ]

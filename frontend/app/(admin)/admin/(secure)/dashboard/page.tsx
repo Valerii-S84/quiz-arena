@@ -146,7 +146,6 @@ const FUNNEL_STEP_LABELS: Record<string, string> = {
 
 const PRODUCT_LABELS: Record<string, string> = {
   ENERGY_10: "Energie +10",
-  MEGA_PACK_15: "Mega Pack",
   STREAK_SAVER_20: "Streak Saver",
   FRIEND_CHALLENGE_5: "Duell-Ticket",
   PREMIUM_STARTER: "Premium Starter",

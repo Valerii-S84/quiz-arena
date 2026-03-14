@@ -37,7 +37,6 @@ from app.bot.handlers.start_flow import _send_home_message
 from app.bot.keyboards.friend_challenge import build_friend_challenge_share_url
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
-from app.economy.offers.constants import TRG_LOCKED_MODE_CLICK
 from app.economy.offers.service import OfferLoggingError, OfferService
 from app.economy.referrals.service import ReferralService
 from app.game.sessions.errors import SessionNotFoundError, TournamentSessionStopNotAllowedError
@@ -92,7 +91,6 @@ _start_mode = partial(
     offer_service=OfferService,
     offer_logging_error=OfferLoggingError,
     channel_bonus_service=ChannelBonusService,
-    trg_locked_mode_click=TRG_LOCKED_MODE_CLICK,
     build_question_text=_build_question_text,
 )
 _send_friend_round_question = partial(
