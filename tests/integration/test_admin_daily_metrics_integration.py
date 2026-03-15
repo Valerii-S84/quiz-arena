@@ -33,6 +33,7 @@ def _freeze_now(monkeypatch: pytest.MonkeyPatch, fixed_now: datetime) -> None:
     _FixedDateTime.fixed_now = fixed_now
     monkeypatch.setattr(admin_daily_metrics, "datetime", _FixedDateTime)
 
+
 async def _create_user(
     session,
     *,

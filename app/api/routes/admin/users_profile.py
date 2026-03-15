@@ -45,7 +45,9 @@ async def get_user_profile(session: AsyncSession, user_id: int) -> dict[str, obj
         (
             await session.execute(
                 select(Referral)
-                .where(or_(Referral.referrer_user_id == user_id, Referral.referred_user_id == user_id))
+                .where(
+                    or_(Referral.referrer_user_id == user_id, Referral.referred_user_id == user_id)
+                )
                 .order_by(Referral.created_at.desc())
                 .limit(50)
             )

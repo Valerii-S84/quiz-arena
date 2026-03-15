@@ -20,4 +20,5 @@ async def apply_bonus(
         amount=amount,
     )
 
+
 __all__ = ["_build_search_filters", "apply_bonus", "get_user_profile", "list_users_page"]
