@@ -43,6 +43,69 @@ run_step() {
   "$@"
 }
 
+wait_for_local_services() {
+  "$PYTHON_BIN" - <<'PY'
+import asyncio
+import os
+import time
+
+import asyncpg
+from redis.asyncio import Redis
+from sqlalchemy.engine import make_url
+
+
+def _asyncpg_dsn(database_url: str) -> str:
+    parsed = make_url(database_url)
+    normalized = parsed.set(drivername="postgresql")
+    return normalized.render_as_string(hide_password=False)
+
+
+async def wait_for_postgres() -> None:
+    deadline = time.monotonic() + 90
+    last_error: Exception | None = None
+    dsn = _asyncpg_dsn(os.environ["TEST_DATABASE_URL"])
+    while time.monotonic() < deadline:
+        try:
+            conn = await asyncpg.connect(dsn)
+            await conn.close()
+            print("Postgres is ready")
+            return
+        except Exception as exc:  # pragma: no cover - environment timing dependent
+            last_error = exc
+            await asyncio.sleep(2)
+    raise RuntimeError(f"Postgres did not become ready in time: {last_error}")
+
+
+async def wait_for_redis() -> None:
+    deadline = time.monotonic() + 90
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        client = Redis.from_url(os.environ["REDIS_URL"])
+        try:
+            if await client.ping():
+                print("Redis is ready")
+                return
+        except Exception as exc:  # pragma: no cover - environment timing dependent
+            last_error = exc
+        finally:
+            await client.aclose()
+        await asyncio.sleep(2)
+    raise RuntimeError(f"Redis did not become ready in time: {last_error}")
+
+
+async def main() -> None:
+    await wait_for_postgres()
+    await wait_for_redis()
+
+
+asyncio.run(main())
+PY
+}
+
+start_local_services() {
+  docker compose up -d postgres redis
+}
+
 lockfile_check() {
   tmp_req=$(mktemp)
   tmp_dev=$(mktemp)
@@ -63,8 +126,8 @@ expected = sys.argv[1]
 current = f"{sys.version_info.major}.{sys.version_info.minor}"
 if current != expected:
     raise SystemExit(
-        f"GitHub lint_unit uses Python {expected}, but local venv uses {current}. "
-        "Recreate .venv with Python 3.12 to reproduce lockfile and lint behavior 1:1."
+        f"GitHub CI uses Python {expected}, but local venv uses {current}. "
+        "Recreate .venv with Python 3.12 to reproduce local CI behavior 1:1."
     )
 PY
 }
@@ -102,3 +165,8 @@ run_step "Black" "$PYTHON_BIN" -m black --check app tests
 run_step "isort" "$PYTHON_BIN" -m isort --check-only app tests
 run_step "Mypy" "$PYTHON_BIN" -m mypy app tests
 run_step "Pytest (unit and bot)" env DATABASE_URL="$TEST_DATABASE_URL" TMPDIR="$TMPDIR" "$PYTHON_BIN" -m pytest -q --ignore=tests/integration
+run_step "Start local Postgres and Redis" start_local_services
+run_step "Wait for Postgres and Redis" wait_for_local_services
+run_step "Apply migrations" env DATABASE_URL="$TEST_DATABASE_URL" "$PYTHON_BIN" -m alembic upgrade head
+run_step "QuizBank import dry-run" env DATABASE_URL="$TEST_DATABASE_URL" "$PYTHON_BIN" -m scripts.quizbank_import_tool --dry-run
+run_step "Pytest (integration)" env DATABASE_URL="$TEST_DATABASE_URL" TMPDIR="$TMPDIR" "$PYTHON_BIN" -m pytest -q -s tests/integration
