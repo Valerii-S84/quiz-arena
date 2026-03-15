@@ -49,9 +49,10 @@ format-check:
 	.venv/bin/isort --check-only app tests
 
 type-check:
-	.venv/bin/mypy
+	.venv/bin/mypy app tests
 
-check: lint format-check type-check test
+check:
+	bash scripts/local_ci.sh
 
 local-ci:
 	bash scripts/local_ci.sh

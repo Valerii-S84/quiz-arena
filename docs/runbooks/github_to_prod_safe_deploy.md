@@ -14,10 +14,15 @@
 2. Внеси зміни.
 3. Прогін локального gate (тільки через venv):
 ```bash
-.venv/bin/ruff check .
-.venv/bin/mypy .
-DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q
+.venv/bin/ruff check app tests
+.venv/bin/black --check app tests
+.venv/bin/isort --check-only app tests
+.venv/bin/mypy app tests
+DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q --ignore=tests/integration
 ```
+   Або одним запуском: `bash scripts/local_ci.sh`
+   Цей helper відтворює повний GitHub CI локально, включно з підняттям
+   `postgres`/`redis` та integration job.
 4. Push гілки і PR у `main`.
 5. Дочекайся `CI / lint_unit` (і `integration`, якщо активний).
 6. Merge PR у `main`.

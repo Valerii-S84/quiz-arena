@@ -68,14 +68,26 @@ Retention cleanup defaults:
 ## 4. Mandatory quality gate
 
 ```bash
-.venv/bin/ruff check .
-.venv/bin/mypy .
-.venv/bin/pytest -q
+.venv/bin/ruff check app tests
+.venv/bin/black --check app tests
+.venv/bin/isort --check-only app tests
+.venv/bin/mypy app tests
+DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q --ignore=tests/integration
 ```
 
-`pytest` explicitly binds `DATABASE_URL` to the local test database
-`quiz_arena_test` in `tests/conftest.py`, so integration tests do not depend on
-shell-specific env assignment.
+For a 1:1 local replay of the full GitHub CI pipeline, use:
+
+```bash
+bash scripts/local_ci.sh
+```
+
+`scripts/local_ci.sh` replays the full GitHub CI pipeline locally: lint/unit gate,
+`docker compose up -d postgres redis`, service readiness, `alembic upgrade head`,
+QuizBank import dry-run, and `tests/integration`.
+
+`pytest` in the mandatory gate explicitly binds `DATABASE_URL` to the local test
+database `quiz_arena_test`; the integration-only flow below remains available as a
+separate targeted run.
 
 Safe integration-only flow:
 

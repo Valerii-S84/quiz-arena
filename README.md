@@ -55,14 +55,25 @@ docker compose up -d
 Use only the project venv binaries:
 
 ```bash
-.venv/bin/ruff check .
-.venv/bin/mypy .
-.venv/bin/pytest -q
+.venv/bin/ruff check app tests
+.venv/bin/black --check app tests
+.venv/bin/isort --check-only app tests
+.venv/bin/mypy app tests
+DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q --ignore=tests/integration
 ```
 
-`pytest` test bootstrap pins `DATABASE_URL` to the local PostgreSQL test DB
-`quiz_arena_test` via `tests/conftest.py`, so the command works without shell-specific
-env prefixes on Windows as well.
+For the full local equivalent of the GitHub CI pipeline, run:
+
+```bash
+bash scripts/local_ci.sh
+```
+
+`scripts/local_ci.sh` runs the full local CI sequence: lint/unit checks,
+`docker compose up -d postgres redis`, service readiness, migrations, QuizBank
+import dry-run, and integration tests.
+
+The mandatory `pytest` gate pins `DATABASE_URL` to the local PostgreSQL test DB
+`quiz_arena_test`; integration stays available below as a separate targeted flow.
 
 ## Production Deploy
 
