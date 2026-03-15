@@ -7,6 +7,7 @@ from app.core.integration_db_safety import assert_safe_integration_db
 from app.db.session import engine
 
 TRUNCATE_TABLES = (
+    "daily_metrics",
     "promo_audit_log",
     "admins",
     "promo_attempts",
@@ -55,7 +56,11 @@ async def _existing_truncate_sql() -> str | None:
     )
     async with engine.connect() as conn:
         result = await conn.execute(stmt)
-    existing_tables = [str(value) for value in result.scalars().all()]
+    existing_table_names = {str(value) for value in result.scalars().all()}
+    # Keep a deterministic lock order across cleanup runs to avoid TRUNCATE deadlocks.
+    existing_tables = [
+        table_name for table_name in TRUNCATE_TABLES if table_name in existing_table_names
+    ]
     if not existing_tables:
         return None
     return f"TRUNCATE TABLE {', '.join(existing_tables)} RESTART IDENTITY CASCADE"
