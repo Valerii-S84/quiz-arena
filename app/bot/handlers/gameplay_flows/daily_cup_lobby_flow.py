@@ -1,0 +1,123 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from uuid import UUID
+
+from aiogram.types import CallbackQuery
+
+from app.bot.handlers.gameplay_flows.daily_cup_views import render_daily_cup_lobby
+from app.bot.handlers.gameplay_flows.tournament_views import resolve_participant_labels
+from app.bot.texts.de import TEXTS_DE
+
+
+async def handle_daily_cup_join(
+    callback: CallbackQuery,
+    *,
+    tournament_id: UUID,
+    session_local,
+    user_onboarding_service,
+    tournament_service,
+    users_repo,
+    emit_analytics_event,
+    event_source_bot: str,
+) -> None:
+    if callback.from_user is None or callback.message is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    now_utc = datetime.now(timezone.utc)
+    async with session_local.begin() as session:
+        snapshot = await user_onboarding_service.ensure_home_snapshot(
+            session,
+            telegram_user=callback.from_user,
+        )
+        join_result = await tournament_service.join_daily_cup_by_id(
+            session,
+            user_id=snapshot.user_id,
+            tournament_id=tournament_id,
+            now_utc=now_utc,
+        )
+        lobby = await tournament_service.get_daily_cup_lobby_by_id(
+            session,
+            tournament_id=tournament_id,
+            viewer_user_id=snapshot.user_id,
+        )
+        labels = await resolve_participant_labels(
+            participants=lobby.participants,
+            users_repo=users_repo,
+            session=session,
+        )
+        if join_result.joined_now:
+            await emit_analytics_event(
+                session,
+                event_type="daily_cup_registered",
+                source=event_source_bot,
+                happened_at=now_utc,
+                user_id=snapshot.user_id,
+                payload={"tournament_id": str(tournament_id)},
+            )
+
+    if join_result.joined_now:
+        await callback.message.answer(
+            TEXTS_DE["msg.daily_cup.joined_confirmation"].format(
+                participants_total=join_result.participants_total
+            )
+        )
+    else:
+        await callback.message.answer(TEXTS_DE["msg.daily_cup.already_joined"])
+    await render_daily_cup_lobby(
+        callback,
+        lobby=lobby,
+        user_id=snapshot.user_id,
+        labels=labels,
+        replace_current_message=True,
+    )
+    await callback.answer()
+
+
+async def handle_daily_cup_view(
+    callback: CallbackQuery,
+    *,
+    tournament_id: UUID,
+    session_local,
+    user_onboarding_service,
+    tournament_service,
+    users_repo,
+    emit_analytics_event,
+    event_source_bot: str,
+) -> None:
+    if callback.from_user is None or callback.message is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    now_utc = datetime.now(timezone.utc)
+    async with session_local.begin() as session:
+        snapshot = await user_onboarding_service.ensure_home_snapshot(
+            session,
+            telegram_user=callback.from_user,
+        )
+        lobby = await tournament_service.get_daily_cup_lobby_by_id(
+            session,
+            tournament_id=tournament_id,
+            viewer_user_id=snapshot.user_id,
+        )
+        labels = await resolve_participant_labels(
+            participants=lobby.participants,
+            users_repo=users_repo,
+            session=session,
+        )
+        if lobby.tournament.status == "COMPLETED" and lobby.viewer_joined:
+            await emit_analytics_event(
+                session,
+                event_type="daily_cup_final_viewed",
+                source=event_source_bot,
+                happened_at=now_utc,
+                user_id=snapshot.user_id,
+                payload={"tournament_id": str(tournament_id)},
+            )
+    await render_daily_cup_lobby(
+        callback,
+        lobby=lobby,
+        user_id=snapshot.user_id,
+        labels=labels,
+        replace_current_message=True,
+    )
+    await callback.answer()

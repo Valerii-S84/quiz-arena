@@ -5,7 +5,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 
 from app.db.models.daily_metrics import DailyMetrics
 from app.db.models.entitlements import Entitlement
@@ -32,15 +32,6 @@ class _FixedDateTime(datetime):
 def _freeze_now(monkeypatch: pytest.MonkeyPatch, fixed_now: datetime) -> None:
     _FixedDateTime.fixed_now = fixed_now
     monkeypatch.setattr(admin_daily_metrics, "datetime", _FixedDateTime)
-
-
-@pytest.fixture(autouse=True)
-async def _cleanup_daily_metrics() -> None:
-    async with SessionLocal.begin() as session:
-        await session.execute(delete(DailyMetrics))
-    yield
-    async with SessionLocal.begin() as session:
-        await session.execute(delete(DailyMetrics))
 
 
 async def _create_user(
