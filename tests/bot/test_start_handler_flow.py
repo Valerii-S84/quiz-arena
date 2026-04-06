@@ -50,6 +50,16 @@ class _StartMessageWithPhotoGuard(_StartMessage):
         await super().answer(*args, **kwargs)
 
 
+@pytest.fixture(autouse=True)
+def _stub_start_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _noop_emit(*args, **kwargs):
+        del args, kwargs
+        return None
+
+    monkeypatch.setattr(start.start_flow, "SessionLocal", DummySessionLocal())
+    monkeypatch.setattr(start.start_flow, "emit_analytics_event", _noop_emit)
+
+
 def test_extract_start_payload() -> None:
     assert start._extract_start_payload("/start ref_ABC123") == "ref_ABC123"
     assert start._extract_start_payload("/start") is None

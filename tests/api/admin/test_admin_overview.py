@@ -9,7 +9,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.routes.admin import deps as admin_deps
-from app.api.routes.admin import overview, overview_metrics, overview_queries
+from app.api.routes.admin import (
+    overview,
+    overview_activity_metrics,
+    overview_metrics,
+    overview_queries,
+    overview_streak_metrics,
+)
 from app.main import app
 from app.services.admin import cache as admin_cache
 
@@ -97,15 +103,29 @@ async def test_overview_metrics_helpers_compute_expected_values() -> None:
     assert overview_metrics.build_kpi(current=0.0, previous=0.0)["delta_pct"] == 0.0
 
     session = _SessionWithExec(
-        _ScalarResult(11), _ScalarResult(7), _ScalarResult(99), _ScalarResult(5)
+        _ScalarResult(11),
+        _ScalarResult(7),
+        _ScalarResult(3),
+        _ScalarResult(99),
+        _ScalarResult(5),
+        _ScalarResult(2),
     )
     now_utc = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
 
     assert (
-        await overview_metrics.count_distinct_users(session, from_utc=now_utc, to_utc=now_utc) == 11
+        await overview_activity_metrics.count_distinct_users(
+            session,
+            from_utc=now_utc,
+            to_utc=now_utc,
+        )
+        == 11
     )
     assert (
         await overview_metrics.count_purchase_users(session, from_utc=now_utc, to_utc=now_utc) == 7
+    )
+    assert (
+        await overview_metrics.count_first_purchase_users(session, from_utc=now_utc, to_utc=now_utc)
+        == 3
     )
     assert await overview_metrics.sum_revenue_stars(session, from_utc=now_utc, to_utc=now_utc) == 99
     assert (
@@ -117,6 +137,15 @@ async def test_overview_metrics_helpers_compute_expected_values() -> None:
         )
         == 5
     )
+    assert (
+        await overview_streak_metrics.count_users_reaching_streak_threshold(
+            session,
+            from_utc=now_utc,
+            to_utc=now_utc,
+            threshold=3,
+        )
+        == 2
+    )
 
 
 @pytest.mark.asyncio
@@ -127,7 +156,7 @@ async def test_retention_day_rate_handles_eligible_users_and_empty_cohorts() -> 
         _RowsResult([(101, created_at), (202, created_at)]),
         _RowsResult([(101, date(2026, 3, 4)), (202, date(2026, 3, 5))]),
     )
-    rate = await overview_metrics.retention_day_rate(
+    rate = await overview_activity_metrics.retention_day_rate(
         session,
         from_utc=datetime(2026, 3, 1, 0, 0, tzinfo=UTC),
         to_utc=now_utc,
@@ -136,7 +165,7 @@ async def test_retention_day_rate_handles_eligible_users_and_empty_cohorts() -> 
     assert rate == 50.0
 
     assert (
-        await overview_metrics.retention_day_rate(
+        await overview_activity_metrics.retention_day_rate(
             _SessionWithExec(_RowsResult([])),
             from_utc=datetime(2026, 3, 1, 0, 0, tzinfo=UTC),
             to_utc=now_utc,
@@ -152,7 +181,7 @@ async def test_retention_day_rate_returns_zero_when_target_by_user_becomes_empty
         _RowsResult([(101, datetime(2026, 3, 9, 9, 0, tzinfo=UTC))]),
     )
 
-    rate = await overview_metrics.retention_day_rate(
+    rate = await overview_activity_metrics.retention_day_rate(
         session,
         from_utc=datetime(2026, 3, 1, 0, 0, tzinfo=UTC),
         to_utc=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
@@ -170,7 +199,7 @@ async def test_retention_day_rate_ignores_event_rows_with_missing_user_id() -> N
         _RowsResult([(None, date(2026, 3, 4))]),
     )
 
-    rate = await overview_metrics.retention_day_rate(
+    rate = await overview_activity_metrics.retention_day_rate(
         session,
         from_utc=datetime(2026, 3, 1, 0, 0, tzinfo=UTC),
         to_utc=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
@@ -204,14 +233,15 @@ async def test_build_overview_payload_builds_kpis_and_alerts() -> None:
         _RowsResult([]),
         _ScalarResult(200),
         _ScalarResult(100),
-        _ScalarResult(50),
-        _ScalarResult(40),
+        _ScalarResult(7),
+        _ScalarResult(4),
         _ScalarResult(20),
-        _ScalarResult(20),
+        _ScalarResult(10),
+        _ScalarResult(5),
+        _ScalarResult(5),
+        _ScalarResult(3),
         _ScalarResult(5),
         _ScalarResult(10),
-        _ScalarResult(12),
-        _ScalarResult(7),
         _ScalarResult(7),
         _RowsResult([]),
         _RowsResult([]),
@@ -235,11 +265,15 @@ async def test_build_overview_payload_builds_kpis_and_alerts() -> None:
 
     assert payload["period"] == "7d"
     assert payload["kpis"]["dau"]["current"] == 100.0
+    assert payload["kpis"]["start_users"]["current"] == 20.0
+    assert payload["kpis"]["conversion_start_to_quiz"]["current"] == 35.0
     assert payload["kpis"]["revenue_eur"]["current"] == float(
         Decimal(200) * overview_metrics.STAR_TO_EUR_RATE
     )
     assert payload["feature_usage"]["duel_created_users"]["current"] == 10.0
+    assert payload["funnel"][1] == {"step": "First Quiz", "value": 7}
     assert payload["funnel"][2] == {"step": "Streak 3+", "value": 7}
+    assert payload["funnel"][3] == {"step": "Purchase", "value": 3}
     assert [item["type"] for item in payload["alerts"]] == [
         "webhook_errors",
         "conversion_drop",

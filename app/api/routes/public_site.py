@@ -18,7 +18,15 @@ async def _collect_public_metrics() -> dict[str, object]:
     async with SessionLocal.begin() as session:
         users_total = int((await session.execute(select(func.count(User.id)))).scalar_one() or 0)
         quizzes_total = int(
-            (await session.execute(select(func.count(QuizSession.id)))).scalar_one() or 0
+            (
+                await session.execute(
+                    select(func.count(QuizSession.id)).where(
+                        QuizSession.status == "COMPLETED",
+                        QuizSession.completed_at.is_not(None),
+                    )
+                )
+            ).scalar_one()
+            or 0
         )
         purchases_total = int(
             (

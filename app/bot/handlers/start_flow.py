@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from aiogram.types import CallbackQuery, Message
 
+from app.bot.handlers.start_analytics import build_start_event_payload
 from app.bot.handlers.start_friend_challenge_flow import handle_start_friend_challenge_payload
 from app.bot.handlers.start_helpers import (
     _notify_creator_about_join,
@@ -28,6 +29,7 @@ from app.bot.handlers.start_views import (
 from app.bot.keyboards.offers import build_offer_keyboard
 from app.bot.keyboards.shop import build_shop_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.core.config import get_settings
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
@@ -71,6 +73,14 @@ async def handle_start_message(message: Message) -> None:
             session,
             telegram_user=message.from_user,
             start_payload=start_payload,
+        )
+        await emit_analytics_event(
+            session,
+            event_type="bot_started",
+            source=EVENT_SOURCE_BOT,
+            happened_at=now_utc,
+            user_id=snapshot.user_id,
+            payload=build_start_event_payload(start_payload),
         )
 
         friend_challenge_result = await handle_start_friend_challenge_payload(
