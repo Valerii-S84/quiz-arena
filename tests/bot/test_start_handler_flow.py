@@ -50,6 +50,16 @@ class _StartMessageWithPhotoGuard(_StartMessage):
         await super().answer(*args, **kwargs)
 
 
+@pytest.fixture(autouse=True)
+def _stub_start_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _noop_emit(*args, **kwargs):
+        del args, kwargs
+        return None
+
+    monkeypatch.setattr(start.start_flow, "SessionLocal", DummySessionLocal())
+    monkeypatch.setattr(start.start_flow, "emit_analytics_event", _noop_emit)
+
+
 def test_extract_start_payload() -> None:
     assert start._extract_start_payload("/start ref_ABC123") == "ref_ABC123"
     assert start._extract_start_payload("/start") is None
@@ -288,6 +298,54 @@ async def test_handle_start_sends_home_and_offer_when_available(monkeypatch) -> 
     assert "Serie: 4 | Beste: 9 | 🏆 Rekord: 27" in (message.answers[0].text or "")
     assert "💎" not in (message.answers[0].text or "")
     assert message.answers[1].text == TEXTS_DE["msg.offer.energy.low"]
+
+
+@pytest.mark.asyncio
+async def test_handle_start_emits_bot_started_event_with_source_payload(monkeypatch) -> None:
+    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
+    emitted: list[dict[str, Any]] = []
+
+    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
+        assert start_payload == "site_public_home"
+        return SimpleNamespace(
+            user_id=8,
+            free_energy=12,
+            paid_energy=3,
+            current_streak=4,
+            best_streak=9,
+            global_best_streak=27,
+        )
+
+    async def _fake_offer(*args, **kwargs):
+        return None
+
+    async def _fake_emit(session, **kwargs):
+        del session
+        emitted.append(kwargs)
+
+    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(start.OfferService, "evaluate_and_log_offer", _fake_offer)
+    monkeypatch.setattr(start.start_flow, "emit_analytics_event", _fake_emit)
+    monkeypatch.setattr(
+        start.start_flow,
+        "get_settings",
+        lambda: SimpleNamespace(telegram_home_header_file_id=""),
+    )
+
+    message = _StartMessage(
+        text="/start site_public_home",
+        from_user=SimpleNamespace(id=2, username="bob", first_name="Bob", language_code="de"),
+    )
+    await start.handle_start(message)
+
+    assert len(emitted) == 1
+    assert emitted[0]["event_type"] == "bot_started"
+    assert emitted[0]["source"] == "BOT"
+    assert emitted[0]["user_id"] == 8
+    assert emitted[0]["payload"] == {
+        "start_source": "site_public_home",
+        "start_payload": "site_public_home",
+    }
 
 
 @pytest.mark.asyncio

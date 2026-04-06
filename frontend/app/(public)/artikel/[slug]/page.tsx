@@ -1,11 +1,12 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 type ArticlePageProps = {
-  params: {
+  params: Promise<{
     slug: string;
-  };
+  }>;
 };
 
 const ARTICLE_EMBEDS: Record<string, { title: string; fileName: string }> = {
@@ -78,7 +79,8 @@ function applyEmbeddedTheme(html: string): string {
 }
 
 export default async function ArticlePage({ params }: ArticlePageProps) {
-  const article = ARTICLE_EMBEDS[params.slug];
+  const { slug } = await params;
+  const article = ARTICLE_EMBEDS[slug];
 
   if (!article) {
     notFound();
@@ -106,12 +108,12 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     >
       <div className="sticky top-0 z-20 border-b border-white/60 bg-white/82 px-4 py-3 backdrop-blur sm:px-6">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-start">
-          <a
+          <Link
             href="/"
             className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-50"
           >
             ← Zur Startseite
-          </a>
+          </Link>
         </div>
       </div>
 

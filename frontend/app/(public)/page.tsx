@@ -16,6 +16,7 @@ const TELEGRAM_BOT_URL =
   process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL || "https://t.me/Deine_Deutsch_Quiz_bot";
 const TELEGRAM_CHANNEL_URL =
   process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_URL || "https://t.me/doechkurse";
+const TELEGRAM_BOT_START_PAYLOAD = "site_public_home";
 const BOT_LOGO_PATH = "/logo/bot-logo.jpg";
 const CHANNEL_LOGO_PATH = "/logo/channel-logo.jpg";
 const WORKLOG_LOGO_PATH = "/products/worklog/logo.png";
@@ -86,6 +87,17 @@ function toFiniteNumber(value: unknown): number | null {
   return null;
 }
 
+function buildTrackedTelegramBotUrl(baseUrl: string, startPayload: string): string {
+  try {
+    const url = new URL(baseUrl);
+    url.searchParams.set("start", startPayload);
+    return url.toString();
+  } catch {
+    const separator = baseUrl.includes("?") ? "&" : "?";
+    return `${baseUrl}${separator}start=${encodeURIComponent(startPayload)}`;
+  }
+}
+
 export default function PublicHomePage() {
   const [stats, setStats] = useState<StatsState>({
     users: null,
@@ -99,6 +111,10 @@ export default function PublicHomePage() {
   const [passwordValue, setPasswordValue] = useState("");
   const [loginStatus, setLoginStatus] = useState<FormStatus>("idle");
   const [loginFeedback, setLoginFeedback] = useState<string | null>(null);
+  const trackedTelegramBotUrl = buildTrackedTelegramBotUrl(
+    TELEGRAM_BOT_URL,
+    TELEGRAM_BOT_START_PAYLOAD,
+  );
 
   useEffect(() => {
     let active = true;
@@ -307,7 +323,7 @@ export default function PublicHomePage() {
                 </div>
               </div>
               <a
-                href={TELEGRAM_BOT_URL}
+                href={trackedTelegramBotUrl}
                 target="_blank"
                 rel="noreferrer"
                 className={`mt-6 ${ORANGE_BUTTON_CLASS}`}

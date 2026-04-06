@@ -10,13 +10,15 @@ from app.api.routes.admin.overview_feature_usage import build_feature_usage_payl
 from app.api.routes.admin.overview_metrics import (
     STAR_TO_EUR_RATE,
     build_kpi,
-    count_distinct_event_users,
     count_distinct_users,
+    count_first_purchase_users,
     count_purchase_users,
+    count_users_reaching_streak_threshold,
     retention_day_rate,
     sum_revenue_stars,
 )
 from app.api.routes.admin.overview_series import (
+    count_first_quiz_users,
     count_new_users,
     count_quiz_users,
     fetch_alert_inputs,
@@ -25,7 +27,6 @@ from app.api.routes.admin.overview_series import (
     fetch_users_series,
 )
 from app.db.models.entitlements import Entitlement
-from app.db.models.streak_state import StreakState
 
 
 async def _count_active_subscriptions(session: AsyncSession, *, at_utc: datetime) -> int:
@@ -35,11 +36,6 @@ async def _count_active_subscriptions(session: AsyncSession, *, at_utc: datetime
         Entitlement.starts_at <= at_utc,
         (Entitlement.ends_at.is_(None) | (Entitlement.ends_at >= at_utc)),
     )
-    return int((await session.execute(stmt)).scalar_one() or 0)
-
-
-async def _count_streak_3_plus_users(session: AsyncSession) -> int:
-    stmt = select(func.count(StreakState.user_id)).where(StreakState.current_streak >= 3)
     return int((await session.execute(stmt)).scalar_one() or 0)
 
 
@@ -106,15 +102,15 @@ async def build_overview_payload(
     revenue_stars_now = await sum_revenue_stars(session, from_utc=range_start, to_utc=range_end)
     revenue_stars_prev = await sum_revenue_stars(session, from_utc=prev_start, to_utc=prev_end)
 
-    start_users_now = await count_distinct_event_users(
+    start_users_now = new_users_now
+    start_users_prev = new_users_prev
+    first_quiz_users_now = await count_first_quiz_users(
         session,
-        event_type="bot_start_pressed",
         from_utc=range_start,
         to_utc=range_end,
     )
-    start_users_prev = await count_distinct_event_users(
+    first_quiz_users_prev = await count_first_quiz_users(
         session,
-        event_type="bot_start_pressed",
         from_utc=prev_start,
         to_utc=prev_end,
     )
@@ -122,9 +118,18 @@ async def build_overview_payload(
     quiz_users_prev = await count_quiz_users(session, from_utc=prev_start, to_utc=prev_end)
     purchase_users_now = await count_purchase_users(session, from_utc=range_start, to_utc=range_end)
     purchase_users_prev = await count_purchase_users(session, from_utc=prev_start, to_utc=prev_end)
+    first_purchase_users_now = await count_first_purchase_users(
+        session,
+        from_utc=range_start,
+        to_utc=range_end,
+    )
 
-    start_to_quiz_now = (quiz_users_now / start_users_now * 100) if start_users_now > 0 else 0.0
-    start_to_quiz_prev = (quiz_users_prev / start_users_prev * 100) if start_users_prev > 0 else 0.0
+    start_to_quiz_now = (
+        (first_quiz_users_now / start_users_now * 100) if start_users_now > 0 else 0.0
+    )
+    start_to_quiz_prev = (
+        (first_quiz_users_prev / start_users_prev * 100) if start_users_prev > 0 else 0.0
+    )
     quiz_to_purchase_now = (
         (purchase_users_now / quiz_users_now * 100) if quiz_users_now > 0 else 0.0
     )
@@ -134,7 +139,12 @@ async def build_overview_payload(
 
     active_subs_now = await _count_active_subscriptions(session, at_utc=now_utc)
     active_subs_prev = await _count_active_subscriptions(session, at_utc=prev_end)
-    streak3_users = await _count_streak_3_plus_users(session)
+    streak3_users = await count_users_reaching_streak_threshold(
+        session,
+        from_utc=range_start,
+        to_utc=range_end,
+        threshold=3,
+    )
 
     revenue_series = await fetch_revenue_series(session, from_utc=range_start, to_utc=range_end)
     users_series = await fetch_users_series(session, from_utc=range_start, to_utc=range_end)
@@ -204,9 +214,9 @@ async def build_overview_payload(
         "users_series": users_series,
         "funnel": [
             {"step": "Start", "value": start_users_now},
-            {"step": "First Quiz", "value": quiz_users_now},
+            {"step": "First Quiz", "value": first_quiz_users_now},
             {"step": "Streak 3+", "value": streak3_users},
-            {"step": "Purchase", "value": purchase_users_now},
+            {"step": "Purchase", "value": first_purchase_users_now},
         ],
         "top_products": top_products,
         "feature_usage": feature_usage,

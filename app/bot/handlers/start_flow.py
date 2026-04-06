@@ -28,6 +28,7 @@ from app.bot.handlers.start_views import (
 from app.bot.keyboards.offers import build_offer_keyboard
 from app.bot.keyboards.shop import build_shop_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.core.config import get_settings
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
@@ -53,6 +54,29 @@ def _build_home_response_text(snapshot: object) -> str:
     )
 
 
+def _classify_start_source(start_payload: str | None) -> str:
+    if not start_payload:
+        return "direct"
+    if start_payload.startswith("site_"):
+        return start_payload
+    if start_payload.startswith("ref_"):
+        return "referral"
+    if _extract_friend_challenge_token(start_payload) is not None:
+        return "friend_challenge"
+    if _extract_duel_challenge_id(start_payload) is not None:
+        return "duel"
+    if _extract_tournament_invite_code(start_payload) is not None:
+        return "tournament"
+    return "payload"
+
+
+def _build_start_event_payload(start_payload: str | None) -> dict[str, object]:
+    payload: dict[str, object] = {"start_source": _classify_start_source(start_payload)}
+    if start_payload is not None:
+        payload["start_payload"] = start_payload
+    return payload
+
+
 async def handle_start_message(message: Message) -> None:
     if message.from_user is None:
         await message.answer(TEXTS_DE["msg.system.error"])
@@ -71,6 +95,14 @@ async def handle_start_message(message: Message) -> None:
             session,
             telegram_user=message.from_user,
             start_payload=start_payload,
+        )
+        await emit_analytics_event(
+            session,
+            event_type="bot_started",
+            source=EVENT_SOURCE_BOT,
+            happened_at=now_utc,
+            user_id=snapshot.user_id,
+            payload=_build_start_event_payload(start_payload),
         )
 
         friend_challenge_result = await handle_start_friend_challenge_payload(

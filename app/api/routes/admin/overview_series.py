@@ -3,16 +3,18 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from sqlalchemy import distinct, func, select
+from sqlalchemy import distinct, func, literal_column, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.routes.admin.overview_metrics import STAR_TO_EUR_RATE
+from app.api.routes.admin.overview_metrics import STAR_TO_EUR_RATE, build_activity_days_subquery
 from app.db.models.outbox_events import OutboxEvent
 from app.db.models.promo_attempts import PromoAttempt
 from app.db.models.purchases import Purchase
 from app.db.models.quiz_sessions import QuizSession
 from app.db.models.referrals import Referral
 from app.db.models.users import User
+
+BERLIN_TIMEZONE_SQL = literal_column("'Europe/Berlin'")
 
 
 async def count_new_users(session: AsyncSession, *, from_utc: datetime, to_utc: datetime) -> int:
@@ -24,6 +26,25 @@ async def count_quiz_users(session: AsyncSession, *, from_utc: datetime, to_utc:
     stmt = select(func.count(distinct(QuizSession.user_id))).where(
         QuizSession.started_at >= from_utc,
         QuizSession.started_at < to_utc,
+    )
+    return int((await session.execute(stmt)).scalar_one() or 0)
+
+
+async def count_first_quiz_users(
+    session: AsyncSession, *, from_utc: datetime, to_utc: datetime
+) -> int:
+    first_quiz_by_user = (
+        select(
+            QuizSession.user_id.label("user_id"),
+            func.min(QuizSession.started_at).label("first_started_at"),
+        )
+        .where(QuizSession.status != "CANCELED")
+        .group_by(QuizSession.user_id)
+        .subquery()
+    )
+    stmt = select(func.count(first_quiz_by_user.c.user_id)).where(
+        first_quiz_by_user.c.first_started_at >= from_utc,
+        first_quiz_by_user.c.first_started_at < to_utc,
     )
     return int((await session.execute(stmt)).scalar_one() or 0)
 
@@ -72,27 +93,29 @@ async def fetch_users_series(
     from_utc: datetime,
     to_utc: datetime,
 ) -> list[dict[str, object]]:
+    created_day_berlin = func.date(func.timezone(BERLIN_TIMEZONE_SQL, User.created_at))
     new_by_day = {
         row_day.isoformat(): int(total)
         for row_day, total in (
             await session.execute(
-                select(func.date(User.created_at), func.count(User.id))
+                select(
+                    created_day_berlin,
+                    func.count(User.id),
+                )
                 .where(User.created_at >= from_utc, User.created_at < to_utc)
-                .group_by(func.date(User.created_at))
+                .group_by(created_day_berlin)
             )
         ).all()
     }
+    activity_days = build_activity_days_subquery(from_utc=from_utc, to_utc=to_utc)
     active_by_day = {
         row_day.isoformat(): int(total)
         for row_day, total in (
             await session.execute(
-                select(func.date(User.last_seen_at), func.count(User.id))
-                .where(
-                    User.last_seen_at.is_not(None),
-                    User.last_seen_at >= from_utc,
-                    User.last_seen_at < to_utc,
-                )
-                .group_by(func.date(User.last_seen_at))
+                select(
+                    activity_days.c.local_date_berlin,
+                    func.count(distinct(activity_days.c.user_id)),
+                ).group_by(activity_days.c.local_date_berlin)
             )
         ).all()
     }
