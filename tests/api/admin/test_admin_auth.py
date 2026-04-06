@@ -19,6 +19,7 @@ def _settings(*, two_fa_required: bool = True) -> SimpleNamespace:
         admin_login_rate_limit_window_minutes=5,
         admin_login_rate_limit_attempts=3,
         admin_access_token_ttl_minutes=15,
+        redis_url="redis://localhost:6379/15",
         internal_api_trusted_proxies="127.0.0.1/32",
     )
 
@@ -268,25 +269,37 @@ def test_admin_auth_setup_refresh_logout_and_session(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     clear_calls: list[bool] = []
+    revoked_tokens: list[tuple[str, str]] = []
 
     async def _setup(**kwargs) -> dict[str, str]:
         del kwargs
         return {"secret": "abc", "otpauth_url": "otpauth://x"}
+
+    async def _decoded_refresh(**kwargs):
+        del kwargs
+        return _principal(two_factor_verified=True)
+
+    async def _revoke_access(**kwargs) -> None:
+        revoked_tokens.append(("access", kwargs["token"]))
+
+    async def _revoke_refresh(**kwargs) -> None:
+        revoked_tokens.append(("refresh", kwargs["token"]))
 
     app.dependency_overrides[auth.get_settings] = lambda: _settings(two_fa_required=True)
     app.dependency_overrides[admin_deps.get_pending_admin] = lambda: _principal(
         two_factor_verified=True
     )
     monkeypatch.setattr(auth, "get_totp_setup_payload", _setup)
-    monkeypatch.setattr(
-        auth, "decode_refresh_token", lambda **kwargs: _principal(two_factor_verified=True)
-    )
+    monkeypatch.setattr(auth, "decode_refresh_token", _decoded_refresh)
     monkeypatch.setattr(auth, "build_access_token", lambda **kwargs: "refresh-access")
     monkeypatch.setattr(auth, "build_refresh_token", lambda **kwargs: "refresh-refresh")
     monkeypatch.setattr(auth, "apply_auth_cookies", lambda **kwargs: None)
     monkeypatch.setattr(auth, "clear_auth_cookies", lambda response: clear_calls.append(True))
+    monkeypatch.setattr(auth, "revoke_access_token", _revoke_access)
+    monkeypatch.setattr(auth, "revoke_refresh_token", _revoke_refresh)
 
     setup = client.get("/admin/auth/2fa/setup")
+    client.cookies.set("qa_admin_access", "access-cookie")
     client.cookies.set("qa_admin_refresh", "refresh-cookie")
     refresh = client.post("/admin/auth/refresh")
     session = client.get("/admin/auth/session")
@@ -301,6 +314,7 @@ def test_admin_auth_setup_refresh_logout_and_session(
     assert logout.status_code == 200
     assert logout.json() == {"ok": True}
     assert clear_calls == [True]
+    assert revoked_tokens == [("access", "access-cookie"), ("refresh", "refresh-cookie")]
 
 
 @pytest.mark.parametrize(
@@ -317,6 +331,10 @@ def test_admin_refresh_rejects_invalid_or_unverified_tokens(
     decoded_payload,
     two_fa_required: bool,
 ) -> None:
+    async def _decode_refresh(**kwargs):
+        del kwargs
+        return role_payload
+
     app.dependency_overrides[auth.get_settings] = lambda: _settings(two_fa_required=two_fa_required)
     role_payload = decoded_payload
     if role_payload is not None and decoded_payload.two_factor_verified:
@@ -327,13 +345,39 @@ def test_admin_refresh_rejects_invalid_or_unverified_tokens(
             two_factor_verified=decoded_payload.two_factor_verified,
             client_ip=decoded_payload.client_ip,
         )
-    monkeypatch.setattr(auth, "decode_refresh_token", lambda **kwargs: role_payload)
+    monkeypatch.setattr(auth, "decode_refresh_token", _decode_refresh)
 
     client.cookies.set("qa_admin_refresh", "refresh-cookie")
     response = client.post("/admin/auth/refresh")
 
     assert response.status_code == 401
     assert response.json() == {"detail": {"code": "E_UNAUTHORIZED"}}
+
+
+def test_admin_logout_returns_503_when_revocation_fails(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _revoke_access(**kwargs) -> None:
+        del kwargs
+        raise auth.AdminAuthStateError("down")
+
+    async def _revoke_refresh(**kwargs) -> None:
+        del kwargs
+        raise AssertionError("refresh revocation should not run after access failure")
+
+    clear_calls: list[bool] = []
+
+    app.dependency_overrides[auth.get_settings] = lambda: _settings(two_fa_required=True)
+    monkeypatch.setattr(auth, "revoke_access_token", _revoke_access)
+    monkeypatch.setattr(auth, "revoke_refresh_token", _revoke_refresh)
+    monkeypatch.setattr(auth, "clear_auth_cookies", lambda response: clear_calls.append(True))
+
+    client.cookies.set("qa_admin_access", "access-cookie")
+    response = client.post("/admin/auth/logout")
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": {"code": "E_AUTH_STATE_UNAVAILABLE"}}
+    assert clear_calls == [True]
 
 
 @pytest.mark.parametrize(

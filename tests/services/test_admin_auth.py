@@ -27,15 +27,17 @@ class _RedisClient:
         self,
         *,
         get_value: object = None,
+        values: dict[str, object] | None = None,
         get_error: Exception | None = None,
         set_error: Exception | None = None,
         ping_error: Exception | None = None,
     ) -> None:
         self.get_value = get_value
+        self.values = values or {}
         self.get_error = get_error
         self.set_error = set_error
         self.ping_error = ping_error
-        self.set_calls: list[tuple[str, str]] = []
+        self.set_calls: list[dict[str, object]] = []
 
     async def ping(self) -> None:
         if self.ping_error is not None:
@@ -44,13 +46,16 @@ class _RedisClient:
     async def get(self, key: str) -> object:
         if self.get_error is not None:
             raise self.get_error
+        if key in self.values:
+            return self.values[key]
         assert key == "qa_admin:totp_secret"
         return self.get_value
 
-    async def set(self, key: str, value: str) -> None:
+    async def set(self, key: str, value: str, ex: int | None = None) -> None:
         if self.set_error is not None:
             raise self.set_error
-        self.set_calls.append((key, value))
+        self.values[key] = value
+        self.set_calls.append({"key": key, "value": value, "ex": ex})
 
 
 @pytest.fixture(autouse=True)
@@ -121,7 +126,7 @@ def test_verify_login_credentials_requires_matching_email_and_password() -> None
     )
 
 
-def test_access_and_refresh_tokens_round_trip() -> None:
+async def test_access_and_refresh_tokens_round_trip() -> None:
     settings = _settings()
 
     access_token = admin_auth.build_access_token(
@@ -131,8 +136,8 @@ def test_access_and_refresh_tokens_round_trip() -> None:
     )
     refresh_token = admin_auth.build_refresh_token(settings=settings, email="Admin@Example.com")
 
-    access_payload = admin_auth.decode_access_token(settings=settings, token=access_token)
-    refresh_payload = admin_auth.decode_refresh_token(settings=settings, token=refresh_token)
+    access_payload = await admin_auth.decode_access_token(settings=settings, token=access_token)
+    refresh_payload = await admin_auth.decode_refresh_token(settings=settings, token=refresh_token)
 
     assert access_payload is not None
     assert access_payload.email == "admin@example.com"
@@ -145,11 +150,11 @@ def test_access_and_refresh_tokens_round_trip() -> None:
 @pytest.mark.parametrize(
     "decoder", [admin_auth.decode_access_token, admin_auth.decode_refresh_token]
 )
-def test_decode_token_rejects_empty_token(decoder) -> None:
-    assert decoder(settings=_settings(), token="") is None
+async def test_decode_token_rejects_empty_token(decoder) -> None:
+    assert await decoder(settings=_settings(), token="") is None
 
 
-def test_decode_access_token_rejects_invalid_signature() -> None:
+async def test_decode_access_token_rejects_invalid_signature() -> None:
     token = admin_auth.build_access_token(
         settings=_settings(admin_jwt_secret="good-secret"),
         email="admin@example.com",
@@ -157,21 +162,21 @@ def test_decode_access_token_rejects_invalid_signature() -> None:
     )
 
     assert (
-        admin_auth.decode_access_token(
+        await admin_auth.decode_access_token(
             settings=_settings(admin_jwt_secret="bad-secret"), token=token
         )
         is None
     )
 
 
-def test_decode_refresh_token_rejects_invalid_signature() -> None:
+async def test_decode_refresh_token_rejects_invalid_signature() -> None:
     token = admin_auth.build_refresh_token(
         settings=_settings(admin_refresh_secret="good-secret"),
         email="admin@example.com",
     )
 
     assert (
-        admin_auth.decode_refresh_token(
+        await admin_auth.decode_refresh_token(
             settings=_settings(admin_refresh_secret="bad-secret"),
             token=token,
         )
@@ -179,7 +184,7 @@ def test_decode_refresh_token_rejects_invalid_signature() -> None:
     )
 
 
-def test_decode_token_rejects_wrong_token_type() -> None:
+async def test_decode_token_rejects_wrong_token_type() -> None:
     access_like_refresh = jwt.encode(
         {
             "sub": "admin@example.com",
@@ -203,8 +208,14 @@ def test_decode_token_rejects_wrong_token_type() -> None:
         algorithm="HS256",
     )
 
-    assert admin_auth.decode_access_token(settings=_settings(), token=access_like_refresh) is None
-    assert admin_auth.decode_refresh_token(settings=_settings(), token=refresh_like_access) is None
+    assert (
+        await admin_auth.decode_access_token(settings=_settings(), token=access_like_refresh)
+        is None
+    )
+    assert (
+        await admin_auth.decode_refresh_token(settings=_settings(), token=refresh_like_access)
+        is None
+    )
 
 
 @pytest.mark.parametrize(
@@ -225,10 +236,48 @@ def test_decode_token_rejects_wrong_token_type() -> None:
         {"sub": "admin@example.com", "role": "admin", "type": "access", "exp": "bad"},
     ],
 )
-def test_decode_access_token_rejects_missing_required_claims(payload: dict[str, object]) -> None:
+async def test_decode_access_token_rejects_missing_required_claims(
+    payload: dict[str, object]
+) -> None:
     token = jwt.encode(payload, _settings().admin_jwt_secret, algorithm="HS256")
 
-    assert admin_auth.decode_access_token(settings=_settings(), token=token) is None
+    assert await admin_auth.decode_access_token(settings=_settings(), token=token) is None
+
+
+async def test_revoke_access_token_blocklists_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _RedisClient()
+    token = admin_auth.build_access_token(
+        settings=_settings(),
+        email="admin@example.com",
+        two_factor_verified=True,
+    )
+
+    async def _client(_settings: SimpleNamespace) -> _RedisClient:
+        return client
+
+    monkeypatch.setattr(admin_auth, "_get_redis_client", _client)
+
+    await admin_auth.revoke_access_token(settings=_settings(), token=token)
+
+    assert client.set_calls[0]["key"] == admin_auth._revoked_token_key(token)
+    assert client.set_calls[0]["value"] == "1"
+    assert isinstance(client.set_calls[0]["ex"], int)
+    assert client.set_calls[0]["ex"] >= 1
+    assert await admin_auth.decode_access_token(settings=_settings(), token=token) is None
+
+
+async def test_revoke_refresh_token_raises_when_redis_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    token = admin_auth.build_refresh_token(settings=_settings(), email="admin@example.com")
+
+    async def _no_client(_settings: SimpleNamespace) -> None:
+        return None
+
+    monkeypatch.setattr(admin_auth, "_get_redis_client", _no_client)
+
+    with pytest.raises(admin_auth.AdminAuthStateError):
+        await admin_auth.revoke_refresh_token(settings=_settings(), token=token)
 
 
 async def test_get_totp_setup_payload_generates_secret_when_missing(

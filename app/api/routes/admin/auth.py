@@ -7,17 +7,22 @@ from app.api.routes.admin.deps import (
     ALLOWED_ADMIN_ROLES,
     AdminPrincipal,
     add_admin_noindex_header,
+    extract_admin_access_token,
     get_pending_admin,
     normalize_admin_role,
 )
 from app.core.config import Settings, get_settings
 from app.services.admin.auth import (
+    ADMIN_REFRESH_COOKIE,
+    AdminAuthStateError,
     apply_auth_cookies,
     build_access_token,
     build_refresh_token,
     clear_auth_cookies,
     decode_refresh_token,
     get_totp_setup_payload,
+    revoke_access_token,
+    revoke_refresh_token,
     verify_login_credentials,
     verify_totp_code,
 )
@@ -155,8 +160,8 @@ async def refresh_session(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     add_admin_noindex_header(response)
-    token = (request.cookies.get("qa_admin_refresh") or "").strip()
-    payload = decode_refresh_token(settings=settings, token=token)
+    token = (request.cookies.get(ADMIN_REFRESH_COOKIE) or "").strip()
+    payload = await decode_refresh_token(settings=settings, token=token)
     if payload is None or normalize_admin_role(payload.role) not in ALLOWED_ADMIN_ROLES:
         raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
     if settings.admin_2fa_required and not payload.two_factor_verified:
@@ -187,9 +192,23 @@ async def refresh_session(
 
 
 @router.post("/logout")
-async def logout(response: Response) -> Response:
+async def logout(
+    request: Request,
+    response: Response,
+    settings: Settings = Depends(get_settings),
+) -> Response:
     add_admin_noindex_header(response)
     logout_response = JSONResponse(content={"ok": True})
+    access_token = extract_admin_access_token(request)
+    refresh_token = (request.cookies.get(ADMIN_REFRESH_COOKIE) or "").strip()
+    try:
+        await revoke_access_token(settings=settings, token=access_token)
+        await revoke_refresh_token(settings=settings, token=refresh_token)
+    except AdminAuthStateError:
+        logout_response = JSONResponse(
+            status_code=503,
+            content={"detail": {"code": "E_AUTH_STATE_UNAVAILABLE"}},
+        )
     add_admin_noindex_header(logout_response)
     clear_auth_cookies(logout_response)
     return logout_response
