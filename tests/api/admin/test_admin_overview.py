@@ -9,7 +9,13 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.routes.admin import deps as admin_deps
-from app.api.routes.admin import overview, overview_metrics, overview_queries
+from app.api.routes.admin import (
+    overview,
+    overview_activity_metrics,
+    overview_metrics,
+    overview_queries,
+    overview_streak_metrics,
+)
 from app.main import app
 from app.services.admin import cache as admin_cache
 
@@ -107,7 +113,12 @@ async def test_overview_metrics_helpers_compute_expected_values() -> None:
     now_utc = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
 
     assert (
-        await overview_metrics.count_distinct_users(session, from_utc=now_utc, to_utc=now_utc) == 11
+        await overview_activity_metrics.count_distinct_users(
+            session,
+            from_utc=now_utc,
+            to_utc=now_utc,
+        )
+        == 11
     )
     assert (
         await overview_metrics.count_purchase_users(session, from_utc=now_utc, to_utc=now_utc) == 7
@@ -127,7 +138,7 @@ async def test_overview_metrics_helpers_compute_expected_values() -> None:
         == 5
     )
     assert (
-        await overview_metrics.count_users_reaching_streak_threshold(
+        await overview_streak_metrics.count_users_reaching_streak_threshold(
             session,
             from_utc=now_utc,
             to_utc=now_utc,
@@ -145,7 +156,7 @@ async def test_retention_day_rate_handles_eligible_users_and_empty_cohorts() -> 
         _RowsResult([(101, created_at), (202, created_at)]),
         _RowsResult([(101, date(2026, 3, 4)), (202, date(2026, 3, 5))]),
     )
-    rate = await overview_metrics.retention_day_rate(
+    rate = await overview_activity_metrics.retention_day_rate(
         session,
         from_utc=datetime(2026, 3, 1, 0, 0, tzinfo=UTC),
         to_utc=now_utc,
@@ -154,7 +165,7 @@ async def test_retention_day_rate_handles_eligible_users_and_empty_cohorts() -> 
     assert rate == 50.0
 
     assert (
-        await overview_metrics.retention_day_rate(
+        await overview_activity_metrics.retention_day_rate(
             _SessionWithExec(_RowsResult([])),
             from_utc=datetime(2026, 3, 1, 0, 0, tzinfo=UTC),
             to_utc=now_utc,
@@ -170,7 +181,7 @@ async def test_retention_day_rate_returns_zero_when_target_by_user_becomes_empty
         _RowsResult([(101, datetime(2026, 3, 9, 9, 0, tzinfo=UTC))]),
     )
 
-    rate = await overview_metrics.retention_day_rate(
+    rate = await overview_activity_metrics.retention_day_rate(
         session,
         from_utc=datetime(2026, 3, 1, 0, 0, tzinfo=UTC),
         to_utc=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
@@ -188,7 +199,7 @@ async def test_retention_day_rate_ignores_event_rows_with_missing_user_id() -> N
         _RowsResult([(None, date(2026, 3, 4))]),
     )
 
-    rate = await overview_metrics.retention_day_rate(
+    rate = await overview_activity_metrics.retention_day_rate(
         session,
         from_utc=datetime(2026, 3, 1, 0, 0, tzinfo=UTC),
         to_utc=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),

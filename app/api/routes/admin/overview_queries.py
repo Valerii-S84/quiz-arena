@@ -6,15 +6,13 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.routes.admin.overview_activity_metrics import count_distinct_users, retention_day_rate
 from app.api.routes.admin.overview_feature_usage import build_feature_usage_payload
 from app.api.routes.admin.overview_metrics import (
     STAR_TO_EUR_RATE,
     build_kpi,
-    count_distinct_users,
     count_first_purchase_users,
     count_purchase_users,
-    count_users_reaching_streak_threshold,
-    retention_day_rate,
     sum_revenue_stars,
 )
 from app.api.routes.admin.overview_series import (
@@ -26,6 +24,7 @@ from app.api.routes.admin.overview_series import (
     fetch_top_products,
     fetch_users_series,
 )
+from app.api.routes.admin.overview_streak_metrics import count_users_reaching_streak_threshold
 from app.db.models.entitlements import Entitlement
 
 
@@ -105,23 +104,17 @@ async def build_overview_payload(
     start_users_now = new_users_now
     start_users_prev = new_users_prev
     first_quiz_users_now = await count_first_quiz_users(
-        session,
-        from_utc=range_start,
-        to_utc=range_end,
+        session, from_utc=range_start, to_utc=range_end
     )
     first_quiz_users_prev = await count_first_quiz_users(
-        session,
-        from_utc=prev_start,
-        to_utc=prev_end,
+        session, from_utc=prev_start, to_utc=prev_end
     )
     quiz_users_now = await count_quiz_users(session, from_utc=range_start, to_utc=range_end)
     quiz_users_prev = await count_quiz_users(session, from_utc=prev_start, to_utc=prev_end)
     purchase_users_now = await count_purchase_users(session, from_utc=range_start, to_utc=range_end)
     purchase_users_prev = await count_purchase_users(session, from_utc=prev_start, to_utc=prev_end)
     first_purchase_users_now = await count_first_purchase_users(
-        session,
-        from_utc=range_start,
-        to_utc=range_end,
+        session, from_utc=range_start, to_utc=range_end
     )
 
     start_to_quiz_now = (

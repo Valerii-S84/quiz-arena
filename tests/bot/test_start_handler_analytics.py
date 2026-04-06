@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -9,7 +10,13 @@ from tests.bot.helpers import DummyMessage, DummySessionLocal
 
 
 class _StartMessage(DummyMessage):
-    def __init__(self, *, text: str, from_user: SimpleNamespace, message_id: int = 100) -> None:
+    def __init__(
+        self,
+        *,
+        text: str,
+        from_user: SimpleNamespace | None,
+        message_id: int = 100,
+    ) -> None:
         super().__init__()
         self.text = text
         self.from_user = from_user
@@ -22,14 +29,17 @@ def _stub_start_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
         del args, kwargs
         return None
 
+    monkeypatch.setattr(start.start_flow, "SessionLocal", DummySessionLocal())
     monkeypatch.setattr(start.start_flow, "emit_analytics_event", _noop_emit)
 
 
 @pytest.mark.asyncio
-async def test_handle_start_home_menu_shows_premium_flag(monkeypatch) -> None:
+async def test_handle_start_emits_bot_started_event_with_source_payload(monkeypatch) -> None:
     monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
+    emitted: list[dict[str, Any]] = []
 
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
+        assert start_payload == "site_public_home"
         return SimpleNamespace(
             user_id=8,
             free_energy=12,
@@ -37,14 +47,18 @@ async def test_handle_start_home_menu_shows_premium_flag(monkeypatch) -> None:
             current_streak=4,
             best_streak=9,
             global_best_streak=27,
-            premium_active=True,
         )
 
     async def _fake_offer(*args, **kwargs):
         return None
 
+    async def _fake_emit(session, **kwargs):
+        del session
+        emitted.append(kwargs)
+
     monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(start.OfferService, "evaluate_and_log_offer", _fake_offer)
+    monkeypatch.setattr(start.start_flow, "emit_analytics_event", _fake_emit)
     monkeypatch.setattr(
         start.start_flow,
         "get_settings",
@@ -52,9 +66,16 @@ async def test_handle_start_home_menu_shows_premium_flag(monkeypatch) -> None:
     )
 
     message = _StartMessage(
-        text="/start",
+        text="/start site_public_home",
         from_user=SimpleNamespace(id=2, username="bob", first_name="Bob", language_code="de"),
     )
     await start.handle_start(message)
 
-    assert "⚡ 12/20 | 💎 Premium aktiv" in (message.answers[0].text or "")
+    assert len(emitted) == 1
+    assert emitted[0]["event_type"] == "bot_started"
+    assert emitted[0]["source"] == "BOT"
+    assert emitted[0]["user_id"] == 8
+    assert emitted[0]["payload"] == {
+        "start_source": "site_public_home",
+        "start_payload": "site_public_home",
+    }

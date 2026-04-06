@@ -25,6 +25,15 @@ class _StartMessage(DummyMessage):
         self.message_id = message_id
 
 
+@pytest.fixture(autouse=True)
+def _stub_start_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _noop_emit(*args, **kwargs):
+        del args, kwargs
+        return None
+
+    monkeypatch.setattr(start.start_flow, "emit_analytics_event", _noop_emit)
+
+
 def test_extract_tournament_invite_code() -> None:
     assert start._extract_tournament_invite_code("tournament_abcdefabcdef") == "abcdefabcdef"
     assert start._extract_tournament_invite_code("tournament_bad") is None

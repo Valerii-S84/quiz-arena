@@ -5,8 +5,10 @@ from decimal import Decimal
 
 from sqlalchemy import distinct, func, literal_column, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
-from app.api.routes.admin.overview_metrics import STAR_TO_EUR_RATE, build_activity_days_subquery
+from app.api.routes.admin.overview_activity_metrics import build_activity_days_subquery
+from app.api.routes.admin.overview_metrics import STAR_TO_EUR_RATE
 from app.db.models.outbox_events import OutboxEvent
 from app.db.models.promo_attempts import PromoAttempt
 from app.db.models.purchases import Purchase
@@ -14,7 +16,7 @@ from app.db.models.quiz_sessions import QuizSession
 from app.db.models.referrals import Referral
 from app.db.models.users import User
 
-BERLIN_TIMEZONE_SQL = literal_column("'Europe/Berlin'")
+BERLIN_TIMEZONE_SQL: ColumnElement[str] = literal_column("'Europe/Berlin'")
 
 
 async def count_new_users(session: AsyncSession, *, from_utc: datetime, to_utc: datetime) -> int:

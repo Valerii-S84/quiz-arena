@@ -301,54 +301,6 @@ async def test_handle_start_sends_home_and_offer_when_available(monkeypatch) -> 
 
 
 @pytest.mark.asyncio
-async def test_handle_start_emits_bot_started_event_with_source_payload(monkeypatch) -> None:
-    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
-    emitted: list[dict[str, Any]] = []
-
-    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
-        assert start_payload == "site_public_home"
-        return SimpleNamespace(
-            user_id=8,
-            free_energy=12,
-            paid_energy=3,
-            current_streak=4,
-            best_streak=9,
-            global_best_streak=27,
-        )
-
-    async def _fake_offer(*args, **kwargs):
-        return None
-
-    async def _fake_emit(session, **kwargs):
-        del session
-        emitted.append(kwargs)
-
-    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(start.OfferService, "evaluate_and_log_offer", _fake_offer)
-    monkeypatch.setattr(start.start_flow, "emit_analytics_event", _fake_emit)
-    monkeypatch.setattr(
-        start.start_flow,
-        "get_settings",
-        lambda: SimpleNamespace(telegram_home_header_file_id=""),
-    )
-
-    message = _StartMessage(
-        text="/start site_public_home",
-        from_user=SimpleNamespace(id=2, username="bob", first_name="Bob", language_code="de"),
-    )
-    await start.handle_start(message)
-
-    assert len(emitted) == 1
-    assert emitted[0]["event_type"] == "bot_started"
-    assert emitted[0]["source"] == "BOT"
-    assert emitted[0]["user_id"] == 8
-    assert emitted[0]["payload"] == {
-        "start_source": "site_public_home",
-        "start_payload": "site_public_home",
-    }
-
-
-@pytest.mark.asyncio
 async def test_handle_start_home_menu_does_not_send_photo(monkeypatch) -> None:
     monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
 
