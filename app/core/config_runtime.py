@@ -1,12 +1,6 @@
 from __future__ import annotations
 
-from base64 import urlsafe_b64encode
-
 from pydantic import Field
-
-_DEFAULT_PROMO_ENCRYPTION_KEY = (
-    urlsafe_b64encode(b"0123456789abcdef0123456789abcdef").decode("ascii").rstrip("=")
-)
 
 
 class RuntimeSettingsMixin:
@@ -76,10 +70,7 @@ class RuntimeSettingsMixin:
         default=15,
         alias="RETENTION_CLEANUP_SCHEDULE_MINUTE_BERLIN",
     )
-    internal_api_token: str = Field(
-        default="dev_internal_token_change_me",
-        alias="INTERNAL_API_TOKEN",
-    )
+    internal_api_token: str = Field(alias="INTERNAL_API_TOKEN")
     internal_api_allowlist: str = Field(
         default="127.0.0.1/32,::1/128",
         alias="INTERNAL_API_ALLOWLIST",
@@ -88,14 +79,8 @@ class RuntimeSettingsMixin:
         default="127.0.0.1/32,::1/128",
         alias="INTERNAL_API_TRUSTED_PROXIES",
     )
-    promo_secret_pepper: str = Field(
-        default="dev_promo_pepper_change_me",
-        alias="PROMO_SECRET_PEPPER",
-    )
-    promo_encryption_key: str = Field(
-        default=_DEFAULT_PROMO_ENCRYPTION_KEY,
-        alias="PROMO_ENCRYPTION_KEY",
-    )
+    promo_secret_pepper: str = Field(alias="PROMO_SECRET_PEPPER")
+    promo_encryption_key: str = Field(alias="PROMO_ENCRYPTION_KEY")
     database_url: str = Field(alias="DATABASE_URL")
     redis_url: str = Field(alias="REDIS_URL")
     celery_broker_url: str = Field(alias="CELERY_BROKER_URL")

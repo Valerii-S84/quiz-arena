@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -13,6 +14,7 @@ from app.core.config import Settings
 ADMIN_ACCESS_COOKIE = "qa_admin_access"
 ADMIN_REFRESH_COOKIE = "qa_admin_refresh"
 _ADMIN_TOTP_SECRET_KEY = "qa_admin:totp_secret"
+_ADMIN_REVOKED_TOKEN_KEY_PREFIX = "qa_admin:revoked_token:"
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _redis_client: redis.Redis | None = None
 
@@ -30,15 +32,19 @@ class AdminAuthError(ValueError):
     pass
 
 
+class AdminAuthStateError(RuntimeError):
+    pass
+
+
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
 def _get_password_hash(settings: Settings) -> str:
-    hashed = settings.admin_password_hash.strip()
+    hashed = (settings.admin_password_hash or "").strip()
     if hashed:
         return hashed
-    fallback_password = settings.admin_password_plain.strip()
+    fallback_password = (settings.admin_password_plain or "").strip()
     if not fallback_password:
         raise AdminAuthError("ADMIN_PASSWORD_HASH or ADMIN_PASSWORD_PLAIN must be configured")
     return _pwd_context.hash(fallback_password)
@@ -85,15 +91,20 @@ def build_refresh_token(*, settings: Settings, email: str, role: str = "admin") 
     return jwt.encode(payload, settings.admin_refresh_secret, algorithm="HS256")
 
 
-def decode_access_token(*, settings: Settings, token: str) -> AdminTokenPayload | None:
-    return _decode_token(settings=settings, token=token, token_type="access")
+async def decode_access_token(*, settings: Settings, token: str) -> AdminTokenPayload | None:
+    return await _decode_token(settings=settings, token=token, token_type="access")
 
 
-def decode_refresh_token(*, settings: Settings, token: str) -> AdminTokenPayload | None:
-    return _decode_token(settings=settings, token=token, token_type="refresh")
+async def decode_refresh_token(*, settings: Settings, token: str) -> AdminTokenPayload | None:
+    return await _decode_token(settings=settings, token=token, token_type="refresh")
 
 
-def _decode_token(*, settings: Settings, token: str, token_type: str) -> AdminTokenPayload | None:
+def _decode_token_payload(
+    *,
+    settings: Settings,
+    token: str,
+    token_type: str,
+) -> AdminTokenPayload | None:
     if not token:
         return None
     try:
@@ -122,6 +133,63 @@ def _decode_token(*, settings: Settings, token: str, token_type: str) -> AdminTo
         token_type=payload_type,
         expires_at=expires_at,
     )
+
+
+async def _decode_token(
+    *, settings: Settings, token: str, token_type: str
+) -> AdminTokenPayload | None:
+    payload = _decode_token_payload(settings=settings, token=token, token_type=token_type)
+    if payload is None:
+        return None
+    if await is_token_revoked(settings=settings, token=token):
+        return None
+    return payload
+
+
+def _revoked_token_key(token: str) -> str:
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return f"{_ADMIN_REVOKED_TOKEN_KEY_PREFIX}{token_hash}"
+
+
+async def is_token_revoked(*, settings: Settings, token: str) -> bool:
+    if not token:
+        return False
+    client = await _get_redis_client(settings)
+    if client is None:
+        return False
+    try:
+        value = await client.get(_revoked_token_key(token))
+    except Exception:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    return value is not None
+
+
+async def revoke_access_token(*, settings: Settings, token: str) -> None:
+    await _revoke_token(settings=settings, token=token, token_type="access")
+
+
+async def revoke_refresh_token(*, settings: Settings, token: str) -> None:
+    await _revoke_token(settings=settings, token=token, token_type="refresh")
+
+
+async def _revoke_token(*, settings: Settings, token: str, token_type: str) -> None:
+    payload = _decode_token_payload(settings=settings, token=token, token_type=token_type)
+    if payload is None:
+        return
+
+    ttl_seconds = int((payload.expires_at - _now_utc()).total_seconds())
+    if ttl_seconds <= 0:
+        return
+
+    client = await _get_redis_client(settings)
+    if client is None:
+        raise AdminAuthStateError("Admin auth state store is unavailable")
+    try:
+        await client.set(_revoked_token_key(token), "1", ex=max(1, ttl_seconds))
+    except Exception as exc:
+        raise AdminAuthStateError("Admin auth state store is unavailable") from exc
 
 
 async def get_totp_setup_payload(*, settings: Settings) -> dict[str, str]:

@@ -9,16 +9,10 @@ class AdminSettingsMixin:
         alias="ADMIN_FRONTEND_ORIGIN",
     )
     admin_email: str = Field(default="admin@example.com", alias="ADMIN_EMAIL")
-    admin_password_hash: str = Field(default="", alias="ADMIN_PASSWORD_HASH")
-    admin_password_plain: str = Field(default="admin12345", alias="ADMIN_PASSWORD_PLAIN")
-    admin_jwt_secret: str = Field(
-        default="dev_admin_jwt_secret_change_me",
-        alias="ADMIN_JWT_SECRET",
-    )
-    admin_refresh_secret: str = Field(
-        default="dev_admin_refresh_secret_change_me",
-        alias="ADMIN_REFRESH_SECRET",
-    )
+    admin_password_hash: str | None = Field(default=None, alias="ADMIN_PASSWORD_HASH")
+    admin_password_plain: str | None = Field(default=None, alias="ADMIN_PASSWORD_PLAIN")
+    admin_jwt_secret: str = Field(alias="ADMIN_JWT_SECRET")
+    admin_refresh_secret: str = Field(alias="ADMIN_REFRESH_SECRET")
     admin_2fa_required: bool = Field(default=True, alias="ADMIN_2FA_REQUIRED")
     admin_totp_secret: str = Field(default="", alias="ADMIN_TOTP_SECRET")
     admin_totp_issuer: str = Field(default="Quiz Arena Admin", alias="ADMIN_TOTP_ISSUER")

@@ -38,7 +38,7 @@ def _extract_bearer_token(request: Request) -> str:
     return auth_header[7:].strip()
 
 
-def _extract_access_token(request: Request) -> str:
+def extract_admin_access_token(request: Request) -> str:
     cookie_token = (request.cookies.get("qa_admin_access") or "").strip()
     if cookie_token:
         return cookie_token
@@ -55,8 +55,8 @@ async def get_pending_admin(
     settings: Settings = Depends(get_settings),
 ) -> AdminPrincipal:
     add_admin_noindex_header(response)
-    token = _extract_access_token(request)
-    payload = decode_access_token(settings=settings, token=token)
+    token = extract_admin_access_token(request)
+    payload = await decode_access_token(settings=settings, token=token)
     if payload is None:
         raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
 
