@@ -90,14 +90,16 @@ async def test_completed_tournament_match_uses_tournament_keyboard_without_remat
         idempotent_replay=False,
         session_local=DummySessionLocal(),
         game_session_service=SimpleNamespace(),
-        resolve_opponent_label=_fake_resolve_opponent_label,
-        notify_opponent=_fake_notify_opponent,
-        build_friend_score_text=lambda **kwargs: "score",
-        build_friend_finish_text=lambda **kwargs: "finish",
-        build_public_badge_label=lambda **kwargs: "badge",
-        build_friend_proof_card_text=lambda **kwargs: "proof",
-        enqueue_friend_challenge_proof_cards=lambda **kwargs: None,
-        build_series_progress_text=lambda **kwargs: "series",
+        callbacks=friend_answer_completion_flow.FriendCompletionCallbacks(
+            resolve_opponent_label=_fake_resolve_opponent_label,
+            notify_opponent=_fake_notify_opponent,
+            build_friend_score_text=lambda **kwargs: "score",
+            build_friend_finish_text=lambda **kwargs: "finish",
+            build_public_badge_label=lambda **kwargs: "badge",
+            build_friend_proof_card_text=lambda **kwargs: "proof",
+            enqueue_friend_challenge_proof_cards=lambda **kwargs: None,
+            build_series_progress_text=lambda **kwargs: "series",
+        ),
     )
 
     response = callback.message.answers[0]
@@ -175,14 +177,16 @@ async def test_completed_daily_cup_match_uses_daily_cup_view_callback(monkeypatc
         idempotent_replay=True,
         session_local=DummySessionLocal(),
         game_session_service=SimpleNamespace(),
-        resolve_opponent_label=_fake_resolve_opponent_label,
-        notify_opponent=_fake_notify_opponent,
-        build_friend_score_text=lambda **kwargs: "score",
-        build_friend_finish_text=lambda **kwargs: "finish",
-        build_public_badge_label=lambda **kwargs: "badge",
-        build_friend_proof_card_text=lambda **kwargs: "proof",
-        enqueue_friend_challenge_proof_cards=lambda **kwargs: None,
-        build_series_progress_text=lambda **kwargs: "series",
+        callbacks=friend_answer_completion_flow.FriendCompletionCallbacks(
+            resolve_opponent_label=_fake_resolve_opponent_label,
+            notify_opponent=_fake_notify_opponent,
+            build_friend_score_text=lambda **kwargs: "score",
+            build_friend_finish_text=lambda **kwargs: "finish",
+            build_public_badge_label=lambda **kwargs: "badge",
+            build_friend_proof_card_text=lambda **kwargs: "proof",
+            enqueue_friend_challenge_proof_cards=lambda **kwargs: None,
+            build_series_progress_text=lambda **kwargs: "series",
+        ),
     )
 
     response = callback.message.answers[0]
