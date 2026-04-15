@@ -92,7 +92,6 @@ ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = [
-  "app.bot.handlers.gameplay",
   "app.game.sessions.service",
 ]
 ignore_errors = true

@@ -85,17 +85,31 @@ _build_friend_result_share_url = partial(
     share_cta_text=TEXTS_DE["msg.friend.challenge.proof.share.cta"],
     build_share_url=build_friend_challenge_share_url,
 )
-_start_mode = partial(
-    play_flow.start_mode,
-    **_SESSION_DEPS,
-    offer_service=OfferService,
-    offer_logging_error=OfferLoggingError,
-    channel_bonus_service=ChannelBonusService,
-    build_question_text=_build_question_text,
-)
 _send_friend_round_question = partial(
     play_flow.send_friend_round_question, build_question_text=_build_question_text
 )
+
+
+async def _start_mode(
+    callback: CallbackQuery,
+    *,
+    mode_code: str,
+    source: str,
+    idempotency_key: str,
+) -> None:
+    await play_flow.start_mode(
+        callback,
+        mode_code=mode_code,
+        source=source,
+        idempotency_key=idempotency_key,
+        session_local=SessionLocal,
+        user_onboarding_service=UserOnboardingService,
+        game_session_service=GameSessionService,
+        offer_service=OfferService,
+        offer_logging_error=OfferLoggingError,
+        channel_bonus_service=ChannelBonusService,
+        build_question_text=_build_question_text,
+    )
 
 
 @router.callback_query(F.data.startswith("game:stop"))
