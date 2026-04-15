@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-from collections import defaultdict
-from dataclasses import dataclass
 from datetime import timedelta
-from uuid import UUID
 
 import structlog
-from aiogram.exceptions import TelegramForbiddenError
 
 from app.bot.application import build_bot
 from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard
@@ -17,6 +13,11 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.friend_challenges.constants import DUEL_STATUS_CREATOR_DONE, DUEL_STATUS_OPPONENT_DONE
 from app.game.tournaments.constants import TOURNAMENT_SELF_BOT_LABEL
+from app.workers.tasks.daily_cup_turn_reminder_delivery import (
+    deliver_reminders,
+    prepare_reminder_batch,
+    store_reminder_events,
+)
 from app.workers.tasks.daily_cup_config import (
     DAILY_CUP_PUSH_BATCH_SIZE,
     DAILY_CUP_TURN_REMINDER_INTERVAL_MINUTES,
@@ -28,16 +29,6 @@ from app.workers.tasks.tournaments_messaging_text import format_deadline, format
 logger = structlog.get_logger("app.workers.tasks.daily_cup_turn_reminder")
 
 _REMINDER_EVENT_TYPE = "daily_cup_turn_reminder_sent"
-
-
-@dataclass(frozen=True, slots=True)
-class _ReminderItem:
-    tournament_id: UUID
-    challenge_id: str
-    target_user_id: int
-    target_chat_id: int
-    opponent_label: str
-    deadline_text: str
 
 
 def resolve_turn_reminder_users(*, challenge: FriendChallenge) -> tuple[tuple[int, int], ...]:
@@ -75,16 +66,32 @@ def _resolve_turn_reminder_opponent_label(
     return user_labels.get(opponent_user_id, "Spieler")
 
 
-async def run_daily_cup_turn_reminders_async(
-    *, batch_size: int = DAILY_CUP_PUSH_BATCH_SIZE
+def _build_turn_reminder_result(
+    *,
+    batch_size: int,
+    scanned_total: int,
+    queued_total: int,
+    sent_total: int,
+    skipped_total: int,
+    failed_total: int,
 ) -> dict[str, int]:
-    now_utc_value = now_utc()
-    remind_before_utc = now_utc_value - timedelta(minutes=DAILY_CUP_TURN_REMINDER_INTERVAL_MINUTES)
-    resolved_batch_size = max(1, int(batch_size))
+    return {
+        "processed": 1,
+        "batch_size": batch_size,
+        "scanned_total": scanned_total,
+        "queued_total": queued_total,
+        "sent_total": sent_total,
+        "skipped_total": skipped_total,
+        "failed_total": failed_total,
+    }
 
-    scanned_total = sent_total = skipped_total = failed_total = 0
-    reminders: list[_ReminderItem] = []
 
+async def _load_reminder_batch(
+    *,
+    now_utc_value,
+    remind_before_utc,
+    resolved_batch_size: int,
+):
     async with SessionLocal.begin() as session:
         candidates = await TournamentMatchesRepo.list_daily_cup_turn_reminder_candidates_for_update(
             session,
@@ -93,130 +100,73 @@ async def run_daily_cup_turn_reminders_async(
             limit=resolved_batch_size,
         )
         if not candidates:
-            result = {
-                "processed": 1,
-                "batch_size": resolved_batch_size,
-                "scanned_total": 0,
-                "queued_total": 0,
-                "sent_total": 0,
-                "skipped_total": 0,
-                "failed_total": 0,
-            }
-            logger.info("daily_cup_turn_reminders_processed", **result)
-            return result
+            return None
+        return await prepare_reminder_batch(
+            candidates=candidates,
+            now_utc_value=now_utc_value,
+            format_user_label_fn=format_user_label,
+            list_users_by_ids=UsersRepo.list_by_ids,
+            session=session,
+            resolve_turn_reminder_users_fn=resolve_turn_reminder_users,
+            resolve_opponent_label_fn=_resolve_turn_reminder_opponent_label,
+            format_deadline_fn=format_deadline,
+        )
 
-        participant_user_ids: set[int] = set()
-        for _match, challenge in candidates:
-            resolved_users = resolve_turn_reminder_users(challenge=challenge)
-            if not resolved_users:
-                continue
-            for target_user_id, opponent_user_id in resolved_users:
-                participant_user_ids.add(target_user_id)
-                participant_user_ids.add(opponent_user_id)
 
-        users = await UsersRepo.list_by_ids(session, list(participant_user_ids))
-        user_labels = {
-            int(user.id): format_user_label(username=user.username, first_name=user.first_name)
-            for user in users
-        }
-        telegram_targets = {int(user.id): int(user.telegram_user_id) for user in users}
+async def run_daily_cup_turn_reminders_async(
+    *, batch_size: int = DAILY_CUP_PUSH_BATCH_SIZE
+) -> dict[str, int]:
+    now_utc_value = now_utc()
+    remind_before_utc = now_utc_value - timedelta(minutes=DAILY_CUP_TURN_REMINDER_INTERVAL_MINUTES)
+    resolved_batch_size = max(1, int(batch_size))
 
-        queued_target_keys: set[tuple[UUID, int]] = set()
-        for match, challenge in candidates:
-            scanned_total += 1
-            challenge.expires_last_chance_notified_at = now_utc_value
-            challenge.updated_at = now_utc_value
+    scanned_total = sent_total = skipped_total = failed_total = 0
+    queued_total = 0
+    batch = await _load_reminder_batch(
+        now_utc_value=now_utc_value,
+        remind_before_utc=remind_before_utc,
+        resolved_batch_size=resolved_batch_size,
+    )
+    if batch is None:
+        result = _build_turn_reminder_result(
+            batch_size=resolved_batch_size,
+            scanned_total=0,
+            queued_total=0,
+            sent_total=0,
+            skipped_total=0,
+            failed_total=0,
+        )
+        logger.info("daily_cup_turn_reminders_processed", **result)
+        return result
+    scanned_total = batch.scanned_total
+    skipped_total = batch.skipped_total
+    queued_total = len(batch.reminders)
 
-            resolved_users = resolve_turn_reminder_users(challenge=challenge)
-            if not resolved_users:
-                skipped_total += 1
-                continue
-            for target_user_id, opponent_user_id in resolved_users:
-                target_chat_id = telegram_targets.get(target_user_id)
-                if target_chat_id is None:
-                    skipped_total += 1
-                    continue
-                target_key = (match.tournament_id, target_user_id)
-                if target_key in queued_target_keys:
-                    skipped_total += 1
-                    continue
-                queued_target_keys.add(target_key)
+    delivery_result = await deliver_reminders(
+        reminders=batch.reminders,
+        build_bot_fn=build_bot,
+        build_keyboard=build_daily_cup_lobby_keyboard,
+        build_text=_build_turn_reminder_text,
+        logger=logger,
+    )
+    sent_total = delivery_result.sent_total
+    failed_total = delivery_result.failed_total
+    await store_reminder_events(
+        sent_user_ids_by_tournament=delivery_result.sent_user_ids_by_tournament,
+        event_type=_REMINDER_EVENT_TYPE,
+        happened_at=now_utc_value,
+        store_push_sent_events_fn=store_push_sent_events,
+        logger=logger,
+    )
 
-                reminders.append(
-                    _ReminderItem(
-                        tournament_id=match.tournament_id,
-                        challenge_id=str(challenge.id),
-                        target_user_id=target_user_id,
-                        target_chat_id=target_chat_id,
-                        opponent_label=_resolve_turn_reminder_opponent_label(
-                            target_user_id=target_user_id,
-                            opponent_user_id=opponent_user_id,
-                            user_labels=user_labels,
-                        ),
-                        deadline_text=format_deadline(match.deadline),
-                    )
-                )
-
-    sent_user_ids_by_tournament: dict[UUID, list[int]] = defaultdict(list)
-    bot = build_bot()
-    try:
-        for reminder in reminders:
-            keyboard = build_daily_cup_lobby_keyboard(
-                tournament_id=str(reminder.tournament_id),
-                can_join=False,
-                play_challenge_id=reminder.challenge_id,
-                show_share_result=False,
-            )
-            text = _build_turn_reminder_text(
-                opponent_label=reminder.opponent_label,
-                deadline_text=reminder.deadline_text,
-            )
-            try:
-                await bot.send_message(
-                    chat_id=reminder.target_chat_id,
-                    text=text,
-                    reply_markup=keyboard,
-                )
-                sent_total += 1
-                sent_user_ids_by_tournament[reminder.tournament_id].append(reminder.target_user_id)
-            except TelegramForbiddenError:
-                failed_total += 1
-            except Exception as exc:
-                logger.warning(
-                    "daily_cup_turn_reminder_send_failed",
-                    challenge_id=reminder.challenge_id,
-                    user_id=reminder.target_user_id,
-                    error_type=type(exc).__name__,
-                )
-                failed_total += 1
-    finally:
-        await bot.session.close()
-
-    for tournament_id, sent_user_ids in sent_user_ids_by_tournament.items():
-        try:
-            await store_push_sent_events(
-                event_type=_REMINDER_EVENT_TYPE,
-                tournament_id=tournament_id,
-                user_ids=sent_user_ids,
-                happened_at=now_utc_value,
-            )
-        except Exception as exc:
-            logger.warning(
-                "daily_cup_turn_reminder_event_store_failed",
-                tournament_id=str(tournament_id),
-                sent_total=len(sent_user_ids),
-                error_type=type(exc).__name__,
-            )
-
-    result = {
-        "processed": 1,
-        "batch_size": resolved_batch_size,
-        "scanned_total": scanned_total,
-        "queued_total": len(reminders),
-        "sent_total": sent_total,
-        "skipped_total": skipped_total,
-        "failed_total": failed_total,
-    }
+    result = _build_turn_reminder_result(
+        batch_size=resolved_batch_size,
+        scanned_total=scanned_total,
+        queued_total=queued_total,
+        sent_total=sent_total,
+        skipped_total=skipped_total,
+        failed_total=failed_total,
+    )
     logger.info("daily_cup_turn_reminders_processed", **result)
     return result
 

@@ -14,9 +14,13 @@ from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
-from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED, TOURNAMENT_TYPE_PRIVATE
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
+from app.workers.tasks.tournaments_messaging_delivery import (
+    deliver_round_messages,
+    load_round_messaging_context,
+    persist_standings_message_ids,
+)
 from app.workers.tasks.tournaments_messaging_text import (
     ROUND_STATUSES,
     build_completed_text,
@@ -66,156 +70,50 @@ async def run_private_tournament_round_messaging_async(*, tournament_id: str) ->
         return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
 
     async with SessionLocal.begin() as session:
-        tournament = await TournamentsRepo.get_by_id(session, parsed_tournament_id)
-        if (
-            tournament is None
-            or tournament.type != TOURNAMENT_TYPE_PRIVATE
-            or tournament.status in {"REGISTRATION", "CANCELED"}
-        ):
-            return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
-        participants = await TournamentParticipantsRepo.list_for_tournament(
-            session,
-            tournament_id=parsed_tournament_id,
+        context = await load_round_messaging_context(
+            session=session,
+            parsed_tournament_id=parsed_tournament_id,
+            tournaments_repo=TournamentsRepo,
+            participants_repo=TournamentParticipantsRepo,
+            users_repo=UsersRepo,
+            matches_repo=TournamentMatchesRepo,
+            format_points_fn=format_points,
+            round_statuses=ROUND_STATUSES,
+            format_user_label_fn=format_user_label,
         )
-        if not participants:
+        if context is None:
             return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
+    delivery_result = await deliver_round_messages(
+        context=context,
+        build_bot_fn=build_bot,
+        resolve_match_context_fn=resolve_match_context,
+        build_standings_lines_fn=build_standings_lines,
+        build_completed_text_fn=build_completed_text,
+        build_round_text_fn=build_round_text,
+        format_deadline_fn=format_deadline,
+        build_keyboard_fn=build_tournament_lobby_keyboard,
+        add_share_button_fn=_with_standings_share_button,
+        build_share_url_fn=_build_standings_share_url,
+        is_message_not_modified_error_fn=is_message_not_modified_error,
+        logger=logger,
+    )
 
-        users = await UsersRepo.list_by_ids(session, [int(item.user_id) for item in participants])
-        labels: dict[int, str] = {}
-        telegram_targets: dict[int, int] = {}
-        for user in users:
-            user_id = int(user.id)
-            labels[user_id] = format_user_label(
-                username=user.username,
-                first_name=user.first_name,
-            )
-            telegram_targets[user_id] = int(user.telegram_user_id)
-
-        round_matches = []
-        if tournament.status in ROUND_STATUSES:
-            round_matches = await TournamentMatchesRepo.list_by_tournament_round(
-                session,
-                tournament_id=parsed_tournament_id,
-                round_no=int(tournament.current_round),
-            )
-
-    standings_user_ids = [int(item.user_id) for item in participants]
-    points_by_user = {int(item.user_id): format_points(item.score) for item in participants}
-    place_by_user = {user_id: place for place, user_id in enumerate(standings_user_ids, start=1)}
-    participant_rows = {int(item.user_id): item for item in participants}
-    participants_total = len(standings_user_ids)
-
-    sent = edited = failed = 0
-    new_message_ids: dict[int, int] = {}
-    replaced_message_ids: dict[int, int] = {}
-
-    bot = build_bot()
-    try:
-        for user_id in standings_user_ids:
-            chat_id = telegram_targets.get(user_id)
-            if chat_id is None:
-                failed += 1
-                continue
-
-            play_challenge_id, opponent_user_id = resolve_match_context(
-                round_matches=round_matches,
-                viewer_user_id=user_id,
-            )
-            standings_lines = build_standings_lines(
-                standings_user_ids=standings_user_ids,
-                labels=labels,
-                points_by_user=points_by_user,
-                viewer_user_id=user_id,
-            )
-            if tournament.status == TOURNAMENT_STATUS_COMPLETED:
-                text = build_completed_text(
-                    tournament_name=tournament.name,
-                    tournament_format=tournament.format,
-                    place=place_by_user[user_id],
-                    my_points=points_by_user.get(user_id, "0"),
-                    standings_lines=standings_lines,
-                )
-            else:
-                text = build_round_text(
-                    tournament_name=tournament.name,
-                    tournament_format=tournament.format,
-                    round_no=max(1, int(tournament.current_round)),
-                    deadline_text=format_deadline(tournament.round_deadline),
-                    opponent_label=(
-                        labels.get(opponent_user_id) if opponent_user_id is not None else None
-                    ),
-                    standings_lines=standings_lines,
-                )
-            keyboard = build_tournament_lobby_keyboard(
-                invite_code=tournament.invite_code,
-                tournament_id=str(tournament.id),
-                can_join=False,
-                can_start=False,
-                play_challenge_id=play_challenge_id,
-                show_share_result=tournament.status == TOURNAMENT_STATUS_COMPLETED,
-            )
-            keyboard = _with_standings_share_button(
-                keyboard=keyboard,
-                share_url=_build_standings_share_url(
-                    invite_code=tournament.invite_code,
-                    tournament_name=tournament.name,
-                ),
-            )
-            existing_message_id = participant_rows[user_id].standings_message_id
-            if existing_message_id is None:
-                message = await bot.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
-                sent += 1
-                new_message_ids[user_id] = int(message.message_id)
-                continue
-
-            try:
-                await bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=int(existing_message_id),
-                    text=text,
-                    reply_markup=keyboard,
-                )
-                edited += 1
-            except Exception as exc:
-                if is_message_not_modified_error(exc):
-                    edited += 1
-                    continue
-                message = await bot.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
-                sent += 1
-                replaced_message_ids[user_id] = int(message.message_id)
-    except Exception as exc:
-        logger.warning(
-            "private_tournament_round_message_failed",
-            tournament_id=tournament_id,
-            error_type=type(exc).__name__,
-        )
-        failed += 1
-    finally:
-        await bot.session.close()
-
-    if new_message_ids or replaced_message_ids:
+    if delivery_result.new_message_ids or delivery_result.replaced_message_ids:
         async with SessionLocal.begin() as session:
-            for user_id, message_id in new_message_ids.items():
-                await TournamentParticipantsRepo.set_standings_message_id_if_missing(
-                    session,
-                    tournament_id=parsed_tournament_id,
-                    user_id=user_id,
-                    message_id=message_id,
-                )
-            for user_id, message_id in replaced_message_ids.items():
-                await TournamentParticipantsRepo.set_standings_message_id(
-                    session,
-                    tournament_id=parsed_tournament_id,
-                    user_id=user_id,
-                    message_id=message_id,
-                )
+            await persist_standings_message_ids(
+                session=session,
+                parsed_tournament_id=parsed_tournament_id,
+                participants_repo=TournamentParticipantsRepo,
+                new_message_ids=delivery_result.new_message_ids,
+                replaced_message_ids=delivery_result.replaced_message_ids,
+            )
 
     return {
         "processed": 1,
-        "participants_total": participants_total,
-        "sent": sent,
-        "edited": edited,
-        "failed": failed,
+        "participants_total": len(context.standings_user_ids),
+        "sent": delivery_result.sent,
+        "edited": delivery_result.edited,
+        "failed": delivery_result.failed,
     }
 
 
