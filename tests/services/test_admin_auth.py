@@ -8,6 +8,8 @@ import pytest
 from jose import jwt
 
 from app.services.admin import auth as admin_auth
+from app.services.admin import auth_state as admin_auth_state
+from app.services.admin import auth_totp as admin_auth_totp
 
 
 class _CookieResponse:
@@ -48,8 +50,9 @@ class _RedisClient:
             raise self.get_error
         if key in self.values:
             return self.values[key]
-        assert key == "qa_admin:totp_secret"
-        return self.get_value
+        if key == "qa_admin:totp_secret":
+            return self.get_value
+        return None
 
     async def set(self, key: str, value: str, ex: int | None = None) -> None:
         if self.set_error is not None:
@@ -60,7 +63,7 @@ class _RedisClient:
 
 @pytest.fixture(autouse=True)
 def _reset_redis_client() -> None:
-    admin_auth._redis_client = None
+    admin_auth_state._redis_client = None
 
 
 def _settings(**overrides: object) -> SimpleNamespace:
@@ -126,8 +129,14 @@ def test_verify_login_credentials_requires_matching_email_and_password() -> None
     )
 
 
-async def test_access_and_refresh_tokens_round_trip() -> None:
+async def test_access_and_refresh_tokens_round_trip(monkeypatch: pytest.MonkeyPatch) -> None:
     settings = _settings()
+    client = _RedisClient()
+
+    async def _client(_settings: SimpleNamespace) -> _RedisClient:
+        return client
+
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _client)
 
     access_token = admin_auth.build_access_token(
         settings=settings,
@@ -255,11 +264,11 @@ async def test_revoke_access_token_blocklists_token(monkeypatch: pytest.MonkeyPa
     async def _client(_settings: SimpleNamespace) -> _RedisClient:
         return client
 
-    monkeypatch.setattr(admin_auth, "_get_redis_client", _client)
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _client)
 
     await admin_auth.revoke_access_token(settings=_settings(), token=token)
 
-    assert client.set_calls[0]["key"] == admin_auth._revoked_token_key(token)
+    assert client.set_calls[0]["key"] == admin_auth_state._revoked_token_key(token)
     assert client.set_calls[0]["value"] == "1"
     assert isinstance(client.set_calls[0]["ex"], int)
     assert client.set_calls[0]["ex"] >= 1
@@ -274,10 +283,42 @@ async def test_revoke_refresh_token_raises_when_redis_unavailable(
     async def _no_client(_settings: SimpleNamespace) -> None:
         return None
 
-    monkeypatch.setattr(admin_auth, "_get_redis_client", _no_client)
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _no_client)
 
     with pytest.raises(admin_auth.AdminAuthStateError):
         await admin_auth.revoke_refresh_token(settings=_settings(), token=token)
+
+
+@pytest.mark.parametrize(
+    ("build_token", "decode_token", "build_kwargs"),
+    [
+        (
+            admin_auth.build_access_token,
+            admin_auth.decode_access_token,
+            {"email": "admin@example.com", "two_factor_verified": True},
+        ),
+        (
+            admin_auth.build_refresh_token,
+            admin_auth.decode_refresh_token,
+            {"email": "admin@example.com"},
+        ),
+    ],
+)
+async def test_decode_token_raises_when_auth_state_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    build_token,
+    decode_token,
+    build_kwargs: dict[str, object],
+) -> None:
+    token = build_token(settings=_settings(), **build_kwargs)
+
+    async def _no_client(_settings: SimpleNamespace) -> None:
+        return None
+
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _no_client)
+
+    with pytest.raises(admin_auth.AdminAuthStateError):
+        await decode_token(settings=_settings(), token=token)
 
 
 async def test_get_totp_setup_payload_generates_secret_when_missing(
@@ -285,15 +326,19 @@ async def test_get_totp_setup_payload_generates_secret_when_missing(
 ) -> None:
     stored: list[str] = []
 
-    async def _missing_secret(_settings: SimpleNamespace) -> str:
+    async def _missing_secret(_settings: SimpleNamespace, *, strict: bool = False) -> str:
+        del strict
         return ""
 
-    async def _store_secret(*, settings: SimpleNamespace, secret: str) -> None:
+    async def _store_secret(
+        *, settings: SimpleNamespace, secret: str, strict: bool = False
+    ) -> None:
         del settings
+        del strict
         stored.append(secret)
 
-    monkeypatch.setattr(admin_auth, "get_totp_secret", _missing_secret)
-    monkeypatch.setattr(admin_auth, "set_totp_secret", _store_secret)
+    monkeypatch.setattr(admin_auth_totp, "get_totp_secret", _missing_secret)
+    monkeypatch.setattr(admin_auth_totp, "set_totp_secret", _store_secret)
 
     payload = await admin_auth.get_totp_setup_payload(settings=_settings())
 
@@ -306,15 +351,19 @@ async def test_get_totp_setup_payload_reuses_existing_secret(
 ) -> None:
     called: list[str] = []
 
-    async def _existing_secret(_settings: SimpleNamespace) -> str:
+    async def _existing_secret(_settings: SimpleNamespace, *, strict: bool = False) -> str:
+        del strict
         return "existing-secret"
 
-    async def _unexpected_store(*, settings: SimpleNamespace, secret: str) -> None:
+    async def _unexpected_store(
+        *, settings: SimpleNamespace, secret: str, strict: bool = False
+    ) -> None:
         del settings
+        del strict
         called.append(secret)
 
-    monkeypatch.setattr(admin_auth, "get_totp_secret", _existing_secret)
-    monkeypatch.setattr(admin_auth, "set_totp_secret", _unexpected_store)
+    monkeypatch.setattr(admin_auth_totp, "get_totp_secret", _existing_secret)
+    monkeypatch.setattr(admin_auth_totp, "set_totp_secret", _unexpected_store)
 
     payload = await admin_auth.get_totp_setup_payload(settings=_settings())
 
@@ -325,18 +374,20 @@ async def test_get_totp_setup_payload_reuses_existing_secret(
 async def test_verify_totp_code_rejects_missing_blank_and_invalid_codes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _missing_secret(_settings: SimpleNamespace) -> str:
+    async def _missing_secret(_settings: SimpleNamespace, *, strict: bool = False) -> str:
+        del strict
         return ""
 
-    monkeypatch.setattr(admin_auth, "get_totp_secret", _missing_secret)
+    monkeypatch.setattr(admin_auth_totp, "get_totp_secret", _missing_secret)
     assert await admin_auth.verify_totp_code(settings=_settings(), code="123456") is False
 
     secret = pyotp.random_base32()
 
-    async def _secret(_settings: SimpleNamespace) -> str:
+    async def _secret(_settings: SimpleNamespace, *, strict: bool = False) -> str:
+        del strict
         return secret
 
-    monkeypatch.setattr(admin_auth, "get_totp_secret", _secret)
+    monkeypatch.setattr(admin_auth_totp, "get_totp_secret", _secret)
     assert await admin_auth.verify_totp_code(settings=_settings(), code="   ") is False
 
     valid_code = pyotp.TOTP(secret).now()
@@ -347,10 +398,11 @@ async def test_verify_totp_code_rejects_missing_blank_and_invalid_codes(
 async def test_verify_totp_code_accepts_current_code(monkeypatch: pytest.MonkeyPatch) -> None:
     secret = pyotp.random_base32()
 
-    async def _secret(_settings: SimpleNamespace) -> str:
+    async def _secret(_settings: SimpleNamespace, *, strict: bool = False) -> str:
+        del strict
         return secret
 
-    monkeypatch.setattr(admin_auth, "get_totp_secret", _secret)
+    monkeypatch.setattr(admin_auth_totp, "get_totp_secret", _secret)
 
     assert (
         await admin_auth.verify_totp_code(
@@ -359,6 +411,30 @@ async def test_verify_totp_code_accepts_current_code(monkeypatch: pytest.MonkeyP
         )
         is True
     )
+
+
+async def test_get_totp_setup_payload_raises_when_state_store_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _no_client(_settings: SimpleNamespace) -> None:
+        return None
+
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _no_client)
+
+    with pytest.raises(admin_auth.AdminAuthStateError):
+        await admin_auth.get_totp_setup_payload(settings=_settings())
+
+
+async def test_verify_totp_code_raises_when_state_store_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _no_client(_settings: SimpleNamespace) -> None:
+        return None
+
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _no_client)
+
+    with pytest.raises(admin_auth.AdminAuthStateError):
+        await admin_auth.verify_totp_code(settings=_settings(), code="123456")
 
 
 async def test_get_totp_secret_prefers_env_secret() -> None:
@@ -376,7 +452,7 @@ async def test_get_totp_secret_returns_trimmed_string_from_redis(
     async def _client(_settings: SimpleNamespace) -> _RedisClient:
         return client
 
-    monkeypatch.setattr(admin_auth, "_get_redis_client", _client)
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _client)
 
     assert await admin_auth.get_totp_secret(_settings()) == "redis-secret"
 
@@ -387,7 +463,7 @@ async def test_get_totp_secret_returns_empty_for_missing_client_and_redis_failur
     async def _no_client(_settings: SimpleNamespace) -> None:
         return None
 
-    monkeypatch.setattr(admin_auth, "_get_redis_client", _no_client)
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _no_client)
     assert await admin_auth.get_totp_secret(_settings()) == ""
 
     client = _RedisClient(get_error=RuntimeError("boom"))
@@ -395,7 +471,7 @@ async def test_get_totp_secret_returns_empty_for_missing_client_and_redis_failur
     async def _error_client(_settings: SimpleNamespace) -> _RedisClient:
         return client
 
-    monkeypatch.setattr(admin_auth, "_get_redis_client", _error_client)
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _error_client)
     assert await admin_auth.get_totp_secret(_settings()) == ""
 
     bytes_client = _RedisClient(get_value=b"secret")
@@ -403,7 +479,7 @@ async def test_get_totp_secret_returns_empty_for_missing_client_and_redis_failur
     async def _bytes_client(_settings: SimpleNamespace) -> _RedisClient:
         return bytes_client
 
-    monkeypatch.setattr(admin_auth, "_get_redis_client", _bytes_client)
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _bytes_client)
     assert await admin_auth.get_totp_secret(_settings()) == ""
 
 
@@ -415,7 +491,7 @@ async def test_set_totp_secret_is_noop_for_env_secret_missing_client_and_redis_e
     async def _unexpected_client(_settings: SimpleNamespace) -> _RedisClient:
         return client
 
-    monkeypatch.setattr(admin_auth, "_get_redis_client", _unexpected_client)
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _unexpected_client)
     await admin_auth.set_totp_secret(
         settings=_settings(admin_totp_secret="configured"), secret="new-secret"
     )
@@ -424,7 +500,7 @@ async def test_set_totp_secret_is_noop_for_env_secret_missing_client_and_redis_e
     async def _no_client(_settings: SimpleNamespace) -> None:
         return None
 
-    monkeypatch.setattr(admin_auth, "_get_redis_client", _no_client)
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _no_client)
     await admin_auth.set_totp_secret(settings=_settings(), secret="new-secret")
 
     failing_client = _RedisClient(set_error=RuntimeError("boom"))
@@ -432,7 +508,7 @@ async def test_set_totp_secret_is_noop_for_env_secret_missing_client_and_redis_e
     async def _failing_client(_settings: SimpleNamespace) -> _RedisClient:
         return failing_client
 
-    monkeypatch.setattr(admin_auth, "_get_redis_client", _failing_client)
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _failing_client)
     await admin_auth.set_totp_secret(settings=_settings(), secret="new-secret")
 
 
@@ -446,11 +522,11 @@ async def test_get_redis_client_caches_successful_client(monkeypatch: pytest.Mon
         assert decode_responses is True
         return client
 
-    monkeypatch.setattr(admin_auth.redis, "from_url", _from_url)
+    monkeypatch.setattr(admin_auth_state.redis, "from_url", _from_url)
     settings = _settings(redis_url="redis://cache")
 
-    first = await admin_auth._get_redis_client(settings)
-    second = await admin_auth._get_redis_client(settings)
+    first = await admin_auth_state._get_redis_client(settings)
+    second = await admin_auth_state._get_redis_client(settings)
 
     assert first is client
     assert second is client
@@ -461,10 +537,10 @@ async def test_get_redis_client_returns_none_on_ping_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client = _RedisClient(ping_error=RuntimeError("down"))
-    monkeypatch.setattr(admin_auth.redis, "from_url", lambda *args, **kwargs: client)
+    monkeypatch.setattr(admin_auth_state.redis, "from_url", lambda *args, **kwargs: client)
 
-    assert await admin_auth._get_redis_client(_settings()) is None
-    assert admin_auth._redis_client is None
+    assert await admin_auth_state._get_redis_client(_settings()) is None
+    assert admin_auth_state._redis_client is None
 
 
 def test_auth_cookie_helpers_set_and_clear_expected_cookies() -> None:

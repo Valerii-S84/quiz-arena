@@ -184,6 +184,27 @@ def test_admin_verify_2fa_rejects_invalid_code(
     assert failures == [("bucket", 300)]
 
 
+def test_admin_verify_2fa_returns_503_when_auth_state_is_unavailable(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _error_totp(**kwargs) -> bool:
+        del kwargs
+        raise auth.AdminAuthStateError("down")
+
+    app.dependency_overrides[auth.get_settings] = lambda: _settings(two_fa_required=True)
+    app.dependency_overrides[admin_deps.get_pending_admin] = lambda: _principal(
+        two_factor_verified=False
+    )
+    monkeypatch.setattr(auth, "rate_limit_bucket", lambda **kwargs: "bucket")
+    monkeypatch.setattr(auth, "is_rate_limited", lambda **kwargs: False)
+    monkeypatch.setattr(auth, "verify_totp_code", _error_totp)
+
+    response = client.post("/admin/auth/2fa/verify", json={"code": "123456"})
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": {"code": "E_AUTH_STATE_UNAVAILABLE"}}
+
+
 def test_admin_verify_2fa_success_sets_full_auth_cookies(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -317,6 +338,25 @@ def test_admin_auth_setup_refresh_logout_and_session(
     assert revoked_tokens == [("access", "access-cookie"), ("refresh", "refresh-cookie")]
 
 
+def test_admin_auth_setup_returns_503_when_auth_state_is_unavailable(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _setup(**kwargs) -> dict[str, str]:
+        del kwargs
+        raise auth.AdminAuthStateError("down")
+
+    app.dependency_overrides[auth.get_settings] = lambda: _settings(two_fa_required=True)
+    app.dependency_overrides[admin_deps.get_pending_admin] = lambda: _principal(
+        two_factor_verified=True
+    )
+    monkeypatch.setattr(auth, "get_totp_setup_payload", _setup)
+
+    response = client.get("/admin/auth/2fa/setup")
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": {"code": "E_AUTH_STATE_UNAVAILABLE"}}
+
+
 @pytest.mark.parametrize(
     ("decoded_payload", "two_fa_required"),
     [
@@ -352,6 +392,23 @@ def test_admin_refresh_rejects_invalid_or_unverified_tokens(
 
     assert response.status_code == 401
     assert response.json() == {"detail": {"code": "E_UNAUTHORIZED"}}
+
+
+def test_admin_refresh_returns_503_when_auth_state_is_unavailable(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _decode_refresh(**kwargs):
+        del kwargs
+        raise auth.AdminAuthStateError("down")
+
+    app.dependency_overrides[auth.get_settings] = lambda: _settings(two_fa_required=True)
+    monkeypatch.setattr(auth, "decode_refresh_token", _decode_refresh)
+
+    client.cookies.set("qa_admin_refresh", "refresh-cookie")
+    response = client.post("/admin/auth/refresh")
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": {"code": "E_AUTH_STATE_UNAVAILABLE"}}
 
 
 def test_admin_logout_returns_503_when_revocation_fails(
@@ -408,3 +465,20 @@ def test_admin_session_rejects_forbidden_principals(
 
     assert response.status_code == 401
     assert response.json() == {"detail": {"code": "E_UNAUTHORIZED"}}
+
+
+def test_admin_session_returns_503_when_auth_state_is_unavailable(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _decode_access(**kwargs):
+        del kwargs
+        raise auth.AdminAuthStateError("down")
+
+    app.dependency_overrides[auth.get_settings] = lambda: _settings(two_fa_required=True)
+    monkeypatch.setattr(admin_deps, "decode_access_token", _decode_access)
+
+    client.cookies.set("qa_admin_access", "access-cookie")
+    response = client.get("/admin/auth/session")
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": {"code": "E_AUTH_STATE_UNAVAILABLE"}}

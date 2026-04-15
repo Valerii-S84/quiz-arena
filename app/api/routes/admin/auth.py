@@ -34,6 +34,10 @@ from .auth_models import LoginRequest, LoginResponse, SessionResponse, Verify2FA
 router = APIRouter(prefix="/admin/auth", tags=["admin-auth"])
 
 
+def _auth_state_unavailable_http_error() -> HTTPException:
+    return HTTPException(status_code=503, detail={"code": "E_AUTH_STATE_UNAVAILABLE"})
+
+
 @router.post("/login", response_model=LoginResponse)
 async def login_admin(
     payload: LoginRequest,
@@ -108,12 +112,17 @@ async def verify_2fa(
     ):
         raise HTTPException(status_code=429, detail={"code": "E_RATE_LIMITED"})
 
-    if settings.admin_2fa_required and not await verify_totp_code(
-        settings=settings,
-        code=payload.code,
-    ):
-        record_failure(bucket=bucket, window_seconds=window_seconds)
-        raise HTTPException(status_code=401, detail={"code": "E_INVALID_TOTP"})
+    if settings.admin_2fa_required:
+        try:
+            is_valid_totp = await verify_totp_code(
+                settings=settings,
+                code=payload.code,
+            )
+        except AdminAuthStateError as exc:
+            raise _auth_state_unavailable_http_error() from exc
+        if not is_valid_totp:
+            record_failure(bucket=bucket, window_seconds=window_seconds)
+            raise HTTPException(status_code=401, detail={"code": "E_INVALID_TOTP"})
 
     clear_failures(bucket=bucket)
     access_token = build_access_token(
@@ -150,7 +159,10 @@ async def setup_2fa(
     settings: Settings = Depends(get_settings),
 ) -> dict[str, str]:
     add_admin_noindex_header(response)
-    return await get_totp_setup_payload(settings=settings)
+    try:
+        return await get_totp_setup_payload(settings=settings)
+    except AdminAuthStateError as exc:
+        raise _auth_state_unavailable_http_error() from exc
 
 
 @router.post("/refresh", response_model=SessionResponse)
@@ -161,7 +173,10 @@ async def refresh_session(
 ) -> Response:
     add_admin_noindex_header(response)
     token = (request.cookies.get(ADMIN_REFRESH_COOKIE) or "").strip()
-    payload = await decode_refresh_token(settings=settings, token=token)
+    try:
+        payload = await decode_refresh_token(settings=settings, token=token)
+    except AdminAuthStateError as exc:
+        raise _auth_state_unavailable_http_error() from exc
     if payload is None or normalize_admin_role(payload.role) not in ALLOWED_ADMIN_ROLES:
         raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
     if settings.admin_2fa_required and not payload.two_factor_verified:
