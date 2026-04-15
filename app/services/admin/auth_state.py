@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 
 import redis.asyncio as redis
@@ -11,6 +12,7 @@ from .auth_common import _auth_state_unavailable
 _ADMIN_TOTP_SECRET_KEY = "qa_admin:totp_secret"
 _ADMIN_REVOKED_TOKEN_KEY_PREFIX = "qa_admin:revoked_token:"
 _redis_client: redis.Redis | None = None
+_redis_client_loop_id: int | None = None
 
 
 def _revoked_token_key(token: str) -> str:
@@ -69,15 +71,26 @@ async def set_totp_secret(*, settings: Settings, secret: str, strict: bool = Fal
 
 
 async def _get_redis_client(settings: Settings) -> redis.Redis | None:
-    global _redis_client
-    if _redis_client is not None:
+    global _redis_client, _redis_client_loop_id
+    current_loop_id = id(asyncio.get_running_loop())
+    if _redis_client is not None and _redis_client_loop_id == current_loop_id:
         return _redis_client
+    if _redis_client is not None:
+        try:
+            await _redis_client.aclose()
+        except Exception:
+            pass
+        _redis_client = None
+        _redis_client_loop_id = None
 
     try:
         _redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
         await _redis_client.ping()
     except Exception:
         _redis_client = None
+        _redis_client_loop_id = None
+    else:
+        _redis_client_loop_id = current_loop_id
     return _redis_client
 
 
