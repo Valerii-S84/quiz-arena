@@ -78,7 +78,7 @@ class UsersRepo:
     async def touch_last_seen(session: AsyncSession, user_id: int, seen_at: datetime) -> int:
         stmt = update(User).where(User.id == user_id).values(last_seen_at=seen_at)
         result = await session.execute(stmt)
-        return result.rowcount or 0
+        return int(getattr(result, "rowcount", 0) or 0)
 
     @staticmethod
     async def get_global_best_streak(session: AsyncSession) -> int:

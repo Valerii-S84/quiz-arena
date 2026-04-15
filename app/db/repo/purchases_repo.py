@@ -189,7 +189,7 @@ class PurchasesRepo:
             .values(status="FAILED")
         )
         result = await session.execute(stmt)
-        return int(result.rowcount or 0)
+        return int(getattr(result, "rowcount", 0) or 0)
 
     @staticmethod
     async def create(
