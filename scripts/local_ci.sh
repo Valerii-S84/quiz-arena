@@ -137,15 +137,13 @@ PY
 }
 
 architecture_guards() {
-  env CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash -lc '
-    bash scripts/check_line_limits.sh
-    bash scripts/check_growth_delta.sh
-    bash scripts/check_monolith_pattern.sh
-    bash scripts/check_no_print_app.sh
-    bash scripts/check_no_except_exception_pass.sh
-    bash scripts/check_architecture_imports.sh
-    bash scripts/check_import_cycles.sh
-  '
+  CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_line_limits.sh
+  CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_growth_delta.sh
+  CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_monolith_pattern.sh
+  CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_no_print_app.sh
+  CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_no_except_exception_pass.sh
+  CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_architecture_imports.sh
+  CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_import_cycles.sh
 }
 
 frontend_quality_gates() {

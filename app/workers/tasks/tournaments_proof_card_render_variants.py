@@ -174,8 +174,4 @@ def render_participant_card(
     return image
 
 
-__all__ = [
-    "render_arena_card",
-    "render_champion_card",
-    "render_participant_card",
-]
+__all__ = ["render_arena_card", "render_champion_card", "render_participant_card"]
