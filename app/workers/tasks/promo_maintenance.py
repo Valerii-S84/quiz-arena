@@ -65,7 +65,10 @@ async def run_promo_bruteforce_guard_async() -> dict[str, int]:
     if paused_campaigns > 0:
         await send_ops_alert(
             event="promo_campaign_auto_paused",
-            payload=result,
+            payload={
+                "abusive_hashes": result["abusive_hashes"],
+                "paused_campaigns": result["paused_campaigns"],
+            },
         )
         logger.warning("promo_campaign_auto_paused", **result)
     else:
