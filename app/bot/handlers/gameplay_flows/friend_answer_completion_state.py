@@ -54,10 +54,7 @@ async def resolve_friend_series_context(
 
     wins_needed = max(1, (best_of // 2) + 1)
     series_finished = (
-        best_of <= 1
-        or my_wins >= wins_needed
-        or opponent_wins >= wins_needed
-        or game_no >= best_of
+        best_of <= 1 or my_wins >= wins_needed or opponent_wins >= wins_needed or game_no >= best_of
     )
     if my_wins > opponent_wins:
         champion_label = "Du"

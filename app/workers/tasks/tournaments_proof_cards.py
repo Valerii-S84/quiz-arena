@@ -13,12 +13,12 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
+from app.workers.tasks.tournaments_proof_card_render import render_tournament_proof_card_png
 from app.workers.tasks.tournaments_proof_cards_delivery import (
     deliver_proof_cards,
     load_proof_card_context,
     persist_proof_card_file_ids,
 )
-from app.workers.tasks.tournaments_proof_card_render import render_tournament_proof_card_png
 
 logger = structlog.get_logger("app.workers.tasks.tournaments_proof_cards")
 

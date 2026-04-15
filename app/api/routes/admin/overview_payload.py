@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.admin.overview_feature_usage import build_feature_usage_payload
@@ -21,6 +22,8 @@ from app.api.routes.admin.overview_series import (
     fetch_users_series,
 )
 from app.api.routes.admin.overview_streak_metrics import count_users_reaching_streak_threshold
+
+
 def _build_funnel(
     *,
     first_quiz_users_now: int,

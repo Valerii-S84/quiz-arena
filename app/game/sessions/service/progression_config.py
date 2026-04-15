@@ -5,8 +5,8 @@ import hashlib
 from .constants import (
     MIX_STEP_WEIGHTS,
     MODE_PROGRESSION_CONFIGS,
-    ModeProgressionConfig,
     PERSISTENT_ADAPTIVE_LEVEL_CHAIN,
+    ModeProgressionConfig,
 )
 
 LEVEL_CHAIN = PERSISTENT_ADAPTIVE_LEVEL_CHAIN

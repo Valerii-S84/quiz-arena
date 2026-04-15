@@ -9,10 +9,7 @@ from app.api.routes.admin.overview_metrics import (
     count_first_purchase_users,
     count_purchase_users,
 )
-from app.api.routes.admin.overview_series import (
-    count_first_quiz_users,
-    count_quiz_users,
-)
+from app.api.routes.admin.overview_series import count_first_quiz_users, count_quiz_users
 
 from .overview_payload_kpis import OverviewWindows
 

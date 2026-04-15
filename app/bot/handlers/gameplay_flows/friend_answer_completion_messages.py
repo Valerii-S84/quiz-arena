@@ -36,9 +36,7 @@ def _append_series_lines(
     )
     if context.series_finished:
         lines.append(
-            TEXTS_DE["msg.friend.challenge.series.finished"].format(
-                champion_label=champion_label
-            )
+            TEXTS_DE["msg.friend.challenge.series.finished"].format(champion_label=champion_label)
         )
 
 

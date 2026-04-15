@@ -16,11 +16,9 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
-from app.workers.tasks.tournaments_messaging_delivery import (
-    deliver_round_messages,
-    load_round_messaging_context,
-    persist_standings_message_ids,
-)
+from app.workers.tasks.tournaments_messaging_context import load_round_messaging_context
+from app.workers.tasks.tournaments_messaging_delivery import deliver_round_messages
+from app.workers.tasks.tournaments_messaging_persistence import persist_standings_message_ids
 from app.workers.tasks.tournaments_messaging_text import (
     ROUND_STATUSES,
     build_completed_text,

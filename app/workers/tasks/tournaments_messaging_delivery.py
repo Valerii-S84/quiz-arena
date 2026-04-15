@@ -1,20 +1,13 @@
 from __future__ import annotations
-from collections.abc import Collection, Callable
+
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
-from uuid import UUID
-from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED, TOURNAMENT_TYPE_PRIVATE
-@dataclass(frozen=True, slots=True)
-class TournamentRoundMessagingContext:
-    parsed_tournament_id: UUID
-    tournament: Any
-    standings_user_ids: list[int]
-    points_by_user: dict[int, str]
-    place_by_user: dict[int, int]
-    participant_rows: dict[int, Any]
-    telegram_targets: dict[int, int]
-    labels: dict[int, str]
-    round_matches: list[Any]
+
+from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED
+from app.workers.tasks.tournaments_messaging_context import TournamentRoundMessagingContext
+
+
 @dataclass(frozen=True, slots=True)
 class TournamentRoundDeliveryResult:
     sent: int
@@ -22,58 +15,8 @@ class TournamentRoundDeliveryResult:
     failed: int
     new_message_ids: dict[int, int]
     replaced_message_ids: dict[int, int]
-async def load_round_messaging_context(
-    *,
-    session: Any,
-    parsed_tournament_id: UUID,
-    tournaments_repo: Any,
-    participants_repo: Any,
-    users_repo: Any,
-    matches_repo: Any,
-    format_points_fn: Callable[..., str],
-    round_statuses: Collection[str],
-    format_user_label_fn: Callable[..., str],
-) -> TournamentRoundMessagingContext | None:
-    tournament = await tournaments_repo.get_by_id(session, parsed_tournament_id)
-    if (
-        tournament is None
-        or tournament.type != TOURNAMENT_TYPE_PRIVATE
-        or tournament.status in {"REGISTRATION", "CANCELED"}
-    ):
-        return None
-    participants = await participants_repo.list_for_tournament(
-        session,
-        tournament_id=parsed_tournament_id,
-    )
-    if not participants:
-        return None
-    users = await users_repo.list_by_ids(session, [int(item.user_id) for item in participants])
-    labels = {
-        int(user.id): format_user_label_fn(username=user.username, first_name=user.first_name)
-        for user in users
-    }
-    telegram_targets = {int(user.id): int(user.telegram_user_id) for user in users}
-    round_matches: list[Any] = []
-    if tournament.status in round_statuses:
-        round_matches = await matches_repo.list_by_tournament_round(
-            session,
-            tournament_id=parsed_tournament_id,
-            round_no=int(tournament.current_round),
-        )
 
-    standings_user_ids = [int(item.user_id) for item in participants]
-    points_by_user = {int(item.user_id): item.score for item in participants}
-    return TournamentRoundMessagingContext(
-        parsed_tournament_id=parsed_tournament_id,
-        tournament=tournament,
-        standings_user_ids=standings_user_ids,
-        points_by_user={user_id: format_points_fn(score) for user_id, score in points_by_user.items()},
-        place_by_user={user_id: place for place, user_id in enumerate(standings_user_ids, start=1)},
-        participant_rows={int(item.user_id): item for item in participants},
-        telegram_targets=telegram_targets,
-        labels=labels,
-        round_matches=round_matches,
-    )
+
 async def deliver_round_messages(
     *,
     context: TournamentRoundMessagingContext,
@@ -94,6 +37,7 @@ async def deliver_round_messages(
     failed = 0
     new_message_ids: dict[int, int] = {}
     replaced_message_ids: dict[int, int] = {}
+
     bot = build_bot_fn()
     try:
         for user_id in context.standings_user_ids:
@@ -127,7 +71,9 @@ async def deliver_round_messages(
                     round_no=max(1, int(context.tournament.current_round)),
                     deadline_text=format_deadline_fn(context.tournament.round_deadline),
                     opponent_label=(
-                        context.labels.get(opponent_user_id) if opponent_user_id is not None else None
+                        context.labels.get(opponent_user_id)
+                        if opponent_user_id is not None
+                        else None
                     ),
                     standings_lines=standings_lines,
                 )
@@ -152,6 +98,7 @@ async def deliver_round_messages(
                 sent += 1
                 new_message_ids[user_id] = int(message.message_id)
                 continue
+
             try:
                 await bot.edit_message_text(
                     chat_id=chat_id,
@@ -184,26 +131,6 @@ async def deliver_round_messages(
         new_message_ids=new_message_ids,
         replaced_message_ids=replaced_message_ids,
     )
-async def persist_standings_message_ids(
-    *,
-    session: Any,
-    parsed_tournament_id: UUID,
-    participants_repo: Any,
-    new_message_ids: dict[int, int],
-    replaced_message_ids: dict[int, int],
-) -> None:
-    for user_id, message_id in new_message_ids.items():
-        await participants_repo.set_standings_message_id_if_missing(
-            session,
-            tournament_id=parsed_tournament_id,
-            user_id=user_id,
-            message_id=message_id,
-        )
-    for user_id, message_id in replaced_message_ids.items():
-        await participants_repo.set_standings_message_id(
-            session,
-            tournament_id=parsed_tournament_id,
-            user_id=user_id,
-            message_id=message_id,
-        )
-__all__ = ["TournamentRoundDeliveryResult", "TournamentRoundMessagingContext", "deliver_round_messages", "load_round_messaging_context", "persist_standings_message_ids"]
+
+
+__all__ = ["TournamentRoundDeliveryResult", "deliver_round_messages"]

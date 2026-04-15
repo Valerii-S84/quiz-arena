@@ -3,8 +3,6 @@ from __future__ import annotations
 from uuid import UUID
 
 import structlog
-from aiogram.exceptions import TelegramForbiddenError
-from sqlalchemy import select
 
 from app.bot.application import build_bot
 from app.bot.texts.de import TEXTS_DE
@@ -17,6 +15,14 @@ from app.db.session import SessionLocal
 from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES, TOURNAMENT_STATUS_COMPLETED
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
+from app.workers.tasks.daily_cup_nonfinishers_summary_context import (
+    collect_nonfinishers,
+    load_daily_cup_nonfinishers_summary_context,
+    user_did_not_finish_challenge,
+)
+from app.workers.tasks.daily_cup_nonfinishers_summary_delivery import (
+    deliver_daily_cup_nonfinishers_summary,
+)
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_nonfinishers_summary")
 
@@ -35,19 +41,8 @@ def _empty_result() -> dict[str, int]:
     }
 
 
-def _user_did_not_finish_challenge(*, challenge: FriendChallenge, user_id: int) -> bool:
-    total_rounds = max(1, int(challenge.total_rounds))
-    if int(challenge.creator_user_id) == user_id:
-        return (
-            challenge.creator_finished_at is None
-            and int(challenge.creator_answered_round) < total_rounds
-        )
-    if challenge.opponent_user_id is not None and int(challenge.opponent_user_id) == user_id:
-        return (
-            challenge.opponent_finished_at is None
-            and int(challenge.opponent_answered_round) < total_rounds
-        )
-    return False
+def _user_did_not_finish_challenge(*, challenge, user_id: int) -> bool:
+    return user_did_not_finish_challenge(challenge=challenge, user_id=user_id)
 
 
 def _collect_nonfinishers(
@@ -55,21 +50,7 @@ def _collect_nonfinishers(
     matches: list,
     challenges_by_id: dict[UUID, FriendChallenge],
 ) -> set[int]:
-    nonfinishers: set[int] = set()
-    for match in matches:
-        if match.friend_challenge_id is None:
-            continue
-        challenge = challenges_by_id.get(match.friend_challenge_id)
-        if challenge is None:
-            continue
-        user_a = int(match.user_a)
-        if _user_did_not_finish_challenge(challenge=challenge, user_id=user_a):
-            nonfinishers.add(user_a)
-        if match.user_b is not None:
-            user_b = int(match.user_b)
-            if _user_did_not_finish_challenge(challenge=challenge, user_id=user_b):
-                nonfinishers.add(user_b)
-    return nonfinishers
+    return collect_nonfinishers(matches=matches, challenges_by_id=challenges_by_id)
 
 
 async def run_daily_cup_nonfinishers_summary_async(*, tournament_id: str) -> dict[str, int]:
@@ -79,89 +60,46 @@ async def run_daily_cup_nonfinishers_summary_async(*, tournament_id: str) -> dic
         return _empty_result()
 
     async with SessionLocal.begin() as session:
-        tournament = await TournamentsRepo.get_by_id(session, parsed_tournament_id)
-        if (
-            tournament is None
-            or tournament.type not in DAILY_CUP_TOURNAMENT_TYPES
-            or tournament.status != TOURNAMENT_STATUS_COMPLETED
-        ):
-            return _empty_result()
-
-        participants = await TournamentParticipantsRepo.list_for_tournament(
-            session,
-            tournament_id=parsed_tournament_id,
+        context = await load_daily_cup_nonfinishers_summary_context(
+            session=session,
+            parsed_tournament_id=parsed_tournament_id,
+            tournaments_repo=TournamentsRepo,
+            participants_repo=TournamentParticipantsRepo,
+            users_repo=UsersRepo,
+            matches_repo=TournamentMatchesRepo,
+            daily_cup_tournament_types=DAILY_CUP_TOURNAMENT_TYPES,
+            tournament_completed_status=TOURNAMENT_STATUS_COMPLETED,
+            collect_nonfinishers_fn=_collect_nonfinishers,
         )
-        participant_user_ids = {int(item.user_id) for item in participants}
-        participants_total = len(participant_user_ids)
-        if not participant_user_ids:
-            return _empty_result()
+    if context is None:
+        return _empty_result()
 
-        users = await UsersRepo.list_by_ids(session, sorted(participant_user_ids))
-        telegram_targets = {int(user.id): int(user.telegram_user_id) for user in users}
-
-        rounds_played = await TournamentMatchesRepo.get_max_round_no(
-            session,
-            tournament_id=parsed_tournament_id,
-        )
-        matches = []
-        for round_no in range(1, rounds_played + 1):
-            round_matches = await TournamentMatchesRepo.list_by_tournament_round(
-                session,
-                tournament_id=parsed_tournament_id,
-                round_no=round_no,
-            )
-            matches.extend(round_matches)
-
-        challenge_ids = {
-            match.friend_challenge_id for match in matches if match.friend_challenge_id is not None
-        }
-        challenges: list[FriendChallenge] = []
-        if challenge_ids:
-            result = await session.execute(
-                select(FriendChallenge).where(FriendChallenge.id.in_(tuple(challenge_ids)))
-            )
-            challenges = list(result.scalars().all())
-        challenges_by_id = {challenge.id: challenge for challenge in challenges}
-        nonfinishers = sorted(
-            participant_user_ids
-            & _collect_nonfinishers(matches=matches, challenges_by_id=challenges_by_id)
-        )
-
-    if not nonfinishers:
+    if not context.nonfinishers:
         return {
             "processed": 1,
-            "participants_total": participants_total,
+            "participants_total": context.participants_total,
             "nonfinishers_total": 0,
             "sent": 0,
             "failed": 0,
         }
 
-    sent = 0
-    failed = 0
-    text = TEXTS_DE["msg.daily_cup.not_finished_summary"]
     bot = build_bot()
     try:
-        for user_id in nonfinishers:
-            chat_id = telegram_targets.get(user_id)
-            if chat_id is None:
-                failed += 1
-                continue
-            try:
-                await bot.send_message(chat_id=chat_id, text=text)
-                sent += 1
-            except TelegramForbiddenError:
-                failed += 1
-            except Exception:
-                failed += 1
+        delivery = await deliver_daily_cup_nonfinishers_summary(
+            bot=bot,
+            nonfinishers=context.nonfinishers,
+            telegram_targets=context.telegram_targets,
+            text=TEXTS_DE["msg.daily_cup.not_finished_summary"],
+        )
     finally:
         await bot.session.close()
 
     return {
         "processed": 1,
-        "participants_total": participants_total,
-        "nonfinishers_total": len(nonfinishers),
-        "sent": sent,
-        "failed": failed,
+        "participants_total": context.participants_total,
+        "nonfinishers_total": len(context.nonfinishers),
+        "sent": delivery.sent,
+        "failed": delivery.failed,
     }
 
 

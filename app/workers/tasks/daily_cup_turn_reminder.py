@@ -13,17 +13,17 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.friend_challenges.constants import DUEL_STATUS_CREATOR_DONE, DUEL_STATUS_OPPONENT_DONE
 from app.game.tournaments.constants import TOURNAMENT_SELF_BOT_LABEL
-from app.workers.tasks.daily_cup_turn_reminder_delivery import (
-    deliver_reminders,
-    prepare_reminder_batch,
-    store_reminder_events,
-)
 from app.workers.tasks.daily_cup_config import (
     DAILY_CUP_PUSH_BATCH_SIZE,
     DAILY_CUP_TURN_REMINDER_INTERVAL_MINUTES,
 )
 from app.workers.tasks.daily_cup_core import now_utc
 from app.workers.tasks.daily_cup_push_events import store_push_sent_events
+from app.workers.tasks.daily_cup_turn_reminder_delivery import (
+    deliver_reminders,
+    prepare_reminder_batch,
+)
+from app.workers.tasks.daily_cup_turn_reminder_events import store_reminder_events
 from app.workers.tasks.tournaments_messaging_text import format_deadline, format_user_label
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_turn_reminder")

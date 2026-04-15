@@ -146,6 +146,8 @@ async def build_range_kpis(
         new_users_now=new_users_now,
         new_users_prev=new_users_prev,
     )
+
+
 async def build_subscription_kpis(
     session: AsyncSession,
     *,
@@ -160,6 +162,8 @@ async def build_subscription_kpis(
             previous=float(active_subs_prev),
         )
     }
+
+
 __all__ = [
     "OverviewWindows",
     "RangeKpiSnapshot",
