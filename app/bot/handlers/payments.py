@@ -121,6 +121,10 @@ async def handle_buy(callback: CallbackQuery) -> None:
         await callback.answer()
         return
 
+    if callback.bot is None:
+        await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)
+        return
+
     try:
         await callback.bot.send_invoice(
             chat_id=callback.from_user.id,
