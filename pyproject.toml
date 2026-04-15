@@ -94,7 +94,6 @@ ignore_errors = true
 module = [
   "app.bot.handlers.gameplay",
   "app.bot.handlers.payments",
-  "app.db.repo.offers_repo",
   "app.db.repo.purchases_repo",
   "app.db.repo.users_repo",
   "app.game.sessions.service",
