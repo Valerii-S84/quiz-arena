@@ -68,9 +68,9 @@ For the full local equivalent of the GitHub CI pipeline, run:
 bash scripts/local_ci.sh
 ```
 
-`scripts/local_ci.sh` runs the full local CI sequence: lint/unit checks,
-`docker compose up -d postgres redis`, service readiness, migrations, QuizBank
-import dry-run, and integration tests.
+`scripts/local_ci.sh` runs the full local CI sequence: backend lint/unit checks,
+frontend `npm ci && npm run lint && npm run build`, `docker compose up -d postgres redis`,
+service readiness, migrations, QuizBank import dry-run, and integration tests.
 
 The mandatory `pytest` gate pins `DATABASE_URL` to the local PostgreSQL test DB
 `quiz_arena_test`; integration stays available below as a separate targeted flow.

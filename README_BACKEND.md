@@ -81,9 +81,9 @@ For a 1:1 local replay of the full GitHub CI pipeline, use:
 bash scripts/local_ci.sh
 ```
 
-`scripts/local_ci.sh` replays the full GitHub CI pipeline locally: lint/unit gate,
-`docker compose up -d postgres redis`, service readiness, `alembic upgrade head`,
-QuizBank import dry-run, and `tests/integration`.
+`scripts/local_ci.sh` replays the full GitHub CI pipeline locally: backend lint/unit gate,
+frontend `npm ci && npm run lint && npm run build`, `docker compose up -d postgres redis`,
+service readiness, `alembic upgrade head`, QuizBank import dry-run, and `tests/integration`.
 
 `pytest` in the mandatory gate explicitly binds `DATABASE_URL` to the local test
 database `quiz_arena_test`; the integration-only flow below remains available as a

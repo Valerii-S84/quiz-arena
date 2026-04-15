@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Inter } from "next/font/google";
 import Image from "next/image";
+import Link from "next/link";
 
 import { api } from "@/lib/api";
 import { ContactWizardModal } from "./_components/contact-wizards";
@@ -190,7 +191,7 @@ export default function PublicHomePage() {
     >
       <header className="sticky top-0 z-40 border-b border-white/60 bg-white/82 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-          <a href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <span className="relative h-8 w-8 overflow-hidden rounded-full ring-1 ring-white/80 shadow-[0_6px_14px_rgba(15,23,42,0.25)]">
               <Image
                 src={BOT_LOGO_PATH}
@@ -201,7 +202,7 @@ export default function PublicHomePage() {
               />
             </span>
             <span className="text-sm font-bold sm:text-base">Quiz Arena Deutsch</span>
-          </a>
+          </Link>
           <button
             type="button"
             className="rounded-full p-2 text-slate-800 transition hover:bg-white/80"
