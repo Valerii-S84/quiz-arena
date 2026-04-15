@@ -56,3 +56,8 @@
 - Merge strategy: `Squash merge into protected main; merged PRs land on main as a single-parent commit even when the PR contained multiple commits`
 - PR title format: `One-line title used as the squash-commit subject; preferred format is type(scope): summary, and main receives it as type(scope): summary (#PR)`
 - PR requirements: `PR into main`, `passing CI checks lint_unit and integration`, `at least 1 approval`, `stale approvals dismissed on new commits`, `conversation resolution`, `branch up to date`, `linear history`, `CODEOWNERS review for covered paths`
+
+## 7. Active remediation context
+
+- For tasks about repo cleanup, technical debt, stabilization, CI hardening, structural refactor, or follow-up after repository audit, read `.agent/project/TECH_DEBT_REMEDIATION_PLAN.md` before acting.
+- Treat `.agent/project/TECH_DEBT_REMEDIATION_PLAN.md` as the ordered project-specific source of truth for debt-remediation priorities unless the user explicitly overrides the order.
