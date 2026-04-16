@@ -87,10 +87,6 @@ module = ["jose", "jose.*", "passlib", "passlib.*", "pyotp"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["tests.*"]
-ignore_errors = true
-
-[[tool.mypy.overrides]]
 module = [
    "tests.game.test_adaptive_difficulty",
    "tests.game.test_mode_rules",
