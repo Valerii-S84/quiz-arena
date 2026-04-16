@@ -13,8 +13,13 @@ from app.economy.purchases.errors import (
     PurchaseNotFoundError,
     PurchasePrecheckoutValidationError,
 )
+from tests.type_helpers import AsyncSessionStub
 
 UTC = timezone.utc
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 def _purchase(
@@ -47,7 +52,7 @@ async def test_apply_successful_payment_rejects_missing_purchase(
 
     with pytest.raises(PurchaseNotFoundError):
         await purchase_credit.apply_successful_payment(
-            object(),
+            _Session(),
             user_id=7,
             invoice_payload="inv-missing",
             telegram_payment_charge_id="charge-1",
@@ -73,7 +78,7 @@ async def test_apply_successful_payment_rejects_invalid_purchase_status(
 
     with pytest.raises(PurchasePrecheckoutValidationError):
         await purchase_credit.apply_successful_payment(
-            object(),
+            _Session(),
             user_id=7,
             invoice_payload="inv-failed",
             telegram_payment_charge_id="charge-1",
@@ -98,7 +103,7 @@ async def test_apply_zero_cost_purchase_replays_already_credited_purchase(
     )
 
     result = await purchase_credit.apply_zero_cost_purchase(
-        object(),
+        _Session(),
         purchase_id=purchase.id,
         user_id=7,
         now_utc=datetime.now(UTC),
@@ -127,7 +132,7 @@ async def test_apply_zero_cost_purchase_rejects_non_zero_amount(
 
     with pytest.raises(PurchasePrecheckoutValidationError):
         await purchase_credit.apply_zero_cost_purchase(
-            object(),
+            _Session(),
             purchase_id=purchase.id,
             user_id=7,
             now_utc=datetime.now(UTC),
@@ -151,7 +156,7 @@ async def test_apply_zero_cost_purchase_rejects_invalid_status(
 
     with pytest.raises(PurchasePrecheckoutValidationError):
         await purchase_credit.apply_zero_cost_purchase(
-            object(),
+            _Session(),
             purchase_id=purchase.id,
             user_id=7,
             now_utc=datetime.now(UTC),
@@ -195,7 +200,7 @@ async def test_apply_zero_cost_purchase_rejects_missing_product(
 
     with pytest.raises(ProductNotFoundError):
         await purchase_credit.apply_zero_cost_purchase(
-            object(),
+            _Session(),
             purchase_id=purchase.id,
             user_id=7,
             now_utc=datetime.now(UTC),
@@ -261,7 +266,7 @@ async def test_apply_zero_cost_purchase_marks_paid_and_credits_assets(
     monkeypatch.setattr(purchase_credit, "get_product", lambda _product_code: product)
 
     result = await purchase_credit.apply_zero_cost_purchase(
-        object(),
+        _Session(),
         purchase_id=purchase.id,
         user_id=7,
         now_utc=now_utc,

@@ -26,11 +26,11 @@ fallback: якщо `primary_language` або `active_sections` не
 ## JavaScript / TypeScript
 
 - Formatter: `No dedicated formatter config found; preserve existing Next.js/TS formatting and avoid reformat-only edits`
-- Linter: `next lint` via `cd frontend && npm run lint`
+- Linter: `ESLint CLI` via `cd frontend && npm run lint`; current repo config is `frontend/eslint.config.mjs`
 - Module / import conventions: `Next.js app-router layout under frontend/app`; TS path alias `@/*` maps to `frontend/*`
 - Types / strictness rules: `strict = true`, `noEmit = true`, `allowJs = false`, `forceConsistentCasingInFileNames = true`, `moduleResolution = bundler`; Next `typedRoutes` is enabled
-- Frontend / build conventions: `Next.js 14` + `React 18` app, `reactStrictMode: true`, Tailwind/PostCSS pipeline, build with `cd frontend && npm run build`
-- JS/TS-specific test rules: `No dedicated frontend test runner is configured in the repo; when touching frontend code, run at least frontend lint and build`
+- Frontend / build conventions: `Next.js 15.5.15` + `React 18.3.1` app, `reactStrictMode: true`, Tailwind/PostCSS pipeline, build with `cd frontend && npm run build`
+- JS/TS-specific test rules: `Vitest` is configured via `cd frontend && npm test`; when touching frontend code, run at least frontend lint and build, and run `npm test` when the scope changes frontend tests, frontend test tooling, or frontend logic already covered by Vitest`
 
 ## Go
 
@@ -56,7 +56,7 @@ fallback: якщо `primary_language` або `active_sections` не
 
 - Test frameworks: `pytest`, `pytest-asyncio`, `FastAPI TestClient`, `httpx.AsyncClient`
 - Fixture / mock conventions: `Bootstrap env through pytest_env_bootstrap.py`; prefer local pytest fixtures and monkeypatch; integration tests use Postgres/Redis plus Alembic against quiz_arena_test`
-- Required test suites before close-out: `Python changes: Ruff, Black --check, isort --check-only, mypy, pytest -q --ignore=tests/integration`; run `bash scripts/local_ci.sh` when the scope touches integration/runtime expectations; frontend changes require `cd frontend && npm run lint` and `cd frontend && npm run build`
+- Required test suites before close-out: `Python changes: Ruff, Black --check, isort --check-only, mypy, pytest -q --ignore=tests/integration`; run `bash scripts/local_ci.sh` when the scope touches integration/runtime expectations; frontend changes require `cd frontend && npm run lint` and `cd frontend && npm run build`, plus `cd frontend && npm test` when the scope changes frontend tests, frontend test tooling, or frontend logic already covered by Vitest`
 
 ## Framework or repo-specific exceptions
 

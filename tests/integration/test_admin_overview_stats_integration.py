@@ -12,6 +12,7 @@ from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from tests.integration.stable_ids import stable_telegram_user_id
+from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
 
@@ -171,7 +172,7 @@ async def test_overview_payload_uses_first_milestones_and_consistent_activity_mo
         )
 
     async with SessionLocal.begin() as session:
-        payload = await build_overview_payload(session, now_utc=now_utc, days=7)
+        payload = as_any_dict(await build_overview_payload(session, now_utc=now_utc, days=7))
 
     assert payload["kpis"]["start_users"]["current"] == 2.0
     assert payload["kpis"]["conversion_start_to_quiz"]["current"] == 50.0

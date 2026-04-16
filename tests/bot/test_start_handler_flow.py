@@ -45,7 +45,7 @@ class _StartMessageWithPhotoGuard(_StartMessage):
         super().__init__(text=text, from_user=from_user, message_id=message_id)
         self.photo_calls = 0
 
-    async def answer_photo(self, *args: Any, **kwargs: Any) -> None:
+    async def answer_photo(self, *args: Any, **kwargs: Any) -> None:  # type: ignore[override]
         self.photo_calls += 1
         await super().answer(*args, **kwargs)
 

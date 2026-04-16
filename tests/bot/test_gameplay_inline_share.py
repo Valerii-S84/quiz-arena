@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -13,9 +14,9 @@ class _DummyInlineQuery:
     def __init__(self, *, telegram_user_id: int, query: str) -> None:
         self.from_user = SimpleNamespace(id=telegram_user_id)
         self.query = query
-        self.answer_calls: list[dict[str, object]] = []
+        self.answer_calls: list[dict[str, Any]] = []
 
-    async def answer(self, results, **kwargs) -> None:
+    async def answer(self, results: Any, **kwargs: Any) -> None:
         self.answer_calls.append({"results": results, "kwargs": kwargs})
 
 

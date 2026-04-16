@@ -70,6 +70,10 @@ async def run_referral_reward_distribution_async(*, batch_size: int = 200) -> di
     return result
 
 
+def _build_alert_payload(result: dict[str, int]) -> dict[str, object]:
+    return {key: value for key, value in result.items()}
+
+
 async def _send_referral_reward_alerts(*, result: dict[str, int]) -> dict[str, int]:
     milestone_alert_sent = 0
     reward_alert_sent = 0
@@ -79,7 +83,7 @@ async def _send_referral_reward_alerts(*, result: dict[str, int]) -> dict[str, i
         milestone_alert_sent = int(
             await send_ops_alert(
                 event=milestone_event,
-                payload=result,
+                payload=_build_alert_payload(result),
             )
         )
         await _record_referral_reward_event(
@@ -93,7 +97,7 @@ async def _send_referral_reward_alerts(*, result: dict[str, int]) -> dict[str, i
         reward_alert_sent = int(
             await send_ops_alert(
                 event=reward_event,
-                payload=result,
+                payload=_build_alert_payload(result),
             )
         )
         await _record_referral_reward_event(

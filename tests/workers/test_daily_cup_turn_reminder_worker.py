@@ -2,120 +2,17 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from typing import Any
 from uuid import UUID
 
 import pytest
-from aiogram.exceptions import TelegramForbiddenError
-from aiogram.methods import SendMessage
 
 from app.workers.tasks import daily_cup_turn_reminder
-
-
-class _DummyBotSession:
-    def __init__(self) -> None:
-        self.closed = False
-
-    async def close(self) -> None:
-        self.closed = True
-
-
-class _RecordingBot:
-    def __init__(
-        self,
-        *,
-        forbidden_chat_id: int | None = None,
-        failing_chat_id: int | None = None,
-    ) -> None:
-        self.session = _DummyBotSession()
-        self.forbidden_chat_id = forbidden_chat_id
-        self.failing_chat_id = failing_chat_id
-        self.messages: list[dict[str, Any]] = []
-
-    async def send_message(self, **kwargs) -> None:
-        chat_id = int(kwargs["chat_id"])
-        if self.forbidden_chat_id is not None and chat_id == self.forbidden_chat_id:
-            raise TelegramForbiddenError(
-                method=SendMessage(chat_id=chat_id, text="x"),
-                message="forbidden",
-            )
-        if self.failing_chat_id is not None and chat_id == self.failing_chat_id:
-            raise RuntimeError("boom")
-        self.messages.append(kwargs)
-
-
-class _AsyncBeginContext:
-    def __init__(self, session: object) -> None:
-        self._session = session
-
-    async def __aenter__(self) -> object:
-        return self._session
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        del exc_type, exc, tb
-        return None
-
-
-def _session_local_with_sessions(*sessions: object) -> SimpleNamespace:
-    remaining = list(sessions)
-
-    def _begin() -> _AsyncBeginContext:
-        return _AsyncBeginContext(remaining.pop(0))
-
-    return SimpleNamespace(begin=_begin)
-
-
-def test_resolve_turn_reminder_users_for_creator_done() -> None:
-    challenge = SimpleNamespace(
-        status="CREATOR_DONE",
-        creator_user_id=10,
-        opponent_user_id=22,
-    )
-
-    resolved = daily_cup_turn_reminder.resolve_turn_reminder_users(challenge=challenge)
-    assert resolved == ((22, 10),)
-
-
-def test_resolve_turn_reminder_users_for_opponent_done() -> None:
-    challenge = SimpleNamespace(
-        status="OPPONENT_DONE",
-        creator_user_id=10,
-        opponent_user_id=22,
-    )
-
-    resolved = daily_cup_turn_reminder.resolve_turn_reminder_users(challenge=challenge)
-    assert resolved == ((10, 22),)
-
-
-def test_resolve_turn_reminder_users_for_accepted_returns_both_users() -> None:
-    challenge = SimpleNamespace(
-        status="ACCEPTED",
-        creator_user_id=10,
-        opponent_user_id=22,
-    )
-
-    resolved = daily_cup_turn_reminder.resolve_turn_reminder_users(challenge=challenge)
-    assert resolved == ((10, 22), (22, 10))
-
-
-def test_resolve_turn_reminder_users_returns_empty_for_other_status() -> None:
-    challenge = SimpleNamespace(
-        status="PENDING",
-        creator_user_id=10,
-        opponent_user_id=22,
-    )
-
-    resolved = daily_cup_turn_reminder.resolve_turn_reminder_users(challenge=challenge)
-    assert resolved == ()
-
-
-def test_resolve_turn_reminder_opponent_label_uses_arena_bot_for_self_match() -> None:
-    label = daily_cup_turn_reminder._resolve_turn_reminder_opponent_label(
-        target_user_id=10,
-        opponent_user_id=10,
-        user_labels={10: "Ich"},
-    )
-    assert label == "Arena Bot"
+from tests.workers.daily_cup_turn_reminder_test_support import (
+    RecordingBot,
+    reminder_candidate,
+    reminder_challenge,
+    session_local_with_sessions,
+)
 
 
 @pytest.mark.asyncio
@@ -136,7 +33,7 @@ async def test_turn_reminders_return_zeroes_when_no_candidates(
     monkeypatch.setattr(
         daily_cup_turn_reminder,
         "SessionLocal",
-        _session_local_with_sessions(SimpleNamespace()),
+        session_local_with_sessions(SimpleNamespace()),
     )
     monkeypatch.setattr(
         daily_cup_turn_reminder.TournamentMatchesRepo,
@@ -169,56 +66,44 @@ async def test_turn_reminders_mark_candidates_deduplicate_targets_and_store_even
 ) -> None:
     now_value = datetime(2026, 3, 13, 12, 0, tzinfo=timezone.utc)
     tournament_id = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-    bot = _RecordingBot()
+    bot = RecordingBot()
     info_logs: list[dict[str, object]] = []
     store_calls: list[dict[str, object]] = []
     list_by_ids_calls: list[set[int]] = []
 
-    challenge_primary = SimpleNamespace(
-        id=UUID("11111111-1111-1111-1111-111111111111"),
+    challenge_primary = reminder_challenge(
+        challenge_id=UUID("11111111-1111-1111-1111-111111111111"),
         creator_user_id=10,
         opponent_user_id=20,
         status="ACCEPTED",
-        expires_last_chance_notified_at=None,
-        updated_at=None,
     )
-    challenge_duplicate = SimpleNamespace(
-        id=UUID("22222222-2222-2222-2222-222222222222"),
+    challenge_duplicate = reminder_challenge(
+        challenge_id=UUID("22222222-2222-2222-2222-222222222222"),
         creator_user_id=10,
         opponent_user_id=20,
         status="OPPONENT_DONE",
-        expires_last_chance_notified_at=None,
-        updated_at=None,
     )
-    challenge_missing_chat = SimpleNamespace(
-        id=UUID("33333333-3333-3333-3333-333333333333"),
+    challenge_missing_chat = reminder_challenge(
+        challenge_id=UUID("33333333-3333-3333-3333-333333333333"),
         creator_user_id=10,
         opponent_user_id=30,
         status="CREATOR_DONE",
-        expires_last_chance_notified_at=None,
-        updated_at=None,
     )
     candidates = [
-        (
-            SimpleNamespace(
-                tournament_id=tournament_id,
-                deadline=datetime(2026, 3, 13, 12, 30, tzinfo=timezone.utc),
-            ),
-            challenge_primary,
+        reminder_candidate(
+            tournament_id=tournament_id,
+            deadline=datetime(2026, 3, 13, 12, 30, tzinfo=timezone.utc),
+            challenge=challenge_primary,
         ),
-        (
-            SimpleNamespace(
-                tournament_id=tournament_id,
-                deadline=datetime(2026, 3, 13, 12, 31, tzinfo=timezone.utc),
-            ),
-            challenge_duplicate,
+        reminder_candidate(
+            tournament_id=tournament_id,
+            deadline=datetime(2026, 3, 13, 12, 31, tzinfo=timezone.utc),
+            challenge=challenge_duplicate,
         ),
-        (
-            SimpleNamespace(
-                tournament_id=tournament_id,
-                deadline=datetime(2026, 3, 13, 12, 32, tzinfo=timezone.utc),
-            ),
-            challenge_missing_chat,
+        reminder_candidate(
+            tournament_id=tournament_id,
+            deadline=datetime(2026, 3, 13, 12, 32, tzinfo=timezone.utc),
+            challenge=challenge_missing_chat,
         ),
     ]
 
@@ -241,7 +126,7 @@ async def test_turn_reminders_mark_candidates_deduplicate_targets_and_store_even
     monkeypatch.setattr(
         daily_cup_turn_reminder,
         "SessionLocal",
-        _session_local_with_sessions(SimpleNamespace()),
+        session_local_with_sessions(SimpleNamespace()),
     )
     monkeypatch.setattr(
         daily_cup_turn_reminder.TournamentMatchesRepo,
@@ -310,42 +195,34 @@ async def test_turn_reminders_count_send_failures_and_swallow_event_store_errors
 ) -> None:
     now_value = datetime(2026, 3, 13, 12, 0, tzinfo=timezone.utc)
     tournament_id = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
-    bot = _RecordingBot(forbidden_chat_id=10020, failing_chat_id=10030)
+    bot = RecordingBot(forbidden_chat_id=10020, failing_chat_id=10030)
     warning_logs: list[dict[str, object]] = []
 
-    challenge = SimpleNamespace(
-        id=UUID("44444444-4444-4444-4444-444444444444"),
+    challenge = reminder_challenge(
+        challenge_id=UUID("44444444-4444-4444-4444-444444444444"),
         creator_user_id=10,
         opponent_user_id=20,
         status="ACCEPTED",
-        expires_last_chance_notified_at=None,
-        updated_at=None,
     )
-    second_challenge = SimpleNamespace(
-        id=UUID("55555555-5555-5555-5555-555555555555"),
+    second_challenge = reminder_challenge(
+        challenge_id=UUID("55555555-5555-5555-5555-555555555555"),
         creator_user_id=40,
         opponent_user_id=30,
         status="CREATOR_DONE",
-        expires_last_chance_notified_at=None,
-        updated_at=None,
     )
 
     async def _fake_candidates(*args, **kwargs):
         del args, kwargs
         return [
-            (
-                SimpleNamespace(
-                    tournament_id=tournament_id,
-                    deadline=datetime(2026, 3, 13, 12, 30, tzinfo=timezone.utc),
-                ),
-                challenge,
+            reminder_candidate(
+                tournament_id=tournament_id,
+                deadline=datetime(2026, 3, 13, 12, 30, tzinfo=timezone.utc),
+                challenge=challenge,
             ),
-            (
-                SimpleNamespace(
-                    tournament_id=tournament_id,
-                    deadline=datetime(2026, 3, 13, 12, 31, tzinfo=timezone.utc),
-                ),
-                second_challenge,
+            reminder_candidate(
+                tournament_id=tournament_id,
+                deadline=datetime(2026, 3, 13, 12, 31, tzinfo=timezone.utc),
+                challenge=second_challenge,
             ),
         ]
 
@@ -366,7 +243,7 @@ async def test_turn_reminders_count_send_failures_and_swallow_event_store_errors
     monkeypatch.setattr(
         daily_cup_turn_reminder,
         "SessionLocal",
-        _session_local_with_sessions(SimpleNamespace()),
+        session_local_with_sessions(SimpleNamespace()),
     )
     monkeypatch.setattr(
         daily_cup_turn_reminder.TournamentMatchesRepo,

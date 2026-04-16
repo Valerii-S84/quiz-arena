@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from typing import Any, cast
 from uuid import UUID
 
 import pytest
+from sqlalchemy import Table
 
 from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournament_participants import TournamentParticipant
@@ -24,6 +26,7 @@ from tests.integration.friend_challenge_fixtures import (
     _create_user,
     _seed_friend_challenge_questions,
 )
+from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
 
@@ -47,24 +50,24 @@ class _DummyMessage:
 class _DummyWorkerBot:
     def __init__(self) -> None:
         self.session = _DummyBotSession()
-        self.send_messages: list[dict[str, object]] = []
-        self.edit_messages: list[dict[str, object]] = []
-        self.send_photos: list[dict[str, object]] = []
+        self.send_messages: list[dict[str, Any]] = []
+        self.edit_messages: list[dict[str, Any]] = []
+        self.send_photos: list[dict[str, Any]] = []
         self._message_id = 1000
         self._file_id = 0
 
     async def get_me(self):
         return type("BotMe", (), {"username": "quizarenabot"})()
 
-    async def send_message(self, **kwargs) -> _DummyMessage:
+    async def send_message(self, **kwargs: Any) -> _DummyMessage:
         self.send_messages.append(kwargs)
         self._message_id += 1
         return _DummyMessage(message_id=self._message_id)
 
-    async def edit_message_text(self, **kwargs) -> None:
+    async def edit_message_text(self, **kwargs: Any) -> None:
         self.edit_messages.append(kwargs)
 
-    async def send_photo(self, **kwargs) -> _DummyMessage:
+    async def send_photo(self, **kwargs: Any) -> _DummyMessage:
         self.send_photos.append(kwargs)
         photo_payload = kwargs.get("photo")
         if isinstance(photo_payload, str):
@@ -76,15 +79,20 @@ class _DummyWorkerBot:
 
 
 async def _ensure_tournament_schema() -> None:
+    round_scores_table = cast(Table, TournamentRoundScore.__table__)
+    matches_table = cast(Table, TournamentMatch.__table__)
+    participants_table = cast(Table, TournamentParticipant.__table__)
+    tournaments_table = cast(Table, Tournament.__table__)
+
     async with engine.begin() as conn:
-        await conn.run_sync(TournamentRoundScore.__table__.drop, checkfirst=True)
-        await conn.run_sync(TournamentMatch.__table__.drop, checkfirst=True)
-        await conn.run_sync(TournamentParticipant.__table__.drop, checkfirst=True)
-        await conn.run_sync(Tournament.__table__.drop, checkfirst=True)
-        await conn.run_sync(Tournament.__table__.create, checkfirst=True)
-        await conn.run_sync(TournamentParticipant.__table__.create, checkfirst=True)
-        await conn.run_sync(TournamentMatch.__table__.create, checkfirst=True)
-        await conn.run_sync(TournamentRoundScore.__table__.create, checkfirst=True)
+        await conn.run_sync(round_scores_table.drop, checkfirst=True)
+        await conn.run_sync(matches_table.drop, checkfirst=True)
+        await conn.run_sync(participants_table.drop, checkfirst=True)
+        await conn.run_sync(tournaments_table.drop, checkfirst=True)
+        await conn.run_sync(tournaments_table.create, checkfirst=True)
+        await conn.run_sync(participants_table.create, checkfirst=True)
+        await conn.run_sync(matches_table.create, checkfirst=True)
+        await conn.run_sync(round_scores_table.create, checkfirst=True)
 
 
 @pytest.mark.asyncio
@@ -157,7 +165,7 @@ async def test_worker_advances_round_after_deadline_when_match_is_settled(monkey
         lambda *, tournament_id: None,
     )
 
-    result = await tournaments_async.run_private_tournament_rounds_async(batch_size=20)
+    result = as_any_dict(await tournaments_async.run_private_tournament_rounds_async(batch_size=20))
     assert int(result["rounds_started_total"]) >= 1
     assert int(result["matches_settled_total"]) >= 1
     assert int(result["matches_created_total"]) >= 1
@@ -265,7 +273,7 @@ async def test_worker_marks_tournament_completed_after_round_three_deadline(monk
         lambda *, tournament_id: enqueued_proofs.append(tournament_id),
     )
 
-    result = await tournaments_async.run_private_tournament_rounds_async(batch_size=20)
+    result = as_any_dict(await tournaments_async.run_private_tournament_rounds_async(batch_size=20))
     assert int(result["tournaments_completed_total"]) >= 1
     assert enqueued_rounds == [str(tournament.tournament_id)]
     assert enqueued_proofs == [str(tournament.tournament_id)]
@@ -313,8 +321,10 @@ async def test_round_messaging_sends_once_then_updates_by_edit(monkeypatch) -> N
     bot = _DummyWorkerBot()
     monkeypatch.setattr(tournaments_messaging, "build_bot", lambda: bot)
 
-    first = await tournaments_messaging.run_private_tournament_round_messaging_async(
-        tournament_id=tournament_id
+    first = as_any_dict(
+        await tournaments_messaging.run_private_tournament_round_messaging_async(
+            tournament_id=tournament_id
+        )
     )
     assert int(first["sent"]) == 2
     assert int(first["edited"]) == 0
@@ -335,8 +345,10 @@ async def test_round_messaging_sends_once_then_updates_by_edit(monkeypatch) -> N
     assert any(callback.startswith("friend:next:") for callback in callbacks)
     assert any(url and "https://t.me/share/url" in url for url in urls)
 
-    second = await tournaments_messaging.run_private_tournament_round_messaging_async(
-        tournament_id=tournament_id
+    second = as_any_dict(
+        await tournaments_messaging.run_private_tournament_round_messaging_async(
+            tournament_id=tournament_id
+        )
     )
     assert int(second["sent"]) == 0
     assert int(second["edited"]) == 2

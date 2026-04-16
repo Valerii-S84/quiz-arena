@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -25,6 +26,7 @@ from tests.integration.friend_challenge_fixtures import (
     _seed_friend_challenge_questions,
 )
 from tests.integration.test_private_tournament_service_integration import _ensure_tournament_schema
+from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
 
@@ -37,9 +39,9 @@ class _DummyBotSession:
 class _RecordingBot:
     def __init__(self) -> None:
         self.session = _DummyBotSession()
-        self.messages: list[dict[str, object]] = []
+        self.messages: list[dict[str, Any]] = []
 
-    async def send_message(self, **kwargs):
+    async def send_message(self, **kwargs: Any):
         self.messages.append(kwargs)
         return None
 
@@ -48,7 +50,7 @@ class _BlockedBot:
     def __init__(self) -> None:
         self.session = _DummyBotSession()
 
-    async def send_message(self, **kwargs):
+    async def send_message(self, **kwargs: Any):
         raise TelegramForbiddenError(
             method=SendMessage(chat_id=int(kwargs["chat_id"]), text="x"),
             message="forbidden",
@@ -115,7 +117,7 @@ async def test_daily_cup_canceled_if_less_than_4(monkeypatch) -> None:
     monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
     monkeypatch.setattr(daily_cup_async, "build_bot", lambda: bot)
 
-    result = await daily_cup_async.close_daily_cup_registration_and_start_async()
+    result = as_any_dict(await daily_cup_async.close_daily_cup_registration_and_start_async())
     assert int(result["canceled"]) == 1
     assert int(result["started"]) == 0
     assert int(result["participants_total"]) == 3
@@ -146,7 +148,7 @@ async def test_daily_cup_starts_with_4_plus(monkeypatch) -> None:
         lambda *, tournament_id: enqueued.append(tournament_id),
     )
 
-    result = await daily_cup_async.close_daily_cup_registration_and_start_async()
+    result = as_any_dict(await daily_cup_async.close_daily_cup_registration_and_start_async())
     assert int(result["started"]) == 1
     assert int(result["canceled"]) == 0
     assert enqueued == [str(tournament_id)]
@@ -205,7 +207,7 @@ async def test_daily_cup_round_advance_on_deadline(monkeypatch) -> None:
         lambda *, tournament_id: enqueued_proofs.append(tournament_id),
     )
 
-    result = await daily_cup_rounds.advance_daily_cup_rounds_async()
+    result = as_any_dict(await daily_cup_rounds.advance_daily_cup_rounds_async())
     assert int(result["matches_settled_total"]) >= 1
     assert int(result["rounds_started_total"]) >= 1
     assert enqueued_rounds == [str(tournament_id)]
@@ -288,7 +290,7 @@ async def test_push_only_to_active_users(monkeypatch) -> None:
     monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
     monkeypatch.setattr(daily_cup_async, "build_bot", lambda: bot)
 
-    result = await daily_cup_async.open_daily_cup_registration_async()
+    result = as_any_dict(await daily_cup_async.open_daily_cup_registration_async())
     assert int(result["users_scanned_total"]) == 2
     assert int(result["sent_total"]) == 2
     assert int(result["skipped_total"]) == 0
@@ -311,7 +313,7 @@ async def test_push_skips_blocked_users(monkeypatch) -> None:
     monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
     monkeypatch.setattr(daily_cup_async, "build_bot", lambda: _BlockedBot())
 
-    result = await daily_cup_async.open_daily_cup_registration_async()
+    result = as_any_dict(await daily_cup_async.open_daily_cup_registration_async())
     assert int(result["users_scanned_total"]) == 1
     assert int(result["sent_total"]) == 0
     assert int(result["skipped_total"]) == 1

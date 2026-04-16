@@ -28,7 +28,9 @@ REWARD_CHOICE_RE = re.compile(r"^referral:reward:(PREMIUM_STARTER)$")
 SHARE_RE = re.compile(r"^referral:(share|prompt:share)$")
 
 
-async def _build_invite_link(bot: Bot, *, referral_code: str) -> str | None:
+async def _build_invite_link(bot: Bot | None, *, referral_code: str) -> str | None:
+    if bot is None:
+        return None
     try:
         await bot.get_me()
     except Exception:

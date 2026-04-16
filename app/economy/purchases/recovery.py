@@ -12,9 +12,14 @@ def increment_recovery_failures(
     payload = deepcopy(raw_successful_payment) if isinstance(raw_successful_payment, dict) else {}
     current_value = payload.get(RECOVERY_FAILURES_KEY, 0)
 
-    try:
-        current_failures = int(current_value)
-    except (TypeError, ValueError):
+    if isinstance(current_value, int):
+        current_failures = current_value
+    elif isinstance(current_value, (str, bytes, bytearray)):
+        try:
+            current_failures = int(current_value)
+        except ValueError:
+            current_failures = 0
+    else:
         current_failures = 0
 
     next_failures = current_failures + 1

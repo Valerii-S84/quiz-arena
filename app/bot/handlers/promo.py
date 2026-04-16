@@ -79,7 +79,7 @@ async def _prompt_for_promo_input(message: Message) -> None:
 
 @router.callback_query(F.data == "promo:open")
 async def handle_promo_open(callback: CallbackQuery) -> None:
-    if callback.message is not None:
+    if isinstance(callback.message, Message):
         await _prompt_for_promo_input(callback.message)
     await callback.answer()
 

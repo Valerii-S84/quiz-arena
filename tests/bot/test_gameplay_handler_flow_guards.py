@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -13,7 +14,7 @@ from tests.bot.helpers import DummyCallback, DummySessionLocal
 @pytest.mark.asyncio
 async def test_handle_game_stop_with_missing_message_returns_error() -> None:
     callback = DummyCallback(data="game:stop", from_user=SimpleNamespace(id=1))
-    callback.message = None
+    callback.message = cast(Any, None)
 
     await gameplay.handle_game_stop(callback)  # type: ignore[arg-type]
 

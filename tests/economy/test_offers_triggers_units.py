@@ -6,8 +6,13 @@ from types import SimpleNamespace
 import pytest
 
 import app.economy.offers.triggers as offer_triggers
+from tests.type_helpers import AsyncSessionStub
 
 UTC = timezone.utc
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 @pytest.mark.asyncio
@@ -63,7 +68,7 @@ async def test_build_trigger_codes_returns_energy_and_purchase_triggers_for_non_
     monkeypatch.setattr(offer_triggers, "berlin_now", lambda _now_utc: _now_utc)
 
     result = await offer_triggers.build_trigger_codes(
-        object(),
+        _Session(),
         user_id=5,
         now_utc=now_utc,
         trigger_event="ignored",
@@ -129,7 +134,7 @@ async def test_build_trigger_codes_returns_streak_and_comeback_triggers(
     monkeypatch.setattr(offer_triggers, "berlin_now", lambda _now_utc: _now_utc)
 
     result = await offer_triggers.build_trigger_codes(
-        object(),
+        _Session(),
         user_id=5,
         now_utc=now_utc,
         trigger_event=None,
@@ -195,7 +200,7 @@ async def test_build_trigger_codes_keeps_month_expiring_for_premium_user_only(
     monkeypatch.setattr(offer_triggers, "berlin_now", lambda _now_utc: _now_utc)
 
     result = await offer_triggers.build_trigger_codes(
-        object(),
+        _Session(),
         user_id=5,
         now_utc=now_utc,
         trigger_event="ignored",

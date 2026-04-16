@@ -8,7 +8,7 @@ from fastapi import Depends, HTTPException, Request, Response
 from app.core.config import Settings, get_settings
 from app.db.repo.admins_repo import AdminsRepo
 from app.db.session import SessionLocal
-from app.services.admin.auth import decode_access_token
+from app.services.admin.auth import AdminAuthStateError, decode_access_token
 from app.services.internal_auth import extract_client_ip
 
 ALLOWED_ADMIN_ROLES = frozenset({"admin", "super_admin"})
@@ -56,7 +56,10 @@ async def get_pending_admin(
 ) -> AdminPrincipal:
     add_admin_noindex_header(response)
     token = extract_admin_access_token(request)
-    payload = await decode_access_token(settings=settings, token=token)
+    try:
+        payload = await decode_access_token(settings=settings, token=token)
+    except AdminAuthStateError as exc:
+        raise HTTPException(status_code=503, detail={"code": "E_AUTH_STATE_UNAVAILABLE"}) from exc
     if payload is None:
         raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
 

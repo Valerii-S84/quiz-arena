@@ -9,9 +9,14 @@ import pytest
 from app.game.friend_challenges.constants import DUEL_STATUS_CANCELED, DUEL_STATUS_EXPIRED
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 from app.game.sessions.service import friend_challenges_manage
+from tests.type_helpers import AsyncSessionStub
 
 UTC = timezone.utc
 NOW_UTC = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 def _challenge(
@@ -52,7 +57,7 @@ async def test_manage_friend_challenge_raises_when_not_found(
 
     with pytest.raises(FriendChallengeNotFoundError):
         await func(
-            SimpleNamespace(),
+            _Session(),
             user_id=11,
             challenge_id=uuid4(),
             now_utc=NOW_UTC,
@@ -94,7 +99,7 @@ async def test_manage_friend_challenge_rejects_access_checks(
 
     with pytest.raises(FriendChallengeAccessError):
         await func(
-            SimpleNamespace(),
+            _Session(),
             user_id=user_id,
             challenge_id=challenge.id,
             now_utc=NOW_UTC,
@@ -153,7 +158,7 @@ async def test_repost_friend_challenge_as_open_creates_repost_and_emits_events(
     )
 
     result = await friend_challenges_manage.repost_friend_challenge_as_open(
-        SimpleNamespace(),
+        _Session(),
         user_id=11,
         challenge_id=challenge.id,
         now_utc=NOW_UTC,
@@ -210,7 +215,7 @@ async def test_repost_friend_challenge_as_open_rejects_non_expired_creator(
 
     with pytest.raises(FriendChallengeAccessError):
         await friend_challenges_manage.repost_friend_challenge_as_open(
-            SimpleNamespace(),
+            _Session(),
             user_id=11,
             challenge_id=challenge.id,
             now_utc=NOW_UTC,
@@ -250,7 +255,7 @@ async def test_cancel_friend_challenge_by_creator_marks_canceled_and_returns_sna
     )
 
     result = await friend_challenges_manage.cancel_friend_challenge_by_creator(
-        SimpleNamespace(),
+        _Session(),
         user_id=11,
         challenge_id=challenge.id,
         now_utc=NOW_UTC,
@@ -303,7 +308,7 @@ async def test_cancel_friend_challenge_by_creator_emits_expired_event_before_acc
 
     with pytest.raises(FriendChallengeAccessError):
         await friend_challenges_manage.cancel_friend_challenge_by_creator(
-            SimpleNamespace(),
+            _Session(),
             user_id=999,
             challenge_id=challenge.id,
             now_utc=NOW_UTC,

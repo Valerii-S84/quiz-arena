@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 import pytest
 
+from app.db.models.friend_challenges import FriendChallenge
+from app.db.models.tournament_matches import TournamentMatch
+from app.db.models.tournament_participants import TournamentParticipant
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
@@ -24,11 +28,16 @@ from tests.integration.test_daily_cup_worker_integration import (
     _join_users,
 )
 from tests.integration.test_private_tournament_service_integration import _ensure_tournament_schema
+from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
 
 
-async def _create_started_daily_cup_with_self_bot(*, monkeypatch, now_utc: datetime):
+async def _create_started_daily_cup_with_self_bot(
+    *,
+    monkeypatch,
+    now_utc: datetime,
+) -> UUID:
     await _ensure_tournament_schema()
     await _seed_friend_challenge_questions(now_utc=now_utc)
 
@@ -43,17 +52,17 @@ async def _create_started_daily_cup_with_self_bot(*, monkeypatch, now_utc: datet
         "enqueue_daily_cup_round_messaging",
         lambda *, tournament_id: None,
     )
-    result = await daily_cup_async.close_daily_cup_registration_and_start_async()
+    result = as_any_dict(await daily_cup_async.close_daily_cup_registration_and_start_async())
     assert int(result["started"]) == 1
     return tournament_id
 
 
 async def _complete_self_bot_match(
     *,
-    tournament_id,
+    tournament_id: UUID,
     now_utc: datetime,
     creator_score: int,
-) -> tuple[object, object, object]:
+) -> tuple[FriendChallenge, TournamentMatch, TournamentParticipant]:
     async with SessionLocal.begin() as session:
         matches = await TournamentMatchesRepo.list_by_tournament_round(
             session,
@@ -152,6 +161,7 @@ async def test_daily_cup_round_question_uses_daily_arena_cup_header(monkeypatch)
             round_no=1,
         )
         self_bot_match = next(match for match in matches if match.user_b is None)
+        assert self_bot_match.friend_challenge_id is not None
         round_start = await GameSessionService.start_friend_challenge_round(
             session,
             user_id=int(self_bot_match.user_a),

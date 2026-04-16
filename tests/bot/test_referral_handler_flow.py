@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -85,6 +86,24 @@ async def test_handle_referral_command_renders_overview(monkeypatch) -> None:
         if button.callback_data
     ]
     assert "referral:share" in callbacks
+
+
+@pytest.mark.asyncio
+async def test_handle_referral_command_uses_fallback_when_bot_missing(monkeypatch) -> None:
+    async def _fake_load_overview(*, telegram_user, now_utc):
+        del telegram_user, now_utc
+        return _overview(claimable=0)
+
+    monkeypatch.setattr(referral, "_load_overview", _fake_load_overview)
+
+    message = _ReferralMessage(from_user=SimpleNamespace(id=1))
+    message.bot = cast(Any, None)
+
+    await referral.handle_referral_command(message)
+
+    response = message.answers[0]
+    assert "ref_ABC123" in (response.text or "")
+    assert "https://t.me/" not in (response.text or "")
 
 
 @pytest.mark.asyncio

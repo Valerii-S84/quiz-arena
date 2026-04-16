@@ -1,42 +1,20 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy.dialects import postgresql
 
 from app.db.repo import promo_repo_admin_runtime_redemptions as redemptions_repo
+from tests.type_helpers import AsyncSessionStub
+from tests.type_helpers import RowsResult as _RowsResult
+from tests.type_helpers import ScalarResult as _ScalarResult
+from tests.type_helpers import ScalarsResult as _ScalarsResult
 
 UTC = timezone.utc
 
 
-class _ScalarResult:
-    def __init__(self, value) -> None:
-        self._value = value
-
-    def scalar_one(self):
-        return self._value
-
-
-class _ScalarsResult:
-    def __init__(self, values) -> None:
-        self._values = values
-
-    def all(self):
-        return list(self._values)
-
-
-class _RowsResult:
-    def __init__(self, rows) -> None:
-        self._rows = rows
-
-    def all(self):
-        return list(self._rows)
-
-    def scalars(self):
-        return _ScalarsResult(self._rows)
-
-
-class _RecordingSession:
+class _RecordingSession(AsyncSessionStub):
     def __init__(self, result) -> None:
         self.statement = None
         self._result = result
@@ -46,7 +24,7 @@ class _RecordingSession:
         return self._result
 
 
-def _compile_sql(statement: object) -> str:
+def _compile_sql(statement: Any) -> str:
     return str(
         statement.compile(
             dialect=postgresql.dialect(),
@@ -85,7 +63,7 @@ async def test_count_active_reserved_redemptions_filters_future_reservations() -
 
 
 async def test_list_redemptions_clamps_page_and_limit() -> None:
-    session = _RecordingSession(_RowsResult([]))
+    session = _RecordingSession(_ScalarsResult([]))
 
     rows = await redemptions_repo.list_redemptions(
         session,

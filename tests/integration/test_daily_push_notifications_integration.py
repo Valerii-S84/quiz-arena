@@ -12,6 +12,7 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.workers.tasks import daily_challenge_async
 from tests.integration.stable_ids import stable_telegram_user_id
+from tests.type_helpers import as_any_dict
 
 
 class _FrozenDateTime(datetime):
@@ -79,8 +80,12 @@ async def test_daily_push_worker_is_idempotent_for_same_day(monkeypatch) -> None
     monkeypatch.setattr(daily_challenge_async, "build_bot", lambda: bot)
     monkeypatch.setattr(daily_challenge_async, "datetime", _FrozenDateTime)
 
-    first = await daily_challenge_async.run_daily_push_notifications_async(batch_size=100)
-    second = await daily_challenge_async.run_daily_push_notifications_async(batch_size=100)
+    first = as_any_dict(
+        await daily_challenge_async.run_daily_push_notifications_async(batch_size=100)
+    )
+    second = as_any_dict(
+        await daily_challenge_async.run_daily_push_notifications_async(batch_size=100)
+    )
 
     assert int(first["sent_total"]) == 1
     assert int(second["sent_total"]) == 0
@@ -99,10 +104,14 @@ async def test_daily_push_worker_sends_evening_reminder_after_morning_push(monke
     monkeypatch.setattr(daily_challenge_async, "build_bot", lambda: bot)
     monkeypatch.setattr(daily_challenge_async, "datetime", _FrozenDateTime)
 
-    first = await daily_challenge_async.run_daily_push_notifications_async(batch_size=100)
-    second = await daily_challenge_async.run_daily_push_notifications_async(
-        batch_size=100,
-        push_kind="EVENING_REMINDER",
+    first = as_any_dict(
+        await daily_challenge_async.run_daily_push_notifications_async(batch_size=100)
+    )
+    second = as_any_dict(
+        await daily_challenge_async.run_daily_push_notifications_async(
+            batch_size=100,
+            push_kind="EVENING_REMINDER",
+        )
     )
 
     assert int(first["sent_total"]) == 1
@@ -133,9 +142,11 @@ async def test_evening_reminder_targets_incomplete_daily_runs(monkeypatch) -> No
     monkeypatch.setattr(daily_challenge_async, "build_bot", lambda: bot)
     monkeypatch.setattr(daily_challenge_async, "datetime", _FrozenDateTime)
 
-    result = await daily_challenge_async.run_daily_push_notifications_async(
-        batch_size=100,
-        push_kind="EVENING_REMINDER",
+    result = as_any_dict(
+        await daily_challenge_async.run_daily_push_notifications_async(
+            batch_size=100,
+            push_kind="EVENING_REMINDER",
+        )
     )
 
     assert result["push_kind"] == "EVENING_REMINDER"

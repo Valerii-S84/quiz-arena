@@ -9,6 +9,11 @@ from app.game.questions.runtime_bank import (
     select_friend_challenge_question,
 )
 from tests.game.runtime_bank_fixtures import _fake_record
+from tests.type_helpers import AsyncSessionStub
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 @pytest.fixture(autouse=True)
@@ -65,7 +70,7 @@ async def test_select_friend_challenge_question_prefers_less_used_category(
     )
 
     selected = await select_friend_challenge_question(
-        object(),
+        _Session(),
         "QUICK_MIX_A1A2",
         local_date_berlin=date(2026, 2, 19),
         previous_round_question_ids=["prev_1", "prev_2"],

@@ -2,46 +2,21 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy.dialects import postgresql
 
 from app.db.repo.offers_repo import OffersRepo
+from tests.type_helpers import AsyncSessionStub
+from tests.type_helpers import RowsResult as _RowsResult
+from tests.type_helpers import ScalarResult as _ScalarResult
+from tests.type_helpers import ScalarsResult as _ScalarsResult
 
 UTC = timezone.utc
 
 
-class _ScalarResult:
-    def __init__(self, value) -> None:
-        self._value = value
-
-    def scalar_one(self):
-        return self._value
-
-    def scalar_one_or_none(self):
-        return self._value
-
-
-class _ScalarsResult:
-    def __init__(self, values: list[object]) -> None:
-        self._values = values
-
-    def all(self) -> list[object]:
-        return self._values
-
-
-class _RowsResult:
-    def __init__(self, rows: list[object]) -> None:
-        self._rows = rows
-
-    def all(self) -> list[object]:
-        return self._rows
-
-    def scalars(self) -> _ScalarsResult:
-        return _ScalarsResult(self._rows)
-
-
-class _RecordingSession:
+class _RecordingSession(AsyncSessionStub):
     def __init__(self, result) -> None:
         self.statement = None
         self._result = result
@@ -51,7 +26,7 @@ class _RecordingSession:
         return self._result
 
 
-def _compile_sql(statement: object) -> str:
+def _compile_sql(statement: Any) -> str:
     return str(
         statement.compile(
             dialect=postgresql.dialect(),
@@ -77,7 +52,7 @@ async def test_get_by_idempotency_key_filters_by_user_and_key() -> None:
 
 
 async def test_list_for_user_since_orders_most_recent_first() -> None:
-    session = _RecordingSession(_RowsResult([]))
+    session = _RecordingSession(_ScalarsResult([]))
     shown_since_utc = datetime(2026, 3, 10, tzinfo=UTC)
 
     rows = await OffersRepo.list_for_user_since(

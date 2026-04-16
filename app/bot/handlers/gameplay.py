@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from functools import partial
-from typing import cast
+from typing import Any, cast
 
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
@@ -63,12 +63,6 @@ _build_friend_proof_card_text = gameplay_views._build_friend_proof_card_text
 _build_friend_ttl_text = gameplay_views._build_friend_ttl_text
 _friend_opponent_user_id = gameplay_helpers._friend_opponent_user_id
 _build_friend_invite_link = gameplay_helpers._build_friend_invite_link
-_SESSION_DEPS: dict[str, object] = {
-    "session_local": SessionLocal,
-    "user_onboarding_service": UserOnboardingService,
-    "game_session_service": GameSessionService,
-}
-
 _resolve_opponent_label = partial(
     gameplay_helpers._resolve_opponent_label,
     session_local=SessionLocal,
@@ -85,16 +79,21 @@ _build_friend_result_share_url = partial(
     share_cta_text=TEXTS_DE["msg.friend.challenge.proof.share.cta"],
     build_share_url=build_friend_challenge_share_url,
 )
-_start_mode = partial(
-    play_flow.start_mode,
-    **_SESSION_DEPS,
-    offer_service=OfferService,
-    offer_logging_error=OfferLoggingError,
-    channel_bonus_service=ChannelBonusService,
-    build_question_text=_build_question_text,
-)
 _send_friend_round_question = partial(
     play_flow.send_friend_round_question, build_question_text=_build_question_text
+)
+_start_mode = cast(
+    Any,
+    partial(
+        play_flow.start_mode,
+        session_local=SessionLocal,
+        user_onboarding_service=UserOnboardingService,
+        game_session_service=GameSessionService,
+        offer_service=OfferService,
+        offer_logging_error=OfferLoggingError,
+        channel_bonus_service=ChannelBonusService,
+        build_question_text=_build_question_text,
+    ),
 )
 
 
@@ -172,7 +171,9 @@ async def handle_answer(callback: CallbackQuery) -> None:
     await answer_flow.handle_answer(
         callback,
         parse_answer_callback=gameplay_callbacks.parse_answer_callback,
-        **_SESSION_DEPS,
+        session_local=SessionLocal,
+        user_onboarding_service=UserOnboardingService,
+        game_session_service=GameSessionService,
         referral_service=ReferralService,
         channel_bonus_service=ChannelBonusService,
         offer_service=OfferService,

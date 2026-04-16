@@ -7,9 +7,14 @@ import pytest
 
 from app.game.friend_challenges import service_facade
 from app.game.sessions.service import GameSessionService
+from tests.type_helpers import AsyncSessionStub
 
 NOW_UTC = datetime(2026, 3, 13, 12, 0, tzinfo=timezone.utc)
 CHALLENGE_ID = UUID("11111111-1111-1111-1111-111111111111")
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 @pytest.mark.asyncio
@@ -27,7 +32,7 @@ async def test_create_challenge_delegates_to_game_session_service(
     monkeypatch.setattr(GameSessionService, "create_friend_challenge", _fake_create_challenge)
 
     result = await service_facade.FriendChallengeServiceFacade.create_challenge(
-        object(),
+        _Session(),
         creator_user_id=10,
         mode_code="CLASSIC",
         now_utc=NOW_UTC,
@@ -57,7 +62,7 @@ async def test_create_rematch_delegates_to_game_session_service(
     monkeypatch.setattr(GameSessionService, "create_friend_challenge_rematch", _fake_create_rematch)
 
     result = await service_facade.FriendChallengeServiceFacade.create_rematch(
-        object(),
+        _Session(),
         initiator_user_id=20,
         challenge_id=CHALLENGE_ID,
         now_utc=NOW_UTC,
@@ -89,7 +94,7 @@ async def test_create_best_of_three_delegates_to_game_session_service(
     )
 
     result = await service_facade.FriendChallengeServiceFacade.create_best_of_three(
-        object(),
+        _Session(),
         initiator_user_id=30,
         challenge_id=CHALLENGE_ID,
         now_utc=NOW_UTC,
@@ -122,7 +127,7 @@ async def test_create_series_next_game_delegates_to_game_session_service(
     )
 
     result = await service_facade.FriendChallengeServiceFacade.create_series_next_game(
-        object(),
+        _Session(),
         initiator_user_id=40,
         challenge_id=CHALLENGE_ID,
         now_utc=NOW_UTC,
@@ -150,7 +155,7 @@ async def test_start_round_delegates_to_game_session_service(
     monkeypatch.setattr(GameSessionService, "start_friend_challenge_round", _fake_start_round)
 
     result = await service_facade.FriendChallengeServiceFacade.start_round(
-        object(),
+        _Session(),
         user_id=50,
         challenge_id=CHALLENGE_ID,
         idempotency_key="idem-1",
@@ -182,7 +187,7 @@ async def test_get_snapshot_for_user_delegates_to_game_session_service(
     )
 
     result = await service_facade.FriendChallengeServiceFacade.get_snapshot_for_user(
-        object(),
+        _Session(),
         user_id=60,
         challenge_id=CHALLENGE_ID,
         now_utc=NOW_UTC,
@@ -212,7 +217,7 @@ async def test_get_series_score_for_user_delegates_to_game_session_service(
     )
 
     result = await service_facade.FriendChallengeServiceFacade.get_series_score_for_user(
-        object(),
+        _Session(),
         user_id=70,
         challenge_id=CHALLENGE_ID,
         now_utc=NOW_UTC,

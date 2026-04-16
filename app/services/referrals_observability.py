@@ -14,6 +14,10 @@ def _safe_rate(*, numerator: int, denominator: int) -> float:
     return numerator / denominator
 
 
+def _metric_int(value: object) -> int:
+    return value if isinstance(value, int) else 0
+
+
 @dataclass(frozen=True, slots=True)
 class ReferralsDashboardSnapshot:
     generated_at: datetime
@@ -101,7 +105,7 @@ def evaluate_referrals_alert_state(
         snapshot.rejected_fraud_total > thresholds.max_rejected_fraud_total
     )
     referrer_spike_detected = any(
-        int(row.get("rejected_fraud_total", 0)) >= thresholds.max_referrer_rejected_fraud
+        _metric_int(row.get("rejected_fraud_total", 0)) >= thresholds.max_referrer_rejected_fraud
         for row in snapshot.top_referrers
     )
 
@@ -151,8 +155,8 @@ async def build_referrals_dashboard_snapshot(
 
     top_referrers: list[dict[str, object]] = []
     for row in top_referrers_raw:
-        started_for_referrer = int(row.get("started_total", 0))
-        rejected_for_referrer = int(row.get("rejected_fraud_total", 0))
+        started_for_referrer = _metric_int(row.get("started_total", 0))
+        rejected_for_referrer = _metric_int(row.get("rejected_fraud_total", 0))
         top_referrers.append(
             {
                 **row,

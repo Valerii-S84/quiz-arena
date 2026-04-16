@@ -68,9 +68,9 @@ For the full local equivalent of the GitHub CI pipeline, run:
 bash scripts/local_ci.sh
 ```
 
-`scripts/local_ci.sh` runs the full local CI sequence: lint/unit checks,
-`docker compose up -d postgres redis`, service readiness, migrations, QuizBank
-import dry-run, and integration tests.
+`scripts/local_ci.sh` runs the full local CI sequence: backend lint/unit checks,
+frontend `npm ci && npm run lint && npm run build`, `docker compose up -d postgres redis`,
+service readiness, migrations, QuizBank import dry-run, and integration tests.
 
 The mandatory `pytest` gate pins `DATABASE_URL` to the local PostgreSQL test DB
 `quiz_arena_test`; integration stays available below as a separate targeted flow.
@@ -84,11 +84,10 @@ The mandatory `pytest` gate pins `DATABASE_URL` to the local PostgreSQL test DB
 
 ## Documentation Map
 
-Core engineering rules:
-- `AGENTS.md`
-- `CODE_STYLE.md`
-- `ENGINEERING_RULES.md`
-- `REPO_STRUCTURE.md`
+Active agent rules and project context:
+- `.agent/AGENTS.md`
+- `.agent/core/`
+- `.agent/project/`
 
 Operational docs:
 - `docs/runbooks/`
@@ -110,5 +109,7 @@ Reports and one-off artifacts:
 ## Documentation Hygiene
 
 - Canonical entrypoint is this file (`README.md`).
+- Active agent source-of-truth lives under `.agent/`; start with `.agent/AGENTS.md`, then follow `.agent/core/` and `.agent/project/`.
 - `README_BACKEND.md` is kept for compatibility and backend-focused bootstrap details.
+- Root `AGENTS.md`, `CODE_STYLE.md`, `ENGINEERING_RULES.md`, and `REPO_STRUCTURE.md` are legacy compatibility docs, not the active source-of-truth for current agent behavior.
 - Historical planning/handoff documents should be treated as archive material, not source-of-truth for current runtime behavior.

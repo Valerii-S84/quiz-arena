@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import TypedDict, cast
 
 from app.game.tournaments.pairing import (
     build_swiss_pairs,
@@ -12,6 +13,23 @@ from app.game.tournaments.pairing import (
 from app.game.tournaments.types import SwissParticipant
 
 UTC = timezone.utc
+
+
+class _BracketSlot(TypedDict):
+    slot_id: int
+    player_id: int | None
+    is_bye: bool
+    round_reached: int
+
+
+class _BracketPayload(TypedDict):
+    tournament_id: str
+    size: int
+    rounds_total: int
+    rounds_done: int
+    bye_count: int
+    slots: list[_BracketSlot]
+    winners: dict[object, object]
 
 
 def _participant(
@@ -26,6 +44,13 @@ def _participant(
         score=Decimal(score),
         tie_break=Decimal(tie_break),
         joined_at=datetime(2026, 2, 27, 12, joined_offset_minutes, tzinfo=UTC),
+    )
+
+
+def _elimination_bracket(*, participants: list[int], tournament_id: int) -> _BracketPayload:
+    return cast(
+        _BracketPayload,
+        create_elimination_bracket(participants, tournament_id=tournament_id),
     )
 
 
@@ -132,23 +157,23 @@ def test_build_swiss_pairs_does_not_repeat_bye_when_alternative_exists() -> None
 
 def test_create_elimination_bracket_with_eight_players_has_no_byes(monkeypatch) -> None:
     monkeypatch.setattr("app.game.tournaments.pairing.random.shuffle", lambda values: None)
-    bracket = create_elimination_bracket(list(range(1, 9)), tournament_id=77)
+    bracket = _elimination_bracket(participants=list(range(1, 9)), tournament_id=77)
     slots = bracket["slots"]
-    assert int(bracket["size"]) == 8
-    assert int(bracket["rounds_total"]) == 3
-    assert int(bracket["bye_count"]) == 0
+    assert bracket["size"] == 8
+    assert bracket["rounds_total"] == 3
+    assert bracket["bye_count"] == 0
     assert len(slots) == 8
     assert all(slot["player_id"] is not None for slot in slots)
-    assert get_winner_bracket_slot(6, bracket) == 3
-    assert get_next_opponent(6, bracket) == 8
+    assert get_winner_bracket_slot(6, cast(dict[str, object], bracket)) == 3
+    assert get_next_opponent(6, cast(dict[str, object], bracket)) == 8
 
 
 def test_create_elimination_bracket_with_byes_distributes_evenly(monkeypatch) -> None:
     monkeypatch.setattr("app.game.tournaments.pairing.random.shuffle", lambda values: None)
-    bracket = create_elimination_bracket(list(range(1, 11)), tournament_id=88)
+    bracket = _elimination_bracket(participants=list(range(1, 11)), tournament_id=88)
     slots = bracket["slots"]
-    assert int(bracket["size"]) == 16
-    assert int(bracket["bye_count"]) == 6
+    assert bracket["size"] == 16
+    assert bracket["bye_count"] == 6
     bye_total = sum(1 for slot in slots if bool(slot["is_bye"]))
     assert bye_total == 6
     for slot_index in range(0, len(slots), 2):
@@ -160,12 +185,12 @@ def test_create_elimination_bracket_with_byes_distributes_evenly(monkeypatch) ->
 def test_create_elimination_bracket_for_431_participants(monkeypatch) -> None:
     monkeypatch.setattr("app.game.tournaments.pairing.random.shuffle", lambda values: None)
     participants = list(range(1, 432))
-    bracket = create_elimination_bracket(participants, tournament_id=431)
+    bracket = _elimination_bracket(participants=participants, tournament_id=431)
     slots = bracket["slots"]
-    assert int(bracket["size"]) == 512
-    assert int(bracket["rounds_total"]) == 9
-    assert int(bracket["bye_count"]) == 81
-    players_in_slots = [int(slot["player_id"]) for slot in slots if slot["player_id"] is not None]
+    assert bracket["size"] == 512
+    assert bracket["rounds_total"] == 9
+    assert bracket["bye_count"] == 81
+    players_in_slots = [slot["player_id"] for slot in slots if slot["player_id"] is not None]
     assert len(players_in_slots) == 431
     assert sorted(players_in_slots) == participants
     for slot_index in range(0, len(slots), 2):

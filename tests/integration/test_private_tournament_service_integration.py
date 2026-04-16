@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import cast
 
 import pytest
+from sqlalchemy import Table
 
 from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournament_participants import TournamentParticipant
@@ -29,15 +31,20 @@ UTC = timezone.utc
 
 
 async def _ensure_tournament_schema() -> None:
+    round_scores_table = cast(Table, TournamentRoundScore.__table__)
+    matches_table = cast(Table, TournamentMatch.__table__)
+    participants_table = cast(Table, TournamentParticipant.__table__)
+    tournaments_table = cast(Table, Tournament.__table__)
+
     async with engine.begin() as conn:
-        await conn.run_sync(TournamentRoundScore.__table__.drop, checkfirst=True)
-        await conn.run_sync(TournamentMatch.__table__.drop, checkfirst=True)
-        await conn.run_sync(TournamentParticipant.__table__.drop, checkfirst=True)
-        await conn.run_sync(Tournament.__table__.drop, checkfirst=True)
-        await conn.run_sync(Tournament.__table__.create, checkfirst=True)
-        await conn.run_sync(TournamentParticipant.__table__.create, checkfirst=True)
-        await conn.run_sync(TournamentMatch.__table__.create, checkfirst=True)
-        await conn.run_sync(TournamentRoundScore.__table__.create, checkfirst=True)
+        await conn.run_sync(round_scores_table.drop, checkfirst=True)
+        await conn.run_sync(matches_table.drop, checkfirst=True)
+        await conn.run_sync(participants_table.drop, checkfirst=True)
+        await conn.run_sync(tournaments_table.drop, checkfirst=True)
+        await conn.run_sync(tournaments_table.create, checkfirst=True)
+        await conn.run_sync(participants_table.create, checkfirst=True)
+        await conn.run_sync(matches_table.create, checkfirst=True)
+        await conn.run_sync(round_scores_table.create, checkfirst=True)
 
 
 @pytest.mark.asyncio

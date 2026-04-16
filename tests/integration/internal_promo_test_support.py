@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from uuid import uuid4
 
 from httpx import ASGITransport, AsyncClient
@@ -73,7 +74,7 @@ async def create_promo_code(
     return promo_code
 
 
-async def post_redeem(payload: dict[str, object]) -> tuple[int, dict[str, object]]:
+async def post_redeem(payload: dict[str, object]) -> tuple[int, dict[str, Any]]:
     async with AsyncClient(
         transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
         base_url="http://testserver",

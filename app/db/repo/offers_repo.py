@@ -93,7 +93,7 @@ class OffersRepo:
             )
         )
         result = await session.execute(stmt)
-        return bool(result.rowcount)
+        return bool(int(getattr(result, "rowcount", 0) or 0))
 
     @staticmethod
     async def mark_clicked(
@@ -114,7 +114,7 @@ class OffersRepo:
             .values(clicked_at=clicked_at)
         )
         result = await session.execute(stmt)
-        return bool(result.rowcount)
+        return bool(int(getattr(result, "rowcount", 0) or 0))
 
     @staticmethod
     async def mark_converted_purchase(
@@ -134,7 +134,7 @@ class OffersRepo:
             .values(converted_purchase_id=purchase_id)
         )
         result = await session.execute(stmt)
-        return bool(result.rowcount)
+        return bool(int(getattr(result, "rowcount", 0) or 0))
 
     @staticmethod
     async def count_impressions_since(session: AsyncSession, *, shown_since_utc: datetime) -> int:

@@ -13,6 +13,7 @@ from app.economy.purchases.errors import (
     PurchaseRefundInvariantError,
     PurchaseRefundValidationError,
 )
+from tests.type_helpers import build_request
 
 
 class _DummySessionBegin:
@@ -63,7 +64,7 @@ async def test_rollback_promo_for_refund_maps_purchase_not_found(
     with pytest.raises(HTTPException) as exc_info:
         await internal_promo_refunds.rollback_promo_for_refund(
             payload=_payload(),
-            request=SimpleNamespace(),
+            request=build_request(),
         )
 
     assert exc_info.value.status_code == 404
@@ -90,7 +91,7 @@ async def test_rollback_promo_for_refund_maps_refund_validation_error(
     with pytest.raises(HTTPException) as exc_info:
         await internal_promo_refunds.rollback_promo_for_refund(
             payload=_payload(),
-            request=SimpleNamespace(),
+            request=build_request(),
         )
 
     assert exc_info.value.status_code == 409
@@ -117,7 +118,7 @@ async def test_rollback_promo_for_refund_maps_refund_invariant_error(
     with pytest.raises(HTTPException) as exc_info:
         await internal_promo_refunds.rollback_promo_for_refund(
             payload=_payload(),
-            request=SimpleNamespace(),
+            request=build_request(),
         )
 
     assert exc_info.value.status_code == 409
@@ -164,7 +165,7 @@ async def test_rollback_promo_for_refund_returns_idempotent_replay_without_promo
 
     response = await internal_promo_refunds.rollback_promo_for_refund(
         payload=_payload(purchase_id),
-        request=SimpleNamespace(),
+        request=build_request(),
     )
 
     assert response.purchase_id == purchase_id
@@ -230,7 +231,7 @@ async def test_rollback_promo_for_refund_returns_rollback_metadata_for_promo(
 
     response = await internal_promo_refunds.rollback_promo_for_refund(
         payload=_payload(purchase_id),
-        request=SimpleNamespace(),
+        request=build_request(),
     )
 
     assert response.purchase_id == purchase_id

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+
 import pytest
 from sqlalchemy import text
 
@@ -67,7 +69,7 @@ async def _existing_truncate_sql() -> str | None:
 
 
 @pytest.fixture(autouse=True)
-async def cleanup_db() -> None:
+async def cleanup_db() -> AsyncGenerator[None, None]:
     # Dispose pooled connections between tests to avoid cross-event-loop asyncpg reuse.
     await engine.dispose()
 

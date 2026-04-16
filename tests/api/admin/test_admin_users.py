@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Generator, Mapping, TypedDict, cast
 from uuid import uuid4
 
 import pytest
@@ -13,72 +14,83 @@ from app.api.routes.admin import users_helpers
 from app.db.models.energy_state import EnergyState
 from app.db.models.streak_state import StreakState
 from app.main import app
+from tests.type_helpers import AsyncBeginContext, AsyncSessionStub
+from tests.type_helpers import RowsResult as _RowsResult
+from tests.type_helpers import ScalarResult as _ScalarResult
+from tests.type_helpers import ScalarsResult as _ScalarsResult
 
 
-class _ScalarResult:
-    def __init__(self, value) -> None:
-        self._value = value
-
-    def scalar_one(self):
-        return self._value
+class _ProfileInfo(TypedDict):
+    telegram_user_id: int
+    last_seen_at: str | None
 
 
-class _RowsResult:
-    def __init__(self, rows) -> None:
-        self._rows = rows
-
-    def all(self):
-        return list(self._rows)
-
-
-class _ScalarsResult:
-    def __init__(self, rows) -> None:
-        self._rows = rows
-
-    def scalars(self):
-        return self
-
-    def all(self):
-        return list(self._rows)
+class _ProfileProgress(TypedDict):
+    levels: list[dict[str, str]]
+    streak: int
+    best_streak: int
+    paid_energy: int
 
 
-class _Session:
+class _ProfilePurchase(TypedDict):
+    product: str
+    paid_at: str | None
+
+
+class _ProfileReferral(TypedDict):
+    referrer_user_id: int
+
+
+class _ProfileTimelineItem(TypedDict):
+    type: str
+
+
+class _UserProfilePayload(TypedDict):
+    info: _ProfileInfo
+    progress: _ProfileProgress
+    purchases: list[_ProfilePurchase]
+    referrals: list[_ProfileReferral]
+    timeline: list[_ProfileTimelineItem]
+
+
+class _BonusPayload(TypedDict):
+    user_id: int
+    bonus_type: str
+    amount: int
+
+
+class _Session(AsyncSessionStub):
     def __init__(
-        self, *, gets: dict[tuple[str, int], object] | None = None, exec_results=None
+        self,
+        *,
+        gets: Mapping[tuple[str, int], object | None] | None = None,
+        exec_results: list[object] | None = None,
     ) -> None:
-        self.gets = gets or {}
+        self.gets = dict(gets or {})
         self.exec_results = list(exec_results or [])
         self.added: list[object] = []
         self.flushed = False
 
-    async def get(self, model, key):
+    async def get(self, model, key, **kwargs: object):  # type: ignore[override]
+        del kwargs
         return self.gets.get((model.__name__, key))
 
     async def execute(self, stmt):
         del stmt
         return self.exec_results.pop(0)
 
-    def add(self, item: object) -> None:
+    def add(self, item: object, _warn: bool = True) -> None:
+        del _warn
         self.added.append(item)
 
-    async def flush(self) -> None:
+    async def flush(self, objects: object | None = None) -> None:
+        del objects
         self.flushed = True
-
-
-class _AsyncBeginContext:
-    def __init__(self, session: object) -> None:
-        self._session = session
-
-    async def __aenter__(self) -> object:
-        return self._session
-
-    async def __aexit__(self, exc_type, exc, tb) -> bool:
-        return False
 
 
 def _session_local(*sessions: object) -> SimpleNamespace:
     remaining = list(sessions)
-    return SimpleNamespace(begin=lambda: _AsyncBeginContext(remaining.pop(0)))
+    return SimpleNamespace(begin=lambda: AsyncBeginContext(remaining.pop(0)))
 
 
 def _admin() -> admin_deps.AdminPrincipal:
@@ -92,7 +104,7 @@ def _admin() -> admin_deps.AdminPrincipal:
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client() -> Generator[TestClient, None, None]:
     app.dependency_overrides.clear()
     app.dependency_overrides[admin_deps.get_current_admin] = _admin
     with TestClient(app) as test_client:
@@ -215,7 +227,7 @@ async def test_get_user_profile_builds_sections_and_timeline() -> None:
         ],
     )
 
-    profile = await users_helpers.get_user_profile(session, 101)
+    profile = cast(_UserProfilePayload, await users_helpers.get_user_profile(session, 101))
 
     assert profile["info"]["telegram_user_id"] == 900101
     assert profile["progress"]["levels"] == [{"mode": "QUIZ", "level": "A2"}]
@@ -258,7 +270,7 @@ async def test_get_user_profile_defaults_related_sections_and_missing_user() -> 
         ],
     )
 
-    profile = await users_helpers.get_user_profile(session, 202)
+    profile = cast(_UserProfilePayload, await users_helpers.get_user_profile(session, 202))
 
     assert profile["info"]["last_seen_at"] is None
     assert profile["progress"] == {"levels": [], "streak": 0, "best_streak": 0, "paid_energy": 0}
@@ -284,15 +296,16 @@ async def test_apply_bonus_handles_supported_bonus_types(
 
     monkeypatch.setattr(users_helpers, "datetime", _FrozenDatetime)
     user = SimpleNamespace(id=101)
-    gets = {("User", 101): user}
+    gets: dict[tuple[str, int], object | None] = {("User", 101): user}
     if bonus_type == "energy":
         gets[("EnergyState", 101)] = None
     elif bonus_type == "streak_token":
         gets[("StreakState", 101)] = None
     session = _Session(gets=gets)
 
-    result = await users_helpers.apply_bonus(
-        session, user_id=101, bonus_type=bonus_type, amount=amount
+    result = cast(
+        _BonusPayload,
+        await users_helpers.apply_bonus(session, user_id=101, bonus_type=bonus_type, amount=amount),
     )
 
     assert result == {"user_id": 101, "bonus_type": bonus_type, "amount": amount}
@@ -341,14 +354,17 @@ async def test_apply_bonus_updates_existing_state_without_creating_duplicate_rec
 
     monkeypatch.setattr(users_helpers, "datetime", _FrozenDatetime)
     existing_state = SimpleNamespace(updated_at=None, **{field_name: 4})
-    gets = {("User", 101): SimpleNamespace(id=101)}
+    gets: dict[tuple[str, int], object | None] = {("User", 101): SimpleNamespace(id=101)}
     if bonus_type == "energy":
         gets[("EnergyState", 101)] = existing_state
     else:
         gets[("StreakState", 101)] = existing_state
     session = _Session(gets=gets)
 
-    result = await users_helpers.apply_bonus(session, user_id=101, bonus_type=bonus_type, amount=3)
+    result = cast(
+        _BonusPayload,
+        await users_helpers.apply_bonus(session, user_id=101, bonus_type=bonus_type, amount=3),
+    )
 
     assert result["amount"] == 3
     assert getattr(existing_state, field_name) == 7

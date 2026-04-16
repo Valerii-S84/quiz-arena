@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any, cast
 from uuid import UUID
 
 import pytest
@@ -43,7 +44,7 @@ def _build_callback(*, with_message: bool = True, with_user: bool = True) -> Dum
         message=DummyMessage() if with_message else DummyMessage(),
     )
     if not with_message:
-        callback.message = None
+        callback.message = cast(Any, None)
     return callback
 
 

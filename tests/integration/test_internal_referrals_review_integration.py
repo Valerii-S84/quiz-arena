@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -30,7 +31,7 @@ async def _create_user(seed: str) -> int:
         return user.id
 
 
-async def _post_json(path: str, payload: dict[str, object]) -> tuple[int, dict[str, object]]:
+async def _post_json(path: str, payload: dict[str, object]) -> tuple[int, dict[str, Any]]:
     async with AsyncClient(
         transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
         base_url="http://testserver",

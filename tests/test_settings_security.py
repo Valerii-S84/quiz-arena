@@ -33,7 +33,7 @@ def test_settings_require_admin_jwt_secret(monkeypatch: pytest.MonkeyPatch) -> N
     kwargs.pop("ADMIN_JWT_SECRET")
 
     with pytest.raises(ValidationError):
-        Settings(_env_file=None, **kwargs)
+        Settings(**kwargs)
 
 
 def test_settings_require_admin_password_source(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -43,12 +43,11 @@ def test_settings_require_admin_password_source(monkeypatch: pytest.MonkeyPatch)
     kwargs.pop("ADMIN_PASSWORD_PLAIN")
 
     with pytest.raises(ValidationError):
-        Settings(_env_file=None, **kwargs)
+        Settings(**kwargs)
 
 
 def test_settings_reject_invalid_promo_encryption_key() -> None:
     with pytest.raises(ValidationError):
         Settings(
-            _env_file=None,
             **_settings_kwargs(PROMO_ENCRYPTION_KEY="not-a-valid-key"),
         )

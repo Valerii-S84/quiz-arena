@@ -6,6 +6,11 @@ import pytest
 
 from app.game.questions.types import QuizQuestion
 from app.game.sessions.service import daily_question_resolver
+from tests.type_helpers import AsyncSessionStub
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 def _question(*, question_id: str, level: str) -> QuizQuestion:
@@ -56,7 +61,7 @@ async def test_resolver_uses_daily_set_question_when_level_is_valid(
     )
 
     question_id, question = await daily_question_resolver.resolve_daily_question_for_position(
-        object(),
+        _Session(),
         berlin_date=date(2026, 3, 4),
         position=1,
     )
@@ -116,7 +121,7 @@ async def test_resolver_reselects_when_daily_set_question_level_is_out_of_window
     )
 
     question_id, question = await daily_question_resolver.resolve_daily_question_for_position(
-        object(),
+        _Session(),
         berlin_date=date(2026, 3, 4),
         position=1,
     )

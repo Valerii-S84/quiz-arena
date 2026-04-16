@@ -41,7 +41,10 @@ class Settings(
     )
     @classmethod
     def _validate_required_secrets(cls, value: Any, info: ValidationInfo) -> str:
-        env_name = info.field_name.upper()
+        field_name = info.field_name
+        if field_name is None:
+            raise ValueError("Required secret validator must be bound to a field")
+        env_name = field_name.upper()
         return cls._normalize_required_secret(value, env_name=env_name)
 
     @field_validator("promo_encryption_key", mode="before")

@@ -14,8 +14,13 @@ from app.economy.promo.errors import (
     PromoUserNotFoundError,
 )
 from app.economy.promo.types import PromoRedeemResult
+from tests.type_helpers import AsyncSessionStub
 
 UTC = timezone.utc
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 def _promo_code(**overrides: object) -> SimpleNamespace:
@@ -69,7 +74,7 @@ async def test_redeem_returns_idempotent_result_for_same_user(
     )
 
     result = await promo_service.PromoService.redeem(
-        object(),
+        _Session(),
         user_id=7,
         promo_code="SAVE40",
         idempotency_key="idem-1",
@@ -94,7 +99,7 @@ async def test_redeem_rejects_idempotency_conflict_for_other_user(
 
     with pytest.raises(PromoIdempotencyConflictError):
         await promo_service.PromoService.redeem(
-            object(),
+            _Session(),
             user_id=7,
             promo_code="SAVE40",
             idempotency_key="idem-1",
@@ -119,7 +124,7 @@ async def test_redeem_rejects_missing_user(monkeypatch: pytest.MonkeyPatch) -> N
 
     with pytest.raises(PromoUserNotFoundError):
         await promo_service.PromoService.redeem(
-            object(),
+            _Session(),
             user_id=7,
             promo_code="SAVE40",
             idempotency_key="idem-1",
@@ -171,7 +176,7 @@ async def test_redeem_records_rate_limit_failure(monkeypatch: pytest.MonkeyPatch
 
     with pytest.raises(PromoRateLimitedError):
         await promo_service.PromoService.redeem(
-            object(),
+            _Session(),
             user_id=7,
             promo_code=" save40 ",
             idempotency_key="idem-2",
@@ -234,7 +239,7 @@ async def test_redeem_rejects_empty_code_and_records_invalid(
 
     with pytest.raises(PromoInvalidError):
         await promo_service.PromoService.redeem(
-            object(),
+            _Session(),
             user_id=7,
             promo_code="   ",
             idempotency_key="idem-3",
@@ -298,7 +303,7 @@ async def test_redeem_rejects_unknown_code_and_records_invalid(
 
     with pytest.raises(PromoInvalidError):
         await promo_service.PromoService.redeem(
-            object(),
+            _Session(),
             user_id=7,
             promo_code="save40",
             idempotency_key="idem-4",

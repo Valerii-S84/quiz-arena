@@ -10,6 +10,7 @@ from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from tests.integration.stable_ids import stable_telegram_user_id
+from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
 
@@ -17,7 +18,7 @@ UTC = timezone.utc
 @pytest.mark.asyncio
 async def test_collect_public_metrics_counts_only_completed_quizzes() -> None:
     started_at = datetime(2026, 4, 6, 12, 0, tzinfo=UTC)
-    before_metrics = await public_site_routes._collect_public_metrics()
+    before_metrics = as_any_dict(await public_site_routes._collect_public_metrics())
 
     async with SessionLocal.begin() as session:
         user = await UsersRepo.create(
@@ -65,6 +66,6 @@ async def test_collect_public_metrics_counts_only_completed_quizzes() -> None:
             ]
         )
 
-    metrics = await public_site_routes._collect_public_metrics()
+    metrics = as_any_dict(await public_site_routes._collect_public_metrics())
 
     assert metrics["quizzes_total"] == before_metrics["quizzes_total"] + 1

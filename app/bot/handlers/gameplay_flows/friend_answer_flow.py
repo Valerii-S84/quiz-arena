@@ -5,6 +5,7 @@ from datetime import datetime
 from aiogram.types import CallbackQuery
 
 from app.bot.handlers.gameplay_flows.friend_answer_completion_flow import (
+    FriendCompletionCallbacks,
     handle_completed_friend_challenge,
 )
 from app.bot.handlers.gameplay_flows.friend_challenge_push_quota import reserve_duel_push_slot
@@ -141,14 +142,16 @@ async def handle_friend_answer_branch(
             idempotent_replay=result.idempotent_replay,
             session_local=session_local,
             game_session_service=game_session_service,
-            resolve_opponent_label=resolve_opponent_label,
-            notify_opponent=notify_opponent,
-            build_friend_score_text=build_friend_score_text,
-            build_friend_finish_text=build_friend_finish_text,
-            build_public_badge_label=build_public_badge_label,
-            build_friend_proof_card_text=build_friend_proof_card_text,
-            enqueue_friend_challenge_proof_cards=enqueue_friend_challenge_proof_cards,
-            build_series_progress_text=build_series_progress_text,
+            callbacks=FriendCompletionCallbacks(
+                resolve_opponent_label=resolve_opponent_label,
+                notify_opponent=notify_opponent,
+                build_friend_score_text=build_friend_score_text,
+                build_friend_finish_text=build_friend_finish_text,
+                build_public_badge_label=build_public_badge_label,
+                build_friend_proof_card_text=build_friend_proof_card_text,
+                enqueue_friend_challenge_proof_cards=enqueue_friend_challenge_proof_cards,
+                build_series_progress_text=build_series_progress_text,
+            ),
         )
         await callback.answer()
         return

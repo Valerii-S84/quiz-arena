@@ -3,7 +3,6 @@ from __future__ import annotations
 from uuid import UUID
 
 import structlog
-from aiogram.types import BufferedInputFile
 
 from app.bot.application import build_bot
 from app.bot.keyboards.friend_challenge import build_friend_challenge_result_share_keyboard
@@ -14,6 +13,15 @@ from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.tasks.friend_challenges_proof_card_render import render_duel_proof_card_png
 from app.workers.tasks.friend_challenges_proof_card_text import build_caption, resolve_user_label
+from app.workers.tasks.friend_challenges_proof_cards_context import (
+    load_friend_challenge_proof_cards_context,
+)
+from app.workers.tasks.friend_challenges_proof_cards_delivery import (
+    deliver_friend_challenge_proof_cards,
+)
+from app.workers.tasks.friend_challenges_proof_cards_persistence import (
+    persist_friend_challenge_proof_card_file_ids,
+)
 
 logger = structlog.get_logger("app.workers.tasks.friend_challenges_proof_cards")
 _DUEL_FINAL_STATUSES = frozenset({"COMPLETED", "EXPIRED", "WALKOVER"})
@@ -34,144 +42,44 @@ async def run_friend_challenge_proof_cards_async(
         return {"processed": 0, "sent": 0, "cached_reused": 0}
 
     async with SessionLocal.begin() as session:
-        challenge = await FriendChallengesRepo.get_by_id_for_update(session, parsed_challenge_id)
-        if challenge is None or challenge.status not in _DUEL_FINAL_STATUSES:
-            return {"processed": 0, "sent": 0, "cached_reused": 0}
-
-        creator = await UsersRepo.get_by_id(session, challenge.creator_user_id)
-        opponent = (
-            await UsersRepo.get_by_id(session, int(challenge.opponent_user_id))
-            if challenge.opponent_user_id is not None
-            else None
+        context = await load_friend_challenge_proof_cards_context(
+            session=session,
+            parsed_challenge_id=parsed_challenge_id,
+            requested_user_id=user_id,
+            challenges_repo=FriendChallengesRepo,
+            users_repo=UsersRepo,
+            final_statuses=_DUEL_FINAL_STATUSES,
+            resolve_user_label_fn=resolve_user_label,
         )
-
-        status = str(challenge.status)
-        creator_score = int(challenge.creator_score)
-        opponent_score = int(challenge.opponent_score)
-        total_rounds = int(challenge.total_rounds)
-        completed_at = challenge.completed_at
-        creator_file_id = challenge.creator_proof_card_file_id
-        opponent_file_id = challenge.opponent_proof_card_file_id
-        creator_chat = int(creator.telegram_user_id) if creator is not None else None
-        opponent_chat = int(opponent.telegram_user_id) if opponent is not None else None
-        creator_name = resolve_user_label(user=creator, fallback="Spieler 1")
-        opponent_name = resolve_user_label(user=opponent, fallback="Spieler 2")
-
-    creator_user_id = int(challenge.creator_user_id)
-    opponent_user_id = (
-        int(challenge.opponent_user_id) if challenge.opponent_user_id is not None else None
-    )
-    send_creator = creator_chat is not None and (user_id is None or user_id == creator_user_id)
-    send_opponent = opponent_chat is not None and (user_id is None or user_id == opponent_user_id)
-    if not send_creator and not send_opponent:
+    if context is None:
+        return {"processed": 0, "sent": 0, "cached_reused": 0}
+    if not context.recipients:
         return {"processed": 1, "sent": 0, "cached_reused": 0}
-    must_render = (send_creator and not creator_file_id) or (send_opponent and not opponent_file_id)
-    card_png = (
-        render_duel_proof_card_png(
-            creator_name=creator_name,
-            opponent_name=opponent_name,
-            creator_score=creator_score,
-            opponent_score=opponent_score,
-            total_rounds=total_rounds,
-            completed_at=completed_at,
-        )
-        if must_render
-        else None
+
+    delivery = await deliver_friend_challenge_proof_cards(
+        context=context,
+        build_bot_fn=build_bot,
+        build_keyboard_fn=build_friend_challenge_result_share_keyboard,
+        build_caption_fn=build_caption,
+        render_card_fn=render_duel_proof_card_png,
+        logger=logger,
     )
 
-    bot = build_bot()
-    sent = 0
-    cached_reused = 0
-    new_creator_file_id: str | None = None
-    new_opponent_file_id: str | None = None
-    keyboard = build_friend_challenge_result_share_keyboard(share_url="", challenge_id=challenge_id)
-    try:
-        if send_creator and creator_chat is not None:
-            creator_caption = build_caption(
-                challenge_id=challenge_id,
-                status=status,
-                role="creator",
-                creator_score=creator_score,
-                opponent_score=opponent_score,
-            )
-            if creator_file_id:
-                await bot.send_photo(
-                    chat_id=creator_chat,
-                    photo=creator_file_id,
-                    caption=creator_caption,
-                    reply_markup=keyboard,
-                )
-                sent += 1
-                cached_reused += 1
-            elif card_png is not None:
-                creator_message = await bot.send_photo(
-                    chat_id=creator_chat,
-                    photo=BufferedInputFile(
-                        card_png,
-                        filename=f"duel_{challenge_id}_creator.png",
-                    ),
-                    caption=creator_caption,
-                    reply_markup=keyboard,
-                )
-                sent += 1
-                if creator_message.photo:
-                    new_creator_file_id = creator_message.photo[-1].file_id
-
-        if send_opponent and opponent_chat is not None:
-            opponent_caption = build_caption(
-                challenge_id=challenge_id,
-                status=status,
-                role="opponent",
-                creator_score=creator_score,
-                opponent_score=opponent_score,
-            )
-            if opponent_file_id:
-                await bot.send_photo(
-                    chat_id=opponent_chat,
-                    photo=opponent_file_id,
-                    caption=opponent_caption,
-                    reply_markup=keyboard,
-                )
-                sent += 1
-                cached_reused += 1
-            elif card_png is not None:
-                opponent_message = await bot.send_photo(
-                    chat_id=opponent_chat,
-                    photo=BufferedInputFile(
-                        card_png,
-                        filename=f"duel_{challenge_id}_opponent.png",
-                    ),
-                    caption=opponent_caption,
-                    reply_markup=keyboard,
-                )
-                sent += 1
-                if opponent_message.photo:
-                    new_opponent_file_id = opponent_message.photo[-1].file_id
-    except Exception as exc:
-        logger.warning(
-            "friend_challenge_proof_card_send_failed",
-            challenge_id=challenge_id,
-            error_type=type(exc).__name__,
-        )
-    finally:
-        await bot.session.close()
-
-    if new_creator_file_id is not None or new_opponent_file_id is not None:
+    if delivery.new_creator_file_id is not None or delivery.new_opponent_file_id is not None:
         async with SessionLocal.begin() as session:
-            challenge_row = await FriendChallengesRepo.get_by_id_for_update(
-                session,
-                parsed_challenge_id,
+            await persist_friend_challenge_proof_card_file_ids(
+                session=session,
+                parsed_challenge_id=context.parsed_challenge_id,
+                challenges_repo=FriendChallengesRepo,
+                new_creator_file_id=delivery.new_creator_file_id,
+                new_opponent_file_id=delivery.new_opponent_file_id,
             )
-            if challenge_row is not None:
-                if new_creator_file_id is not None and not challenge_row.creator_proof_card_file_id:
-                    challenge_row.creator_proof_card_file_id = new_creator_file_id
-                if (
-                    new_opponent_file_id is not None
-                    and not challenge_row.opponent_proof_card_file_id
-                ):
-                    challenge_row.opponent_proof_card_file_id = new_opponent_file_id
 
-    return {"processed": 1, "sent": sent, "cached_reused": cached_reused}
+    return {
+        "processed": 1,
+        "sent": delivery.sent,
+        "cached_reused": delivery.cached_reused,
+    }
 
 
 def enqueue_friend_challenge_proof_cards(

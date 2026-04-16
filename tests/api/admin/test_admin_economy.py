@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Generator
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
@@ -64,7 +65,7 @@ def _admin() -> admin_deps.AdminPrincipal:
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client() -> Generator[TestClient, None, None]:
     app.dependency_overrides.clear()
     app.dependency_overrides[admin_deps.get_current_admin] = _admin
     with TestClient(app) as test_client:

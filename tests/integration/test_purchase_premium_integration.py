@@ -14,6 +14,7 @@ from app.db.session import SessionLocal
 from app.economy.purchases.errors import PremiumDowngradeNotAllowedError
 from app.economy.purchases.service import PurchaseService
 from tests.integration.stable_ids import stable_telegram_user_id
+from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
 
@@ -87,7 +88,9 @@ async def test_premium_month_purchase_grants_active_entitlement() -> None:
         assert ledger_entry is not None
         assert ledger_entry.asset == "PURCHASE"
         assert ledger_entry.amount == purchase.stars_amount
-        assert ledger_entry.metadata_["asset_breakdown"]["premium_days"] == 30
+        metadata = as_any_dict(ledger_entry.metadata_)
+        asset_breakdown = as_any_dict(metadata["asset_breakdown"])
+        assert asset_breakdown["premium_days"] == 30
 
 
 @pytest.mark.asyncio

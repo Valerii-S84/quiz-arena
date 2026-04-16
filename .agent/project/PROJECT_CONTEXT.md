@@ -9,7 +9,7 @@
 
 - Project name: `Quiz Arena` (`quiz-arena-bot`)
 - Primary languages: `Python 3.12`, `TypeScript`, `Bash`
-- Runtime / platform: `FastAPI + aiogram + Celery on Python 3.12`, `Next.js 14 / React 18 frontend`, `Docker Compose local/prod`, `Linux VPS production`
+- Runtime / platform: `FastAPI + aiogram + Celery on Python 3.12`, `Next.js 15.5.15 / React 18.3.1 frontend`, `Docker Compose local/prod`, `Linux VPS production`
 - Main frameworks / libraries: `FastAPI`, `aiogram`, `SQLAlchemy`, `Alembic`, `Celery`, `Redis`, `Pydantic`, `Next.js`, `React`, `Tailwind CSS`
 - Data stores: `PostgreSQL`, `Redis`, `QuizBank CSV assets`
 - Default user-facing language: `German only for all product-facing UI, bot text, admin UI text, notifications, and other user-visible copy`
@@ -26,8 +26,8 @@
 
 | Purpose | Command | Notes |
 |---|---|---|
-| Test | `make test` | Prepares `quiz_arena_test`, runs Alembic migrations, then `pytest -q`; full local CI equivalent is `bash scripts/local_ci.sh` |
-| Lint | `make lint && make format-check && make type-check` | Python gate is `ruff`, `black --check`, `isort --check-only`, `mypy`; frontend changes additionally use `cd frontend && npm run lint` |
+| Test | `make test` | Backend flow prepares `quiz_arena_test`, runs Alembic migrations, then `pytest -q`; frontend unit tests run via `cd frontend && npm test`; full local CI equivalent is `bash scripts/local_ci.sh` |
+| Lint | `make lint && make format-check && make type-check` | Python gate is `ruff`, `black --check`, `isort --check-only`, `mypy`; frontend changes additionally use `cd frontend && npm run lint` (`ESLint CLI` over `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.mts`, `.cts`, `.tsx`) |
 | Build | `cd frontend && npm run build` | Frontend has the only explicit app build command; production runtime build uses `docker compose -f docker-compose.prod.yml up -d --build` |
 | Dev / Run | `make up` | Starts local `postgres` and `redis`; then use `make run-api`, `make run-worker`, `make run-beat`, and `cd frontend && npm run dev` as needed |
 
@@ -56,3 +56,8 @@
 - Merge strategy: `Squash merge into protected main; merged PRs land on main as a single-parent commit even when the PR contained multiple commits`
 - PR title format: `One-line title used as the squash-commit subject; preferred format is type(scope): summary, and main receives it as type(scope): summary (#PR)`
 - PR requirements: `PR into main`, `passing CI checks lint_unit and integration`, `at least 1 approval`, `stale approvals dismissed on new commits`, `conversation resolution`, `branch up to date`, `linear history`, `CODEOWNERS review for covered paths`
+
+## 7. Active remediation context
+
+- For tasks about repo cleanup, technical debt, stabilization, CI hardening, structural refactor, or follow-up after repository audit, read `.agent/project/TECH_DEBT_REMEDIATION_PLAN.md` before acting.
+- Treat `.agent/project/TECH_DEBT_REMEDIATION_PLAN.md` as the ordered project-specific source of truth for debt-remediation priorities unless the user explicitly overrides the order.

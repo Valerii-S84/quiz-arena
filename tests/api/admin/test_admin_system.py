@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Generator
 from uuid import uuid4
 
 import pytest
@@ -10,25 +11,13 @@ from fastapi.testclient import TestClient
 from app.api.routes.admin import deps as admin_deps
 from app.api.routes.admin import system
 from app.main import app
+from tests.type_helpers import AsyncBeginContext, AsyncSessionStub
+from tests.type_helpers import RowsResult as _RowsResult
+from tests.type_helpers import ScalarResult as _ScalarResult
+from tests.type_helpers import build_settings
 
 
-class _RowsResult:
-    def __init__(self, rows) -> None:
-        self._rows = rows
-
-    def all(self):
-        return list(self._rows)
-
-
-class _ScalarResult:
-    def __init__(self, value) -> None:
-        self._value = value
-
-    def scalar_one(self):
-        return self._value
-
-
-class _Session:
+class _Session(AsyncSessionStub):
     def __init__(self, *results) -> None:
         self.results = list(results)
 
@@ -37,20 +26,9 @@ class _Session:
         return self.results.pop(0)
 
 
-class _AsyncBeginContext:
-    def __init__(self, session: object) -> None:
-        self._session = session
-
-    async def __aenter__(self) -> object:
-        return self._session
-
-    async def __aexit__(self, exc_type, exc, tb) -> bool:
-        return False
-
-
 def _session_local(*sessions: object) -> SimpleNamespace:
     remaining = list(sessions)
-    return SimpleNamespace(begin=lambda: _AsyncBeginContext(remaining.pop(0)))
+    return SimpleNamespace(begin=lambda: AsyncBeginContext(remaining.pop(0)))
 
 
 def _admin() -> admin_deps.AdminPrincipal:
@@ -63,12 +41,12 @@ def _admin() -> admin_deps.AdminPrincipal:
     )
 
 
-def _settings() -> SimpleNamespace:
-    return SimpleNamespace(redis_url="redis://test")
+def _settings():
+    return build_settings(redis_url="redis://test")
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client() -> Generator[TestClient, None, None]:
     app.dependency_overrides.clear()
     app.dependency_overrides[admin_deps.get_current_admin] = _admin
     app.dependency_overrides[system.get_settings] = _settings
@@ -83,9 +61,6 @@ async def test_system_service_status_handles_celery_failure(
 ) -> None:
     monkeypatch.setattr(
         system, "SessionLocal", _session_local(_Session(_RowsResult([]), _ScalarResult(0)))
-    )
-    monkeypatch.setattr(
-        system, "get_redis_client", lambda settings: system.get_redis_client.__class__(None)
     )
 
     async def _no_redis(settings):

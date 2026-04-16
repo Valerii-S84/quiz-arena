@@ -6,6 +6,11 @@ import pytest
 
 from app.game.questions.runtime_bank import clear_question_pool_cache, select_question_for_mode
 from tests.game.runtime_bank_fixtures import _fake_record
+from tests.type_helpers import AsyncSessionStub
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 @pytest.fixture(autouse=True)
@@ -54,7 +59,7 @@ async def test_select_question_for_mode_uses_db_pool_before_fallback(
     )
 
     selected = await select_question_for_mode(
-        object(),  # session is unused by monkeypatched repo methods
+        _Session(),  # session is unused by monkeypatched repo methods
         "ARTIKEL_SPRINT",
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=["recent_q"],
@@ -108,14 +113,14 @@ async def test_select_question_for_mode_daily_uses_quick_mix_source_mode(
     )
 
     first = await select_question_for_mode(
-        object(),
+        _Session(),
         "DAILY_CHALLENGE",
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=["ignored_recent"],
         selection_seed="seed-ignored",
     )
     second = await select_question_for_mode(
-        object(),
+        _Session(),
         "DAILY_CHALLENGE",
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=["another_recent"],
@@ -173,7 +178,7 @@ async def test_select_question_for_quick_mix_uses_only_eligible_active_pool(
     )
 
     selected = await select_question_for_mode(
-        object(),
+        _Session(),
         "QUICK_MIX_A1A2",
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=[],
@@ -231,7 +236,7 @@ async def test_select_question_for_mode_prefers_requested_level(
     )
 
     selected = await select_question_for_mode(
-        object(),
+        _Session(),
         "ARTIKEL_SPRINT",
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=[],
@@ -288,7 +293,7 @@ async def test_select_question_for_mode_relaxes_only_within_allowed_levels(
     )
 
     selected = await select_question_for_mode(
-        object(),
+        _Session(),
         "ARTIKEL_SPRINT",
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=[],
@@ -343,7 +348,7 @@ async def test_select_question_for_quick_mix_excludes_recent_ids_after_filtering
     )
 
     selected = await select_question_for_mode(
-        object(),
+        _Session(),
         "QUICK_MIX_A1A2",
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=["mix_recent"],

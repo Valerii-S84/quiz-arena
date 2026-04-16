@@ -81,9 +81,9 @@ For a 1:1 local replay of the full GitHub CI pipeline, use:
 bash scripts/local_ci.sh
 ```
 
-`scripts/local_ci.sh` replays the full GitHub CI pipeline locally: lint/unit gate,
-`docker compose up -d postgres redis`, service readiness, `alembic upgrade head`,
-QuizBank import dry-run, and `tests/integration`.
+`scripts/local_ci.sh` replays the full GitHub CI pipeline locally: backend lint/unit gate,
+frontend `npm ci && npm run lint && npm run build`, `docker compose up -d postgres redis`,
+service readiness, `alembic upgrade head`, QuizBank import dry-run, and `tests/integration`.
 
 `pytest` in the mandatory gate explicitly binds `DATABASE_URL` to the local test
 database `quiz_arena_test`; the integration-only flow below remains available as a
@@ -105,10 +105,13 @@ DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test .venv
 - New files in `app/bot/handlers/` over 180 lines fail CI
 - Growth delta guard and monolith warning are enabled in CI
 
-Full rules:
-- `CODE_STYLE.md`
-- `ENGINEERING_RULES.md`
-- `REPO_STRUCTURE.md`
+Active agent/source-of-truth rules:
+- `.agent/AGENTS.md`
+- `.agent/project/PROJECT_CONTEXT.md`
+- `.agent/project/CODE_STYLE.md`
+
+Root `AGENTS.md`, `CODE_STYLE.md`, `ENGINEERING_RULES.md`, and `REPO_STRUCTURE.md`
+remain compatibility docs only and are not the active source-of-truth for agent work.
 
 ## 6. Production references
 

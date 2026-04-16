@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -9,12 +8,12 @@ import pytest
 import app.economy.promo.idempotency as promo_idempotency
 import app.economy.promo.redeem_validation as promo_validation
 from app.economy.promo.errors import PromoExpiredError, PromoInvalidError, PromoNotApplicableError
+from tests.type_helpers import AsyncSessionStub, build_promo_code, build_promo_redemption
 
 UTC = timezone.utc
 
 
-def _promo_code(**overrides: object) -> SimpleNamespace:
-    now_utc = datetime.now(UTC)
+def _promo_code(**overrides: object):
     payload: dict[str, object] = {
         "id": 21,
         "promo_type": "PERCENT_DISCOUNT",
@@ -24,8 +23,6 @@ def _promo_code(**overrides: object) -> SimpleNamespace:
         "target_scope": "ENERGY_10",
         "applicable_products": None,
         "status": "ACTIVE",
-        "valid_from": now_utc - timedelta(days=1),
-        "valid_until": now_utc + timedelta(days=1),
         "max_total_uses": 10,
         "used_total": 0,
         "grant_premium_days": None,
@@ -33,10 +30,10 @@ def _promo_code(**overrides: object) -> SimpleNamespace:
         "first_purchase_only": False,
     }
     payload.update(overrides)
-    return SimpleNamespace(**payload)
+    return build_promo_code(**payload)
 
 
-class _Session:
+class _Session(AsyncSessionStub):
     def __init__(self, entitlement: object | None = None) -> None:
         self._entitlement = entitlement
 
@@ -56,7 +53,7 @@ async def test_build_idempotent_result_rejects_missing_promo_code(
     with pytest.raises(PromoInvalidError):
         await promo_idempotency.build_idempotent_result(
             _Session(),
-            redemption=SimpleNamespace(
+            redemption=build_promo_redemption(
                 id=uuid4(),
                 promo_code_id=21,
                 grant_entitlement_id=None,
@@ -76,7 +73,7 @@ async def test_build_idempotent_result_returns_premium_grant_without_entitlement
 
     result = await promo_idempotency.build_idempotent_result(
         _Session(),
-        redemption=SimpleNamespace(
+        redemption=build_promo_redemption(
             id=uuid4(),
             promo_code_id=21,
             grant_entitlement_id=None,
@@ -103,7 +100,7 @@ async def test_build_idempotent_result_returns_percent_discount_snapshot(
     reserved_until = datetime.now(UTC) + timedelta(minutes=15)
     result = await promo_idempotency.build_idempotent_result(
         _Session(),
-        redemption=SimpleNamespace(
+        redemption=build_promo_redemption(
             id=uuid4(),
             promo_code_id=21,
             grant_entitlement_id=None,
@@ -179,7 +176,7 @@ async def test_ensure_purchase_eligibility_rejects_new_users_only_after_purchase
 
     with pytest.raises(PromoNotApplicableError):
         await promo_validation.ensure_purchase_eligibility(
-            object(),
+            _Session(),
             promo_code=_promo_code(new_users_only=True),
             user_id=7,
             code_hash="hash:new-user-only",
@@ -207,7 +204,7 @@ async def test_ensure_purchase_eligibility_rejects_first_purchase_only_after_pur
 
     with pytest.raises(PromoNotApplicableError):
         await promo_validation.ensure_purchase_eligibility(
-            object(),
+            _Session(),
             promo_code=_promo_code(first_purchase_only=True),
             user_id=7,
             code_hash="hash:first-purchase-only",

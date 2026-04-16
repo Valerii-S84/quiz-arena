@@ -8,8 +8,13 @@ import pytest
 import app.economy.promo.service as promo_service
 from app.economy.promo.errors import PromoNotApplicableError
 from app.economy.promo.types import PromoRedeemResult
+from tests.type_helpers import AsyncSessionStub
 
 UTC = timezone.utc
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 def _promo_code(**overrides: object) -> SimpleNamespace:
@@ -137,7 +142,7 @@ async def test_redeem_applies_premium_grant_and_records_attempt(
     )
 
     result = await promo_service.PromoService.redeem(
-        object(),
+        _Session(),
         user_id=7,
         promo_code="grant7",
         idempotency_key="idem-5",
@@ -215,7 +220,7 @@ async def test_redeem_rejects_misconfigured_percent_discount_code(
 
     with pytest.raises(PromoNotApplicableError):
         await promo_service.PromoService.redeem(
-            object(),
+            _Session(),
             user_id=7,
             promo_code="save40",
             idempotency_key="idem-6",

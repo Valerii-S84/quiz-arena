@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from typing import Any
 
 from sqlalchemy.dialects import postgresql
 
@@ -14,41 +15,15 @@ from app.db.repo.promo_repo_admin_runtime_redemptions import (
     list_recent_redemptions,
     revoke_active_reserved_redemptions,
 )
+from tests.type_helpers import AsyncSessionStub
+from tests.type_helpers import RowsResult as _RowsResult
+from tests.type_helpers import ScalarResult as _ScalarResult
+from tests.type_helpers import ScalarsResult as _ScalarsResult
 
 UTC = timezone.utc
 
 
-class _ScalarResult:
-    def __init__(self, value) -> None:
-        self._value = value
-
-    def scalar_one(self):
-        return self._value
-
-    def scalar_one_or_none(self):
-        return self._value
-
-
-class _ScalarsResult:
-    def __init__(self, values: list[object]) -> None:
-        self._values = values
-
-    def all(self) -> list[object]:
-        return self._values
-
-
-class _RowsResult:
-    def __init__(self, rows: list[object]) -> None:
-        self._rows = rows
-
-    def all(self) -> list[object]:
-        return self._rows
-
-    def scalars(self) -> _ScalarsResult:
-        return _ScalarsResult(self._rows)
-
-
-class _RecordingSession:
+class _RecordingSession(AsyncSessionStub):
     def __init__(self, result) -> None:
         self.statement = None
         self._result = result
@@ -58,7 +33,11 @@ class _RecordingSession:
         return self._result
 
 
-def _compile_sql(statement: object) -> str:
+class _Session(AsyncSessionStub):
+    pass
+
+
+def _compile_sql(statement: Any) -> str:
     return str(
         statement.compile(
             dialect=postgresql.dialect(),
@@ -93,7 +72,7 @@ async def test_search_condition_uses_trimmed_ilike_term() -> None:
 
 
 async def test_list_existing_hashes_returns_empty_set_without_query() -> None:
-    result = await AdminRuntimePromoRepo.list_existing_hashes(object(), code_hashes=())
+    result = await AdminRuntimePromoRepo.list_existing_hashes(_Session(), code_hashes=())
     assert result == set()
 
 
@@ -118,7 +97,7 @@ async def test_count_codes_applies_status_and_search_filters() -> None:
 
 
 async def test_list_codes_clamps_page_and_limit_and_orders_by_recent_update() -> None:
-    session = _RecordingSession(_RowsResult([]))
+    session = _RecordingSession(_ScalarsResult([]))
     now_utc = datetime(2026, 3, 13, tzinfo=UTC)
 
     rows = await AdminRuntimePromoRepo.list_codes(
@@ -162,7 +141,7 @@ async def test_revoke_active_reserved_redemptions_updates_rows_in_memory() -> No
         reserved_until=now_utc.replace(hour=14),
         updated_at=None,
     )
-    session = _RecordingSession(_RowsResult([row]))
+    session = _RecordingSession(_ScalarsResult([row]))
 
     rows = await revoke_active_reserved_redemptions(session, promo_id=77, now_utc=now_utc)
 

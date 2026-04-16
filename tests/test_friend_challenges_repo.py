@@ -1,26 +1,21 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy.dialects import postgresql
 
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
+from tests.type_helpers import AsyncSessionStub
+from tests.type_helpers import ScalarResult as _ScalarResult
 
 
-class _ScalarResult:
-    def __init__(self, value: int) -> None:
-        self._value = value
-
-    def scalar_one(self) -> int:
-        return self._value
-
-
-class _RecordingSession:
+class _RecordingSession(AsyncSessionStub):
     def __init__(self, scalar_value: int) -> None:
         self.scalar_value = scalar_value
         self.statement: object | None = None
 
-    async def execute(self, statement: object) -> _ScalarResult:
+    async def execute(self, statement: object) -> _ScalarResult:  # type: ignore[override]
         self.statement = statement
         return _ScalarResult(self.scalar_value)
 
@@ -41,17 +36,17 @@ class _RowsResult:
         return _RowsScalarResult(self._rows)
 
 
-class _RecordingRowsSession:
+class _RecordingRowsSession(AsyncSessionStub):
     def __init__(self, rows: list[object]) -> None:
         self.rows = rows
         self.statement: object | None = None
 
-    async def execute(self, statement: object) -> _RowsResult:
+    async def execute(self, statement: object) -> _RowsResult:  # type: ignore[override]
         self.statement = statement
         return _RowsResult(self.rows)
 
 
-def _compile_sql(statement: object) -> str:
+def _compile_sql(statement: Any) -> str:
     return str(
         statement.compile(
             dialect=postgresql.dialect(),

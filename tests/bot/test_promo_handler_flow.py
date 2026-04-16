@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from typing import Any, cast
 from uuid import UUID
 
 import pytest
@@ -10,7 +11,7 @@ from app.bot.handlers import promo
 from app.bot.texts.de import TEXTS_DE
 from app.economy.promo.errors import PromoInvalidError
 from app.economy.promo.types import PromoRedeemResult
-from tests.bot.helpers import DummyMessage, DummySessionLocal
+from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
 
 class _PromoMessage(DummyMessage):
@@ -61,6 +62,35 @@ async def test_prompt_for_promo_input_does_not_use_force_reply() -> None:
 
     assert message.answers[0].text == TEXTS_DE["msg.promo.input.hint"]
     assert "reply_markup" not in message.answers[0].kwargs
+
+
+@pytest.mark.asyncio
+async def test_handle_promo_open_prompts_for_accessible_callback_message(monkeypatch) -> None:
+    monkeypatch.setattr(promo, "Message", DummyMessage)
+    callback = DummyCallback(
+        data="promo:open",
+        from_user=SimpleNamespace(id=1),
+        message=DummyMessage(),
+    )
+
+    await promo.handle_promo_open(callback)
+
+    assert callback.message.answers[0].text == TEXTS_DE["msg.promo.input.hint"]
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
+
+
+@pytest.mark.asyncio
+async def test_handle_promo_open_ignores_inaccessible_callback_message() -> None:
+    callback = DummyCallback(
+        data="promo:open",
+        from_user=SimpleNamespace(id=1),
+        message=DummyMessage(),
+    )
+    callback.message = cast(Any, object())
+
+    await promo.handle_promo_open(callback)
+
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 
 @pytest.mark.asyncio
