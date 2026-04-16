@@ -78,9 +78,14 @@ services:
   frontend:
     build:
       context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: https://${DOMAIN}/api
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=https://${DOMAIN}/api
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: https://${DOMAIN}/api
     depends_on:
       api:
         condition: service_healthy
