@@ -4,7 +4,7 @@
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -13,6 +13,16 @@ Set API base URL:
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
+
+## Quality Gates
+
+```bash
+npm run lint
+npm run build
+npm test
+```
+
+`npm run lint` uses the repo-supported ESLint CLI path.
 
 ## Routes
 
