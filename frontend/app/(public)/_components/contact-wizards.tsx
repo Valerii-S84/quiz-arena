@@ -18,6 +18,7 @@ type StudentFormState = {
   budget: string;
   contact: string;
   message: string;
+  company: string;
 };
 
 type PartnerFormState = {
@@ -30,6 +31,7 @@ type PartnerFormState = {
   website: string;
   idea: string;
   startTimeline: string;
+  company: string;
 };
 
 type WizardModalProps = {
@@ -150,6 +152,7 @@ const INITIAL_STUDENT_STATE: StudentFormState = {
   budget: "",
   contact: "",
   message: "",
+  company: "",
 };
 
 const INITIAL_PARTNER_STATE: PartnerFormState = {
@@ -162,6 +165,7 @@ const INITIAL_PARTNER_STATE: PartnerFormState = {
   website: "",
   idea: "",
   startTimeline: "",
+  company: "",
 };
 
 const SELECT_BASE_CLASS =
@@ -278,6 +282,30 @@ function Spinner() {
       aria-hidden="true"
       className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
     />
+  );
+}
+
+function HoneypotField({
+  fieldId,
+  value,
+  onChange,
+}: {
+  fieldId: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
+      <label htmlFor={fieldId}>Firma</label>
+      <input
+        id={fieldId}
+        type="text"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        autoComplete="off"
+        tabIndex={-1}
+      />
+    </div>
   );
 }
 
@@ -410,6 +438,7 @@ function StudentWizard({ onClose }: WizardProps) {
         budget: form.budget,
         contact: form.contact.trim(),
         message: form.message.trim(),
+        company: form.company,
       });
       setSubmittedName(form.name.trim());
       setSubmitState("success");
@@ -441,6 +470,11 @@ function StudentWizard({ onClose }: WizardProps) {
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
+      <HoneypotField
+        fieldId="student-company"
+        value={form.company}
+        onChange={(value) => setForm((prev) => ({ ...prev, company: value }))}
+      />
       <StepIndicator current={step} total={3} />
 
       {step === 1 ? (
@@ -689,6 +723,7 @@ function PartnerWizard({ onClose }: WizardProps) {
         website: form.website.trim(),
         idea: form.idea.trim(),
         startTimeline: form.startTimeline,
+        company: form.company,
       });
       setSubmitState("success");
     } catch {
@@ -718,6 +753,11 @@ function PartnerWizard({ onClose }: WizardProps) {
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
+      <HoneypotField
+        fieldId="partner-company"
+        value={form.company}
+        onChange={(value) => setForm((prev) => ({ ...prev, company: value }))}
+      />
       <StepIndicator current={step} total={2} />
 
       {step === 1 ? (

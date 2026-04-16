@@ -8,7 +8,7 @@ from app.db.repo.outbox_events_repo import OutboxEventsRepo
 from app.db.session import SessionLocal
 
 from .internal_referrals_constants import REFERRAL_NOTIFICATION_EVENT_TYPES
-from .internal_referrals_helpers import _assert_internal_access
+from .internal_referrals_helpers import _assert_ops_surface_access
 from .internal_referrals_models import (
     ReferralNotificationEventResponse,
     ReferralNotificationsFeedResponse,
@@ -28,7 +28,7 @@ async def get_referrals_notification_events(
     event_type: str | None,
     limit: int,
 ) -> ReferralNotificationsFeedResponse:
-    _assert_internal_access(request)
+    await _assert_ops_surface_access(request)
     now_utc = datetime.now(timezone.utc)
     since_utc = now_utc - timedelta(hours=window_hours)
 

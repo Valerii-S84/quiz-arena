@@ -8,7 +8,7 @@ from app.db.repo.referrals_repo import ReferralsRepo
 from app.db.session import SessionLocal
 
 from .internal_referrals_constants import REFERRAL_REVIEW_STATUSES
-from .internal_referrals_helpers import _as_review_case, _assert_internal_access
+from .internal_referrals_helpers import _as_review_case, _assert_ops_surface_access
 from .internal_referrals_models import ReferralReviewQueueResponse
 
 
@@ -25,7 +25,7 @@ async def get_referrals_review_queue(
     status: str | None,
     limit: int,
 ) -> ReferralReviewQueueResponse:
-    _assert_internal_access(request)
+    await _assert_ops_surface_access(request)
     now_utc = datetime.now(timezone.utc)
     status_filter: str | None = None
     if status is not None:

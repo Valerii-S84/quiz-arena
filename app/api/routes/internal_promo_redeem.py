@@ -16,7 +16,7 @@ from app.economy.promo.errors import (
 )
 from app.economy.promo.service import PromoService
 
-from .internal_promo_helpers import _as_response, _assert_internal_access
+from .internal_promo_helpers import _as_response, _assert_machine_internal_access
 from .internal_promo_models import PromoRedeemRequest, PromoRedeemResponse
 
 
@@ -25,7 +25,7 @@ async def redeem_promo(
     payload: PromoRedeemRequest,
     request: Request,
 ) -> PromoRedeemResponse:
-    _assert_internal_access(request)
+    _assert_machine_internal_access(request)
 
     now_utc = datetime.now(timezone.utc)
     try:

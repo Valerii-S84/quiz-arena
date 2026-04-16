@@ -15,7 +15,7 @@ from app.services.analytics_daily import build_daily_snapshot
 from app.services.internal_auth import (
     extract_client_ip,
     is_client_ip_allowed,
-    is_internal_request_authenticated,
+    is_internal_service_request_authenticated,
 )
 
 router = APIRouter(tags=["internal", "analytics"])
@@ -70,7 +70,7 @@ def _assert_internal_access(request: Request) -> None:
         )
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
 
-    if not is_internal_request_authenticated(
+    if not is_internal_service_request_authenticated(
         request,
         expected_token=settings.internal_api_token,
     ):

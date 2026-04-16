@@ -3,13 +3,16 @@ from __future__ import annotations
 import structlog
 from fastapi import HTTPException, Request
 
+from app.core.config import Settings
 from app.core.config import get_settings as _base_get_settings
 from app.economy.promo.types import PromoRedeemResult
 from app.services.internal_auth import (
+    OPS_UI_SESSION_COOKIE,
     extract_client_ip,
     is_client_ip_allowed,
-    is_internal_request_authenticated,
+    is_internal_service_request_authenticated,
 )
+from app.services.ops_auth import OpsSessionStateError, validate_ops_ui_session
 
 from .internal_promo_models import PromoCampaignResponse, PromoRedeemResponse
 
@@ -60,7 +63,11 @@ def _safe_rate(*, numerator: int, denominator: int) -> float:
     return numerator / denominator
 
 
-def _assert_internal_access(request: Request) -> None:
+def _auth_state_unavailable_http_error() -> HTTPException:
+    return HTTPException(status_code=503, detail={"code": "E_AUTH_STATE_UNAVAILABLE"})
+
+
+def _resolve_internal_auth_context(request: Request) -> tuple[Settings, str | None]:
     settings = _get_settings()
     client_ip = extract_client_ip(
         request,
@@ -70,8 +77,12 @@ def _assert_internal_access(request: Request) -> None:
     if not is_client_ip_allowed(client_ip=client_ip, allowlist=settings.internal_api_allowlist):
         logger.warning("internal_promo_auth_failed", reason="ip_not_allowed", client_ip=client_ip)
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
+    return settings, client_ip
 
-    if not is_internal_request_authenticated(
+
+def _assert_machine_internal_access(request: Request) -> None:
+    settings, client_ip = _resolve_internal_auth_context(request)
+    if not is_internal_service_request_authenticated(
         request,
         expected_token=settings.internal_api_token,
     ):
@@ -81,3 +92,33 @@ def _assert_internal_access(request: Request) -> None:
             client_ip=client_ip,
         )
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
+
+
+async def _assert_ops_surface_access(request: Request) -> None:
+    settings, client_ip = _resolve_internal_auth_context(request)
+    if is_internal_service_request_authenticated(
+        request,
+        expected_token=settings.internal_api_token,
+    ):
+        return
+
+    try:
+        if await validate_ops_ui_session(
+            settings=settings,
+            session_id=request.cookies.get(OPS_UI_SESSION_COOKIE),
+        ):
+            return
+    except OpsSessionStateError as exc:
+        logger.warning(
+            "internal_promo_auth_failed",
+            reason="auth_state_unavailable",
+            client_ip=client_ip,
+        )
+        raise _auth_state_unavailable_http_error() from exc
+
+    logger.warning(
+        "internal_promo_auth_failed",
+        reason="invalid_credentials",
+        client_ip=client_ip,
+    )
+    raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})

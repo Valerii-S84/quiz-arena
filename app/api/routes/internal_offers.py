@@ -11,7 +11,7 @@ from app.db.session import SessionLocal
 from app.services.internal_auth import (
     extract_client_ip,
     is_client_ip_allowed,
-    is_internal_request_authenticated,
+    is_internal_service_request_authenticated,
 )
 from app.services.offers_observability import (
     build_offer_funnel_snapshot,
@@ -67,7 +67,7 @@ def _assert_internal_access(request: Request) -> None:
         logger.warning("internal_offers_auth_failed", reason="ip_not_allowed", client_ip=client_ip)
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
 
-    if not is_internal_request_authenticated(
+    if not is_internal_service_request_authenticated(
         request,
         expected_token=settings.internal_api_token,
     ):

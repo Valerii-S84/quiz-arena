@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from datetime import datetime, timezone
 
 import structlog
@@ -15,10 +16,14 @@ from app.economy.purchases.errors import (
 )
 from app.economy.purchases.service import PurchaseService
 
-from .internal_promo_helpers import _assert_internal_access
+from .internal_promo_helpers import _assert_ops_surface_access
 from .internal_promo_models import PromoRefundRollbackRequest, PromoRefundRollbackResponse
 
 logger = structlog.get_logger(__name__)
+
+
+async def _assert_internal_access(request: Request) -> None:
+    await _assert_ops_surface_access(request)
 
 
 async def rollback_promo_for_refund(
@@ -26,7 +31,9 @@ async def rollback_promo_for_refund(
     payload: PromoRefundRollbackRequest,
     request: Request,
 ) -> PromoRefundRollbackResponse:
-    _assert_internal_access(request)
+    access_result = _assert_internal_access(request)
+    if inspect.isawaitable(access_result):
+        await access_result
     now_utc = datetime.now(timezone.utc)
     async with SessionLocal.begin() as session:
         try:

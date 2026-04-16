@@ -2,13 +2,24 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, status
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.config import Settings, get_settings
 from app.db.models.contact_requests import ContactRequest as ContactRequestModel
 from app.db.session import SessionLocal
+from app.services.contact_rate_limit import (
+    ContactRateLimitStateError,
+    consume_contact_submission_slot,
+)
+from app.services.internal_auth import extract_client_ip
 
 router = APIRouter(tags=["public-site"])
+logger = structlog.get_logger(__name__)
+
+CONTACT_RATE_LIMIT_ATTEMPTS = 5
+CONTACT_RATE_LIMIT_WINDOW_SECONDS = 10 * 60
 
 
 class ContactPayload(BaseModel):
@@ -33,6 +44,7 @@ class ContactPayload(BaseModel):
     idea: str | None = Field(default=None, max_length=1000)
     start_timeline: str | None = Field(default=None, alias="startTimeline", max_length=120)
     message: str | None = Field(default=None, max_length=500)
+    honeypot: str | None = Field(default=None, alias="company", max_length=200)
 
 
 def _is_blank(value: str | None) -> bool:
@@ -50,6 +62,18 @@ def _first_non_blank(*values: str | None) -> str | None:
         if value is not None and value.strip():
             return value
     return None
+
+
+def _is_honeypot_triggered(payload: ContactPayload) -> bool:
+    return not _is_blank(payload.honeypot)
+
+
+def _contact_rate_limit_bucket(request: Request, settings: Settings) -> tuple[str, str | None]:
+    client_ip = extract_client_ip(
+        request,
+        trusted_proxies=getattr(settings, "internal_api_trusted_proxies", ""),
+    )
+    return f"contact:ip:{client_ip or 'unknown'}", client_ip
 
 
 def _validate_student_payload(payload: ContactPayload) -> None:
@@ -124,13 +148,55 @@ def _validate_partner_payload(payload: ContactPayload) -> None:
 # - reverse-proxy setups with stripped /api prefix use /contact
 @router.post("/contact", status_code=status.HTTP_202_ACCEPTED)
 @router.post("/api/contact", status_code=status.HTTP_202_ACCEPTED)
-async def submit_contact(payload: ContactPayload) -> dict[str, bool]:
+async def submit_contact(
+    payload: ContactPayload,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> dict[str, bool]:
+    bucket, client_ip = _contact_rate_limit_bucket(request, settings)
+    try:
+        is_rate_limited = await consume_contact_submission_slot(
+            settings=settings,
+            bucket=bucket,
+            limit=CONTACT_RATE_LIMIT_ATTEMPTS,
+            window_seconds=CONTACT_RATE_LIMIT_WINDOW_SECONDS,
+        )
+    except ContactRateLimitStateError as exc:
+        logger.warning(
+            "public_contact_guard_unavailable",
+            reason="rate_limit_state_unavailable",
+            client_ip=client_ip,
+        )
+        raise HTTPException(status_code=503, detail={"code": "E_RATE_LIMIT_UNAVAILABLE"}) from exc
+
+    if is_rate_limited:
+        logger.warning(
+            "public_contact_rejected",
+            reason="rate_limited",
+            client_ip=client_ip,
+            request_type=payload.request_type,
+        )
+        raise HTTPException(status_code=429, detail={"code": "E_RATE_LIMITED"})
+
+    if _is_honeypot_triggered(payload):
+        logger.warning(
+            "public_contact_rejected",
+            reason="honeypot_triggered",
+            client_ip=client_ip,
+            request_type=payload.request_type,
+        )
+        return {"ok": True}
+
     if payload.request_type == "student":
         _validate_student_payload(payload)
     if payload.request_type == "partner":
         _validate_partner_payload(payload)
 
-    normalized_payload = payload.model_dump(by_alias=True, exclude_none=True)
+    normalized_payload = payload.model_dump(
+        by_alias=True,
+        exclude_none=True,
+        exclude={"honeypot"},
+    )
     if payload.request_type == "partner":
         normalized_partner_type = _first_non_blank(payload.partner_type, payload.cooperation_type)
         if normalized_partner_type is not None:
