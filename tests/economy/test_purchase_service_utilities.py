@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 from app.economy.purchases.catalog import ProductSpec
 from app.economy.purchases.service.utilities import (
     _calculate_discount_amount,
@@ -9,9 +7,10 @@ from app.economy.purchases.service.utilities import (
     _is_promo_scope_applicable,
     _premium_plan_rank,
 )
+from tests.type_helpers import build_promo_code
 
 
-def _promo_code(**overrides: object) -> SimpleNamespace:
+def _promo_code(**overrides: object):
     payload: dict[str, object] = {
         "promo_type": "PERCENT_DISCOUNT",
         "discount_type": None,
@@ -21,7 +20,7 @@ def _promo_code(**overrides: object) -> SimpleNamespace:
         "applicable_products": None,
     }
     payload.update(overrides)
-    return SimpleNamespace(**payload)
+    return build_promo_code(**payload)
 
 
 def _product(*, product_code: str, product_type: str) -> ProductSpec:

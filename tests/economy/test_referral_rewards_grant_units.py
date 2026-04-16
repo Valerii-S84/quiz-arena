@@ -2,12 +2,18 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
 import app.economy.referrals.service.rewards_grant as rewards_grant
+from tests.type_helpers import AsyncSessionStub
 
 UTC = timezone.utc
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 @pytest.mark.asyncio
@@ -19,8 +25,8 @@ async def test_grant_premium_starter_reward_extends_active_entitlement(
         ends_at=now_utc + timedelta(days=5),
         updated_at=None,
     )
-    created_entitlements: list[object] = []
-    ledger_entries: list[object] = []
+    created_entitlements: list[Any] = []
+    ledger_entries: list[Any] = []
 
     async def _fake_get_active_premium_for_update(_session, user_id: int, now_utc: datetime):
         return active_entitlement
@@ -41,7 +47,7 @@ async def test_grant_premium_starter_reward_extends_active_entitlement(
     monkeypatch.setattr(rewards_grant.LedgerRepo, "create", _fake_create_ledger)
 
     await rewards_grant._grant_premium_starter_reward(
-        object(),
+        _Session(),
         user_id=9,
         referral_id=44,
         now_utc=now_utc,
@@ -58,8 +64,8 @@ async def test_grant_premium_starter_reward_creates_new_entitlement_when_missing
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now_utc = datetime.now(UTC)
-    created_entitlements: list[object] = []
-    ledger_entries: list[object] = []
+    created_entitlements: list[Any] = []
+    ledger_entries: list[Any] = []
 
     async def _fake_get_active_premium_for_update(_session, user_id: int, now_utc: datetime):
         return None
@@ -80,7 +86,7 @@ async def test_grant_premium_starter_reward_creates_new_entitlement_when_missing
     monkeypatch.setattr(rewards_grant.LedgerRepo, "create", _fake_create_ledger)
 
     await rewards_grant._grant_premium_starter_reward(
-        object(),
+        _Session(),
         user_id=9,
         referral_id=45,
         now_utc=now_utc,
@@ -106,7 +112,7 @@ async def test_grant_reward_dispatches_premium_starter(
     monkeypatch.setattr(rewards_grant, "_grant_premium_starter_reward", _fake_premium)
 
     await rewards_grant._grant_reward(
-        object(),
+        _Session(),
         user_id=1,
         referral_id=1,
         reward_code=rewards_grant.REWARD_CODE_PREMIUM_STARTER,

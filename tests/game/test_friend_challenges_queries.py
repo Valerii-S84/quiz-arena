@@ -8,9 +8,14 @@ import pytest
 
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 from app.game.sessions.service import friend_challenges_queries
+from tests.type_helpers import AsyncSessionStub
 
 UTC = timezone.utc
 NOW_UTC = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 def _challenge(
@@ -48,7 +53,7 @@ async def test_get_friend_challenge_snapshot_for_user_raises_when_missing(
 
     with pytest.raises(FriendChallengeNotFoundError):
         await friend_challenges_queries.get_friend_challenge_snapshot_for_user(
-            SimpleNamespace(),
+            _Session(),
             user_id=11,
             challenge_id=uuid4(),
             now_utc=NOW_UTC,
@@ -74,7 +79,7 @@ async def test_get_friend_challenge_snapshot_for_user_rejects_outsider(
 
     with pytest.raises(FriendChallengeAccessError):
         await friend_challenges_queries.get_friend_challenge_snapshot_for_user(
-            SimpleNamespace(),
+            _Session(),
             user_id=999,
             challenge_id=challenge.id,
             now_utc=NOW_UTC,
@@ -115,7 +120,7 @@ async def test_get_friend_challenge_snapshot_for_user_expires_and_returns_snapsh
     )
 
     result = await friend_challenges_queries.get_friend_challenge_snapshot_for_user(
-        SimpleNamespace(),
+        _Session(),
         user_id=11,
         challenge_id=challenge.id,
         now_utc=NOW_UTC,
@@ -149,7 +154,7 @@ async def test_get_friend_series_score_for_user_returns_default_for_non_series(
     )
 
     result = await friend_challenges_queries.get_friend_series_score_for_user(
-        SimpleNamespace(),
+        _Session(),
         user_id=11,
         challenge_id=challenge.id,
         now_utc=NOW_UTC,
@@ -170,7 +175,7 @@ async def test_get_friend_series_score_for_user_raises_when_missing(
 
     with pytest.raises(FriendChallengeNotFoundError):
         await friend_challenges_queries.get_friend_series_score_for_user(
-            SimpleNamespace(),
+            _Session(),
             user_id=11,
             challenge_id=uuid4(),
             now_utc=NOW_UTC,
@@ -230,7 +235,7 @@ async def test_get_friend_series_score_for_user_swaps_perspective_for_opponent(
     )
 
     result = await friend_challenges_queries.get_friend_series_score_for_user(
-        SimpleNamespace(),
+        _Session(),
         user_id=22,
         challenge_id=challenge.id,
         now_utc=NOW_UTC,
@@ -270,7 +275,7 @@ async def test_get_friend_series_score_for_user_emits_expired_event_before_acces
 
     with pytest.raises(FriendChallengeAccessError):
         await friend_challenges_queries.get_friend_series_score_for_user(
-            SimpleNamespace(),
+            _Session(),
             user_id=999,
             challenge_id=challenge.id,
             now_utc=NOW_UTC,
@@ -331,7 +336,7 @@ async def test_get_friend_series_score_for_user_returns_creator_perspective(
     )
 
     result = await friend_challenges_queries.get_friend_series_score_for_user(
-        SimpleNamespace(),
+        _Session(),
         user_id=11,
         challenge_id=challenge.id,
         now_utc=NOW_UTC,
@@ -379,7 +384,7 @@ async def test_list_friend_challenges_for_user_expires_rows_and_builds_snapshots
     )
 
     result = await friend_challenges_queries.list_friend_challenges_for_user(
-        SimpleNamespace(),
+        _Session(),
         user_id=11,
         now_utc=NOW_UTC,
         limit=5,

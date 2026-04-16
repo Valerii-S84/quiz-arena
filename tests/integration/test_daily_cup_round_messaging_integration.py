@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -22,6 +23,7 @@ from tests.integration.test_daily_cup_worker_integration import (
     _ensure_tournament_schema,
     _join_users,
 )
+from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
 
@@ -34,13 +36,13 @@ class _DummyBotSession:
 class _RecordingBot:
     def __init__(self) -> None:
         self.session = _DummyBotSession()
-        self.messages: list[dict[str, object]] = []
+        self.messages: list[dict[str, Any]] = []
 
-    async def send_message(self, **kwargs):
+    async def send_message(self, **kwargs: Any):
         self.messages.append(kwargs)
         return SimpleNamespace(message_id=len(self.messages))
 
-    async def edit_message_text(self, **kwargs):
+    async def edit_message_text(self, **kwargs: Any):
         self.messages.append(kwargs)
         return None
 
@@ -89,7 +91,7 @@ async def _advance_to_round(
             assert int(transition["round_started"]) == 1
 
 
-def _start_button_callbacks(message: dict[str, object]) -> list[str]:
+def _start_button_callbacks(message: dict[str, Any]) -> list[str]:
     reply_markup = message["reply_markup"]
     buttons = [button for row in reply_markup.inline_keyboard for button in row]
     return [
@@ -133,7 +135,7 @@ async def test_daily_cup_round_messaging_rounds_2_to_4_send_round_start_buttons(
     monkeypatch.setattr(
         daily_cup_messaging, "enqueue_daily_cup_round_messaging", lambda **kwargs: None
     )
-    started = await daily_cup_async.close_daily_cup_registration_and_start_async()
+    started = as_any_dict(await daily_cup_async.close_daily_cup_registration_and_start_async())
     assert int(started["started"]) == 1
 
     await _advance_to_round(tournament_id=tournament_id, target_round=target_round, now_utc=now_utc)
@@ -141,8 +143,10 @@ async def test_daily_cup_round_messaging_rounds_2_to_4_send_round_start_buttons(
     bot = _RecordingBot()
     monkeypatch.setattr(daily_cup_messaging, "build_bot", lambda: bot)
 
-    result = await daily_cup_messaging.run_daily_cup_round_messaging_async(
-        tournament_id=str(tournament_id)
+    result = as_any_dict(
+        await daily_cup_messaging.run_daily_cup_round_messaging_async(
+            tournament_id=str(tournament_id)
+        )
     )
     assert int(result["sent"]) == participants_total
 
@@ -183,7 +187,7 @@ async def test_daily_cup_round_messaging_hides_round_start_button_for_completed_
     monkeypatch.setattr(
         daily_cup_messaging, "enqueue_daily_cup_round_messaging", lambda **kwargs: None
     )
-    started = await daily_cup_async.close_daily_cup_registration_and_start_async()
+    started = as_any_dict(await daily_cup_async.close_daily_cup_registration_and_start_async())
     assert int(started["started"]) == 1
 
     await _advance_to_round(tournament_id=tournament_id, target_round=2, now_utc=now_utc)
@@ -197,6 +201,7 @@ async def test_daily_cup_round_messaging_hides_round_start_button_for_completed_
         completed_match = round_two[0]
         completed_match.status = "COMPLETED"
         completed_match.winner_id = int(completed_match.user_a)
+        assert completed_match.user_b is not None
         users = await UsersRepo.list_by_ids(
             session,
             [int(completed_match.user_a), int(completed_match.user_b)],
@@ -206,8 +211,10 @@ async def test_daily_cup_round_messaging_hides_round_start_button_for_completed_
     bot = _RecordingBot()
     monkeypatch.setattr(daily_cup_messaging, "build_bot", lambda: bot)
 
-    result = await daily_cup_messaging.run_daily_cup_round_messaging_async(
-        tournament_id=str(tournament_id)
+    result = as_any_dict(
+        await daily_cup_messaging.run_daily_cup_round_messaging_async(
+            tournament_id=str(tournament_id)
+        )
     )
     assert int(result["sent"]) == 4
 

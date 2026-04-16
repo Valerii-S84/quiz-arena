@@ -10,6 +10,7 @@ from aiogram.exceptions import TelegramForbiddenError
 from aiogram.methods import SendMessage
 
 from app.workers.tasks import daily_cup_turn_reminder
+from tests.type_helpers import build_friend_challenge
 
 
 class _DummyBotSession:
@@ -66,7 +67,7 @@ def _session_local_with_sessions(*sessions: object) -> SimpleNamespace:
 
 
 def test_resolve_turn_reminder_users_for_creator_done() -> None:
-    challenge = SimpleNamespace(
+    challenge = build_friend_challenge(
         status="CREATOR_DONE",
         creator_user_id=10,
         opponent_user_id=22,
@@ -77,7 +78,7 @@ def test_resolve_turn_reminder_users_for_creator_done() -> None:
 
 
 def test_resolve_turn_reminder_users_for_opponent_done() -> None:
-    challenge = SimpleNamespace(
+    challenge = build_friend_challenge(
         status="OPPONENT_DONE",
         creator_user_id=10,
         opponent_user_id=22,
@@ -88,7 +89,7 @@ def test_resolve_turn_reminder_users_for_opponent_done() -> None:
 
 
 def test_resolve_turn_reminder_users_for_accepted_returns_both_users() -> None:
-    challenge = SimpleNamespace(
+    challenge = build_friend_challenge(
         status="ACCEPTED",
         creator_user_id=10,
         opponent_user_id=22,
@@ -99,7 +100,7 @@ def test_resolve_turn_reminder_users_for_accepted_returns_both_users() -> None:
 
 
 def test_resolve_turn_reminder_users_returns_empty_for_other_status() -> None:
-    challenge = SimpleNamespace(
+    challenge = build_friend_challenge(
         status="PENDING",
         creator_user_id=10,
         opponent_user_id=22,

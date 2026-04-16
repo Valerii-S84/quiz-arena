@@ -8,10 +8,11 @@ from app.workers.tasks.daily_cup_nonfinishers_summary import (
     _collect_nonfinishers,
     _user_did_not_finish_challenge,
 )
+from tests.type_helpers import build_friend_challenge
 
 
 def test_user_did_not_finish_challenge_flags_incomplete_creator() -> None:
-    challenge = SimpleNamespace(
+    challenge = build_friend_challenge(
         id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
         creator_user_id=101,
         opponent_user_id=202,
@@ -40,7 +41,7 @@ def test_collect_nonfinishers_skips_bye_and_keeps_only_incomplete_users() -> Non
         ),
     ]
     challenges_by_id = {
-        challenge_id: SimpleNamespace(
+        challenge_id: build_friend_challenge(
             id=challenge_id,
             creator_user_id=101,
             opponent_user_id=202,
@@ -65,7 +66,7 @@ def test_collect_nonfinishers_includes_incomplete_self_bot_match() -> None:
         )
     ]
     challenges_by_id = {
-        challenge_id: SimpleNamespace(
+        challenge_id: build_friend_challenge(
             id=challenge_id,
             creator_user_id=101,
             opponent_user_id=101,

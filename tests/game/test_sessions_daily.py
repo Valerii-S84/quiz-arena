@@ -8,10 +8,15 @@ import pytest
 
 from app.game.sessions.errors import SessionNotFoundError, TournamentSessionStopNotAllowedError
 from app.game.sessions.service import sessions_daily
+from tests.type_helpers import AsyncSessionStub
 
 UTC = timezone.utc
 NOW_UTC = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
 BERLIN_DATE = date(2026, 3, 14)
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 def _quiz_session(
@@ -71,7 +76,7 @@ async def test_abandon_session_rejects_missing_or_foreign_session(
 
     with pytest.raises(SessionNotFoundError):
         await sessions_daily.abandon_session(
-            SimpleNamespace(),
+            _Session(),
             user_id=11,
             session_id=uuid4(),
             now_utc=NOW_UTC,
@@ -99,7 +104,7 @@ async def test_abandon_session_rejects_tournament_friend_challenge(
 
     with pytest.raises(TournamentSessionStopNotAllowedError):
         await sessions_daily.abandon_session(
-            SimpleNamespace(),
+            _Session(),
             user_id=11,
             session_id=quiz_session.id,
             now_utc=NOW_UTC,
@@ -126,7 +131,7 @@ async def test_abandon_session_returns_without_changes_when_not_started(
     monkeypatch.setattr(sessions_daily, "emit_analytics_event", _unexpected_emit)
 
     await sessions_daily.abandon_session(
-        SimpleNamespace(),
+        _Session(),
         user_id=11,
         session_id=quiz_session.id,
         now_utc=NOW_UTC,
@@ -158,7 +163,7 @@ async def test_abandon_session_marks_non_daily_session_without_daily_side_effect
     monkeypatch.setattr(sessions_daily, "emit_analytics_event", _unexpected_emit)
 
     await sessions_daily.abandon_session(
-        SimpleNamespace(),
+        _Session(),
         user_id=11,
         session_id=quiz_session.id,
         now_utc=NOW_UTC,
@@ -198,7 +203,7 @@ async def test_abandon_session_skips_daily_run_updates_when_missing_or_completed
     monkeypatch.setattr(sessions_daily, "emit_analytics_event", _unexpected_emit)
 
     await sessions_daily.abandon_session(
-        SimpleNamespace(),
+        _Session(),
         user_id=11,
         session_id=quiz_session.id,
         now_utc=NOW_UTC,
@@ -234,7 +239,7 @@ async def test_abandon_session_marks_daily_run_abandoned_and_emits_event(
     monkeypatch.setattr(sessions_daily, "emit_analytics_event", _fake_emit_analytics_event)
 
     await sessions_daily.abandon_session(
-        SimpleNamespace(),
+        _Session(),
         user_id=11,
         session_id=quiz_session.id,
         now_utc=NOW_UTC,
@@ -269,7 +274,7 @@ async def test_get_daily_run_summary_returns_summary_for_owner_and_rejects_other
     monkeypatch.setattr(sessions_daily.DailyRunsRepo, "get_by_id", _async_return(run))
 
     summary = await sessions_daily.get_daily_run_summary(
-        SimpleNamespace(),
+        _Session(),
         user_id=11,
         daily_run_id=run.id,
     )
@@ -282,7 +287,7 @@ async def test_get_daily_run_summary_returns_summary_for_owner_and_rejects_other
 
     with pytest.raises(SessionNotFoundError):
         await sessions_daily.get_daily_run_summary(
-            SimpleNamespace(),
+            _Session(),
             user_id=99,
             daily_run_id=run.id,
         )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from uuid import uuid4
 
 from httpx import ASGITransport, AsyncClient
@@ -58,7 +59,7 @@ async def redeem_code(*, user_id: int, promo_code: str, suffix: str) -> None:
     assert response.status_code == 200
 
 
-async def create_discount_promo_via_api(*, code: str = "WELCOME50") -> dict[str, object]:
+async def create_discount_promo_via_api(*, code: str = "WELCOME50") -> dict[str, Any]:
     async with AsyncClient(
         transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
         base_url="http://testserver",

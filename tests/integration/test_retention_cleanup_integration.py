@@ -10,6 +10,7 @@ from app.db.models.outbox_events import OutboxEvent
 from app.db.models.processed_updates import ProcessedUpdate
 from app.db.session import SessionLocal
 from app.workers.tasks.retention_cleanup import run_retention_cleanup_async
+from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
 
@@ -78,7 +79,7 @@ async def test_retention_cleanup_deletes_only_records_older_than_policy_cutoffs(
         )
         await session.flush()
 
-    result = await run_retention_cleanup_async()
+    result = as_any_dict(await run_retention_cleanup_async())
 
     assert int(result["error_count"]) == 0
     table_results = {str(item["table"]): item for item in result["tables"]}

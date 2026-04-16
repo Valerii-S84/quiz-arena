@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
+from typing import Generator
 from uuid import uuid4
 
 import pytest
@@ -8,10 +8,11 @@ from fastapi.testclient import TestClient
 
 from app.api.routes.admin import deps as admin_deps
 from app.main import app
+from tests.type_helpers import build_settings
 
 
-def settings_stub(*, two_fa_required: bool = True) -> SimpleNamespace:
-    return SimpleNamespace(
+def settings_stub(*, two_fa_required: bool = True):
+    return build_settings(
         app_env="dev",
         admin_role="admin",
         admin_2fa_required=two_fa_required,
@@ -34,7 +35,7 @@ def principal_stub(*, two_factor_verified: bool = False) -> admin_deps.AdminPrin
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client() -> Generator[TestClient, None, None]:
     app.dependency_overrides.clear()
     with TestClient(app) as test_client:
         yield test_client

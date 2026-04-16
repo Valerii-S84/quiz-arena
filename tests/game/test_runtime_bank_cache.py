@@ -7,6 +7,11 @@ import pytest
 
 from app.game.questions.runtime_bank import clear_question_pool_cache, select_question_for_mode
 from tests.game.runtime_bank_fixtures import _fake_record
+from tests.type_helpers import AsyncSessionStub
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 @pytest.fixture(autouse=True)
@@ -57,14 +62,14 @@ async def test_select_question_for_mode_reuses_cached_pool_between_calls(
     )
 
     first = await select_question_for_mode(
-        object(),
+        _Session(),
         "ARTIKEL_SPRINT",
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=["q_cache_1"],
         selection_seed="seed-cache-1",
     )
     second = await select_question_for_mode(
-        object(),
+        _Session(),
         "ARTIKEL_SPRINT",
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=["q_cache_2"],
@@ -123,7 +128,7 @@ async def test_select_question_for_mode_refreshes_stale_cache_if_selected_id_mis
     )
 
     selected = await select_question_for_mode(
-        object(),
+        _Session(),
         "ARTIKEL_SPRINT",
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=[],
@@ -218,21 +223,21 @@ async def test_select_question_for_mode_refresh_uses_incremental_changes(
     monkeypatch.setattr("app.game.questions.runtime_bank_pool.monotonic", fake_monotonic)
 
     await select_question_for_mode(
-        object(),
+        _Session(),
         "ARTIKEL_SPRINT",
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=[],
         selection_seed="seed-incremental-refresh",
     )
     second = await select_question_for_mode(
-        object(),
+        _Session(),
         "ARTIKEL_SPRINT",
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=[],
         selection_seed="seed-incremental-refresh",
     )
     third = await select_question_for_mode(
-        object(),
+        _Session(),
         "ARTIKEL_SPRINT",
         local_date_berlin=date(2026, 2, 19),
         recent_question_ids=[],

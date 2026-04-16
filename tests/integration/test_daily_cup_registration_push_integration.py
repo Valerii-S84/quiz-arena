@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from uuid import UUID
 
 import pytest
@@ -18,6 +19,7 @@ from app.workers.tasks.daily_cup_time import format_close_time_local, get_daily_
 from tests.integration.friend_challenge_fixtures import _create_user
 from tests.integration.test_daily_cup_worker_integration import _DummyBotSession
 from tests.integration.test_private_tournament_service_integration import _ensure_tournament_schema
+from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
 
@@ -25,19 +27,19 @@ UTC = timezone.utc
 class _RecordingBot:
     def __init__(self) -> None:
         self.session = _DummyBotSession()
-        self.messages: list[dict[str, object]] = []
+        self.messages: list[dict[str, Any]] = []
 
-    async def send_message(self, **kwargs: object) -> None:
+    async def send_message(self, **kwargs: Any) -> None:
         self.messages.append(kwargs)
 
 
 class _SlowRecordingBot:
-    def __init__(self, *, sink: list[dict[str, object]], delay_seconds: float) -> None:
+    def __init__(self, *, sink: list[dict[str, Any]], delay_seconds: float) -> None:
         self.session = _DummyBotSession()
         self._sink = sink
         self._delay_seconds = delay_seconds
 
-    async def send_message(self, **kwargs: object) -> None:
+    async def send_message(self, **kwargs: Any) -> None:
         await asyncio.sleep(self._delay_seconds)
         self._sink.append(kwargs)
 
@@ -72,7 +74,7 @@ async def test_invite_registration_push_sends_single_message_with_registration_b
     monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
     monkeypatch.setattr(daily_cup_async, "build_bot", lambda: bot)
 
-    result = await daily_cup_async.send_daily_cup_invite_registration_async()
+    result = as_any_dict(await daily_cup_async.send_daily_cup_invite_registration_async())
 
     assert int(result["sent_total"]) == 1
     assert len(bot.messages) == 1
@@ -101,8 +103,8 @@ async def test_invite_registration_push_repeat_run_does_not_send_twice(monkeypat
     monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
     monkeypatch.setattr(daily_cup_async, "build_bot", lambda: bot)
 
-    first = await daily_cup_async.send_daily_cup_invite_registration_async()
-    second = await daily_cup_async.send_daily_cup_invite_registration_async()
+    first = as_any_dict(await daily_cup_async.send_daily_cup_invite_registration_async())
+    second = as_any_dict(await daily_cup_async.send_daily_cup_invite_registration_async())
 
     assert int(first["sent_total"]) == 1
     assert int(second["sent_total"]) == 0
@@ -118,7 +120,7 @@ async def test_invite_registration_push_parallel_workers_send_once(monkeypatch) 
     user_id = await _create_user("daily_cup_push_parallel")
     await _set_last_seen(user_id=user_id, seen_at=now_utc - timedelta(days=1))
 
-    messages: list[dict[str, object]] = []
+    messages: list[dict[str, Any]] = []
     monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
     monkeypatch.setattr(
         daily_cup_async,
@@ -126,10 +128,12 @@ async def test_invite_registration_push_parallel_workers_send_once(monkeypatch) 
         lambda: _SlowRecordingBot(sink=messages, delay_seconds=0.2),
     )
 
-    first, second = await asyncio.gather(
+    first_raw, second_raw = await asyncio.gather(
         daily_cup_async.send_daily_cup_invite_registration_async(),
         daily_cup_async.send_daily_cup_invite_registration_async(),
     )
+    first = as_any_dict(first_raw)
+    second = as_any_dict(second_raw)
 
     assert int(first["sent_total"]) + int(second["sent_total"]) == 1
     assert len(messages) == 1

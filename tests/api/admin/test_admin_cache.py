@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 
 from app.services.admin import cache as admin_cache
+from tests.type_helpers import build_settings
 
 
-def _settings() -> SimpleNamespace:
-    return SimpleNamespace(redis_url="redis://test")
+def _settings():
+    return build_settings(redis_url="redis://test")
 
 
 @pytest.fixture(autouse=True)

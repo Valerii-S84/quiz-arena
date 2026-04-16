@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -96,7 +97,7 @@ async def test_handle_referral_command_uses_fallback_when_bot_missing(monkeypatc
     monkeypatch.setattr(referral, "_load_overview", _fake_load_overview)
 
     message = _ReferralMessage(from_user=SimpleNamespace(id=1))
-    message.bot = None
+    message.bot = cast(Any, None)
 
     await referral.handle_referral_command(message)
 

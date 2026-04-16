@@ -191,7 +191,7 @@ def make_worker_user(
     )
 
 
-def close_coroutine_with_name(coroutine: Coroutine[Any, Any, Any]) -> str:
+def close_coroutine_with_name(coroutine: Any) -> str:
     code_name = coroutine.cr_code.co_name
     coroutine.close()
     return str(code_name)

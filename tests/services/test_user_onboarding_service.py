@@ -5,6 +5,11 @@ from types import SimpleNamespace
 import pytest
 
 from app.services import user_onboarding
+from tests.type_helpers import AsyncSessionStub
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 @pytest.mark.asyncio
@@ -18,7 +23,7 @@ async def test_get_by_id_delegates_to_users_repo(monkeypatch) -> None:
         return expected_user
 
     monkeypatch.setattr(user_onboarding.UsersRepo, "get_by_id", _fake_get_by_id)
-    session = object()
+    session = _Session()
 
     result = await user_onboarding.UserOnboardingService.get_by_id(session, 17)
 
@@ -41,7 +46,7 @@ async def test_get_by_telegram_user_id_delegates_to_users_repo(monkeypatch) -> N
         "get_by_telegram_user_id",
         _fake_get_by_telegram_user_id,
     )
-    session = object()
+    session = _Session()
 
     result = await user_onboarding.UserOnboardingService.get_by_telegram_user_id(
         session,

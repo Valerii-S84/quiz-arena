@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -72,7 +73,7 @@ async def _create_discount_campaign(
     return promo_code
 
 
-async def _post_json(path: str, payload: dict[str, object]) -> tuple[int, dict[str, object]]:
+async def _post_json(path: str, payload: dict[str, object]) -> tuple[int, dict[str, Any]]:
     async with AsyncClient(
         transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
         base_url="http://testserver",
@@ -85,7 +86,7 @@ async def _post_json(path: str, payload: dict[str, object]) -> tuple[int, dict[s
     return response.status_code, response.json()
 
 
-async def _get_json(path: str) -> tuple[int, dict[str, object]]:
+async def _get_json(path: str) -> tuple[int, dict[str, Any]]:
     async with AsyncClient(
         transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
         base_url="http://testserver",

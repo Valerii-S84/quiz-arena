@@ -15,6 +15,7 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.workers.tasks import admin_daily_metrics
 from tests.integration.stable_ids import stable_telegram_user_id
+from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
 
@@ -133,11 +134,15 @@ async def test_admin_daily_metrics_clamps_days_back_to_valid_range(
     fixed_now = datetime(2026, 4, 10, 12, 0, tzinfo=UTC)
     _freeze_now(monkeypatch, fixed_now)
 
-    zero_result = await admin_daily_metrics.run_admin_daily_metrics_aggregation_async(days_back=0)
-    negative_result = await admin_daily_metrics.run_admin_daily_metrics_aggregation_async(
-        days_back=-3
+    zero_result = as_any_dict(
+        await admin_daily_metrics.run_admin_daily_metrics_aggregation_async(days_back=0)
     )
-    max_result = await admin_daily_metrics.run_admin_daily_metrics_aggregation_async(days_back=99)
+    negative_result = as_any_dict(
+        await admin_daily_metrics.run_admin_daily_metrics_aggregation_async(days_back=-3)
+    )
+    max_result = as_any_dict(
+        await admin_daily_metrics.run_admin_daily_metrics_aggregation_async(days_back=99)
+    )
 
     async with SessionLocal.begin() as session:
         rows = list(
@@ -273,7 +278,9 @@ async def test_admin_daily_metrics_respects_berlin_day_boundaries_and_filters(
             ]
         )
 
-    result = await admin_daily_metrics.run_admin_daily_metrics_aggregation_async(days_back=1)
+    result = as_any_dict(
+        await admin_daily_metrics.run_admin_daily_metrics_aggregation_async(days_back=1)
+    )
 
     async with SessionLocal.begin() as session:
         row = await session.get(DailyMetrics, local_day)
@@ -342,7 +349,9 @@ async def test_admin_daily_metrics_upserts_existing_rows_and_writes_multiple_day
             )
         )
 
-    first_result = await admin_daily_metrics.run_admin_daily_metrics_aggregation_async(days_back=2)
+    first_result = as_any_dict(
+        await admin_daily_metrics.run_admin_daily_metrics_aggregation_async(days_back=2)
+    )
 
     async with SessionLocal.begin() as session:
         initial_rows = list(
@@ -380,7 +389,9 @@ async def test_admin_daily_metrics_upserts_existing_rows_and_writes_multiple_day
             )
         )
 
-    second_result = await admin_daily_metrics.run_admin_daily_metrics_aggregation_async(days_back=2)
+    second_result = as_any_dict(
+        await admin_daily_metrics.run_admin_daily_metrics_aggregation_async(days_back=2)
+    )
 
     async with SessionLocal.begin() as session:
         updated_rows = list(

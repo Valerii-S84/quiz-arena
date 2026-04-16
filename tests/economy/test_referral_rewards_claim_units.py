@@ -6,8 +6,13 @@ from types import SimpleNamespace
 import pytest
 
 import app.economy.referrals.service.rewards_claim as rewards_claim
+from tests.type_helpers import AsyncSessionStub
 
 UTC = timezone.utc
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 def _overview(status: str) -> SimpleNamespace:
@@ -32,7 +37,7 @@ def _anchor(
 async def test_claim_next_reward_choice_rejects_unsupported_reward_code() -> None:
     with pytest.raises(ValueError):
         await rewards_claim.claim_next_reward_choice(
-            object(),
+            _Session(),
             user_id=7,
             reward_code="bad-code",
             now_utc=datetime.now(UTC),
@@ -49,7 +54,7 @@ async def test_claim_next_reward_choice_returns_none_for_missing_user(
     monkeypatch.setattr(rewards_claim.UsersRepo, "get_by_id", _fake_get_by_id)
 
     result = await rewards_claim.claim_next_reward_choice(
-        object(),
+        _Session(),
         user_id=7,
         reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
         now_utc=datetime.now(UTC),
@@ -106,7 +111,7 @@ async def test_claim_next_reward_choice_returns_monthly_cap_and_marks_anchor(
     )
 
     result = await rewards_claim.claim_next_reward_choice(
-        object(),
+        _Session(),
         user_id=7,
         reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
         now_utc=now_utc,
@@ -167,7 +172,7 @@ async def test_claim_next_reward_choice_returns_too_early_for_delayed_reward(
     )
 
     result = await rewards_claim.claim_next_reward_choice(
-        object(),
+        _Session(),
         user_id=7,
         reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
         now_utc=now_utc,
@@ -239,7 +244,7 @@ async def test_claim_next_reward_choice_claims_reward_and_updates_anchor(
     )
 
     result = await rewards_claim.claim_next_reward_choice(
-        object(),
+        _Session(),
         user_id=7,
         reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
         now_utc=now_utc,

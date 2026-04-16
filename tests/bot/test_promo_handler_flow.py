@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from typing import Any, cast
 from uuid import UUID
 
 import pytest
@@ -85,7 +86,7 @@ async def test_handle_promo_open_ignores_inaccessible_callback_message() -> None
         from_user=SimpleNamespace(id=1),
         message=DummyMessage(),
     )
-    callback.message = object()
+    callback.message = cast(Any, object())
 
     await promo.handle_promo_open(callback)
 

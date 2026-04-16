@@ -17,6 +17,11 @@ from tests.game.daily_arena_golden_support import (
     reload_daily_cup_config,
     status_tournament,
 )
+from tests.type_helpers import AsyncSessionStub
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 def test_daily_arena_constants_include_only_arena_type() -> None:
@@ -76,7 +81,7 @@ async def test_daily_arena_core_always_uses_arena_type_no_fallback_needed(
     monkeypatch.setattr(daily_cup_core, "generate_invite_code", _fake_invite_code)
 
     tournament = await daily_cup_core.ensure_daily_cup_registration_tournament(
-        session=SimpleNamespace(),
+        session=_Session(),
         now_utc_value=now_utc,
     )
 
@@ -110,12 +115,13 @@ async def test_daily_arena_status_returns_round_active_for_pending_match(
     )
 
     snapshot = await daily_cup_user_status.get_daily_cup_status_for_user(
-        SimpleNamespace(),
+        _Session(),
         user_id=101,
         now_utc=datetime(2026, 3, 1, 17, 0, tzinfo=UTC),
     )
 
     assert snapshot.status is DailyCupUserStatus.ROUND_ACTIVE
+    assert snapshot.tournament is not None
     assert snapshot.tournament.type == TOURNAMENT_TYPE_DAILY_ARENA
 
 
@@ -132,7 +138,7 @@ async def test_daily_arena_status_returns_no_tournament_when_row_not_found(
     )
 
     snapshot = await daily_cup_user_status.get_daily_cup_status_for_user(
-        SimpleNamespace(),
+        _Session(),
         user_id=101,
         now_utc=datetime(2026, 3, 1, 17, 0, tzinfo=UTC),
     )
@@ -170,7 +176,7 @@ async def test_daily_arena_status_registration_variants(
     )
 
     snapshot = await daily_cup_user_status.get_daily_cup_status_for_user(
-        SimpleNamespace(),
+        _Session(),
         user_id=101,
         now_utc=datetime(2026, 3, 1, 17, 0, tzinfo=UTC),
     )

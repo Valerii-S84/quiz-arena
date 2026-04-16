@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import pytest
 
@@ -14,6 +15,7 @@ from tests.integration.test_private_tournament_worker_integration import (
     _DummyWorkerBot,
     _ensure_tournament_schema,
 )
+from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
 
@@ -51,9 +53,9 @@ async def test_proof_cards_use_cached_file_id_on_second_run(monkeypatch) -> None
             tournament_id=tournament.tournament_id,
         )
         assert len(participants) == 3
-        participants[0].score = 3
-        participants[1].score = 2
-        participants[2].score = 1
+        participants[0].score = Decimal("3")
+        participants[1].score = Decimal("2")
+        participants[2].score = Decimal("1")
 
         tournament_row = await TournamentsRepo.get_by_id_for_update(
             session,
@@ -67,8 +69,10 @@ async def test_proof_cards_use_cached_file_id_on_second_run(monkeypatch) -> None
     bot = _DummyWorkerBot()
     monkeypatch.setattr(tournaments_proof_cards, "build_bot", lambda: bot)
 
-    first = await tournaments_proof_cards.run_private_tournament_proof_cards_async(
-        tournament_id=tournament_id
+    first = as_any_dict(
+        await tournaments_proof_cards.run_private_tournament_proof_cards_async(
+            tournament_id=tournament_id
+        )
     )
     assert int(first["sent"]) == 3
     assert int(first["cached_reused"]) == 0
@@ -80,8 +84,10 @@ async def test_proof_cards_use_cached_file_id_on_second_run(monkeypatch) -> None
     ]
 
     first_batch = len(bot.send_photos)
-    second = await tournaments_proof_cards.run_private_tournament_proof_cards_async(
-        tournament_id=tournament_id
+    second = as_any_dict(
+        await tournaments_proof_cards.run_private_tournament_proof_cards_async(
+            tournament_id=tournament_id
+        )
     )
     assert int(second["sent"]) == 3
     assert int(second["cached_reused"]) == 3

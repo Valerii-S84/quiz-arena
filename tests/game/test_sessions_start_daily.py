@@ -9,10 +9,15 @@ from sqlalchemy.exc import IntegrityError
 
 from app.game.sessions.errors import DailyChallengeAlreadyPlayedError
 from app.game.sessions.service import sessions_start_daily
+from tests.type_helpers import AsyncSessionStub
 
 UTC = timezone.utc
 NOW_UTC = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
 BERLIN_DATE = date(2026, 3, 14)
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 def _question() -> SimpleNamespace:
@@ -65,7 +70,7 @@ async def test_create_or_resume_daily_run_blocks_completed_existing_run(
 
     with pytest.raises(DailyChallengeAlreadyPlayedError):
         await sessions_start_daily._create_or_resume_daily_run(
-            SimpleNamespace(),
+            _Session(),
             user_id=11,
             berlin_date=BERLIN_DATE,
             now_utc=NOW_UTC,
@@ -93,7 +98,7 @@ async def test_create_or_resume_daily_run_resumes_abandoned_run(
     )
 
     run, started_now = await sessions_start_daily._create_or_resume_daily_run(
-        SimpleNamespace(),
+        _Session(),
         user_id=11,
         berlin_date=BERLIN_DATE,
         now_utc=NOW_UTC,
@@ -118,7 +123,7 @@ async def test_create_or_resume_daily_run_returns_existing_in_progress_run(
     )
 
     run, started_now = await sessions_start_daily._create_or_resume_daily_run(
-        SimpleNamespace(),
+        _Session(),
         user_id=11,
         berlin_date=BERLIN_DATE,
         now_utc=NOW_UTC,
@@ -154,7 +159,7 @@ async def test_create_or_resume_daily_run_recovers_integrity_error_with_loaded_a
     monkeypatch.setattr(sessions_start_daily.DailyRunsRepo, "create", _fake_create)
 
     run, started_now = await sessions_start_daily._create_or_resume_daily_run(
-        SimpleNamespace(),
+        _Session(),
         user_id=12,
         berlin_date=BERLIN_DATE,
         now_utc=NOW_UTC,
@@ -185,7 +190,7 @@ async def test_start_daily_session_blocks_when_run_is_already_exhausted(
 
     with pytest.raises(DailyChallengeAlreadyPlayedError):
         await sessions_start_daily.start_daily_session(
-            SimpleNamespace(),
+            _Session(),
             user_id=13,
             idempotency_key="daily:overflow",
             local_date=BERLIN_DATE,
@@ -236,7 +241,7 @@ async def test_start_daily_session_reuses_active_session_without_started_event(
     monkeypatch.setattr(sessions_start_daily, "emit_analytics_event", _unexpected_emit)
 
     result = await sessions_start_daily.start_daily_session(
-        SimpleNamespace(),
+        _Session(),
         user_id=14,
         idempotency_key="daily:reuse",
         local_date=BERLIN_DATE,
@@ -292,7 +297,7 @@ async def test_start_daily_session_recovers_after_quiz_session_integrity_error(
     )
 
     result = await sessions_start_daily.start_daily_session(
-        SimpleNamespace(),
+        _Session(),
         user_id=15,
         idempotency_key="daily:recover-session",
         local_date=BERLIN_DATE,
@@ -337,7 +342,7 @@ async def test_start_daily_session_emits_started_event_only_for_new_run(
     monkeypatch.setattr(sessions_start_daily, "emit_analytics_event", _fake_emit_analytics_event)
 
     result = await sessions_start_daily.start_daily_session(
-        SimpleNamespace(),
+        _Session(),
         user_id=16,
         idempotency_key="daily:new-run",
         local_date=BERLIN_DATE,

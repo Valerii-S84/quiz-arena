@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 from app.services.admin import auth as admin_auth
 from app.services.admin import auth_state as admin_auth_state
 from app.services.admin import auth_totp as admin_auth_totp
+from tests.type_helpers import build_settings
 
 
 class CookieResponse:
@@ -59,22 +58,8 @@ class RedisClient:
         return None
 
 
-def settings_stub(**overrides: object) -> SimpleNamespace:
-    defaults = {
-        "app_env": "test",
-        "admin_email": "admin@example.com",
-        "admin_password_hash": "",
-        "admin_password_plain": "secret123",
-        "admin_jwt_secret": "jwt-secret",
-        "admin_refresh_secret": "refresh-secret",
-        "admin_totp_secret": "",
-        "admin_totp_issuer": "Quiz Arena Admin",
-        "admin_access_token_ttl_minutes": 15,
-        "admin_refresh_token_ttl_days": 7,
-        "redis_url": "redis://localhost:6379/15",
-    }
-    defaults.update(overrides)
-    return SimpleNamespace(**defaults)
+def settings_stub(**overrides: object):
+    return build_settings(**overrides)
 
 
 def reset_admin_auth_redis_client() -> None:

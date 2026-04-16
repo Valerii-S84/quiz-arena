@@ -140,6 +140,7 @@ async def test_daily_cup_auto_finish_uses_max_time_and_ranks_below_completed_los
             completed_match.friend_challenge_id,
         )
         assert completed_challenge is not None
+        assert completed_match.user_b is not None
         completed_challenge.status = "COMPLETED"
         completed_challenge.winner_user_id = int(completed_match.user_b)
         completed_challenge.creator_score = 0
@@ -166,6 +167,7 @@ async def test_daily_cup_auto_finish_uses_max_time_and_ranks_below_completed_los
                 )
             ).scalars()
         )
+        assert auto_finished_match.user_b is not None
         auto_rows = [
             row
             for row in round_rows
@@ -184,6 +186,7 @@ async def test_daily_cup_auto_finish_uses_max_time_and_ranks_below_completed_los
     ]
     assert completed_loser_id in zero_point_user_ids
     assert zero_point_user_ids.index(completed_loser_id) == 0
+    assert auto_finished_match.user_b is not None
     assert zero_point_user_ids[1:] == [
         int(auto_finished_match.user_a),
         int(auto_finished_match.user_b),

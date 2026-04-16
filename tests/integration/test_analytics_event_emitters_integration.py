@@ -19,6 +19,7 @@ from app.game.questions.runtime_bank import get_question_by_id
 from app.game.sessions.errors import DailyChallengeAlreadyPlayedError
 from app.game.sessions.service import GameSessionService
 from tests.integration.stable_ids import stable_telegram_user_id
+from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
 
@@ -152,7 +153,8 @@ async def test_streak_rollover_emits_streak_lost_event() -> None:
 
     events = await _list_user_events(user_id, event_type="streak_lost")
     assert len(events) == 1
-    assert int(events[0].payload.get("previous_streak", 0)) >= 1
+    payload = as_any_dict(events[0].payload)
+    assert int(payload.get("previous_streak", 0)) >= 1
 
 
 @pytest.mark.asyncio

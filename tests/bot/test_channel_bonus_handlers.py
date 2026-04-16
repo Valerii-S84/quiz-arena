@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -196,7 +197,7 @@ async def test_handle_channel_bonus_check_rejects_missing_bot(monkeypatch) -> No
         from_user=SimpleNamespace(id=11),
         message=DummyMessage(),
     )
-    callback.bot = None
+    callback.bot = cast(Any, None)
 
     await channel_bonus.handle_channel_bonus_check(callback)
 

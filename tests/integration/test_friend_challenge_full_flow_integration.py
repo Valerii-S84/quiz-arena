@@ -15,6 +15,7 @@ from app.db.session import SessionLocal
 from app.game.friend_challenges.constants import DUEL_TYPE_OPEN
 from app.game.sessions.errors import FriendChallengeFullError
 from app.game.sessions.service import GameSessionService
+from app.game.sessions.types import FriendChallengeJoinResult
 from app.workers.tasks import friend_challenges_notifications
 from app.workers.tasks.friend_challenges_async import run_friend_challenge_deadlines_async
 from tests.bot.helpers import DummyCallback, DummyMessage
@@ -199,13 +200,14 @@ async def test_open_duel_race_condition_allows_only_one_accept() -> None:
                 now_utc=now_utc + timedelta(seconds=1),
             )
 
-    first_result, second_result = await asyncio.gather(
-        _accept(first_opponent_user_id),
-        _accept(second_opponent_user_id),
-        return_exceptions=True,
+    outcomes = list(
+        await asyncio.gather(
+            _accept(first_opponent_user_id),
+            _accept(second_opponent_user_id),
+            return_exceptions=True,
+        )
     )
-    outcomes = [first_result, second_result]
-    success = [item for item in outcomes if not isinstance(item, Exception)]
+    success = [item for item in outcomes if isinstance(item, FriendChallengeJoinResult)]
     failures = [item for item in outcomes if isinstance(item, Exception)]
 
     assert len(success) == 1

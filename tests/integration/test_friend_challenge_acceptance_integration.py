@@ -14,6 +14,7 @@ from app.game.sessions.errors import (
     FriendChallengeFullError,
 )
 from app.game.sessions.service import GameSessionService
+from app.game.sessions.types import FriendChallengeJoinResult
 from tests.integration.friend_challenge_fixtures import UTC, _create_user
 
 
@@ -43,14 +44,14 @@ async def test_open_challenge_concurrent_accept_allows_only_one_opponent() -> No
                 now_utc=now_utc + timedelta(seconds=1),
             )
 
-    first_result, second_result = await asyncio.gather(
-        _join(first_user_id),
-        _join(second_user_id),
-        return_exceptions=True,
+    outcomes = list(
+        await asyncio.gather(
+            _join(first_user_id),
+            _join(second_user_id),
+            return_exceptions=True,
+        )
     )
-
-    outcomes = [first_result, second_result]
-    joined_success = [item for item in outcomes if not isinstance(item, Exception)]
+    joined_success = [item for item in outcomes if isinstance(item, FriendChallengeJoinResult)]
     join_errors = [item for item in outcomes if isinstance(item, Exception)]
 
     assert len(joined_success) == 1

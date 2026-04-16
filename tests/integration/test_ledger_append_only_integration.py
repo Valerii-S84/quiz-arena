@@ -74,14 +74,14 @@ async def test_ledger_entries_append_only_blocks_orm_mutations() -> None:
 
     with pytest.raises(ValueError, match="append-only"):
         async with SessionLocal.begin() as session:
-            entry = await session.get(LedgerEntry, entry_id)
-            assert entry is not None
-            entry.amount = 99
+            stored_entry = await session.get(LedgerEntry, entry_id)
+            assert stored_entry is not None
+            stored_entry.amount = 99
             await session.flush()
 
     with pytest.raises(ValueError, match="append-only"):
         async with SessionLocal.begin() as session:
-            entry = await session.get(LedgerEntry, entry_id)
-            assert entry is not None
-            await session.delete(entry)
+            stored_entry = await session.get(LedgerEntry, entry_id)
+            assert stored_entry is not None
+            await session.delete(stored_entry)
             await session.flush()

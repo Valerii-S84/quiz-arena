@@ -9,10 +9,15 @@ from sqlalchemy.exc import IntegrityError
 
 from app.game.sessions.errors import DailyChallengeAlreadyPlayedError
 from app.game.sessions.service import sessions_start_daily
+from tests.type_helpers import AsyncSessionStub
 
 UTC = timezone.utc
 NOW_UTC = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
 BERLIN_DATE = date(2026, 3, 14)
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 def _run(*, status: str = "IN_PROGRESS", completed_at: datetime | None = None) -> SimpleNamespace:
@@ -49,7 +54,7 @@ async def test_emit_daily_blocked_emits_expected_analytics_event(
     monkeypatch.setattr(sessions_start_daily, "emit_analytics_event", _fake_emit_analytics_event)
 
     await sessions_start_daily._emit_daily_blocked(
-        SimpleNamespace(),
+        _Session(),
         user_id=21,
         berlin_date=BERLIN_DATE,
         now_utc=NOW_UTC,
@@ -84,7 +89,7 @@ async def test_create_or_resume_daily_run_returns_created_run_when_new(
     )
 
     run, started_now = await sessions_start_daily._create_or_resume_daily_run(
-        SimpleNamespace(),
+        _Session(),
         user_id=22,
         berlin_date=BERLIN_DATE,
         now_utc=NOW_UTC,
@@ -116,7 +121,7 @@ async def test_create_or_resume_daily_run_reraises_when_integrity_error_cannot_r
 
     with pytest.raises(IntegrityError):
         await sessions_start_daily._create_or_resume_daily_run(
-            SimpleNamespace(),
+            _Session(),
             user_id=23,
             berlin_date=BERLIN_DATE,
             now_utc=NOW_UTC,
@@ -153,7 +158,7 @@ async def test_create_or_resume_daily_run_blocks_when_integrity_error_loads_comp
 
     with pytest.raises(DailyChallengeAlreadyPlayedError):
         await sessions_start_daily._create_or_resume_daily_run(
-            SimpleNamespace(),
+            _Session(),
             user_id=24,
             berlin_date=BERLIN_DATE,
             now_utc=NOW_UTC,
@@ -195,7 +200,7 @@ async def test_start_daily_session_reraises_when_quiz_session_integrity_error_ha
 
     with pytest.raises(IntegrityError):
         await sessions_start_daily.start_daily_session(
-            SimpleNamespace(),
+            _Session(),
             user_id=25,
             idempotency_key="daily:edge",
             local_date=BERLIN_DATE,

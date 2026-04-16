@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -9,11 +10,16 @@ import pytest
 from app.game.friend_challenges.constants import DUEL_STATUS_ACCEPTED
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 from app.game.sessions.service import friend_challenges_series
+from tests.type_helpers import AsyncSessionStub
 
 NOW_UTC = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
 SERIES_A_ID = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 SERIES_B_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 SERIES_C_ID = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 def _challenge(
@@ -79,7 +85,7 @@ async def test_create_friend_challenge_best_of_three_raises_when_challenge_missi
 
     with pytest.raises(FriendChallengeNotFoundError):
         await friend_challenges_series.create_friend_challenge_best_of_three(
-            SimpleNamespace(), initiator_user_id=101, challenge_id=uuid4(), now_utc=NOW_UTC
+            _Session(), initiator_user_id=101, challenge_id=uuid4(), now_utc=NOW_UTC
         )
 
 
@@ -103,7 +109,7 @@ async def test_create_friend_challenge_best_of_three_rejects_invalid_access(
 
     with pytest.raises(FriendChallengeAccessError):
         await friend_challenges_series.create_friend_challenge_best_of_three(
-            SimpleNamespace(),
+            _Session(),
             initiator_user_id=initiator_user_id,
             challenge_id=uuid4(),
             now_utc=NOW_UTC,
@@ -118,7 +124,7 @@ async def test_create_friend_challenge_best_of_three_creates_series_duel_and_emi
     fixed_series_id = uuid4()
     duel = _duel(series_id=fixed_series_id, series_best_of=5)
     expired_events: list[dict[str, object]] = []
-    analytics_events: list[dict[str, object]] = []
+    analytics_events: list[dict[str, Any]] = []
     create_calls: list[dict[str, object]] = []
 
     async def _fake_create_row(session, **kwargs):
@@ -160,7 +166,7 @@ async def test_create_friend_challenge_best_of_three_creates_series_duel_and_emi
     )
 
     result = await friend_challenges_series.create_friend_challenge_best_of_three(
-        SimpleNamespace(),
+        _Session(),
         initiator_user_id=101,
         challenge_id=challenge.id,
         now_utc=NOW_UTC,
@@ -224,7 +230,7 @@ async def test_create_friend_challenge_series_next_game_rejects_without_series_m
 
     with pytest.raises(FriendChallengeAccessError):
         await friend_challenges_series.create_friend_challenge_series_next_game(
-            SimpleNamespace(),
+            _Session(),
             initiator_user_id=101,
             challenge_id=challenge.id,
             now_utc=NOW_UTC,
@@ -294,7 +300,7 @@ async def test_create_friend_challenge_series_next_game_rejects_finished_series(
 
     with pytest.raises(FriendChallengeAccessError):
         await friend_challenges_series.create_friend_challenge_series_next_game(
-            SimpleNamespace(),
+            _Session(),
             initiator_user_id=101,
             challenge_id=challenge.id,
             now_utc=NOW_UTC,
@@ -314,7 +320,7 @@ async def test_create_friend_challenge_series_next_game_creates_followup_duel_an
         winner_user_id=101,
     )
     duel = _duel(access_type="PAID_TICKET", series_id=SERIES_C_ID, series_game_number=2)
-    analytics_events: list[dict[str, object]] = []
+    analytics_events: list[dict[str, Any]] = []
     create_calls: list[dict[str, object]] = []
 
     async def _fake_create_row(session, **kwargs):
@@ -355,7 +361,7 @@ async def test_create_friend_challenge_series_next_game_creates_followup_duel_an
     )
 
     result = await friend_challenges_series.create_friend_challenge_series_next_game(
-        SimpleNamespace(),
+        _Session(),
         initiator_user_id=202,
         challenge_id=challenge.id,
         now_utc=NOW_UTC,

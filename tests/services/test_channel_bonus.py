@@ -7,10 +7,19 @@ import pytest
 
 from app.services import channel_bonus
 from app.services.channel_bonus import ChannelBonusService
+from tests.bot.helpers import DummyBot
+from tests.type_helpers import AsyncSessionStub
 
 
-class _FakeBot:
+class _Session(AsyncSessionStub):
+    async def flush(self, objects: object | None = None) -> None:
+        del objects
+        return None
+
+
+class _FakeBot(DummyBot):
     def __init__(self, *, status: str = "member", error: Exception | None = None) -> None:
+        super().__init__()
         self._status = status
         self._error = error
 
@@ -53,12 +62,7 @@ async def test_claim_bonus_grants_energy_only_once_when_subscribed(monkeypatch) 
         _fake_fill_to_free_cap,
     )
 
-    session = SimpleNamespace(flush=lambda: None)
-
-    async def _flush() -> None:
-        return None
-
-    session.flush = _flush
+    session = _Session()
 
     first = await ChannelBonusService.claim_bonus_if_subscribed(
         session,
@@ -107,12 +111,7 @@ async def test_claim_bonus_does_not_grant_when_not_subscribed(monkeypatch) -> No
         _fail_fill_to_free_cap,
     )
 
-    session = SimpleNamespace(flush=lambda: None)
-
-    async def _flush() -> None:
-        return None
-
-    session.flush = _flush
+    session = _Session()
 
     result = await ChannelBonusService.claim_bonus_if_subscribed(
         session,
@@ -142,12 +141,7 @@ async def test_claim_bonus_does_not_grant_when_check_fails(monkeypatch) -> None:
         _fail_fill_to_free_cap,
     )
 
-    session = SimpleNamespace(flush=lambda: None)
-
-    async def _flush() -> None:
-        return None
-
-    session.flush = _flush
+    session = _Session()
 
     result = await ChannelBonusService.claim_bonus_if_subscribed(
         session,
@@ -199,12 +193,7 @@ async def test_claim_bonus_uses_dedicated_checker_bot_token(monkeypatch) -> None
     monkeypatch.setattr(channel_bonus.UsersRepo, "get_by_id_for_update", _fake_get_user_for_update)
     monkeypatch.setattr(channel_bonus.EnergyService, "fill_to_free_cap", _fake_fill_to_free_cap)
 
-    session = SimpleNamespace(flush=lambda: None)
-
-    async def _flush() -> None:
-        return None
-
-    session.flush = _flush
+    session = _Session()
 
     result = await ChannelBonusService.claim_bonus_if_subscribed(
         session,
@@ -235,12 +224,7 @@ async def test_claim_bonus_returns_error_when_checker_token_invalid(monkeypatch)
     )
     monkeypatch.setattr(channel_bonus, "Bot", _InvalidCheckerBot)
 
-    session = SimpleNamespace(flush=lambda: None)
-
-    async def _flush() -> None:
-        return None
-
-    session.flush = _flush
+    session = _Session()
 
     result = await ChannelBonusService.claim_bonus_if_subscribed(
         session,
@@ -263,6 +247,6 @@ async def test_can_show_prompt_returns_false_when_bonus_already_claimed(monkeypa
 
     monkeypatch.setattr(channel_bonus.UsersRepo, "get_by_id", _fake_get_user)
 
-    can_show = await ChannelBonusService.can_show_prompt(SimpleNamespace(), user_id=404)
+    can_show = await ChannelBonusService.can_show_prompt(_Session(), user_id=404)
 
     assert can_show is False

@@ -24,7 +24,7 @@ class _Client:
     async def __aexit__(self, exc_type, exc, tb) -> None:  # type: ignore[override]
         return None
 
-    async def post(self, url: str, json: dict[str, object]) -> _Response:
+    async def post(self, url: str, json: dict[str, Any]) -> _Response:
         self._calls.append({"url": url, "json": json})
         if url in self._fail_urls:
             raise RuntimeError("delivery failed")
@@ -32,7 +32,7 @@ class _Client:
 
 
 def _settings(**overrides: object) -> SimpleNamespace:
-    base = {
+    base: dict[str, object] = {
         "app_env": "test",
         "ops_alert_webhook_url": "",
         "ops_alert_slack_webhook_url": "",

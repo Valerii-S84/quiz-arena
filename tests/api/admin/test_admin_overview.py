@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
+from typing import Generator
 from uuid import uuid4
 
 import pytest
@@ -18,36 +19,13 @@ from app.api.routes.admin import (
 )
 from app.main import app
 from app.services.admin import cache as admin_cache
+from tests.type_helpers import AsyncBeginContext, AsyncSessionStub
+from tests.type_helpers import RowsResult as _RowsResult
+from tests.type_helpers import ScalarResult as _ScalarResult
+from tests.type_helpers import build_settings
 
 
-class _ScalarResult:
-    def __init__(self, value) -> None:
-        self._value = value
-
-    def scalar_one(self):
-        return self._value
-
-
-class _RowsResult:
-    def __init__(self, rows) -> None:
-        self._rows = rows
-
-    def all(self):
-        return list(self._rows)
-
-
-class _ScalarsResult:
-    def __init__(self, rows) -> None:
-        self._rows = rows
-
-    def scalars(self):
-        return self
-
-    def all(self):
-        return list(self._rows)
-
-
-class _SessionWithExec:
+class _SessionWithExec(AsyncSessionStub):
     def __init__(self, *results) -> None:
         self._results = list(results)
 
@@ -56,23 +34,12 @@ class _SessionWithExec:
         return self._results.pop(0)
 
 
-class _AsyncBeginContext:
-    def __init__(self, session: object) -> None:
-        self._session = session
-
-    async def __aenter__(self) -> object:
-        return self._session
-
-    async def __aexit__(self, exc_type, exc, tb) -> bool:
-        return False
-
-
 def _session_local(session: object) -> SimpleNamespace:
-    return SimpleNamespace(begin=lambda: _AsyncBeginContext(session))
+    return SimpleNamespace(begin=lambda: AsyncBeginContext(session))
 
 
-def _settings() -> SimpleNamespace:
-    return SimpleNamespace(redis_url="redis://test")
+def _settings():
+    return build_settings(redis_url="redis://test")
 
 
 def _admin() -> admin_deps.AdminPrincipal:
@@ -86,7 +53,7 @@ def _admin() -> admin_deps.AdminPrincipal:
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client() -> Generator[TestClient, None, None]:
     app.dependency_overrides.clear()
     with TestClient(app) as test_client:
         yield test_client
@@ -261,20 +228,22 @@ async def test_build_overview_payload_builds_kpis_and_alerts() -> None:
         _ScalarResult(30),
     )
     now_utc = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
-    payload = await overview_queries.build_overview_payload(session, now_utc=now_utc, days=7)
+    payload = overview.OverviewResponse.model_validate(
+        await overview_queries.build_overview_payload(session, now_utc=now_utc, days=7)
+    )
 
-    assert payload["period"] == "7d"
-    assert payload["kpis"]["dau"]["current"] == 100.0
-    assert payload["kpis"]["start_users"]["current"] == 20.0
-    assert payload["kpis"]["conversion_start_to_quiz"]["current"] == 35.0
-    assert payload["kpis"]["revenue_eur"]["current"] == float(
+    assert payload.period == "7d"
+    assert payload.kpis["dau"].current == 100.0
+    assert payload.kpis["start_users"].current == 20.0
+    assert payload.kpis["conversion_start_to_quiz"].current == 35.0
+    assert payload.kpis["revenue_eur"].current == float(
         Decimal(200) * overview_metrics.STAR_TO_EUR_RATE
     )
-    assert payload["feature_usage"]["duel_created_users"]["current"] == 10.0
-    assert payload["funnel"][1] == {"step": "First Quiz", "value": 7}
-    assert payload["funnel"][2] == {"step": "Streak 3+", "value": 7}
-    assert payload["funnel"][3] == {"step": "Purchase", "value": 3}
-    assert [item["type"] for item in payload["alerts"]] == [
+    assert payload.feature_usage["duel_created_users"].current == 10.0
+    assert payload.funnel[1] == {"step": "First Quiz", "value": 7}
+    assert payload.funnel[2] == {"step": "Streak 3+", "value": 7}
+    assert payload.funnel[3] == {"step": "Purchase", "value": 3}
+    assert [str(item["type"]) for item in payload.alerts] == [
         "webhook_errors",
         "conversion_drop",
         "suspicious_activity",

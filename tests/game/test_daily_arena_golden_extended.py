@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -24,6 +25,11 @@ from tests.game.daily_arena_golden_support import (
     session_local_with_sessions,
     status_tournament,
 )
+from tests.type_helpers import AsyncSessionStub
+
+
+class _Session(AsyncSessionStub):
+    pass
 
 
 def _arena_tournament(*, status: str, current_round: int = 0) -> SimpleNamespace:
@@ -104,7 +110,7 @@ async def test_daily_arena_status_returns_no_tournament_before_invite_window(
     )
 
     snapshot = await daily_cup_user_status.get_daily_cup_status_for_user(
-        SimpleNamespace(),
+        _Session(),
         user_id=101,
         now_utc=datetime(2026, 3, 1, 16, 0, tzinfo=UTC),
     )
@@ -131,7 +137,7 @@ async def test_daily_arena_status_returns_not_participant_for_active_round(
     )
 
     snapshot = await daily_cup_user_status.get_daily_cup_status_for_user(
-        SimpleNamespace(),
+        _Session(),
         user_id=101,
         now_utc=datetime(2026, 3, 1, 17, 0, tzinfo=UTC),
     )
@@ -162,7 +168,7 @@ async def test_daily_arena_status_returns_round_waiting_without_pending_match(
     )
 
     snapshot = await daily_cup_user_status.get_daily_cup_status_for_user(
-        SimpleNamespace(),
+        _Session(),
         user_id=101,
         now_utc=datetime(2026, 3, 1, 17, 0, tzinfo=UTC),
     )
@@ -202,7 +208,7 @@ async def test_daily_arena_status_completed_and_fallback_snapshots(
     )
 
     snapshot = await daily_cup_user_status.get_daily_cup_status_for_user(
-        SimpleNamespace(),
+        _Session(),
         user_id=101,
         now_utc=datetime(2026, 3, 1, 17, 0, tzinfo=UTC),
     )
@@ -268,7 +274,7 @@ async def test_daily_arena_messaging_round_pipeline_fetches_round_matches_for_ar
         make_standing_row(user_id=101, place=1, score="4", tie_break="7"),
         make_standing_row(user_id=202, place=2, score="3", tie_break="6"),
     ]
-    calls: dict[str, object] = {}
+    calls: dict[str, Any] = {}
     bot = DummyBot()
 
     async def _fake_round_matches(session, *, tournament_id, round_no):
