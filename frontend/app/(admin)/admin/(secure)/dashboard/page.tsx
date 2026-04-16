@@ -364,6 +364,11 @@ function formatHourLabel(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`;
 }
 
+function formatHourRangeLabel(hour: number): string {
+  const nextHour = (hour + 1) % 24;
+  return `${formatHourLabel(hour)}-${formatHourLabel(nextHour)}`;
+}
+
 function formatShortDateLabel(value: string): string {
   return new Date(value).toLocaleDateString("de-DE", {
     day: "2-digit",
@@ -462,8 +467,25 @@ export default function DashboardPage() {
     });
   }, [data]);
 
+  const averageHourlyActivity = useMemo(() => {
+    const series = data?.hourly_activity_series ?? [];
+    if (series.length === 0) {
+      return 0;
+    }
+    const total = series.reduce((sum, item) => sum + Number(item.active_users ?? 0), 0);
+    return total / series.length;
+  }, [data]);
+
+  const topHourlyWindows = useMemo(() => {
+    const series = data?.hourly_activity_series ?? [];
+    return [...series]
+      .filter((item) => Number(item.active_users ?? 0) > 0)
+      .sort((left, right) => Number(right.active_users ?? 0) - Number(left.active_users ?? 0))
+      .slice(0, 3);
+  }, [data]);
+
   return (
-    <main className="space-y-6 py-2">
+    <main className="min-w-0 space-y-6 py-2">
       <header className="surface rounded-2xl p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -538,13 +560,139 @@ export default function DashboardPage() {
             </div>
           </section>
 
+          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(18rem,0.62fr)]">
+            <article className="surface overflow-hidden rounded-[32px] p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember/45">
+                    Aktivitaet
+                  </p>
+                  <h2 className="mt-1 text-2xl">Bot-Aktivität nach Uhrzeit</h2>
+                  <p className="mt-1 text-sm text-ember/70">
+                    Zeigt, in welchen Berliner Stunden Nutzer im Bot wirklich aktiv sind.
+                  </p>
+                </div>
+                <div className="rounded-full border border-ember/15 bg-white/80 px-3 py-1 text-xs text-ember/75">
+                  Berlin-Zeit · {data.hourly_activity_series?.length ?? 0} Stundenpunkte
+                </div>
+              </div>
+              <div className="mt-4 h-[24rem] rounded-[26px] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(41,80,101,0.16),transparent_38%),radial-gradient(circle_at_top_right,rgba(137,245,199,0.16),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.94),rgba(242,247,249,0.98))] p-3">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={data.hourly_activity_series ?? []}
+                    margin={{ top: 8, right: 12, left: -16, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="dashboardHourlyGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#295065" stopOpacity={0.96} />
+                        <stop offset="100%" stopColor="#89f5c7" stopOpacity={0.84} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      stroke={CHART_GRID_STROKE}
+                      strokeDasharray="4 8"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="hour"
+                      tick={CHART_AXIS_TICK}
+                      tickFormatter={formatHourLabel}
+                      axisLine={false}
+                      tickLine={false}
+                      minTickGap={12}
+                    />
+                    <YAxis
+                      tick={CHART_AXIS_TICK}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "rgba(41, 80, 101, 0.06)" }}
+                      contentStyle={CHART_TOOLTIP_STYLE}
+                      labelFormatter={(value) => `${formatHourLabel(Number(value))} Uhr`}
+                      formatter={(value) => [
+                        `${Number(value).toLocaleString("de-DE")} Nutzer`,
+                        "Aktiv",
+                      ]}
+                    />
+                    <Bar
+                      dataKey="active_users"
+                      name="Aktiv"
+                      fill="url(#dashboardHourlyGradient)"
+                      radius={[12, 12, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </article>
+
+            <article className="surface rounded-[32px] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-ember/45">
+                Stunden-Insights
+              </p>
+              <div className="mt-4 space-y-3">
+                <div className="rounded-[24px] border border-[#295065]/12 bg-[linear-gradient(135deg,rgba(41,80,101,0.12),rgba(137,245,199,0.18))] p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-ember/50">Peak</p>
+                  <p className="mt-2 text-2xl font-semibold text-[#1f4257]">
+                    {peakHourlyActivity
+                      ? formatHourRangeLabel(peakHourlyActivity.hour)
+                      : "Keine Daten"}
+                  </p>
+                  <p className="mt-1 text-sm text-ember/70">
+                    {peakHourlyActivity
+                      ? `${peakHourlyActivity.active_users.toLocaleString("de-DE")} aktive Nutzer`
+                      : "Im gewählten Zeitraum wurden noch keine Stundenwerte erfasst."}
+                  </p>
+                </div>
+
+                <div className="rounded-[24px] border border-ember/12 bg-[#fff9f3] p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-ember/50">
+                    Ø pro Stunde
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold text-[#1f4257]">
+                    {averageHourlyActivity.toLocaleString("de-DE", { maximumFractionDigits: 1 })}
+                  </p>
+                  <p className="mt-1 text-sm text-ember/70">
+                    Durchschnitt aktiver Nutzer über alle 24 Stunden.
+                  </p>
+                </div>
+
+                <div className="rounded-[24px] border border-ember/12 bg-white/80 p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-ember/50">
+                    Top-Zeitfenster
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {topHourlyWindows.length > 0 ? (
+                      topHourlyWindows.map((item) => (
+                        <div
+                          key={item.hour}
+                          className="flex items-center justify-between rounded-2xl border border-ember/10 bg-[#fffdf9] px-3 py-2"
+                        >
+                          <span className="text-sm font-medium text-[#1f4257]">
+                            {formatHourRangeLabel(item.hour)}
+                          </span>
+                          <span className="rounded-full bg-[#1f4257] px-2.5 py-1 text-xs font-semibold text-white">
+                            {item.active_users.toLocaleString("de-DE")}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-ember/65">Noch keine Aktivitaetsdaten.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </article>
+          </section>
+
           <section className="grid gap-4 xl:grid-cols-2">
             <article className="surface overflow-hidden rounded-3xl p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-xl">Umsatz pro Tag (⭐)</h2>
+                  <h2 className="text-xl">Tagesumsatz (⭐)</h2>
                   <p className="mt-1 text-sm text-ember/70">
-                    Tagesverlauf mit weicherer Kurve statt reiner Tabellenoptik.
+                    Umsatzkurve als sekundäre Geschäftssicht neben dem Aktivitätsprofil.
                   </p>
                 </div>
                 <div className="rounded-full border border-ember/15 bg-white/80 px-3 py-1 text-xs text-ember/75">
@@ -630,60 +778,6 @@ export default function DashboardPage() {
                 </ResponsiveContainer>
               </div>
             </article>
-          </section>
-
-          <section className="surface overflow-hidden rounded-3xl p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl">Aktivität nach Stunde (Berlin)</h2>
-                <p className="mt-1 text-sm text-ember/70">
-                  Zeigt, in welchen Berliner Stunden Nutzer im gewählten Zeitraum aktiv waren.
-                </p>
-              </div>
-              <div className="rounded-full border border-ember/15 bg-white/80 px-3 py-1 text-xs text-ember/75">
-                Peak:{" "}
-                {peakHourlyActivity
-                  ? `${formatHourLabel(peakHourlyActivity.hour)} · ${peakHourlyActivity.active_users.toLocaleString("de-DE")} Nutzer`
-                  : "Keine Daten"}
-              </div>
-            </div>
-            <div className="mt-4 h-[22rem] rounded-2xl border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(41,80,101,0.14),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.92),rgba(243,247,249,0.98))] p-3">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.hourly_activity_series ?? []} margin={{ top: 8, right: 12, left: -16, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="dashboardHourlyGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#295065" stopOpacity={0.92} />
-                      <stop offset="100%" stopColor="#89f5c7" stopOpacity={0.82} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="4 8" vertical={false} />
-                  <XAxis
-                    dataKey="hour"
-                    tick={CHART_AXIS_TICK}
-                    tickFormatter={formatHourLabel}
-                    axisLine={false}
-                    tickLine={false}
-                    minTickGap={12}
-                  />
-                  <YAxis
-                    tick={CHART_AXIS_TICK}
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "rgba(41, 80, 101, 0.06)" }}
-                    contentStyle={CHART_TOOLTIP_STYLE}
-                    labelFormatter={(value) => `${formatHourLabel(Number(value))} Uhr`}
-                    formatter={(value) => [
-                      `${Number(value).toLocaleString("de-DE")} Nutzer`,
-                      "Aktiv",
-                    ]}
-                  />
-                  <Bar dataKey="active_users" name="Aktiv" fill="url(#dashboardHourlyGradient)" radius={[10, 10, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
           </section>
 
           <section className="grid gap-4 xl:grid-cols-2">

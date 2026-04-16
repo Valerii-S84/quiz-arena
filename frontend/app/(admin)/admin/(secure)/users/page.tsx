@@ -115,7 +115,7 @@ export default function UsersPage() {
   }, [items]);
 
   return (
-    <main className="space-y-6 py-2 fade-in">
+    <main className="min-w-0 space-y-6 py-2 fade-in">
       <header className="surface rounded-[28px] p-6">
         <h1 className="text-3xl">Nutzer</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-ember/70">
@@ -124,8 +124,8 @@ export default function UsersPage() {
         </p>
       </header>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.65fr)]">
-        <article className="surface rounded-[28px] p-5">
+      <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+        <article className="surface min-w-0 rounded-[28px] p-5">
           <div className="flex flex-col gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-ember/45">
@@ -141,7 +141,7 @@ export default function UsersPage() {
                 className="mt-3 w-full rounded-2xl border border-ember/15 bg-white px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] outline-none transition focus:border-[#295065]/35 focus:ring-2 focus:ring-[#295065]/15"
               />
             </div>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-2xl border border-ember/12 bg-[#fff9f3] p-4">
                 <p className="text-xs uppercase tracking-[0.22em] text-ember/45">Gesamt</p>
                 <p className="mt-2 text-2xl font-semibold text-[#1f4257]">
@@ -175,7 +175,7 @@ export default function UsersPage() {
           </div>
         </article>
 
-        <article className="surface rounded-[28px] p-5">
+        <article className="surface min-w-0 rounded-[28px] p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-ember/45">
             Ansicht
           </p>
@@ -216,7 +216,7 @@ export default function UsersPage() {
         </article>
       </section>
 
-      <section className="surface overflow-hidden rounded-[28px] p-0">
+      <section className="surface min-w-0 overflow-hidden rounded-[28px] p-0">
         <div className="flex flex-col gap-3 border-b border-ember/10 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm font-semibold text-[#1f4257]">
@@ -228,7 +228,7 @@ export default function UsersPage() {
               100 Nutzer pro Seite. Suche und Sortierung laufen serverseitig.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <button
               type="button"
               onClick={() => setPage((current) => Math.max(1, current - 1))}
@@ -253,8 +253,8 @@ export default function UsersPage() {
 
         {isLoading && !data ? <p className="px-5 py-5 text-sm">Daten werden geladen...</p> : null}
         {data ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+          <div className="max-w-full overflow-x-auto">
+            <table className="w-full min-w-[72rem] text-sm">
               <thead className="bg-[#fff8f0] text-left">
                 <tr className="border-b border-ember/12">
                   <th className="px-5 py-3 font-medium text-ember/65">#</th>
@@ -288,7 +288,7 @@ export default function UsersPage() {
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="min-w-[18rem]">
+                        <div className="w-[17rem] min-w-[17rem]">
                           <p className="font-semibold text-[#1f4257]">{formatDisplayName(item)}</p>
                           <p className="mt-1 text-xs text-ember/60">
                             ID {item.id} · Telegram {item.telegram_user_id}
@@ -304,7 +304,7 @@ export default function UsersPage() {
                         </span>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="min-w-[14rem]">
+                        <div className="w-[14rem] min-w-[14rem]">
                           <div className="flex items-end justify-between gap-3">
                             <div>
                               <p className="text-lg font-semibold text-[#1f4257]">
