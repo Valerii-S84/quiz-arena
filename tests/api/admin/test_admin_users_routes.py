@@ -81,7 +81,9 @@ def test_admin_users_routes_cover_happy_paths(
     session = object()
 
     async def _list_users_page(*args, **kwargs):
-        del args, kwargs
+        del args
+        assert kwargs["sort_by"] == "daily_challenge_rating"
+        assert kwargs["limit"] == 100
         return (
             [
                 {
@@ -94,6 +96,8 @@ def test_admin_users_routes_cover_happy_paths(
                     "created_at": "2026-03-01T10:00:00+00:00",
                     "last_seen_at": None,
                     "streak": 5,
+                    "daily_challenge_score": 21,
+                    "daily_challenge_completed_runs": 4,
                 }
             ],
             1,
@@ -123,7 +127,7 @@ def test_admin_users_routes_cover_happy_paths(
     monkeypatch.setattr(users, "apply_bonus", _apply_bonus)
     monkeypatch.setattr(users, "write_admin_audit", _audit)
 
-    listed = client.get("/admin/users?search=anna&page=1&limit=50")
+    listed = client.get("/admin/users?search=anna&sort_by=daily_challenge_rating&page=1&limit=100")
     profile = client.get("/admin/users/101")
     bonus = client.post("/admin/users/101/bonus", json={"type": "energy", "amount": 2})
 
@@ -140,6 +144,8 @@ def test_admin_users_routes_cover_happy_paths(
                 "created_at": "2026-03-01T10:00:00+00:00",
                 "last_seen_at": None,
                 "streak": 5,
+                "daily_challenge_score": 21,
+                "daily_challenge_completed_runs": 4,
             }
         ],
         "total": 1,

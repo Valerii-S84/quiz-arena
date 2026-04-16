@@ -145,7 +145,7 @@ async def test_list_users_page_builds_rows_and_total() -> None:
     session = _Session(
         exec_results=[
             _ScalarResult(2),
-            _ScalarsResult(user_rows),
+            _RowsResult([(user_rows[0], 18, 3), (user_rows[1], 7, 2)]),
             _RowsResult([(101, 5)]),
         ]
     )
@@ -157,17 +157,22 @@ async def test_list_users_page_builds_rows_and_total() -> None:
         level="A2",
         page=1,
         limit=50,
+        sort_by="daily_challenge_rating",
     )
 
     assert total == 2
     assert rows[0]["telegram_user_id"] == 900101
     assert rows[0]["streak"] == 5
+    assert rows[0]["daily_challenge_score"] == 18
+    assert rows[0]["daily_challenge_completed_runs"] == 3
     assert rows[1]["streak"] == 0
+    assert rows[1]["daily_challenge_score"] == 7
+    assert rows[1]["daily_challenge_completed_runs"] == 2
 
 
 @pytest.mark.asyncio
 async def test_list_users_page_returns_empty_result_without_filters() -> None:
-    session = _Session(exec_results=[_ScalarResult(0), _ScalarsResult([]), _RowsResult([])])
+    session = _Session(exec_results=[_ScalarResult(0), _RowsResult([]), _RowsResult([])])
 
     rows, total = await users_helpers.list_users_page(
         session,
@@ -176,6 +181,7 @@ async def test_list_users_page_returns_empty_result_without_filters() -> None:
         level=None,
         page=2,
         limit=25,
+        sort_by="created_at",
     )
 
     assert rows == []
