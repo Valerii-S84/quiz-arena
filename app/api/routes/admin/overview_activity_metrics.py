@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import distinct, func, select, union_all
+from sqlalchemy import Integer, cast, distinct, func, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.analytics_events import AnalyticsEvent
@@ -30,6 +30,39 @@ def build_activity_days_subquery(*, from_utc: datetime, to_utc: datetime):
         select(
             QuizSession.user_id.label("user_id"),
             QuizSession.local_date_berlin.label("local_date_berlin"),
+        ).where(
+            QuizSession.started_at >= from_utc,
+            QuizSession.started_at < to_utc,
+        ),
+    ).subquery()
+
+
+def build_activity_hours_subquery(*, from_utc: datetime, to_utc: datetime):
+    return union_all(
+        select(
+            User.id.label("user_id"),
+            cast(
+                func.extract("hour", func.timezone("Europe/Berlin", User.created_at)),
+                Integer,
+            ).label("local_hour_berlin"),
+        ).where(User.created_at >= from_utc, User.created_at < to_utc),
+        select(
+            AnalyticsEvent.user_id.label("user_id"),
+            cast(
+                func.extract("hour", func.timezone("Europe/Berlin", AnalyticsEvent.happened_at)),
+                Integer,
+            ).label("local_hour_berlin"),
+        ).where(
+            AnalyticsEvent.user_id.is_not(None),
+            AnalyticsEvent.happened_at >= from_utc,
+            AnalyticsEvent.happened_at < to_utc,
+        ),
+        select(
+            QuizSession.user_id.label("user_id"),
+            cast(
+                func.extract("hour", func.timezone("Europe/Berlin", QuizSession.started_at)),
+                Integer,
+            ).label("local_hour_berlin"),
         ).where(
             QuizSession.started_at >= from_utc,
             QuizSession.started_at < to_utc,

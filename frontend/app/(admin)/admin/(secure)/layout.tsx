@@ -29,7 +29,7 @@ export default async function SecureAdminLayout({ children }: { children: React.
   const session = await ensureSession();
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-7xl gap-6 px-4 py-6 lg:px-6">
+    <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 overflow-x-hidden px-4 py-6 lg:flex-row lg:items-start lg:px-6">
       <aside className="surface h-fit w-full rounded-2xl p-4 lg:sticky lg:top-6 lg:w-64">
         <p className="text-xs uppercase tracking-[0.2em] text-ember/60">Admin Bereich</p>
         <p className="mt-2 text-lg">{session.email}</p>
@@ -46,7 +46,7 @@ export default async function SecureAdminLayout({ children }: { children: React.
           </button>
         </form>
       </aside>
-      <section className="flex-1">{children}</section>
+      <section className="min-w-0 flex-1">{children}</section>
     </div>
   );
 }

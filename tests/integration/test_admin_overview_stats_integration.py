@@ -178,6 +178,12 @@ async def test_overview_payload_uses_first_milestones_and_consistent_activity_mo
     assert payload["kpis"]["conversion_start_to_quiz"]["current"] == 50.0
     assert payload["kpis"]["retention_d1"]["current"] == 100.0
     assert payload["kpis"]["dau"]["current"] == 2.0
+    hourly_activity = {
+        int(item["hour"]): int(item["active_users"]) for item in payload["hourly_activity_series"]
+    }
+    assert hourly_activity[10] == 2
+    assert hourly_activity[11] == 2
+    assert hourly_activity[12] == 1
     assert payload["funnel"] == [
         {"step": "Start", "value": 2},
         {"step": "First Quiz", "value": 1},
