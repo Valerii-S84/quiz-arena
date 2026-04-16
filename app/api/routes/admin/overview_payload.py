@@ -17,6 +17,7 @@ from app.api.routes.admin.overview_payload_kpis import (
 )
 from app.api.routes.admin.overview_series import (
     fetch_alert_inputs,
+    fetch_hourly_activity_series,
     fetch_revenue_series,
     fetch_top_products,
     fetch_users_series,
@@ -103,6 +104,11 @@ async def build_overview_payload(
     users_series = await fetch_users_series(
         session, from_utc=windows.current_start, to_utc=windows.current_end
     )
+    hourly_activity_series = await fetch_hourly_activity_series(
+        session,
+        from_utc=windows.current_start,
+        to_utc=windows.current_end,
+    )
     top_products = await fetch_top_products(
         session, from_utc=windows.current_start, to_utc=windows.current_end
     )
@@ -130,6 +136,7 @@ async def build_overview_payload(
         },
         "revenue_series": revenue_series,
         "users_series": users_series,
+        "hourly_activity_series": hourly_activity_series,
         "funnel": _build_funnel(
             first_quiz_users_now=conversion_snapshot.first_quiz_users_now,
             first_purchase_users_now=conversion_snapshot.first_purchase_users_now,

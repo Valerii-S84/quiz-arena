@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -154,6 +156,20 @@ const PRODUCT_LABELS: Record<string, string> = {
   PREMIUM_YEAR: "Premium Jahr",
 };
 
+const CHART_AXIS_TICK = {
+  fill: "#7d6658",
+  fontSize: 12,
+};
+
+const CHART_GRID_STROKE = "rgba(41, 80, 101, 0.12)";
+
+const CHART_TOOLTIP_STYLE = {
+  borderRadius: "18px",
+  border: "1px solid rgba(41, 80, 101, 0.14)",
+  boxShadow: "0 18px 44px rgba(15, 23, 42, 0.14)",
+  backgroundColor: "rgba(255, 255, 255, 0.96)",
+};
+
 type KpiMetric = {
   current: number;
   previous: number;
@@ -169,6 +185,11 @@ type RevenueSeriesItem = {
 type UsersSeriesItem = {
   date: string;
   new_users: number;
+  active_users: number;
+};
+
+type HourlyActivityItem = {
+  hour: number;
   active_users: number;
 };
 
@@ -197,6 +218,7 @@ type OverviewData = {
   kpis: Record<string, KpiMetric>;
   revenue_series: RevenueSeriesItem[];
   users_series: UsersSeriesItem[];
+  hourly_activity_series?: HourlyActivityItem[];
   funnel: FunnelItem[];
   top_products: TopProductItem[];
   feature_usage?: Record<string, KpiMetric>;
@@ -338,6 +360,18 @@ function mapProductLabel(productCode: string): string {
   return PRODUCT_LABELS[productCode] ?? productCode;
 }
 
+function formatHourLabel(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function formatShortDateLabel(value: string): string {
+  return new Date(value).toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Europe/Berlin",
+  });
+}
+
 function mapFunnelStep(step: string): string {
   return FUNNEL_STEP_LABELS[step] ?? step;
 }
@@ -398,6 +432,34 @@ export default function DashboardPage() {
       product_label: mapProductLabel(item.product),
       revenue_stars: Number(item.revenue_stars ?? 0),
     }));
+  }, [data]);
+
+  const totalRevenueStars = useMemo(() => {
+    if (!data) {
+      return 0;
+    }
+    return data.revenue_series.reduce((sum, item) => sum + Number(item.stars ?? 0), 0);
+  }, [data]);
+
+  const averageActiveUsers = useMemo(() => {
+    if (!data || data.users_series.length === 0) {
+      return 0;
+    }
+    const total = data.users_series.reduce((sum, item) => sum + Number(item.active_users ?? 0), 0);
+    return total / data.users_series.length;
+  }, [data]);
+
+  const peakHourlyActivity = useMemo(() => {
+    const series = data?.hourly_activity_series ?? [];
+    if (series.length === 0) {
+      return null;
+    }
+    return series.reduce((best, item) => {
+      if (item.active_users > best.active_users) {
+        return item;
+      }
+      return best;
+    });
   }, [data]);
 
   return (
@@ -476,37 +538,92 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <section className="grid gap-4 lg:grid-cols-2">
-            <article className="surface rounded-2xl p-4">
-              <h2 className="text-xl">Umsatz pro Tag (⭐)</h2>
-              <div className="mt-4 h-72">
+          <section className="grid gap-4 xl:grid-cols-2">
+            <article className="surface overflow-hidden rounded-3xl p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-xl">Umsatz pro Tag (⭐)</h2>
+                  <p className="mt-1 text-sm text-ember/70">
+                    Tagesverlauf mit weicherer Kurve statt reiner Tabellenoptik.
+                  </p>
+                </div>
+                <div className="rounded-full border border-ember/15 bg-white/80 px-3 py-1 text-xs text-ember/75">
+                  Gesamt: {totalRevenueStars.toLocaleString("de-DE")} ⭐
+                </div>
+              </div>
+              <div className="mt-4 h-[22rem] rounded-2xl border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(137,245,199,0.22),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,248,244,0.96))] p-3">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.revenue_series}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line dataKey="stars" stroke="#295065" strokeWidth={2} dot={false} />
-                  </LineChart>
+                  <AreaChart data={data.revenue_series} margin={{ top: 8, right: 12, left: -16, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="dashboardRevenueGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#89f5c7" stopOpacity={0.75} />
+                        <stop offset="100%" stopColor="#89f5c7" stopOpacity={0.08} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="4 8" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tick={CHART_AXIS_TICK}
+                      tickFormatter={formatShortDateLabel}
+                      axisLine={false}
+                      tickLine={false}
+                      minTickGap={24}
+                    />
+                    <YAxis tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip
+                      cursor={{ stroke: "#295065", strokeDasharray: "4 6", strokeOpacity: 0.35 }}
+                      contentStyle={CHART_TOOLTIP_STYLE}
+                      labelFormatter={(value) => formatShortDateLabel(String(value))}
+                      formatter={(value) => [`${Number(value).toLocaleString("de-DE")} ⭐`, "Umsatz"]}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="stars"
+                      stroke="#295065"
+                      strokeWidth={3}
+                      fill="url(#dashboardRevenueGradient)"
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             </article>
 
-            <article className="surface rounded-2xl p-4">
-              <h2 className="text-xl">Neue vs. aktive Nutzer</h2>
-              <div className="mt-4 h-72">
+            <article className="surface overflow-hidden rounded-3xl p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-xl">Neue vs. aktive Nutzer</h2>
+                  <p className="mt-1 text-sm text-ember/70">
+                    Besser lesbarer Vergleich zwischen Wachstum und echter Nutzung.
+                  </p>
+                </div>
+                <div className="rounded-full border border-ember/15 bg-white/80 px-3 py-1 text-xs text-ember/75">
+                  Ø aktiv: {averageActiveUsers.toLocaleString("de-DE", { maximumFractionDigits: 1 })}
+                </div>
+              </div>
+              <div className="mt-4 h-[22rem] rounded-2xl border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(245,141,116,0.16),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.92),rgba(249,244,241,0.98))] p-3">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.users_series}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip />
-                    <Line dataKey="new_users" name="Neu" stroke="#f58d74" strokeWidth={2} dot={false} />
+                  <LineChart data={data.users_series} margin={{ top: 8, right: 12, left: -16, bottom: 0 }}>
+                    <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="4 8" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tick={CHART_AXIS_TICK}
+                      tickFormatter={formatShortDateLabel}
+                      axisLine={false}
+                      tickLine={false}
+                      minTickGap={24}
+                    />
+                    <YAxis tick={CHART_AXIS_TICK} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip
+                      cursor={{ stroke: "#f58d74", strokeDasharray: "4 6", strokeOpacity: 0.28 }}
+                      contentStyle={CHART_TOOLTIP_STYLE}
+                      labelFormatter={(value) => formatShortDateLabel(String(value))}
+                    />
+                    <Line dataKey="new_users" name="Neu" stroke="#f58d74" strokeWidth={3} dot={false} />
                     <Line
                       dataKey="active_users"
                       name="Aktiv"
                       stroke="#295065"
-                      strokeWidth={2}
+                      strokeWidth={3}
                       dot={false}
                     />
                   </LineChart>
@@ -515,17 +632,95 @@ export default function DashboardPage() {
             </article>
           </section>
 
-          <section className="grid gap-4 lg:grid-cols-2">
-            <article className="surface rounded-2xl p-4">
-              <h2 className="text-xl">Nutzer-Funnel</h2>
-              <div className="mt-4 h-72">
+          <section className="surface overflow-hidden rounded-3xl p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl">Aktivität nach Stunde (Berlin)</h2>
+                <p className="mt-1 text-sm text-ember/70">
+                  Zeigt, in welchen Berliner Stunden Nutzer im gewählten Zeitraum aktiv waren.
+                </p>
+              </div>
+              <div className="rounded-full border border-ember/15 bg-white/80 px-3 py-1 text-xs text-ember/75">
+                Peak:{" "}
+                {peakHourlyActivity
+                  ? `${formatHourLabel(peakHourlyActivity.hour)} · ${peakHourlyActivity.active_users.toLocaleString("de-DE")} Nutzer`
+                  : "Keine Daten"}
+              </div>
+            </div>
+            <div className="mt-4 h-[22rem] rounded-2xl border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(41,80,101,0.14),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.92),rgba(243,247,249,0.98))] p-3">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.hourly_activity_series ?? []} margin={{ top: 8, right: 12, left: -16, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="dashboardHourlyGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#295065" stopOpacity={0.92} />
+                      <stop offset="100%" stopColor="#89f5c7" stopOpacity={0.82} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="4 8" vertical={false} />
+                  <XAxis
+                    dataKey="hour"
+                    tick={CHART_AXIS_TICK}
+                    tickFormatter={formatHourLabel}
+                    axisLine={false}
+                    tickLine={false}
+                    minTickGap={12}
+                  />
+                  <YAxis
+                    tick={CHART_AXIS_TICK}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    cursor={{ fill: "rgba(41, 80, 101, 0.06)" }}
+                    contentStyle={CHART_TOOLTIP_STYLE}
+                    labelFormatter={(value) => `${formatHourLabel(Number(value))} Uhr`}
+                    formatter={(value) => [
+                      `${Number(value).toLocaleString("de-DE")} Nutzer`,
+                      "Aktiv",
+                    ]}
+                  />
+                  <Bar dataKey="active_users" name="Aktiv" fill="url(#dashboardHourlyGradient)" radius={[10, 10, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+
+          <section className="grid gap-4 xl:grid-cols-2">
+            <article className="surface overflow-hidden rounded-3xl p-5">
+              <div>
+                <h2 className="text-xl">Nutzer-Funnel</h2>
+                <p className="mt-1 text-sm text-ember/70">
+                  Klarere Stufenansicht statt klassischer Standardbalken.
+                </p>
+              </div>
+              <div className="mt-4 h-[22rem] rounded-2xl border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(137,245,199,0.20),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.92),rgba(241,248,245,0.98))] p-3">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={funnelData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis type="category" dataKey="step_label" width={130} />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#89f5c7" />
+                  <BarChart data={funnelData} layout="vertical" margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="dashboardFunnelGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#89f5c7" stopOpacity={0.98} />
+                        <stop offset="100%" stopColor="#295065" stopOpacity={0.88} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="4 8" horizontal={false} />
+                    <XAxis
+                      type="number"
+                      tick={CHART_AXIS_TICK}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="step_label"
+                      width={130}
+                      tick={CHART_AXIS_TICK}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+                    <Bar dataKey="value" fill="url(#dashboardFunnelGradient)" radius={[0, 10, 10, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -543,16 +738,43 @@ export default function DashboardPage() {
               </div>
             </article>
 
-            <article className="surface rounded-2xl p-4">
-              <h2 className="text-xl">Top-Produkte (⭐ Umsatz)</h2>
-              <div className="mt-4 h-72">
+            <article className="surface overflow-hidden rounded-3xl p-5">
+              <div>
+                <h2 className="text-xl">Top-Produkte (⭐ Umsatz)</h2>
+                <p className="mt-1 text-sm text-ember/70">
+                  Horizontaler Vergleich, damit Produktnamen nicht mehr gequetscht wirken.
+                </p>
+              </div>
+              <div className="mt-4 h-[22rem] rounded-2xl border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(245,141,116,0.16),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.92),rgba(251,245,242,0.98))] p-3">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topProductsData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="product_label" interval={0} angle={-20} textAnchor="end" height={72} />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="revenue_stars" fill="#f58d74" />
+                  <BarChart data={topProductsData} layout="vertical" margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="dashboardProductsGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="#f58d74" stopOpacity={0.98} />
+                        <stop offset="100%" stopColor="#e6bc77" stopOpacity={0.9} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke={CHART_GRID_STROKE} strokeDasharray="4 8" horizontal={false} />
+                    <XAxis
+                      type="number"
+                      tick={CHART_AXIS_TICK}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                    />
+                    <YAxis
+                      dataKey="product_label"
+                      type="category"
+                      width={132}
+                      tick={CHART_AXIS_TICK}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={CHART_TOOLTIP_STYLE}
+                      formatter={(value) => [`${Number(value).toLocaleString("de-DE")} ⭐`, "Umsatz"]}
+                    />
+                    <Bar dataKey="revenue_stars" fill="url(#dashboardProductsGradient)" radius={[0, 10, 10, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

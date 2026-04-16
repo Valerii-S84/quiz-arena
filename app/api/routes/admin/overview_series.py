@@ -7,7 +7,10 @@ from sqlalchemy import distinct, func, literal_column, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.api.routes.admin.overview_activity_metrics import build_activity_days_subquery
+from app.api.routes.admin.overview_activity_metrics import (
+    build_activity_days_subquery,
+    build_activity_hours_subquery,
+)
 from app.api.routes.admin.overview_metrics import STAR_TO_EUR_RATE
 from app.db.models.outbox_events import OutboxEvent
 from app.db.models.promo_attempts import PromoAttempt
@@ -129,6 +132,31 @@ async def fetch_users_series(
         }
         for key in sorted(set(new_by_day) | set(active_by_day))
     ]
+
+
+async def fetch_hourly_activity_series(
+    session: AsyncSession,
+    *,
+    from_utc: datetime,
+    to_utc: datetime,
+) -> list[dict[str, int]]:
+    activity_hours = build_activity_hours_subquery(from_utc=from_utc, to_utc=to_utc)
+    active_by_hour = {
+        int(hour): int(total)
+        for hour, total in (
+            await session.execute(
+                select(
+                    activity_hours.c.local_hour_berlin,
+                    func.count(distinct(activity_hours.c.user_id)),
+                )
+                .where(activity_hours.c.local_hour_berlin.is_not(None))
+                .group_by(activity_hours.c.local_hour_berlin)
+                .order_by(activity_hours.c.local_hour_berlin)
+            )
+        ).all()
+        if hour is not None
+    }
+    return [{"hour": hour, "active_users": active_by_hour.get(hour, 0)} for hour in range(24)]
 
 
 async def fetch_top_products(

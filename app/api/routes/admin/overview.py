@@ -28,6 +28,7 @@ class OverviewResponse(BaseModel):
     kpis: dict[str, KpiCard]
     revenue_series: list[dict[str, object]]
     users_series: list[dict[str, object]]
+    hourly_activity_series: list[dict[str, object]] = Field(default_factory=list)
     funnel: list[dict[str, object]]
     top_products: list[dict[str, object]]
     feature_usage: dict[str, KpiCard] = Field(default_factory=dict)

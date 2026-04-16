@@ -213,6 +213,7 @@ async def test_build_overview_payload_builds_kpis_and_alerts() -> None:
         _RowsResult([]),
         _RowsResult([]),
         _RowsResult([]),
+        _RowsResult([(10, 2), (11, 3)]),
         _RowsResult([]),
         _ScalarResult(10),
         _ScalarResult(5),
@@ -240,6 +241,9 @@ async def test_build_overview_payload_builds_kpis_and_alerts() -> None:
         Decimal(200) * overview_metrics.STAR_TO_EUR_RATE
     )
     assert payload.feature_usage["duel_created_users"].current == 10.0
+    assert payload.hourly_activity_series[10] == {"hour": 10, "active_users": 2}
+    assert payload.hourly_activity_series[11] == {"hour": 11, "active_users": 3}
+    assert payload.hourly_activity_series[12] == {"hour": 12, "active_users": 0}
     assert payload.funnel[1] == {"step": "First Quiz", "value": 7}
     assert payload.funnel[2] == {"step": "Streak 3+", "value": 7}
     assert payload.funnel[3] == {"step": "Purchase", "value": 3}
