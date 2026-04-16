@@ -48,7 +48,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: development
     environment:
+      NODE_ENV: development
       NEXT_PUBLIC_API_URL: http://api:8000
     depends_on:
       api:
