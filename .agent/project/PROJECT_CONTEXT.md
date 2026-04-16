@@ -9,7 +9,7 @@
 
 - Project name: `Quiz Arena` (`quiz-arena-bot`)
 - Primary languages: `Python 3.12`, `TypeScript`, `Bash`
-- Runtime / platform: `FastAPI + aiogram + Celery on Python 3.12`, `Next.js 15.5.14 / React 18.3.1 frontend`, `Docker Compose local/prod`, `Linux VPS production`
+- Runtime / platform: `FastAPI + aiogram + Celery on Python 3.12`, `Next.js 15.5.15 / React 18.3.1 frontend`, `Docker Compose local/prod`, `Linux VPS production`
 - Main frameworks / libraries: `FastAPI`, `aiogram`, `SQLAlchemy`, `Alembic`, `Celery`, `Redis`, `Pydantic`, `Next.js`, `React`, `Tailwind CSS`
 - Data stores: `PostgreSQL`, `Redis`, `QuizBank CSV assets`
 - Default user-facing language: `German only for all product-facing UI, bot text, admin UI text, notifications, and other user-visible copy`
