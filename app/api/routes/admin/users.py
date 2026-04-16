@@ -35,8 +35,9 @@ async def list_users(
     search: str = Query(default=""),
     language: str | None = Query(default=None),
     level: str | None = Query(default=None),
+    sort_by: str = Query(default="created_at", pattern="^(created_at|daily_challenge_rating)$"),
     page: int = Query(default=1, ge=1),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=100, ge=1, le=200),
     _admin: AdminPrincipal = Depends(get_current_admin),
 ) -> dict[str, object]:
     add_admin_noindex_header(response)
@@ -48,6 +49,7 @@ async def list_users(
             level=level,
             page=page,
             limit=limit,
+            sort_by=sort_by,
         )
     pagination = build_pagination(total=total, page=page, limit=limit)
     return {

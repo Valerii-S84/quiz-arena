@@ -31,9 +31,29 @@ export async function fetchEconomyCohorts() {
   return data;
 }
 
-export async function fetchUsers() {
+export type UserListSortBy = "created_at" | "daily_challenge_rating";
+
+type FetchUsersOptions = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sortBy?: UserListSortBy;
+};
+
+export async function fetchUsers(options: FetchUsersOptions = {}) {
+  const {
+    page = 1,
+    limit = 100,
+    search = "",
+    sortBy = "created_at",
+  } = options;
   const { data } = await api.get("/admin/users", {
-    params: { page: 1, limit: 50 },
+    params: {
+      page,
+      limit,
+      search,
+      sort_by: sortBy,
+    },
   });
   return data;
 }

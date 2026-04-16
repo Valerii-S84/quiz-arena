@@ -4,6 +4,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
+from app.db.models.daily_runs import DailyRun
 from app.db.models.mode_progress import ModeProgress
 from app.db.models.streak_state import StreakState
 from app.db.models.users import User
@@ -33,6 +34,7 @@ async def list_users_page(
     level: str | None,
     page: int,
     limit: int,
+    sort_by: str = "created_at",
 ) -> tuple[list[dict[str, object]], int]:
     filters: list[ColumnElement[bool]] = _build_search_filters(search)
     if language:
@@ -52,11 +54,44 @@ async def list_users_page(
         total_stmt = total_stmt.where(where_clause)
     total = int((await session.execute(total_stmt)).scalar_one() or 0)
 
-    stmt = select(User)
+    daily_totals_subquery = (
+        select(
+            DailyRun.user_id.label("user_id"),
+            func.coalesce(func.sum(DailyRun.score), 0).label("daily_challenge_score"),
+            func.count(DailyRun.id).label("daily_challenge_completed_runs"),
+        )
+        .where(DailyRun.status == "COMPLETED")
+        .group_by(DailyRun.user_id)
+        .subquery()
+    )
+    daily_challenge_score = func.coalesce(daily_totals_subquery.c.daily_challenge_score, 0)
+    daily_challenge_completed_runs = func.coalesce(
+        daily_totals_subquery.c.daily_challenge_completed_runs,
+        0,
+    )
+
+    stmt = (
+        select(
+            User,
+            daily_challenge_score.label("daily_challenge_score"),
+            daily_challenge_completed_runs.label("daily_challenge_completed_runs"),
+        )
+        .outerjoin(daily_totals_subquery, daily_totals_subquery.c.user_id == User.id)
+    )
     if where_clause is not None:
         stmt = stmt.where(where_clause)
-    stmt = stmt.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit)
-    users = list((await session.execute(stmt)).scalars().all())
+    if sort_by == "daily_challenge_rating":
+        stmt = stmt.order_by(
+            daily_challenge_score.desc(),
+            daily_challenge_completed_runs.desc(),
+            User.created_at.desc(),
+            User.id.desc(),
+        )
+    else:
+        stmt = stmt.order_by(User.created_at.desc(), User.id.desc())
+    stmt = stmt.offset((page - 1) * limit).limit(limit)
+    user_rows = list((await session.execute(stmt)).all())
+    users = [user for user, _, _ in user_rows]
 
     user_ids = [int(user.id) for user in users]
     streak_stmt = select(StreakState.user_id, StreakState.current_streak).where(
@@ -77,7 +112,9 @@ async def list_users_page(
             "created_at": user.created_at.isoformat(),
             "last_seen_at": user.last_seen_at.isoformat() if user.last_seen_at else None,
             "streak": streak_map.get(int(user.id), 0),
+            "daily_challenge_score": int(daily_score_raw or 0),
+            "daily_challenge_completed_runs": int(daily_runs_raw or 0),
         }
-        for user in users
+        for user, daily_score_raw, daily_runs_raw in user_rows
     ]
     return rows, total
