@@ -70,14 +70,11 @@ async def list_users_page(
         0,
     )
 
-    stmt = (
-        select(
-            User,
-            daily_challenge_score.label("daily_challenge_score"),
-            daily_challenge_completed_runs.label("daily_challenge_completed_runs"),
-        )
-        .outerjoin(daily_totals_subquery, daily_totals_subquery.c.user_id == User.id)
-    )
+    stmt = select(
+        User,
+        daily_challenge_score.label("daily_challenge_score"),
+        daily_challenge_completed_runs.label("daily_challenge_completed_runs"),
+    ).outerjoin(daily_totals_subquery, daily_totals_subquery.c.user_id == User.id)
     if where_clause is not None:
         stmt = stmt.where(where_clause)
     if sort_by == "daily_challenge_rating":
