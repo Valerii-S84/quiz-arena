@@ -76,6 +76,22 @@ describe("public home data", () => {
     });
   });
 
+  it("redirects straight to admin when 2FA is not required", async () => {
+    const result = await submitAdminLogin(
+      {
+        login: "admin@example.com",
+        password: "secret",
+      },
+      async () => ({ requires_2fa: false }),
+    );
+
+    expect(result).toEqual({
+      status: "idle",
+      feedback: null,
+      redirectTo: "/admin",
+    });
+  });
+
   it("returns the login error message when authentication fails", async () => {
     const result = await submitAdminLogin(
       {
