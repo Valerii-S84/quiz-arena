@@ -106,6 +106,10 @@ def _all_checks_ok(checks: dict[str, dict[str, Any]]) -> bool:
     return all(check.get("status") == "ok" for check in checks.values())
 
 
+def _coarse_health_payload(is_healthy: bool) -> dict[str, str]:
+    return {"status": "ok" if is_healthy else "degraded"}
+
+
 @router.get("/live")
 async def live() -> JSONResponse:
     return JSONResponse(
@@ -120,10 +124,7 @@ async def health() -> JSONResponse:
     is_healthy = _all_checks_ok(checks)
     return JSONResponse(
         status_code=(status.HTTP_200_OK if is_healthy else status.HTTP_503_SERVICE_UNAVAILABLE),
-        content={
-            "status": "ok" if is_healthy else "degraded",
-            "checks": checks,
-        },
+        content=_coarse_health_payload(is_healthy),
     )
 
 
