@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import os
+
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 
 _VALID_PROMO_ENCRYPTION_KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY"
 
@@ -51,3 +53,33 @@ def test_settings_reject_invalid_promo_encryption_key() -> None:
         Settings(
             **_settings_kwargs(PROMO_ENCRYPTION_KEY="not-a-valid-key"),
         )
+
+
+def test_get_settings_bootstraps_required_test_env_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    test_database_url = "postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test"
+
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("DATABASE_URL", test_database_url)
+    monkeypatch.delenv("TEST_DATABASE_URL", raising=False)
+    monkeypatch.delenv("ADMIN_JWT_SECRET", raising=False)
+    monkeypatch.delenv("ADMIN_REFRESH_SECRET", raising=False)
+    monkeypatch.delenv("PROMO_ENCRYPTION_KEY", raising=False)
+    monkeypatch.delenv("INTERNAL_API_TOKEN", raising=False)
+    monkeypatch.delenv("PROMO_SECRET_PEPPER", raising=False)
+    monkeypatch.delenv("ADMIN_PASSWORD_PLAIN", raising=False)
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("TELEGRAM_WEBHOOK_SECRET", raising=False)
+    get_settings.cache_clear()
+
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+
+    assert settings.database_url == test_database_url
+    assert settings.admin_jwt_secret == "ci-test-admin-jwt-secret"
+    assert settings.admin_refresh_secret == "ci-test-admin-refresh-secret"
+    assert settings.promo_encryption_key == _VALID_PROMO_ENCRYPTION_KEY
+    assert os.environ["TEST_DATABASE_URL"] == test_database_url

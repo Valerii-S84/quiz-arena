@@ -2,6 +2,7 @@ PYTHON=.venv/bin/python
 PIP=.venv/bin/pip
 PIP_COMPILE=.venv/bin/pip-compile
 TEST_DATABASE_URL?=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test
+TEST_ENV=APP_ENV=test TEST_DATABASE_URL=$(TEST_DATABASE_URL) DATABASE_URL=$(TEST_DATABASE_URL)
 
 venv:
 	python3 -m venv .venv
@@ -58,14 +59,14 @@ local-ci:
 	bash scripts/local_ci.sh
 
 test:
-	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m scripts.ensure_test_db
-	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m alembic upgrade head
-	DATABASE_URL=$(TEST_DATABASE_URL) TMPDIR=/tmp .venv/bin/pytest -q
+	$(TEST_ENV) $(PYTHON) -m scripts.ensure_test_db
+	$(TEST_ENV) $(PYTHON) -m alembic upgrade head
+	$(TEST_ENV) TMPDIR=/tmp .venv/bin/pytest -q
 
 test-integration:
-	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m scripts.ensure_test_db
-	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m alembic upgrade head
-	DATABASE_URL=$(TEST_DATABASE_URL) TMPDIR=/tmp .venv/bin/pytest -q -s tests/integration
+	$(TEST_ENV) $(PYTHON) -m scripts.ensure_test_db
+	$(TEST_ENV) $(PYTHON) -m alembic upgrade head
+	$(TEST_ENV) TMPDIR=/tmp .venv/bin/pytest -q -s tests/integration
 
 migrate:
 	$(PYTHON) -m alembic upgrade head

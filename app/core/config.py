@@ -11,6 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.core.config_admin import AdminSettingsMixin
 from app.core.config_messaging import MessagingSettingsMixin
 from app.core.config_runtime import RuntimeSettingsMixin
+from app.core.test_env import apply_test_env_defaults_if_requested
 
 
 class Settings(
@@ -81,6 +82,7 @@ class Settings(
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
+    apply_test_env_defaults_if_requested()
     return Settings()
 
 
