@@ -157,3 +157,48 @@ async def test_send_deadline_notifications_pending_expired_only_notifies_creator
     assert bot.messages[0]["chat_id"] == 10010
     assert events[0]["status"] == "EXPIRED"
     assert events[0]["previous_status"] == "PENDING"
+
+
+@pytest.mark.asyncio
+async def test_send_deadline_notifications_standard_expired_notifies_both_users(
+    monkeypatch,
+) -> None:
+    bot = _RecordingBot()
+
+    async def _fake_resolve_targets(user_ids):
+        assert user_ids == {10, 20}
+        return {10: 10010, 20: 10020}
+
+    monkeypatch.setattr(friend_challenges_notifications, "build_bot", lambda: bot)
+    monkeypatch.setattr(
+        friend_challenges_notifications,
+        "resolve_telegram_targets",
+        _fake_resolve_targets,
+    )
+
+    result = await friend_challenges_notifications.send_deadline_notifications(
+        now_utc=datetime.now(timezone.utc),
+        reminder_items=[],
+        expired_items=[
+            {
+                "challenge_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                "creator_user_id": 10,
+                "opponent_user_id": 20,
+                "creator_score": 3,
+                "opponent_score": 2,
+                "status": "EXPIRED",
+                "previous_status": "ACCEPTED",
+            }
+        ],
+    )
+
+    reminders_sent, reminders_failed, expired_sent, expired_failed, _, events = result
+    assert reminders_sent == 0
+    assert reminders_failed == 0
+    assert expired_sent == 2
+    assert expired_failed == 0
+    assert [message["chat_id"] for message in bot.messages] == [10010, 10020]
+    assert "Finaler Score: Du 3 | Gegner 2." in str(bot.messages[0]["text"])
+    assert "Finaler Score: Du 2 | Gegner 3." in str(bot.messages[1]["text"])
+    assert events[0]["status"] == "EXPIRED"
+    assert events[0]["previous_status"] == "ACCEPTED"
