@@ -7,7 +7,6 @@ from uuid import uuid4
 import pytest
 
 from app.game.friend_challenges.constants import DUEL_STATUS_CANCELED, DUEL_STATUS_EXPIRED
-from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 from app.game.sessions.service import friend_challenges_manage
 from tests.type_helpers import AsyncSessionStub
 
@@ -38,91 +37,13 @@ def _challenge(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "func",
-    [
-        friend_challenges_manage.repost_friend_challenge_as_open,
-        friend_challenges_manage.cancel_friend_challenge_by_creator,
-    ],
-)
-async def test_manage_friend_challenge_raises_when_not_found(
-    monkeypatch: pytest.MonkeyPatch,
-    func,
-) -> None:
-    monkeypatch.setattr(
-        friend_challenges_manage.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(None),
-    )
-
-    with pytest.raises(FriendChallengeNotFoundError):
-        await func(
-            _Session(),
-            user_id=11,
-            challenge_id=uuid4(),
-            now_utc=NOW_UTC,
-        )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("func", "challenge", "user_id"),
-    [
-        (
-            friend_challenges_manage.repost_friend_challenge_as_open,
-            _challenge(creator_user_id=11),
-            999,
-        ),
-        (
-            friend_challenges_manage.cancel_friend_challenge_by_creator,
-            _challenge(status="ACCEPTED", creator_user_id=11),
-            11,
-        ),
-    ],
-)
-async def test_manage_friend_challenge_rejects_access_checks(
-    monkeypatch: pytest.MonkeyPatch,
-    func,
-    challenge: SimpleNamespace,
-    user_id: int,
-) -> None:
-    monkeypatch.setattr(
-        friend_challenges_manage.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(challenge),
-    )
-    monkeypatch.setattr(
-        friend_challenges_manage,
-        "_expire_friend_challenge_if_due",
-        lambda **_kwargs: False,
-    )
-
-    with pytest.raises(FriendChallengeAccessError):
-        await func(
-            _Session(),
-            user_id=user_id,
-            challenge_id=challenge.id,
-            now_utc=NOW_UTC,
-        )
-
-
-@pytest.mark.asyncio
 async def test_repost_friend_challenge_as_open_creates_repost_and_emits_events(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    challenge = _challenge(status="ACTIVE", creator_user_id=11, opponent_user_id=None)
+    challenge = _challenge()
     repost = SimpleNamespace(challenge_id=uuid4(), total_rounds=challenge.total_rounds)
-    expired_events: list[dict[str, object]] = []
     analytics_events: list[dict[str, object]] = []
     create_calls: list[dict[str, object]] = []
-
-    def _fake_expire(*, challenge, now_utc) -> bool:
-        assert now_utc == NOW_UTC
-        challenge.status = DUEL_STATUS_EXPIRED
-        return True
-
-    async def _fake_emit_expired_event(*_args, **kwargs) -> None:
-        expired_events.append(kwargs)
 
     async def _fake_create_friend_challenge(*_args, **kwargs):
         create_calls.append(kwargs)
@@ -132,19 +53,9 @@ async def test_repost_friend_challenge_as_open_creates_repost_and_emits_events(
         analytics_events.append(kwargs)
 
     monkeypatch.setattr(
-        friend_challenges_manage.FriendChallengesRepo,
-        "get_by_id_for_update",
+        friend_challenges_manage,
+        "load_manageable_friend_challenge",
         _async_return(challenge),
-    )
-    monkeypatch.setattr(
-        friend_challenges_manage,
-        "_expire_friend_challenge_if_due",
-        _fake_expire,
-    )
-    monkeypatch.setattr(
-        friend_challenges_manage,
-        "_emit_friend_challenge_expired_event",
-        _fake_emit_expired_event,
     )
     monkeypatch.setattr(
         friend_challenges_manage,
@@ -165,13 +76,6 @@ async def test_repost_friend_challenge_as_open_creates_repost_and_emits_events(
     )
 
     assert result is repost
-    assert expired_events == [
-        {
-            "challenge": challenge,
-            "happened_at": NOW_UTC,
-            "source": friend_challenges_manage.EVENT_SOURCE_BOT,
-        }
-    ]
     assert create_calls == [
         {
             "creator_user_id": 11,
@@ -197,29 +101,47 @@ async def test_repost_friend_challenge_as_open_creates_repost_and_emits_events(
 
 
 @pytest.mark.asyncio
-async def test_repost_friend_challenge_as_open_rejects_non_expired_creator(
+async def test_repost_friend_challenge_as_open_delegates_state_loading(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    challenge = _challenge(status="ACCEPTED", creator_user_id=11)
+    challenge = _challenge()
+    repost = SimpleNamespace(challenge_id=uuid4(), total_rounds=challenge.total_rounds)
+    calls: list[dict[str, object]] = []
+
+    async def _fake_load_manageable_friend_challenge(*_args, **kwargs):
+        calls.append(kwargs)
+        return challenge
 
     monkeypatch.setattr(
-        friend_challenges_manage.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(challenge),
+        friend_challenges_manage,
+        "load_manageable_friend_challenge",
+        _fake_load_manageable_friend_challenge,
     )
     monkeypatch.setattr(
         friend_challenges_manage,
-        "_expire_friend_challenge_if_due",
-        lambda **_kwargs: False,
+        "create_friend_challenge",
+        _async_return(repost),
+    )
+    monkeypatch.setattr(
+        friend_challenges_manage,
+        "emit_analytics_event",
+        _async_return(None),
     )
 
-    with pytest.raises(FriendChallengeAccessError):
-        await friend_challenges_manage.repost_friend_challenge_as_open(
-            _Session(),
-            user_id=11,
-            challenge_id=challenge.id,
-            now_utc=NOW_UTC,
-        )
+    await friend_challenges_manage.repost_friend_challenge_as_open(
+        _Session(),
+        user_id=11,
+        challenge_id=challenge.id,
+        now_utc=NOW_UTC,
+    )
+
+    assert calls == [
+        {
+            "challenge_id": challenge.id,
+            "user_id": 11,
+            "now_utc": NOW_UTC,
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -234,14 +156,9 @@ async def test_cancel_friend_challenge_by_creator_marks_canceled_and_returns_sna
         analytics_events.append(kwargs)
 
     monkeypatch.setattr(
-        friend_challenges_manage.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(challenge),
-    )
-    monkeypatch.setattr(
         friend_challenges_manage,
-        "_expire_friend_challenge_if_due",
-        lambda **_kwargs: False,
+        "load_manageable_friend_challenge",
+        _async_return(challenge),
     )
     monkeypatch.setattr(
         friend_challenges_manage,
@@ -280,45 +197,44 @@ async def test_cancel_friend_challenge_by_creator_marks_canceled_and_returns_sna
 
 
 @pytest.mark.asyncio
-async def test_cancel_friend_challenge_by_creator_emits_expired_event_before_access_error(
+async def test_cancel_friend_challenge_by_creator_delegates_state_loading(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    challenge = _challenge(status="ACTIVE", creator_user_id=11, opponent_user_id=None)
-    expired_events: list[dict[str, object]] = []
+    challenge = _challenge()
+    calls: list[dict[str, object]] = []
 
-    def _fake_expire(*, challenge, now_utc) -> bool:
-        assert now_utc == NOW_UTC
-        challenge.status = DUEL_STATUS_EXPIRED
-        return True
+    async def _fake_load_manageable_friend_challenge(*_args, **kwargs):
+        calls.append(kwargs)
+        return challenge
 
-    async def _fake_emit_expired_event(*_args, **kwargs) -> None:
-        expired_events.append(kwargs)
-
-    monkeypatch.setattr(
-        friend_challenges_manage.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(challenge),
-    )
-    monkeypatch.setattr(friend_challenges_manage, "_expire_friend_challenge_if_due", _fake_expire)
     monkeypatch.setattr(
         friend_challenges_manage,
-        "_emit_friend_challenge_expired_event",
-        _fake_emit_expired_event,
+        "load_manageable_friend_challenge",
+        _fake_load_manageable_friend_challenge,
+    )
+    monkeypatch.setattr(
+        friend_challenges_manage,
+        "emit_analytics_event",
+        _async_return(None),
+    )
+    monkeypatch.setattr(
+        friend_challenges_manage,
+        "_build_friend_challenge_snapshot",
+        lambda challenge_row: {"challenge_id": str(challenge_row.id)},
     )
 
-    with pytest.raises(FriendChallengeAccessError):
-        await friend_challenges_manage.cancel_friend_challenge_by_creator(
-            _Session(),
-            user_id=999,
-            challenge_id=challenge.id,
-            now_utc=NOW_UTC,
-        )
+    await friend_challenges_manage.cancel_friend_challenge_by_creator(
+        _Session(),
+        user_id=11,
+        challenge_id=challenge.id,
+        now_utc=NOW_UTC,
+    )
 
-    assert expired_events == [
+    assert calls == [
         {
-            "challenge": challenge,
-            "happened_at": NOW_UTC,
-            "source": friend_challenges_manage.EVENT_SOURCE_BOT,
+            "challenge_id": challenge.id,
+            "user_id": 11,
+            "now_utc": NOW_UTC,
         }
     ]
 
