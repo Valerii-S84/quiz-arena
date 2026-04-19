@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -57,3 +58,44 @@ async def test_try_create_processing_slot_is_atomic_under_race_condition() -> No
     assert row is not None
     assert row.status == "PROCESSING"
     assert row.processing_task_id in {"task-1", "task-2"}
+
+
+@pytest.mark.asyncio
+async def test_processing_observability_queries_ignore_non_processing_rows() -> None:
+    now_utc = datetime.now(timezone.utc)
+
+    async with SessionLocal.begin() as session:
+        await ProcessedUpdatesRepo.create(
+            session,
+            update_id=800_001,
+            status="PROCESSING",
+            processed_at=now_utc - timedelta(hours=2),
+            processing_task_id="task-oldest",
+        )
+        await ProcessedUpdatesRepo.create(
+            session,
+            update_id=800_002,
+            status="PROCESSING",
+            processed_at=now_utc - timedelta(minutes=10),
+            processing_task_id="task-newer",
+        )
+        await ProcessedUpdatesRepo.create(
+            session,
+            update_id=800_003,
+            status="DONE",
+            processed_at=now_utc - timedelta(hours=3),
+            processing_task_id="task-done",
+        )
+
+    async with SessionLocal.begin() as session:
+        older_count = await ProcessedUpdatesRepo.count_processing_older_than_seconds(
+            session,
+            older_than_seconds=3_600,
+        )
+        max_age_seconds = await ProcessedUpdatesRepo.get_processing_age_max_seconds(session)
+        oldest_processing = await ProcessedUpdatesRepo.list_oldest_processing(session, limit=2)
+
+    assert older_count == 1
+    assert max_age_seconds >= 7_000
+    assert [item["update_id"] for item in oldest_processing] == [800_001, 800_002]
+    assert all(item["processing_task_id"] is not None for item in oldest_processing)

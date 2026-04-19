@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import Any, cast
+from uuid import UUID
 
 import pytest
 
@@ -124,3 +125,158 @@ async def test_handle_answer_rejects_missing_callback_fields() -> None:
     await gameplay.handle_answer(callback)  # type: ignore[arg-type]
 
     assert callback.answer_calls == [{"text": TEXTS_DE["msg.system.error"], "show_alert": True}]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("handler_name", "callback_data", "expected_mode", "expected_source", "expected_key"),
+    [
+        (
+            "handle_play",
+            "play",
+            "QUICK_MIX_A1A2",
+            "MENU",
+            "start:play:cb-1",
+        ),
+        (
+            "handle_daily_challenge",
+            "daily_challenge",
+            "DAILY_CHALLENGE",
+            "DAILY_CHALLENGE",
+            "start:daily:cb-1",
+        ),
+    ],
+)
+async def test_start_handlers_delegate_with_current_bound_dependencies(
+    monkeypatch,
+    handler_name: str,
+    callback_data: str,
+    expected_mode: str,
+    expected_source: str,
+    expected_key: str,
+) -> None:
+    captured: dict[str, object] = {}
+    session_local = object()
+    user_onboarding_service = object()
+    game_session_service = object()
+    offer_service = object()
+    channel_bonus_service = object()
+    build_question_text = object()
+
+    class DummyOfferLoggingError(RuntimeError):
+        pass
+
+    async def _fake_start_mode(callback, **kwargs):
+        captured["callback"] = callback
+        captured.update(kwargs)
+
+    monkeypatch.setattr(gameplay, "SessionLocal", session_local)
+    monkeypatch.setattr(gameplay, "UserOnboardingService", user_onboarding_service)
+    monkeypatch.setattr(gameplay, "GameSessionService", game_session_service)
+    monkeypatch.setattr(gameplay, "OfferService", offer_service)
+    monkeypatch.setattr(gameplay, "OfferLoggingError", DummyOfferLoggingError)
+    monkeypatch.setattr(gameplay, "ChannelBonusService", channel_bonus_service)
+    monkeypatch.setattr(gameplay, "_build_question_text", build_question_text)
+    monkeypatch.setattr(gameplay.play_flow, "start_mode", _fake_start_mode)
+
+    callback = DummyCallback(data=callback_data, from_user=SimpleNamespace(id=1))
+
+    await getattr(gameplay, handler_name)(callback)
+
+    assert captured == {
+        "callback": callback,
+        "mode_code": expected_mode,
+        "source": expected_source,
+        "idempotency_key": expected_key,
+        "session_local": session_local,
+        "user_onboarding_service": user_onboarding_service,
+        "game_session_service": game_session_service,
+        "offer_service": offer_service,
+        "offer_logging_error": DummyOfferLoggingError,
+        "channel_bonus_service": channel_bonus_service,
+        "build_question_text": build_question_text,
+    }
+
+
+@pytest.mark.asyncio
+async def test_handle_mode_delegates_with_current_bound_dependencies(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+    session_local = object()
+    user_onboarding_service = object()
+    game_session_service = object()
+    offer_service = object()
+    channel_bonus_service = object()
+    build_question_text = object()
+
+    class DummyOfferLoggingError(RuntimeError):
+        pass
+
+    async def _fake_start_mode(callback, **kwargs):
+        captured["callback"] = callback
+        captured.update(kwargs)
+
+    monkeypatch.setattr(gameplay, "SessionLocal", session_local)
+    monkeypatch.setattr(gameplay, "UserOnboardingService", user_onboarding_service)
+    monkeypatch.setattr(gameplay, "GameSessionService", game_session_service)
+    monkeypatch.setattr(gameplay, "OfferService", offer_service)
+    monkeypatch.setattr(gameplay, "OfferLoggingError", DummyOfferLoggingError)
+    monkeypatch.setattr(gameplay, "ChannelBonusService", channel_bonus_service)
+    monkeypatch.setattr(gameplay, "_build_question_text", build_question_text)
+    monkeypatch.setattr(gameplay.play_flow, "start_mode", _fake_start_mode)
+
+    callback = DummyCallback(data="mode:ARTIKEL_SPRINT", from_user=SimpleNamespace(id=1))
+
+    await gameplay.handle_mode(callback)
+
+    assert captured == {
+        "callback": callback,
+        "mode_code": "ARTIKEL_SPRINT",
+        "source": "MENU",
+        "idempotency_key": "start:mode:ARTIKEL_SPRINT:cb-1",
+        "session_local": session_local,
+        "user_onboarding_service": user_onboarding_service,
+        "game_session_service": game_session_service,
+        "offer_service": offer_service,
+        "offer_logging_error": DummyOfferLoggingError,
+        "channel_bonus_service": channel_bonus_service,
+        "build_question_text": build_question_text,
+    }
+
+
+@pytest.mark.asyncio
+async def test_handle_daily_result_delegates_with_current_bound_dependencies(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+    session_local = object()
+    user_onboarding_service = object()
+    game_session_service = object()
+    daily_run_id = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+
+    async def _fake_handle_daily_result_screen(callback, **kwargs):
+        captured["callback"] = callback
+        captured.update(kwargs)
+
+    monkeypatch.setattr(gameplay, "SessionLocal", session_local)
+    monkeypatch.setattr(gameplay, "UserOnboardingService", user_onboarding_service)
+    monkeypatch.setattr(gameplay, "GameSessionService", game_session_service)
+    monkeypatch.setattr(
+        gameplay.daily_result_flow,
+        "handle_daily_result_screen",
+        _fake_handle_daily_result_screen,
+    )
+
+    callback = DummyCallback(
+        data=f"daily:result:{daily_run_id}",
+        from_user=SimpleNamespace(id=1),
+    )
+
+    await gameplay.handle_daily_result(callback)
+
+    assert captured == {
+        "callback": callback,
+        "daily_run_id": daily_run_id,
+        "session_local": session_local,
+        "user_onboarding_service": user_onboarding_service,
+        "game_session_service": game_session_service,
+    }

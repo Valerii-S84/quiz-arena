@@ -4,12 +4,27 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.tournament_participants import TournamentParticipant
-from app.db.models.tournaments import Tournament
+from app.db.repo.tournament_participants_queries import (
+    count_for_tournament as count_for_tournament_query,
+)
+from app.db.repo.tournament_participants_queries import (
+    get_for_tournament_user as get_for_tournament_user_query,
+)
+from app.db.repo.tournament_participants_queries import (
+    list_for_tournament as list_for_tournament_query,
+)
+from app.db.repo.tournament_participants_queries import (
+    list_for_tournament_for_update as list_for_tournament_for_update_query,
+)
+from app.db.repo.tournament_participants_queries import (
+    list_joined_at_for_user_by_tournament_type as list_joined_at_for_user_by_tournament_type_query,
+)
+from app.db.repo.tournament_participants_updates import apply_score_delta as apply_score_delta_query
+from app.db.repo.tournament_participants_updates import set_score as set_score_query
 from app.db.repo.tournament_participants_updates import update_participant
 
 
@@ -47,11 +62,10 @@ class TournamentParticipantsRepo:
 
     @staticmethod
     async def count_for_tournament(session: AsyncSession, *, tournament_id: UUID) -> int:
-        stmt = select(func.count(TournamentParticipant.user_id)).where(
-            TournamentParticipant.tournament_id == tournament_id
+        return await count_for_tournament_query(
+            session,
+            tournament_id=tournament_id,
         )
-        result = await session.execute(stmt)
-        return int(result.scalar_one() or 0)
 
     @staticmethod
     async def list_for_tournament(
@@ -59,17 +73,10 @@ class TournamentParticipantsRepo:
         *,
         tournament_id: UUID,
     ) -> list[TournamentParticipant]:
-        stmt = (
-            select(TournamentParticipant)
-            .where(TournamentParticipant.tournament_id == tournament_id)
-            .order_by(
-                TournamentParticipant.score.desc(),
-                TournamentParticipant.tie_break.desc(),
-                TournamentParticipant.joined_at.asc(),
-            )
+        return await list_for_tournament_query(
+            session,
+            tournament_id=tournament_id,
         )
-        result = await session.execute(stmt)
-        return list(result.scalars().all())
 
     @staticmethod
     async def get_for_tournament_user(
@@ -78,12 +85,11 @@ class TournamentParticipantsRepo:
         tournament_id: UUID,
         user_id: int,
     ) -> TournamentParticipant | None:
-        stmt = select(TournamentParticipant).where(
-            TournamentParticipant.tournament_id == tournament_id,
-            TournamentParticipant.user_id == user_id,
+        return await get_for_tournament_user_query(
+            session,
+            tournament_id=tournament_id,
+            user_id=user_id,
         )
-        result = await session.execute(stmt)
-        return result.scalar_one_or_none()
 
     @staticmethod
     async def list_for_tournament_for_update(
@@ -91,14 +97,10 @@ class TournamentParticipantsRepo:
         *,
         tournament_id: UUID,
     ) -> list[TournamentParticipant]:
-        stmt = (
-            select(TournamentParticipant)
-            .where(TournamentParticipant.tournament_id == tournament_id)
-            .order_by(TournamentParticipant.joined_at.asc())
-            .with_for_update()
+        return await list_for_tournament_for_update_query(
+            session,
+            tournament_id=tournament_id,
         )
-        result = await session.execute(stmt)
-        return list(result.scalars().all())
 
     @staticmethod
     async def apply_score_delta(
@@ -109,20 +111,13 @@ class TournamentParticipantsRepo:
         score_delta: Decimal,
         tie_break_delta: Decimal,
     ) -> int:
-        stmt = (
-            update(TournamentParticipant)
-            .where(
-                TournamentParticipant.tournament_id == tournament_id,
-                TournamentParticipant.user_id == user_id,
-            )
-            .values(
-                score=TournamentParticipant.score + score_delta,
-                tie_break=TournamentParticipant.tie_break + tie_break_delta,
-            )
-            .returning(TournamentParticipant.user_id)
+        return await apply_score_delta_query(
+            session,
+            tournament_id=tournament_id,
+            user_id=user_id,
+            score_delta=score_delta,
+            tie_break_delta=tie_break_delta,
         )
-        result = await session.execute(stmt)
-        return int(result.scalar_one_or_none() is not None)
 
     @staticmethod
     async def set_score(
@@ -133,17 +128,13 @@ class TournamentParticipantsRepo:
         score: Decimal,
         tie_break: Decimal,
     ) -> int:
-        stmt = (
-            update(TournamentParticipant)
-            .where(
-                TournamentParticipant.tournament_id == tournament_id,
-                TournamentParticipant.user_id == user_id,
-            )
-            .values(score=score, tie_break=tie_break)
-            .returning(TournamentParticipant.user_id)
+        return await set_score_query(
+            session,
+            tournament_id=tournament_id,
+            user_id=user_id,
+            score=score,
+            tie_break=tie_break,
         )
-        result = await session.execute(stmt)
-        return int(result.scalar_one_or_none() is not None)
 
     @staticmethod
     async def set_standings_message_id_if_missing(
@@ -215,18 +206,10 @@ class TournamentParticipantsRepo:
         tournament_status: str | None = None,
         limit: int = 365,
     ) -> list[datetime]:
-        resolved_limit = max(1, min(1000, int(limit)))
-        stmt = (
-            select(TournamentParticipant.joined_at)
-            .join(Tournament, Tournament.id == TournamentParticipant.tournament_id)
-            .where(
-                TournamentParticipant.user_id == user_id,
-                Tournament.type == tournament_type,
-            )
-            .order_by(TournamentParticipant.joined_at.desc())
-            .limit(resolved_limit)
+        return await list_joined_at_for_user_by_tournament_type_query(
+            session,
+            user_id=user_id,
+            tournament_type=tournament_type,
+            tournament_status=tournament_status,
+            limit=limit,
         )
-        if tournament_status is not None:
-            stmt = stmt.where(Tournament.status == tournament_status)
-        result = await session.execute(stmt)
-        return list(result.scalars().all())
