@@ -67,6 +67,29 @@ def _duel(
     )
 
 
+def _draft(
+    *,
+    creator_user_id: int,
+    opponent_user_id: int | None,
+    access_type: str,
+    series_id: UUID,
+    series_game_number: int,
+    series_best_of: int,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        creator_user_id=creator_user_id,
+        opponent_user_id=opponent_user_id,
+        challenge_type="DIRECT",
+        mode_code="QUICK_MIX_A1A2",
+        access_type=access_type,
+        total_rounds=7,
+        series_id=series_id,
+        series_game_number=series_game_number,
+        series_best_of=series_best_of,
+        status=DUEL_STATUS_ACCEPTED,
+    )
+
+
 def _async_return(value):
     async def _inner(*args, **kwargs):
         del args, kwargs
@@ -75,12 +98,25 @@ def _async_return(value):
     return _inner
 
 
+def _context(*, challenge: SimpleNamespace, opponent_user_id: int) -> SimpleNamespace:
+    return SimpleNamespace(
+        challenge=challenge,
+        opponent_user_id=opponent_user_id,
+    )
+
+
 @pytest.mark.asyncio
 async def test_create_friend_challenge_best_of_three_raises_when_challenge_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    async def _raise_not_found(*args, **kwargs):
+        del args, kwargs
+        raise FriendChallengeNotFoundError
+
     monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo, "get_by_id_for_update", _async_return(None)
+        friend_challenges_series,
+        "load_friend_challenge_series_context",
+        _raise_not_found,
     )
 
     with pytest.raises(FriendChallengeNotFoundError):
@@ -98,20 +134,23 @@ async def test_create_friend_challenge_best_of_three_raises_when_challenge_missi
 async def test_create_friend_challenge_best_of_three_rejects_invalid_access(
     monkeypatch: pytest.MonkeyPatch, status: str, initiator_user_id: int
 ) -> None:
+    challenge = _challenge(status=status)
+
+    async def _raise_access_error(*args, **kwargs):
+        del args, kwargs
+        raise FriendChallengeAccessError
+
     monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(_challenge(status=status)),
-    )
-    monkeypatch.setattr(
-        friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: False
+        friend_challenges_series,
+        "load_friend_challenge_series_context",
+        _raise_access_error,
     )
 
     with pytest.raises(FriendChallengeAccessError):
         await friend_challenges_series.create_friend_challenge_best_of_three(
             _Session(),
             initiator_user_id=initiator_user_id,
-            challenge_id=uuid4(),
+            challenge_id=challenge.id,
             now_utc=NOW_UTC,
         )
 
@@ -122,42 +161,42 @@ async def test_create_friend_challenge_best_of_three_creates_series_duel_and_emi
 ) -> None:
     challenge = _challenge()
     fixed_series_id = uuid4()
+    draft = _draft(
+        creator_user_id=101,
+        opponent_user_id=202,
+        access_type="FREE",
+        series_id=fixed_series_id,
+        series_game_number=1,
+        series_best_of=5,
+    )
     duel = _duel(series_id=fixed_series_id, series_best_of=5)
-    expired_events: list[dict[str, object]] = []
-    analytics_events: list[dict[str, Any]] = []
     create_calls: list[dict[str, object]] = []
+    series_event_calls: list[dict[str, Any]] = []
 
     async def _fake_create_row(session, **kwargs):
         del session
         create_calls.append(kwargs)
         return duel
 
-    async def _fake_emit_expired_event(session, **kwargs):
+    async def _fake_emit_series_started(session, **kwargs):
         del session
-        expired_events.append(kwargs)
-
-    async def _fake_emit_analytics_event(session, **kwargs):
-        del session
-        analytics_events.append(kwargs)
+        series_event_calls.append(kwargs)
 
     monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(challenge),
-    )
-    monkeypatch.setattr(friend_challenges_series, "uuid4", lambda: fixed_series_id)
-    monkeypatch.setattr(
-        friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: True
+        friend_challenges_series,
+        "load_friend_challenge_series_context",
+        _async_return(_context(challenge=challenge, opponent_user_id=202)),
     )
     monkeypatch.setattr(
-        friend_challenges_series, "_emit_friend_challenge_expired_event", _fake_emit_expired_event
-    )
-    monkeypatch.setattr(
-        friend_challenges_series, "_resolve_friend_challenge_access_type", _async_return("FREE")
+        friend_challenges_series,
+        "build_series_start_friend_challenge_draft",
+        _async_return(draft),
     )
     monkeypatch.setattr(friend_challenges_series, "_create_friend_challenge_row", _fake_create_row)
     monkeypatch.setattr(
-        friend_challenges_series, "emit_analytics_event", _fake_emit_analytics_event
+        friend_challenges_series,
+        "emit_series_started_duel_created_events",
+        _fake_emit_series_started,
     )
     monkeypatch.setattr(
         friend_challenges_series,
@@ -174,13 +213,6 @@ async def test_create_friend_challenge_best_of_three_creates_series_duel_and_emi
     )
 
     assert result == {"challenge_id": duel.id}
-    assert expired_events == [
-        {
-            "challenge": challenge,
-            "happened_at": NOW_UTC,
-            "source": friend_challenges_series.EVENT_SOURCE_BOT,
-        }
-    ]
     assert create_calls == [
         {
             "creator_user_id": 101,
@@ -196,12 +228,16 @@ async def test_create_friend_challenge_best_of_three_creates_series_duel_and_emi
             "status": DUEL_STATUS_ACCEPTED,
         }
     ]
-    assert [event["event_type"] for event in analytics_events] == [
-        "friend_challenge_created",
-        "friend_challenge_series_started",
+    assert series_event_calls == [
+        {
+            "duel": duel,
+            "source_challenge_id": challenge.id,
+            "opponent_user_id": 202,
+            "happened_at": NOW_UTC,
+            "source": friend_challenges_series.EVENT_SOURCE_BOT,
+            "initiator_user_id": 101,
+        }
     ]
-    assert analytics_events[0]["payload"]["entrypoint"] == "best_of_series"
-    assert analytics_events[1]["payload"]["series_id"] == str(fixed_series_id)
 
 
 @pytest.mark.asyncio
@@ -210,22 +246,19 @@ async def test_create_friend_challenge_series_next_game_rejects_without_series_m
 ) -> None:
     challenge = _challenge(series_id=None, series_best_of=1)
 
-    async def _unexpected_list_series(*args, **kwargs):
+    async def _raise_access_error(*args, **kwargs):
         del args, kwargs
-        pytest.fail("series lookup should not happen without valid series metadata")
+        raise FriendChallengeAccessError
 
     monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(challenge),
+        friend_challenges_series,
+        "load_friend_challenge_series_context",
+        _async_return(_context(challenge=challenge, opponent_user_id=202)),
     )
     monkeypatch.setattr(
-        friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: False
-    )
-    monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo,
-        "list_by_series_id_for_update",
-        _unexpected_list_series,
+        friend_challenges_series,
+        "build_series_next_game_friend_challenge_draft",
+        _raise_access_error,
     )
 
     with pytest.raises(FriendChallengeAccessError):
@@ -284,18 +317,21 @@ async def test_create_friend_challenge_series_next_game_rejects_finished_series(
     series_challenges: list[SimpleNamespace],
     challenge: SimpleNamespace,
 ) -> None:
+    del series_challenges
+
+    async def _raise_access_error(*args, **kwargs):
+        del args, kwargs
+        raise FriendChallengeAccessError
+
     monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(challenge),
+        friend_challenges_series,
+        "load_friend_challenge_series_context",
+        _async_return(_context(challenge=challenge, opponent_user_id=202)),
     )
     monkeypatch.setattr(
-        friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: False
-    )
-    monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo,
-        "list_by_series_id_for_update",
-        _async_return(series_challenges),
+        friend_challenges_series,
+        "build_series_next_game_friend_challenge_draft",
+        _raise_access_error,
     )
 
     with pytest.raises(FriendChallengeAccessError):
@@ -319,40 +355,42 @@ async def test_create_friend_challenge_series_next_game_creates_followup_duel_an
         series_best_of=3,
         winner_user_id=101,
     )
+    draft = _draft(
+        creator_user_id=202,
+        opponent_user_id=101,
+        access_type="PAID_TICKET",
+        series_id=SERIES_C_ID,
+        series_game_number=2,
+        series_best_of=3,
+    )
     duel = _duel(access_type="PAID_TICKET", series_id=SERIES_C_ID, series_game_number=2)
-    analytics_events: list[dict[str, Any]] = []
     create_calls: list[dict[str, object]] = []
+    series_event_calls: list[dict[str, Any]] = []
 
     async def _fake_create_row(session, **kwargs):
         del session
         create_calls.append(kwargs)
         return duel
 
-    async def _fake_emit_analytics_event(session, **kwargs):
+    async def _fake_emit_series_next_game(session, **kwargs):
         del session
-        analytics_events.append(kwargs)
+        series_event_calls.append(kwargs)
 
     monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(challenge),
-    )
-    monkeypatch.setattr(
-        friend_challenges_series, "_expire_friend_challenge_if_due", lambda **_: False
-    )
-    monkeypatch.setattr(
-        friend_challenges_series.FriendChallengesRepo,
-        "list_by_series_id_for_update",
-        _async_return([challenge]),
+        friend_challenges_series,
+        "load_friend_challenge_series_context",
+        _async_return(_context(challenge=challenge, opponent_user_id=101)),
     )
     monkeypatch.setattr(
         friend_challenges_series,
-        "_resolve_friend_challenge_access_type",
-        _async_return("PAID_TICKET"),
+        "build_series_next_game_friend_challenge_draft",
+        _async_return(draft),
     )
     monkeypatch.setattr(friend_challenges_series, "_create_friend_challenge_row", _fake_create_row)
     monkeypatch.setattr(
-        friend_challenges_series, "emit_analytics_event", _fake_emit_analytics_event
+        friend_challenges_series,
+        "emit_series_next_game_created_events",
+        _fake_emit_series_next_game,
     )
     monkeypatch.setattr(
         friend_challenges_series,
@@ -383,9 +421,13 @@ async def test_create_friend_challenge_series_next_game_creates_followup_duel_an
             "status": DUEL_STATUS_ACCEPTED,
         }
     ]
-    assert [event["event_type"] for event in analytics_events] == [
-        "friend_challenge_created",
-        "friend_challenge_series_game_created",
+    assert series_event_calls == [
+        {
+            "duel": duel,
+            "source_challenge_id": challenge.id,
+            "opponent_user_id": 101,
+            "happened_at": NOW_UTC,
+            "source": friend_challenges_series.EVENT_SOURCE_BOT,
+            "initiator_user_id": 202,
+        }
     ]
-    assert analytics_events[0]["payload"]["entrypoint"] == "best_of_series_next_game"
-    assert analytics_events[1]["payload"]["opponent_user_id"] == 101
