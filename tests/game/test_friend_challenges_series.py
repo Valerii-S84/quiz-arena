@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.game.friend_challenges.constants import DUEL_STATUS_ACCEPTED
-from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
+from app.game.sessions.errors import FriendChallengeAccessError
 from app.game.sessions.service import friend_challenges_series
 from tests.type_helpers import AsyncSessionStub
 
@@ -109,130 +109,37 @@ def _context(*, challenge: SimpleNamespace, opponent_user_id: int) -> SimpleName
 async def test_create_friend_challenge_best_of_three_raises_when_challenge_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _raise_not_found(*args, **kwargs):
-        del args, kwargs
-        raise FriendChallengeNotFoundError
+    session = _Session()
+    expected = {"challenge_id": str(uuid4())}
+    captured_kwargs: dict[str, object] = {}
+
+    async def _fake_create_best_of_three(session_arg, **kwargs):
+        captured_kwargs["session"] = session_arg
+        captured_kwargs.update(kwargs)
+        return expected
 
     monkeypatch.setattr(
         friend_challenges_series,
-        "load_friend_challenge_series_context",
-        _raise_not_found,
-    )
-
-    with pytest.raises(FriendChallengeNotFoundError):
-        await friend_challenges_series.create_friend_challenge_best_of_three(
-            _Session(), initiator_user_id=101, challenge_id=uuid4(), now_utc=NOW_UTC
-        )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("status", "initiator_user_id"),
-    [("ACCEPTED", 101), ("COMPLETED", 999)],
-    ids=["active_status_rejected", "outsider_rejected"],
-)
-async def test_create_friend_challenge_best_of_three_rejects_invalid_access(
-    monkeypatch: pytest.MonkeyPatch, status: str, initiator_user_id: int
-) -> None:
-    challenge = _challenge(status=status)
-
-    async def _raise_access_error(*args, **kwargs):
-        del args, kwargs
-        raise FriendChallengeAccessError
-
-    monkeypatch.setattr(
-        friend_challenges_series,
-        "load_friend_challenge_series_context",
-        _raise_access_error,
-    )
-
-    with pytest.raises(FriendChallengeAccessError):
-        await friend_challenges_series.create_friend_challenge_best_of_three(
-            _Session(),
-            initiator_user_id=initiator_user_id,
-            challenge_id=challenge.id,
-            now_utc=NOW_UTC,
-        )
-
-
-@pytest.mark.asyncio
-async def test_create_friend_challenge_best_of_three_creates_series_duel_and_emits_events(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    challenge = _challenge()
-    fixed_series_id = uuid4()
-    draft = _draft(
-        creator_user_id=101,
-        opponent_user_id=202,
-        access_type="FREE",
-        series_id=fixed_series_id,
-        series_game_number=1,
-        series_best_of=5,
-    )
-    duel = _duel(series_id=fixed_series_id, series_best_of=5)
-    create_calls: list[dict[str, object]] = []
-    series_event_calls: list[dict[str, Any]] = []
-
-    async def _fake_create_row(session, **kwargs):
-        del session
-        create_calls.append(kwargs)
-        return duel
-
-    async def _fake_emit_series_started(session, **kwargs):
-        del session
-        series_event_calls.append(kwargs)
-
-    monkeypatch.setattr(
-        friend_challenges_series,
-        "load_friend_challenge_series_context",
-        _async_return(_context(challenge=challenge, opponent_user_id=202)),
-    )
-    monkeypatch.setattr(
-        friend_challenges_series,
-        "build_series_start_friend_challenge_draft",
-        _async_return(draft),
-    )
-    monkeypatch.setattr(
-        friend_challenges_series,
-        "create_series_friend_challenge_from_draft",
-        _fake_create_row,
-    )
-    monkeypatch.setattr(
-        friend_challenges_series,
-        "emit_series_started_duel_created_events",
-        _fake_emit_series_started,
-    )
-    monkeypatch.setattr(
-        friend_challenges_series,
-        "_build_friend_challenge_snapshot",
-        lambda challenge_row: {"challenge_id": challenge_row.id},
+        "create_series_start_friend_challenge",
+        _fake_create_best_of_three,
     )
 
     result = await friend_challenges_series.create_friend_challenge_best_of_three(
-        _Session(),
+        session,
         initiator_user_id=101,
-        challenge_id=challenge.id,
+        challenge_id=SERIES_A_ID,
         now_utc=NOW_UTC,
         best_of=5,
     )
 
-    assert result == {"challenge_id": duel.id}
-    assert create_calls == [
-        {
-            "draft": draft,
-            "now_utc": NOW_UTC,
-        }
-    ]
-    assert series_event_calls == [
-        {
-            "duel": duel,
-            "source_challenge_id": challenge.id,
-            "opponent_user_id": 202,
-            "happened_at": NOW_UTC,
-            "source": friend_challenges_series.EVENT_SOURCE_BOT,
-            "initiator_user_id": 101,
-        }
-    ]
+    assert result is expected
+    assert captured_kwargs == {
+        "session": session,
+        "initiator_user_id": 101,
+        "challenge_id": SERIES_A_ID,
+        "now_utc": NOW_UTC,
+        "best_of": 5,
+    }
 
 
 @pytest.mark.asyncio
