@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
 from aiogram.types import CallbackQuery
 
 from app.bot.handlers.gameplay_flows.friend_answer_completion_delivery import (
+    Answerable,
     FriendCompletionCallbacks,
     notify_opponent_if_needed,
     resolve_answerable,
     send_player_completion_message,
 )
 from app.bot.handlers.gameplay_flows.friend_answer_completion_state import (
+    FriendSeriesContext,
     resolve_friend_series_context,
 )
 from app.bot.handlers.gameplay_flows.tournament_match_completion import (
@@ -24,6 +27,35 @@ from app.bot.handlers.gameplay_flows.tournament_match_post_flow import (
     resolve_tournament_place_for_user,
     resolve_tournament_view_callback_data_for_match,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _FriendCompletionContext:
+    answerable: Answerable
+    series_context: FriendSeriesContext
+
+
+async def _resolve_completion_context(
+    callback: CallbackQuery,
+    *,
+    challenge,
+    snapshot_user_id: int,
+    opponent_label: str,
+    now_utc: datetime,
+    session_local,
+    game_session_service,
+) -> _FriendCompletionContext:
+    return _FriendCompletionContext(
+        answerable=resolve_answerable(callback),
+        series_context=await resolve_friend_series_context(
+            challenge=challenge,
+            snapshot_user_id=snapshot_user_id,
+            opponent_label=opponent_label,
+            now_utc=now_utc,
+            session_local=session_local,
+            game_session_service=game_session_service,
+        ),
+    )
 
 
 async def _handle_tournament_completion(
@@ -59,6 +91,53 @@ async def _handle_tournament_completion(
     )
 
 
+def _enqueue_proof_cards_if_needed(
+    *,
+    challenge,
+    idempotent_replay: bool,
+    callbacks: FriendCompletionCallbacks,
+) -> None:
+    if idempotent_replay:
+        return
+    callbacks.enqueue_friend_challenge_proof_cards(challenge_id=str(challenge.challenge_id))
+
+
+async def _deliver_standard_completion(
+    *,
+    callback: CallbackQuery,
+    challenge,
+    snapshot_user_id: int,
+    opponent_label: str,
+    opponent_user_id: int | None,
+    idempotent_replay: bool,
+    completion_context: _FriendCompletionContext,
+    callbacks: FriendCompletionCallbacks,
+) -> None:
+    await send_player_completion_message(
+        callback=callback,
+        challenge=challenge,
+        snapshot_user_id=snapshot_user_id,
+        opponent_label=opponent_label,
+        answerable=completion_context.answerable,
+        series_context=completion_context.series_context,
+        callbacks=callbacks,
+    )
+    await notify_opponent_if_needed(
+        callback=callback,
+        challenge=challenge,
+        idempotent_replay=idempotent_replay,
+        opponent_label=opponent_label,
+        opponent_user_id=opponent_user_id,
+        callbacks=callbacks,
+        series_context=completion_context.series_context,
+    )
+    _enqueue_proof_cards_if_needed(
+        challenge=challenge,
+        idempotent_replay=idempotent_replay,
+        callbacks=callbacks,
+    )
+
+
 async def handle_completed_friend_challenge(
     callback: CallbackQuery,
     *,
@@ -72,7 +151,8 @@ async def handle_completed_friend_challenge(
     game_session_service,
     callbacks: FriendCompletionCallbacks,
 ) -> None:
-    series_context = await resolve_friend_series_context(
+    completion_context = await _resolve_completion_context(
+        callback,
         challenge=challenge,
         snapshot_user_id=snapshot_user_id,
         opponent_label=opponent_label,
@@ -80,7 +160,6 @@ async def handle_completed_friend_challenge(
         session_local=session_local,
         game_session_service=game_session_service,
     )
-    answerable = resolve_answerable(callback)
     if await _handle_tournament_completion(
         challenge=challenge,
         callback=callback,
@@ -91,26 +170,16 @@ async def handle_completed_friend_challenge(
         session_local=session_local,
         resolve_opponent_label=callbacks.resolve_opponent_label,
         notify_opponent=callbacks.notify_opponent,
-        answerable=answerable,
+        answerable=completion_context.answerable,
     ):
         return
-    await send_player_completion_message(
+    await _deliver_standard_completion(
         callback=callback,
         challenge=challenge,
         snapshot_user_id=snapshot_user_id,
         opponent_label=opponent_label,
-        answerable=answerable,
-        series_context=series_context,
-        callbacks=callbacks,
-    )
-    await notify_opponent_if_needed(
-        callback=callback,
-        challenge=challenge,
-        idempotent_replay=idempotent_replay,
-        opponent_label=opponent_label,
         opponent_user_id=opponent_user_id,
+        idempotent_replay=idempotent_replay,
+        completion_context=completion_context,
         callbacks=callbacks,
-        series_context=series_context,
     )
-    if not idempotent_replay:
-        callbacks.enqueue_friend_challenge_proof_cards(challenge_id=str(challenge.challenge_id))
