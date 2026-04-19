@@ -1,33 +1,34 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from uuid import UUID, uuid4
+from datetime import datetime
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.friend_challenges import FriendChallenge
-from app.db.repo.friend_challenges_repo import FriendChallengesRepo
-from app.game.friend_challenges.constants import (
-    DUEL_STATUS_ACCEPTED,
-    DUEL_STATUS_CREATOR_DONE,
-    DUEL_STATUS_OPPONENT_DONE,
-    DUEL_STATUS_PENDING,
-    DUEL_TYPE_DIRECT,
-)
+from app.game.friend_challenges.constants import DUEL_STATUS_PENDING, DUEL_TYPE_DIRECT
 from app.game.sessions.types import FriendChallengeSnapshot
 
-from .constants import DUEL_ACCEPTED_TTL_SECONDS, DUEL_PENDING_TTL_SECONDS
+from .friend_challenges_record_create import (
+    _create_friend_challenge_row as create_friend_challenge_row,
+)
+from .friend_challenges_record_create import (
+    _friend_challenge_expires_at as friend_challenge_expires_at,
+)
+from .friend_challenges_record_create import (
+    _friend_challenge_expires_at_accepted as friend_challenge_expires_at_accepted,
+)
 from .friend_challenges_record_snapshot import (
     _build_friend_challenge_snapshot as build_friend_challenge_snapshot,
 )
 
 
 def _friend_challenge_expires_at(*, now_utc: datetime) -> datetime:
-    return now_utc + timedelta(seconds=DUEL_PENDING_TTL_SECONDS)
+    return friend_challenge_expires_at(now_utc=now_utc)
 
 
 def _friend_challenge_expires_at_accepted(*, now_utc: datetime) -> datetime:
-    return now_utc + timedelta(seconds=DUEL_ACCEPTED_TTL_SECONDS)
+    return friend_challenge_expires_at_accepted(now_utc=now_utc)
 
 
 async def _create_friend_challenge_row(
@@ -47,46 +48,21 @@ async def _create_friend_challenge_row(
     series_best_of: int = 1,
     status: str = DUEL_STATUS_PENDING,
 ) -> FriendChallenge:
-    expires_at = (
-        _friend_challenge_expires_at_accepted(now_utc=now_utc)
-        if status in {DUEL_STATUS_ACCEPTED, DUEL_STATUS_CREATOR_DONE, DUEL_STATUS_OPPONENT_DONE}
-        else _friend_challenge_expires_at(now_utc=now_utc)
-    )
-    return await FriendChallengesRepo.create(
+    return await create_friend_challenge_row(
         session,
-        challenge=FriendChallenge(
-            id=challenge_id or uuid4(),
-            invite_token=uuid4().hex,
-            creator_user_id=creator_user_id,
-            opponent_user_id=opponent_user_id,
-            challenge_type=challenge_type,
-            mode_code=mode_code,
-            access_type=access_type,
-            question_ids=question_ids,
-            tournament_match_id=None,
-            status=status,
-            current_round=1,
-            total_rounds=max(1, total_rounds),
-            series_id=series_id,
-            series_game_number=max(1, int(series_game_number)),
-            series_best_of=max(1, int(series_best_of)),
-            creator_score=0,
-            opponent_score=0,
-            creator_answered_round=0,
-            opponent_answered_round=0,
-            winner_user_id=None,
-            creator_finished_at=None,
-            opponent_finished_at=None,
-            creator_push_count=0,
-            opponent_push_count=0,
-            creator_proof_card_file_id=None,
-            opponent_proof_card_file_id=None,
-            expires_at=expires_at,
-            expires_last_chance_notified_at=None,
-            created_at=now_utc,
-            updated_at=now_utc,
-            completed_at=None,
-        ),
+        challenge_id=challenge_id,
+        creator_user_id=creator_user_id,
+        opponent_user_id=opponent_user_id,
+        challenge_type=challenge_type,
+        mode_code=mode_code,
+        access_type=access_type,
+        total_rounds=total_rounds,
+        now_utc=now_utc,
+        question_ids=question_ids,
+        series_id=series_id,
+        series_game_number=series_game_number,
+        series_best_of=series_best_of,
+        status=status,
     )
 
 
