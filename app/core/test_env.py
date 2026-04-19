@@ -35,8 +35,8 @@ def is_test_env_enabled() -> bool:
     return _read_env("APP_ENV").lower() == "test"
 
 
-def _safe_database_url_fallback() -> str:
-    database_url = _read_env("DATABASE_URL")
+def _safe_test_database_url(name: str) -> str:
+    database_url = _read_env(name)
     if not database_url:
         return ""
     if not assess_integration_db_safety(database_url).is_safe:
@@ -46,7 +46,9 @@ def _safe_database_url_fallback() -> str:
 
 def resolve_test_database_url() -> str:
     return (
-        _read_env("TEST_DATABASE_URL") or _safe_database_url_fallback() or DEFAULT_TEST_DATABASE_URL
+        _safe_test_database_url("TEST_DATABASE_URL")
+        or _safe_test_database_url("DATABASE_URL")
+        or DEFAULT_TEST_DATABASE_URL
     )
 
 

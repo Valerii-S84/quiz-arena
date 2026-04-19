@@ -96,3 +96,15 @@ def test_resolve_test_database_url_rejects_unsafe_database_url_fallback(
     )
 
     assert resolve_test_database_url() == DEFAULT_TEST_DATABASE_URL
+
+
+def test_resolve_test_database_url_rejects_unsafe_test_database_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "TEST_DATABASE_URL",
+        "postgresql+asyncpg://quiz:quiz@db.internal:5432/quiz_arena_prod",
+    )
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    assert resolve_test_database_url() == DEFAULT_TEST_DATABASE_URL
