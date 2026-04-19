@@ -80,19 +80,21 @@ async def test_emit_standard_duel_created_events_emits_expected_payloads(
 async def test_emit_rematch_duel_created_events_emits_expected_payloads(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    session = _Session()
     rematch = _duel(series_game_number=2, series_best_of=5)
-    analytics_events: list[dict[str, Any]] = []
+    delegated_calls: list[dict[str, object]] = []
 
-    async def _fake_emit_analytics_event(session, **kwargs):
-        del session
-        analytics_events.append(kwargs)
+    async def _fake_emit_rematch_duel_created_events_impl(session_arg, **kwargs):
+        delegated_calls.append({"session": session_arg, **kwargs})
 
     monkeypatch.setattr(
-        friend_challenges_create_analytics, "emit_analytics_event", _fake_emit_analytics_event
+        friend_challenges_create_analytics,
+        "emit_rematch_duel_created_events_impl",
+        _fake_emit_rematch_duel_created_events_impl,
     )
 
     await friend_challenges_create_analytics.emit_rematch_duel_created_events(
-        _Session(),
+        session,
         rematch=cast(Any, rematch),
         source_challenge_id=SOURCE_CHALLENGE_ID,
         opponent_user_id=202,
@@ -101,11 +103,14 @@ async def test_emit_rematch_duel_created_events_emits_expected_payloads(
         initiator_user_id=101,
     )
 
-    assert [event["event_type"] for event in analytics_events] == [
-        "friend_challenge_created",
-        "duel_revanche_created",
+    assert delegated_calls == [
+        {
+            "session": session,
+            "rematch": rematch,
+            "source_challenge_id": SOURCE_CHALLENGE_ID,
+            "opponent_user_id": 202,
+            "happened_at": NOW_UTC,
+            "source": "BOT",
+            "initiator_user_id": 101,
+        }
     ]
-    assert analytics_events[0]["payload"]["entrypoint"] == "rematch"
-    assert analytics_events[0]["payload"]["source_challenge_id"] == str(SOURCE_CHALLENGE_ID)
-    assert analytics_events[1]["payload"]["opponent_user_id"] == 202
-    assert analytics_events[1]["payload"]["series_best_of"] == 5
