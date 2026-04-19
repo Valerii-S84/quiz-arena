@@ -12,7 +12,7 @@ from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.game.friend_challenges.constants import normalize_duel_status
-from app.game.sessions.service.friend_challenges_internal import (
+from app.game.sessions.service.friend_challenges_expiry import (
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
 )

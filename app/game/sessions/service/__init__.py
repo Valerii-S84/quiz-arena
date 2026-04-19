@@ -23,7 +23,7 @@ from .constants import (
 )
 from .friend_challenges_access import _resolve_friend_challenge_access_type
 from .friend_challenges_create import create_friend_challenge, create_friend_challenge_rematch
-from .friend_challenges_internal import (
+from .friend_challenges_expiry import (
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
 )

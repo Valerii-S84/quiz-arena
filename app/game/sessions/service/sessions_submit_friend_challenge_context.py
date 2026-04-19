@@ -10,7 +10,7 @@ from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.game.friend_challenges.constants import normalize_duel_status
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 
-from .friend_challenges_internal import (
+from .friend_challenges_expiry import (
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
 )

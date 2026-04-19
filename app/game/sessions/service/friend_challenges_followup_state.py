@@ -11,7 +11,7 @@ from app.db.models.friend_challenges import FriendChallenge
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 
-from .friend_challenges_internal import (
+from .friend_challenges_expiry import (
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
 )

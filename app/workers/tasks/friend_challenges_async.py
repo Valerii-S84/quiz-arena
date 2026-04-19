@@ -9,7 +9,7 @@ from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.session import SessionLocal
 from app.game.friend_challenges.constants import DUEL_STATUS_CREATOR_DONE, DUEL_STATUS_OPPONENT_DONE
 from app.game.sessions.service.constants import DUEL_MAX_PUSH_PER_USER
-from app.game.sessions.service.friend_challenges_internal import _expire_friend_challenge_if_due
+from app.game.sessions.service.friend_challenges_expiry import _expire_friend_challenge_if_due
 from app.workers.tasks.friend_challenges_config import DEADLINE_BATCH_SIZE, LAST_CHANCE_SECONDS
 from app.workers.tasks.friend_challenges_notifications import send_deadline_notifications
 
