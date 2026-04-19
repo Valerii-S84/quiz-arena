@@ -87,7 +87,11 @@ async def test_create_friend_challenge_creates_standard_duel_and_emits_events(
         "build_create_friend_challenge_draft",
         _fake_build_create_draft,
     )
-    monkeypatch.setattr(friend_challenges_create, "_create_friend_challenge_row", _fake_create_row)
+    monkeypatch.setattr(
+        friend_challenges_create,
+        "create_friend_challenge_from_draft",
+        _fake_create_row,
+    )
     monkeypatch.setattr(
         friend_challenges_create,
         "emit_standard_duel_created_events",
@@ -116,16 +120,8 @@ async def test_create_friend_challenge_creates_standard_duel_and_emits_events(
     }
     assert create_calls == [
         {
-            "challenge_id": CHALLENGE_ID,
-            "creator_user_id": 101,
-            "opponent_user_id": None,
-            "challenge_type": "DIRECT",
-            "mode_code": "QUICK_MIX_A1A2",
-            "access_type": "FREE",
-            "total_rounds": 5,
+            "draft": draft,
             "now_utc": NOW_UTC,
-            "question_ids": ["q-1", "q-2"],
-            "status": "PENDING",
         }
     ]
     assert analytics_calls == [
@@ -186,7 +182,11 @@ async def test_create_friend_challenge_rematch_creates_duel_and_emits_events(
         "build_rematch_friend_challenge_draft",
         _fake_build_rematch_draft,
     )
-    monkeypatch.setattr(friend_challenges_create, "_create_friend_challenge_row", _fake_create_row)
+    monkeypatch.setattr(
+        friend_challenges_create,
+        "create_friend_challenge_from_draft",
+        _fake_create_row,
+    )
     monkeypatch.setattr(
         friend_challenges_create,
         "emit_rematch_duel_created_events",
@@ -214,19 +214,8 @@ async def test_create_friend_challenge_rematch_creates_duel_and_emits_events(
     }
     assert create_calls == [
         {
-            "challenge_id": draft.challenge_id,
-            "creator_user_id": 202,
-            "opponent_user_id": 101,
-            "challenge_type": "DIRECT",
-            "mode_code": "QUICK_MIX_A1A2",
-            "access_type": "PAID_TICKET",
-            "total_rounds": 7,
+            "draft": draft,
             "now_utc": NOW_UTC,
-            "question_ids": ["r-1", "r-2"],
-            "series_id": SERIES_ID,
-            "series_game_number": 2,
-            "series_best_of": 3,
-            "status": "ACCEPTED",
         }
     ]
     assert analytics_calls == [

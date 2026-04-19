@@ -19,11 +19,9 @@ from .friend_challenges_create_drafts import (
     build_rematch_friend_challenge_draft,
 )
 from .friend_challenges_create_limits import resolve_friend_challenge_create_request
+from .friend_challenges_create_rows import create_friend_challenge_from_draft
 from .friend_challenges_create_state import load_friend_challenge_rematch_context
-from .friend_challenges_records import (
-    _build_friend_challenge_snapshot,
-    _create_friend_challenge_row,
-)
+from .friend_challenges_records import _build_friend_challenge_snapshot
 
 
 async def create_friend_challenge(
@@ -50,18 +48,10 @@ async def create_friend_challenge(
         total_rounds=request.total_rounds,
         now_utc=now_utc,
     )
-    challenge = await _create_friend_challenge_row(
+    challenge = await create_friend_challenge_from_draft(
         session,
-        challenge_id=draft.challenge_id,
-        creator_user_id=draft.creator_user_id,
-        opponent_user_id=draft.opponent_user_id,
-        challenge_type=draft.challenge_type,
-        mode_code=draft.mode_code,
-        access_type=draft.access_type,
-        total_rounds=draft.total_rounds,
+        draft=draft,
         now_utc=now_utc,
-        question_ids=draft.question_ids,
-        status=draft.status,
     )
     await emit_standard_duel_created_events(
         session,
@@ -93,21 +83,10 @@ async def create_friend_challenge_rematch(
         opponent_user_id=context.opponent_user_id,
         now_utc=now_utc,
     )
-    rematch = await _create_friend_challenge_row(
+    rematch = await create_friend_challenge_from_draft(
         session,
-        challenge_id=draft.challenge_id,
-        creator_user_id=draft.creator_user_id,
-        opponent_user_id=draft.opponent_user_id,
-        challenge_type=draft.challenge_type,
-        mode_code=draft.mode_code,
-        access_type=draft.access_type,
-        total_rounds=draft.total_rounds,
+        draft=draft,
         now_utc=now_utc,
-        question_ids=draft.question_ids,
-        series_id=draft.series_id,
-        series_game_number=draft.series_game_number,
-        series_best_of=draft.series_best_of,
-        status=draft.status,
     )
     await emit_rematch_duel_created_events(
         session,
