@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.game.sessions.service import friend_challenges_queries
+from app.game.sessions.service import friend_challenges_queries, friend_challenges_query_series
 from tests.game.friend_challenges_queries_test_support import (
     NOW_UTC,
     FriendChallengeQueriesSession,
@@ -27,12 +27,12 @@ async def test_get_friend_series_score_for_user_delegates_to_shared_loader_for_n
         return challenge
 
     monkeypatch.setattr(
-        friend_challenges_queries,
+        friend_challenges_query_series,
         "load_friend_challenge_for_user",
         _fake_load_friend_challenge_for_user,
     )
 
-    result = await friend_challenges_queries.get_friend_series_score_for_user(
+    result = await friend_challenges_query_series.get_friend_series_score_for_user(
         session,
         user_id=11,
         challenge_id=challenge.id,
@@ -85,17 +85,17 @@ async def test_get_friend_series_score_for_user_swaps_perspective_for_opponent(
     ]
 
     monkeypatch.setattr(
-        friend_challenges_queries,
+        friend_challenges_query_series,
         "load_friend_challenge_for_user",
         async_return(challenge),
     )
     monkeypatch.setattr(
-        friend_challenges_queries.FriendChallengesRepo,
+        friend_challenges_query_series.FriendChallengesRepo,
         "list_by_series_id_for_update",
         async_return(series_challenges),
     )
 
-    result = await friend_challenges_queries.get_friend_series_score_for_user(
+    result = await friend_challenges_query_series.get_friend_series_score_for_user(
         FriendChallengeQueriesSession(),
         user_id=22,
         challenge_id=challenge.id,
@@ -135,17 +135,17 @@ async def test_get_friend_series_score_for_user_returns_creator_perspective(
     ]
 
     monkeypatch.setattr(
-        friend_challenges_queries,
+        friend_challenges_query_series,
         "load_friend_challenge_for_user",
         async_return(challenge),
     )
     monkeypatch.setattr(
-        friend_challenges_queries.FriendChallengesRepo,
+        friend_challenges_query_series.FriendChallengesRepo,
         "list_by_series_id_for_update",
         async_return(series_challenges),
     )
 
-    result = await friend_challenges_queries.get_friend_series_score_for_user(
+    result = await friend_challenges_query_series.get_friend_series_score_for_user(
         FriendChallengeQueriesSession(),
         user_id=11,
         challenge_id=challenge.id,
@@ -153,3 +153,38 @@ async def test_get_friend_series_score_for_user_returns_creator_perspective(
     )
 
     assert result == (1, 1, 2, 3)
+
+
+@pytest.mark.asyncio
+async def test_queries_get_friend_series_score_for_user_delegates_to_query_series(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_kwargs: dict[str, object] = {}
+    session = FriendChallengeQueriesSession()
+    challenge_id = uuid4()
+
+    async def _fake_get_friend_series_score_for_user(session, **kwargs):
+        captured_kwargs["session"] = session
+        captured_kwargs.update(kwargs)
+        return (4, 2, 3, 5)
+
+    monkeypatch.setattr(
+        friend_challenges_queries,
+        "load_friend_series_score_for_user",
+        _fake_get_friend_series_score_for_user,
+    )
+
+    result = await friend_challenges_queries.get_friend_series_score_for_user(
+        session,
+        user_id=22,
+        challenge_id=challenge_id,
+        now_utc=NOW_UTC,
+    )
+
+    assert result == (4, 2, 3, 5)
+    assert captured_kwargs == {
+        "session": session,
+        "user_id": 22,
+        "challenge_id": challenge_id,
+        "now_utc": NOW_UTC,
+    }
