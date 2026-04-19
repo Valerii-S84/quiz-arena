@@ -32,40 +32,39 @@ def _candidate_ids(
     )
 
 
-@lru_cache(maxsize=None)
-def _search_pairs(
-    remaining_ids: tuple[int, ...],
-    previous_pairs: frozenset[frozenset[int]],
-    allow_rematch: bool,
-) -> tuple[tuple[int, int], ...] | None:
-    if not remaining_ids:
-        return ()
-
-    user_a = remaining_ids[0]
-    tail = remaining_ids[1:]
-    for candidate_id in _candidate_ids(
-        tail=tail,
-        user_a=user_a,
-        previous_pairs=previous_pairs,
-        allow_rematch=allow_rematch,
-    ):
-        next_remaining = tuple(user_id for user_id in tail if user_id != candidate_id)
-        nested_pairs = _search_pairs(next_remaining, previous_pairs, allow_rematch)
-        if nested_pairs is not None:
-            return ((user_a, candidate_id),) + nested_pairs
-    return None
-
-
 def _resolve_pairs(
     *,
     user_ids: tuple[int, ...],
     previous_pairs: set[frozenset[int]],
 ) -> tuple[tuple[int, int], ...] | None:
     previous_pairs_key = frozenset(previous_pairs)
-    pairs = _search_pairs(user_ids, previous_pairs_key, False)
+
+    @lru_cache(maxsize=None)
+    def _search_pairs(
+        remaining_ids: tuple[int, ...],
+        allow_rematch: bool,
+    ) -> tuple[tuple[int, int], ...] | None:
+        if not remaining_ids:
+            return ()
+
+        user_a = remaining_ids[0]
+        tail = remaining_ids[1:]
+        for candidate_id in _candidate_ids(
+            tail=tail,
+            user_a=user_a,
+            previous_pairs=previous_pairs_key,
+            allow_rematch=allow_rematch,
+        ):
+            next_remaining = tuple(user_id for user_id in tail if user_id != candidate_id)
+            nested_pairs = _search_pairs(next_remaining, allow_rematch)
+            if nested_pairs is not None:
+                return ((user_a, candidate_id),) + nested_pairs
+        return None
+
+    pairs = _search_pairs(user_ids, False)
     if pairs is not None:
         return pairs
-    return _search_pairs(user_ids, previous_pairs_key, True)
+    return _search_pairs(user_ids, True)
 
 
 def _pick_bye_participant(
