@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.models.daily_runs import DailyRun
 from app.db.models.quiz_sessions import QuizSession
-from app.db.repo.daily_runs_repo import DailyRunsRepo
+from app.db.repo.daily_runs_repo import DailyRunsRepo as _DailyRunsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.game.sessions.errors import DailyChallengeAlreadyPlayedError
 from app.game.sessions.types import SessionQuestionView, StartSessionResult
@@ -17,6 +17,11 @@ from app.game.sessions.types import SessionQuestionView, StartSessionResult
 from .constants import DAILY_CHALLENGE_TOTAL_QUESTIONS
 from .daily_question_resolver import resolve_daily_question_for_position
 from .question_loading import _build_start_result_from_existing_session
+from .sessions_start_daily_runs import (
+    create_or_resume_daily_run as _create_or_resume_daily_run_impl,
+)
+
+DailyRunsRepo = _DailyRunsRepo
 
 
 async def _emit_daily_blocked(
@@ -43,58 +48,13 @@ async def _create_or_resume_daily_run(
     berlin_date: date,
     now_utc: datetime,
 ) -> tuple[DailyRun, bool]:
-    existing = await DailyRunsRepo.get_by_user_date_for_update(
+    return await _create_or_resume_daily_run_impl(
         session,
         user_id=user_id,
         berlin_date=berlin_date,
+        now_utc=now_utc,
+        emit_daily_blocked=_emit_daily_blocked,
     )
-    if existing is not None:
-        if existing.status == "COMPLETED":
-            await _emit_daily_blocked(
-                session,
-                user_id=user_id,
-                berlin_date=berlin_date,
-                now_utc=now_utc,
-            )
-            raise DailyChallengeAlreadyPlayedError
-        if existing.status == "ABANDONED":
-            existing.status = "IN_PROGRESS"
-            existing.completed_at = None
-        return existing, False
-
-    run = DailyRun(
-        id=uuid4(),
-        user_id=user_id,
-        berlin_date=berlin_date,
-        current_question=0,
-        score=0,
-        status="IN_PROGRESS",
-        started_at=now_utc,
-        completed_at=None,
-    )
-    try:
-        created = await DailyRunsRepo.create(session, daily_run=run)
-    except IntegrityError:
-        loaded = await DailyRunsRepo.get_by_user_date_for_update(
-            session,
-            user_id=user_id,
-            berlin_date=berlin_date,
-        )
-        if loaded is None:
-            raise
-        if loaded.status == "COMPLETED":
-            await _emit_daily_blocked(
-                session,
-                user_id=user_id,
-                berlin_date=berlin_date,
-                now_utc=now_utc,
-            )
-            raise DailyChallengeAlreadyPlayedError
-        if loaded.status == "ABANDONED":
-            loaded.status = "IN_PROGRESS"
-            loaded.completed_at = None
-        return loaded, False
-    return created, True
 
 
 async def start_daily_session(
