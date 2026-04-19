@@ -192,7 +192,11 @@ async def test_create_friend_challenge_best_of_three_creates_series_duel_and_emi
         "build_series_start_friend_challenge_draft",
         _async_return(draft),
     )
-    monkeypatch.setattr(friend_challenges_series, "_create_friend_challenge_row", _fake_create_row)
+    monkeypatch.setattr(
+        friend_challenges_series,
+        "create_series_friend_challenge_from_draft",
+        _fake_create_row,
+    )
     monkeypatch.setattr(
         friend_challenges_series,
         "emit_series_started_duel_created_events",
@@ -215,17 +219,8 @@ async def test_create_friend_challenge_best_of_three_creates_series_duel_and_emi
     assert result == {"challenge_id": duel.id}
     assert create_calls == [
         {
-            "creator_user_id": 101,
-            "opponent_user_id": 202,
-            "challenge_type": "DIRECT",
-            "mode_code": challenge.mode_code,
-            "access_type": "FREE",
-            "total_rounds": challenge.total_rounds,
+            "draft": draft,
             "now_utc": NOW_UTC,
-            "series_id": fixed_series_id,
-            "series_game_number": 1,
-            "series_best_of": 5,
-            "status": DUEL_STATUS_ACCEPTED,
         }
     ]
     assert series_event_calls == [
@@ -386,7 +381,11 @@ async def test_create_friend_challenge_series_next_game_creates_followup_duel_an
         "build_series_next_game_friend_challenge_draft",
         _async_return(draft),
     )
-    monkeypatch.setattr(friend_challenges_series, "_create_friend_challenge_row", _fake_create_row)
+    monkeypatch.setattr(
+        friend_challenges_series,
+        "create_series_friend_challenge_from_draft",
+        _fake_create_row,
+    )
     monkeypatch.setattr(
         friend_challenges_series,
         "emit_series_next_game_created_events",
@@ -408,17 +407,8 @@ async def test_create_friend_challenge_series_next_game_creates_followup_duel_an
     assert result == {"challenge_id": duel.id}
     assert create_calls == [
         {
-            "creator_user_id": 202,
-            "opponent_user_id": 101,
-            "challenge_type": "DIRECT",
-            "mode_code": challenge.mode_code,
-            "access_type": "PAID_TICKET",
-            "total_rounds": challenge.total_rounds,
+            "draft": draft,
             "now_utc": NOW_UTC,
-            "series_id": SERIES_C_ID,
-            "series_game_number": 2,
-            "series_best_of": 3,
-            "status": DUEL_STATUS_ACCEPTED,
         }
     ]
     assert series_event_calls == [
