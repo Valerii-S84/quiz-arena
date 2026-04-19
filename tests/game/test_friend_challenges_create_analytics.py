@@ -44,32 +44,36 @@ def _duel(
 async def test_emit_standard_duel_created_events_emits_expected_payloads(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    session = _Session()
     challenge = _duel(series_id=None)
-    analytics_events: list[dict[str, Any]] = []
+    delegated_calls: list[dict[str, object]] = []
 
-    async def _fake_emit_analytics_event(session, **kwargs):
-        del session
-        analytics_events.append(kwargs)
+    async def _fake_emit_standard_duel_created_events_impl(session_arg, **kwargs):
+        delegated_calls.append({"session": session_arg, **kwargs})
 
     monkeypatch.setattr(
-        friend_challenges_create_analytics, "emit_analytics_event", _fake_emit_analytics_event
+        friend_challenges_create_analytics,
+        "emit_standard_duel_created_events_impl",
+        _fake_emit_standard_duel_created_events_impl,
     )
 
     await friend_challenges_create_analytics.emit_standard_duel_created_events(
-        _Session(),
+        session,
         challenge=cast(Any, challenge),
         happened_at=NOW_UTC,
         source="BOT",
         creator_user_id=101,
     )
 
-    assert [event["event_type"] for event in analytics_events] == [
-        "friend_challenge_created",
-        "duel_created",
+    assert delegated_calls == [
+        {
+            "session": session,
+            "challenge": challenge,
+            "happened_at": NOW_UTC,
+            "source": "BOT",
+            "creator_user_id": 101,
+        }
     ]
-    assert analytics_events[0]["payload"]["entrypoint"] == "standard"
-    assert analytics_events[0]["payload"]["series_id"] is None
-    assert analytics_events[1]["payload"]["type"] == challenge.challenge_type
 
 
 @pytest.mark.asyncio
