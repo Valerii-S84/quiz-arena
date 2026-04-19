@@ -37,111 +37,38 @@ def _challenge(
 
 
 @pytest.mark.asyncio
-async def test_repost_friend_challenge_as_open_creates_repost_and_emits_events(
+async def test_repost_friend_challenge_as_open_delegates_to_manage_repost(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    challenge = _challenge()
-    repost = SimpleNamespace(challenge_id=uuid4(), total_rounds=challenge.total_rounds)
-    analytics_events: list[dict[str, object]] = []
-    create_calls: list[dict[str, object]] = []
+    repost = SimpleNamespace(challenge_id=uuid4(), total_rounds=7)
+    captured_kwargs: dict[str, object] = {}
+    session = _Session()
 
-    async def _fake_create_friend_challenge(*_args, **kwargs):
-        create_calls.append(kwargs)
+    async def _fake_manage_repost_friend_challenge_as_open(session, **kwargs):
+        captured_kwargs["session"] = session
+        captured_kwargs.update(kwargs)
         return repost
 
-    async def _fake_emit_analytics_event(*_args, **kwargs) -> None:
-        analytics_events.append(kwargs)
-
     monkeypatch.setattr(
         friend_challenges_manage,
-        "load_manageable_friend_challenge",
-        _async_return(challenge),
-    )
-    monkeypatch.setattr(
-        friend_challenges_manage,
-        "create_friend_challenge",
-        _fake_create_friend_challenge,
-    )
-    monkeypatch.setattr(
-        friend_challenges_manage,
-        "emit_analytics_event",
-        _fake_emit_analytics_event,
+        "manage_repost_friend_challenge_as_open",
+        _fake_manage_repost_friend_challenge_as_open,
     )
 
     result = await friend_challenges_manage.repost_friend_challenge_as_open(
-        _Session(),
+        session,
         user_id=11,
-        challenge_id=challenge.id,
+        challenge_id=repost.challenge_id,
         now_utc=NOW_UTC,
     )
 
     assert result is repost
-    assert create_calls == [
-        {
-            "creator_user_id": 11,
-            "mode_code": challenge.mode_code,
-            "now_utc": NOW_UTC,
-            "challenge_type": friend_challenges_manage.DUEL_TYPE_OPEN,
-            "total_rounds": challenge.total_rounds,
-        }
-    ]
-    assert analytics_events == [
-        {
-            "event_type": "duel_reposted_as_open",
-            "source": friend_challenges_manage.EVENT_SOURCE_BOT,
-            "happened_at": NOW_UTC,
-            "user_id": 11,
-            "payload": {
-                "source_challenge_id": str(challenge.id),
-                "repost_challenge_id": str(repost.challenge_id),
-                "format": repost.total_rounds,
-            },
-        }
-    ]
-
-
-@pytest.mark.asyncio
-async def test_repost_friend_challenge_as_open_delegates_state_loading(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    challenge = _challenge()
-    repost = SimpleNamespace(challenge_id=uuid4(), total_rounds=challenge.total_rounds)
-    calls: list[dict[str, object]] = []
-
-    async def _fake_load_manageable_friend_challenge(*_args, **kwargs):
-        calls.append(kwargs)
-        return challenge
-
-    monkeypatch.setattr(
-        friend_challenges_manage,
-        "load_manageable_friend_challenge",
-        _fake_load_manageable_friend_challenge,
-    )
-    monkeypatch.setattr(
-        friend_challenges_manage,
-        "create_friend_challenge",
-        _async_return(repost),
-    )
-    monkeypatch.setattr(
-        friend_challenges_manage,
-        "emit_analytics_event",
-        _async_return(None),
-    )
-
-    await friend_challenges_manage.repost_friend_challenge_as_open(
-        _Session(),
-        user_id=11,
-        challenge_id=challenge.id,
-        now_utc=NOW_UTC,
-    )
-
-    assert calls == [
-        {
-            "challenge_id": challenge.id,
-            "user_id": 11,
-            "now_utc": NOW_UTC,
-        }
-    ]
+    assert captured_kwargs == {
+        "session": session,
+        "user_id": 11,
+        "challenge_id": repost.challenge_id,
+        "now_utc": NOW_UTC,
+    }
 
 
 @pytest.mark.asyncio
