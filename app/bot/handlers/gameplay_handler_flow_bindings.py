@@ -3,6 +3,16 @@ from __future__ import annotations
 from functools import partial
 from typing import Any, cast
 
+from app.bot.handlers.gameplay_handler_answer_bindings import build_answer_flow_binding
+
+__all__ = [
+    "build_start_mode_binding_kwargs",
+    "build_start_mode_flow_binding",
+    "build_answer_flow_binding",
+    "build_daily_result_binding_kwargs",
+    "build_daily_result_flow_binding",
+]
+
 
 def build_start_mode_binding_kwargs(
     *,
@@ -48,136 +58,6 @@ def build_start_mode_flow_binding(
                 offer_logging_error=offer_logging_error,
                 channel_bonus_service=channel_bonus_service,
                 build_question_text=build_question_text,
-            ),
-        ),
-    )
-
-
-def build_answer_flow_core_binding_kwargs(
-    *,
-    parse_answer_callback,
-    session_local,
-    user_onboarding_service,
-    game_session_service,
-    referral_service,
-    channel_bonus_service,
-    offer_service,
-    offer_logging_error,
-    build_question_text,
-    emit_analytics_event,
-    event_source_bot,
-    continue_regular_mode_after_answer,
-    handle_daily_answer_branch,
-    handle_friend_answer_branch,
-) -> dict[str, Any]:
-    return {
-        "parse_answer_callback": parse_answer_callback,
-        "session_local": session_local,
-        "user_onboarding_service": user_onboarding_service,
-        "game_session_service": game_session_service,
-        "referral_service": referral_service,
-        "channel_bonus_service": channel_bonus_service,
-        "offer_service": offer_service,
-        "offer_logging_error": offer_logging_error,
-        "build_question_text": build_question_text,
-        "emit_analytics_event": emit_analytics_event,
-        "event_source_bot": event_source_bot,
-        "continue_regular_mode_after_answer": continue_regular_mode_after_answer,
-        "handle_daily_answer_branch": handle_daily_answer_branch,
-        "handle_friend_answer_branch": handle_friend_answer_branch,
-    }
-
-
-def build_friend_answer_binding_kwargs(
-    *,
-    resolve_opponent_label,
-    notify_opponent,
-    friend_opponent_user_id,
-    build_friend_score_text,
-    build_friend_ttl_text,
-    build_friend_finish_text,
-    build_public_badge_label,
-    build_friend_proof_card_text,
-    enqueue_friend_challenge_proof_cards,
-    build_series_progress_text,
-    send_friend_round_question,
-) -> dict[str, Any]:
-    return {
-        "resolve_opponent_label": resolve_opponent_label,
-        "notify_opponent": notify_opponent,
-        "friend_opponent_user_id": friend_opponent_user_id,
-        "build_friend_score_text": build_friend_score_text,
-        "build_friend_ttl_text": build_friend_ttl_text,
-        "build_friend_finish_text": build_friend_finish_text,
-        "build_public_badge_label": build_public_badge_label,
-        "build_friend_proof_card_text": build_friend_proof_card_text,
-        "enqueue_friend_challenge_proof_cards": enqueue_friend_challenge_proof_cards,
-        "build_series_progress_text": build_series_progress_text,
-        "send_friend_round_question": send_friend_round_question,
-    }
-
-
-def build_answer_flow_binding(
-    *,
-    answer_flow_handle_answer,
-    parse_answer_callback,
-    session_local,
-    user_onboarding_service,
-    game_session_service,
-    referral_service,
-    channel_bonus_service,
-    offer_service,
-    offer_logging_error,
-    build_question_text,
-    emit_analytics_event,
-    event_source_bot,
-    continue_regular_mode_after_answer,
-    handle_daily_answer_branch,
-    handle_friend_answer_branch,
-    resolve_opponent_label,
-    notify_opponent,
-    friend_opponent_user_id,
-    build_friend_score_text,
-    build_friend_ttl_text,
-    build_friend_finish_text,
-    build_public_badge_label,
-    build_friend_proof_card_text,
-    enqueue_friend_challenge_proof_cards,
-    build_series_progress_text,
-    send_friend_round_question,
-) -> Any:
-    return cast(
-        Any,
-        partial(
-            answer_flow_handle_answer,
-            **build_answer_flow_core_binding_kwargs(
-                parse_answer_callback=parse_answer_callback,
-                session_local=session_local,
-                user_onboarding_service=user_onboarding_service,
-                game_session_service=game_session_service,
-                referral_service=referral_service,
-                channel_bonus_service=channel_bonus_service,
-                offer_service=offer_service,
-                offer_logging_error=offer_logging_error,
-                build_question_text=build_question_text,
-                emit_analytics_event=emit_analytics_event,
-                event_source_bot=event_source_bot,
-                continue_regular_mode_after_answer=continue_regular_mode_after_answer,
-                handle_daily_answer_branch=handle_daily_answer_branch,
-                handle_friend_answer_branch=handle_friend_answer_branch,
-            ),
-            **build_friend_answer_binding_kwargs(
-                resolve_opponent_label=resolve_opponent_label,
-                notify_opponent=notify_opponent,
-                friend_opponent_user_id=friend_opponent_user_id,
-                build_friend_score_text=build_friend_score_text,
-                build_friend_ttl_text=build_friend_ttl_text,
-                build_friend_finish_text=build_friend_finish_text,
-                build_public_badge_label=build_public_badge_label,
-                build_friend_proof_card_text=build_friend_proof_card_text,
-                enqueue_friend_challenge_proof_cards=enqueue_friend_challenge_proof_cards,
-                build_series_progress_text=build_series_progress_text,
-                send_friend_round_question=send_friend_round_question,
             ),
         ),
     )
