@@ -43,7 +43,23 @@ def _planned_question_id(
         return None
 
 
-async def _resolve_round_question_id(
+async def _shared_round_question_id(
+    session: AsyncSession,
+    *,
+    challenge: FriendChallenge,
+    next_round: int,
+) -> str | None:
+    shared_round_session = await QuizSessionsRepo.get_by_friend_challenge_round_any_user(
+        session,
+        friend_challenge_id=challenge.id,
+        friend_challenge_round=next_round,
+    )
+    if shared_round_session is None or shared_round_session.question_id is None:
+        return None
+    return shared_round_session.question_id
+
+
+async def _selected_round_question_id(
     session: AsyncSession,
     *,
     challenge: FriendChallenge,
@@ -52,21 +68,6 @@ async def _resolve_round_question_id(
     selection_seed: str,
     preferred_level: str | None,
 ) -> str:
-    shared_round_session = await QuizSessionsRepo.get_by_friend_challenge_round_any_user(
-        session,
-        friend_challenge_id=challenge.id,
-        friend_challenge_round=next_round,
-    )
-    if shared_round_session is not None and shared_round_session.question_id is not None:
-        return shared_round_session.question_id
-
-    planned_question_id = _planned_question_id(
-        challenge=challenge,
-        next_round=next_round,
-    )
-    if planned_question_id is not None:
-        return planned_question_id
-
     previous_round_question_ids = (
         await QuizSessionsRepo.list_friend_challenge_question_ids_before_round(
             session,
@@ -85,6 +86,40 @@ async def _resolve_round_question_id(
         preferred_level=preferred_level,
     )
     return selected_question.question_id
+
+
+async def _resolve_round_question_id(
+    session: AsyncSession,
+    *,
+    challenge: FriendChallenge,
+    next_round: int,
+    now_utc: datetime,
+    selection_seed: str,
+    preferred_level: str | None,
+) -> str:
+    shared_question_id = await _shared_round_question_id(
+        session,
+        challenge=challenge,
+        next_round=next_round,
+    )
+    if shared_question_id is not None:
+        return shared_question_id
+
+    planned_question_id = _planned_question_id(
+        challenge=challenge,
+        next_round=next_round,
+    )
+    if planned_question_id is not None:
+        return planned_question_id
+
+    return await _selected_round_question_id(
+        session,
+        challenge=challenge,
+        next_round=next_round,
+        now_utc=now_utc,
+        selection_seed=selection_seed,
+        preferred_level=preferred_level,
+    )
 
 
 async def load_friend_challenge_round_question_state(

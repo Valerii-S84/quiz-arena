@@ -59,22 +59,17 @@ async def test_load_round_question_state_reuses_shared_round_question(
         _unexpected_list_previous_round_ids,
     )
 
-    state = (
-        await friend_challenges_round_start_question_state.load_friend_challenge_round_question_state(
-            _Session(),
-            challenge=challenge,
-            next_round=2,
-            now_utc=NOW_UTC,
-        )
+    state = await friend_challenges_round_start_question_state.load_friend_challenge_round_question_state(
+        _Session(),
+        challenge=challenge,
+        next_round=2,
+        now_utc=NOW_UTC,
     )
 
-    assert (
-        state
-        == friend_challenges_round_start_question_state.FriendChallengeRoundQuestionState(
-            selection_seed=f"friend:{challenge.id}:2:{challenge.mode_code}",
-            preferred_level="A2",
-            forced_question_id="shared-question",
-        )
+    assert state == friend_challenges_round_start_question_state.FriendChallengeRoundQuestionState(
+        selection_seed=f"friend:{challenge.id}:2:{challenge.mode_code}",
+        preferred_level="A2",
+        forced_question_id="shared-question",
     )
 
 
@@ -104,22 +99,17 @@ async def test_load_round_question_state_uses_planned_question_ids_before_select
         _unexpected_list_previous_round_ids,
     )
 
-    state = (
-        await friend_challenges_round_start_question_state.load_friend_challenge_round_question_state(
-            _Session(),
-            challenge=challenge,
-            next_round=2,
-            now_utc=NOW_UTC,
-        )
+    state = await friend_challenges_round_start_question_state.load_friend_challenge_round_question_state(
+        _Session(),
+        challenge=challenge,
+        next_round=2,
+        now_utc=NOW_UTC,
     )
 
-    assert (
-        state
-        == friend_challenges_round_start_question_state.FriendChallengeRoundQuestionState(
-            selection_seed=f"friend:{challenge.id}:2:{challenge.mode_code}",
-            preferred_level="B1",
-            forced_question_id="q-2",
-        )
+    assert state == friend_challenges_round_start_question_state.FriendChallengeRoundQuestionState(
+        selection_seed=f"friend:{challenge.id}:2:{challenge.mode_code}",
+        preferred_level="B1",
+        forced_question_id="q-2",
     )
 
 
@@ -155,22 +145,17 @@ async def test_load_round_question_state_selects_question_from_history_when_need
         _fake_select_friend_challenge_question,
     )
 
-    state = (
-        await friend_challenges_round_start_question_state.load_friend_challenge_round_question_state(
-            _Session(),
-            challenge=challenge,
-            next_round=3,
-            now_utc=NOW_UTC,
-        )
+    state = await friend_challenges_round_start_question_state.load_friend_challenge_round_question_state(
+        _Session(),
+        challenge=challenge,
+        next_round=3,
+        now_utc=NOW_UTC,
     )
 
-    assert (
-        state
-        == friend_challenges_round_start_question_state.FriendChallengeRoundQuestionState(
-            selection_seed=f"friend:{challenge.id}:3:{challenge.mode_code}",
-            preferred_level="A1",
-            forced_question_id="selected-question",
-        )
+    assert state == friend_challenges_round_start_question_state.FriendChallengeRoundQuestionState(
+        selection_seed=f"friend:{challenge.id}:3:{challenge.mode_code}",
+        preferred_level="A1",
+        forced_question_id="selected-question",
     )
     assert captured["kwargs"] == {
         "local_date_berlin": NOW_UTC.date(),
