@@ -10,7 +10,7 @@ from app.db.models.quiz_sessions import QuizSession
 from app.game.friend_challenges.constants import DUEL_STATUS_COMPLETED
 from app.game.sessions.types import FriendChallengeSnapshot
 
-from .friend_challenges_internal import _build_friend_challenge_snapshot
+from .friend_challenges_records import _build_friend_challenge_snapshot
 from .friend_challenges_tournament_progress import handle_tournament_duel_progress
 from .sessions_submit_friend_challenge_context import load_friend_challenge_answer_state
 from .sessions_submit_friend_challenge_transitions import (

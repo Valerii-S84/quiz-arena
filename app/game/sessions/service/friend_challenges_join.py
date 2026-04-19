@@ -24,9 +24,11 @@ from app.game.sessions.errors import (
 from app.game.sessions.types import FriendChallengeJoinResult
 
 from .friend_challenges_internal import (
-    _build_friend_challenge_snapshot,
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
+)
+from .friend_challenges_records import (
+    _build_friend_challenge_snapshot,
     _friend_challenge_expires_at_accepted,
 )
 

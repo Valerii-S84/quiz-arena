@@ -12,10 +12,10 @@ from app.game.sessions.errors import FriendChallengeAccessError, FriendChallenge
 from app.game.sessions.types import FriendChallengeSnapshot
 
 from .friend_challenges_internal import (
-    _build_friend_challenge_snapshot,
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
 )
+from .friend_challenges_records import _build_friend_challenge_snapshot
 from .friend_challenges_series_utils import _count_series_wins
 
 

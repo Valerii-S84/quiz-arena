@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.game.sessions.types import FriendChallengeRoundStartResult, StartSessionResult
 
-from .friend_challenges_internal import _build_friend_challenge_snapshot
+from .friend_challenges_records import _build_friend_challenge_snapshot
 from .friend_challenges_round_start_session import (
     build_existing_round_start_result,
     start_new_round_session,

@@ -9,11 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.game.friend_challenges.constants import DUEL_STATUS_ACCEPTED, DUEL_TYPE_DIRECT
 from app.game.sessions.types import FriendChallengeSnapshot
 
-from .friend_challenges_internal import (
+from .friend_challenges_question_plan import resolve_duel_rounds, select_duel_question_ids
+from .friend_challenges_records import (
     _build_friend_challenge_snapshot,
     _create_friend_challenge_row,
 )
-from .friend_challenges_question_plan import resolve_duel_rounds, select_duel_question_ids
 
 
 async def create_tournament_match_friend_challenge(

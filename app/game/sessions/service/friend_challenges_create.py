@@ -20,7 +20,7 @@ from .friend_challenges_create_drafts import (
 )
 from .friend_challenges_create_limits import resolve_friend_challenge_create_request
 from .friend_challenges_create_state import load_friend_challenge_rematch_context
-from .friend_challenges_internal import (
+from .friend_challenges_records import (
     _build_friend_challenge_snapshot,
     _create_friend_challenge_row,
 )

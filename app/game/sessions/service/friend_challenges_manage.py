@@ -18,10 +18,10 @@ from app.game.sessions.types import FriendChallengeSnapshot
 
 from .friend_challenges_create import create_friend_challenge
 from .friend_challenges_internal import (
-    _build_friend_challenge_snapshot,
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
 )
+from .friend_challenges_records import _build_friend_challenge_snapshot
 
 
 async def repost_friend_challenge_as_open(
