@@ -8,7 +8,10 @@ import pytest
 from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournaments import Tournament
 from app.game.sessions.service import friend_challenges_tournament_daily_cup
-from app.game.tournaments.constants import TOURNAMENT_MATCH_STATUS_PENDING
+from app.game.tournaments.constants import (
+    TOURNAMENT_MATCH_STATUS_PENDING,
+    daily_cup_max_rounds_for_participants,
+)
 from tests.type_helpers import AsyncSessionStub, build_friend_challenge
 
 NOW_UTC = datetime(2026, 3, 15, 12, 0, tzinfo=UTC)
@@ -173,8 +176,7 @@ async def test_handle_daily_cup_tournament_progress_emits_events_and_sends_match
         ),
     )
     monkeypatch.setattr(
-        friend_challenges_tournament_daily_cup.TournamentParticipantsRepo,
-        "count_for_tournament",
+        "app.db.repo.tournament_participants_repo.TournamentParticipantsRepo.count_for_tournament",
         _async_return(8),
     )
     monkeypatch.setattr(
@@ -232,11 +234,7 @@ async def test_handle_daily_cup_tournament_progress_emits_events_and_sends_match
             "user_b": 20,
             "user_a_points": 4,
             "user_b_points": 3,
-            "rounds_total": (
-                friend_challenges_tournament_daily_cup.daily_cup_max_rounds_for_participants(
-                    participants_total=8
-                )
-            ),
+            "rounds_total": daily_cup_max_rounds_for_participants(participants_total=8),
             "tournament_registration_deadline": tournament.registration_deadline,
             "next_round_start_time": tournament.round_start_time,
         }
