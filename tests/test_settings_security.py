@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.core.config import Settings, get_settings
+from app.core.test_env import DEFAULT_TEST_DATABASE_URL, resolve_test_database_url
 
 _VALID_PROMO_ENCRYPTION_KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY"
 
@@ -83,3 +84,15 @@ def test_get_settings_bootstraps_required_test_env_defaults(
     assert settings.admin_refresh_secret == "ci-test-admin-refresh-secret"
     assert settings.promo_encryption_key == _VALID_PROMO_ENCRYPTION_KEY
     assert os.environ["TEST_DATABASE_URL"] == test_database_url
+
+
+def test_resolve_test_database_url_rejects_unsafe_database_url_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("TEST_DATABASE_URL", raising=False)
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql+asyncpg://quiz:quiz@db.internal:5432/quiz_arena_prod",
+    )
+
+    assert resolve_test_database_url() == DEFAULT_TEST_DATABASE_URL

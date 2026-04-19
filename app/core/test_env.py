@@ -4,6 +4,8 @@ import os
 import shlex
 import sys
 
+from app.core.integration_db_safety import assess_integration_db_safety
+
 DEFAULT_TEST_DATABASE_URL = "postgresql+asyncpg://quiz:quiz@127.0.0.1:5432/quiz_arena_test"
 DEFAULT_TEST_REDIS_URL = "redis://127.0.0.1:6379/0"
 DEFAULT_TEST_CELERY_BROKER_URL = "redis://127.0.0.1:6379/1"
@@ -33,8 +35,19 @@ def is_test_env_enabled() -> bool:
     return _read_env("APP_ENV").lower() == "test"
 
 
+def _safe_database_url_fallback() -> str:
+    database_url = _read_env("DATABASE_URL")
+    if not database_url:
+        return ""
+    if not assess_integration_db_safety(database_url).is_safe:
+        return ""
+    return database_url
+
+
 def resolve_test_database_url() -> str:
-    return _read_env("TEST_DATABASE_URL") or _read_env("DATABASE_URL") or DEFAULT_TEST_DATABASE_URL
+    return (
+        _read_env("TEST_DATABASE_URL") or _safe_database_url_fallback() or DEFAULT_TEST_DATABASE_URL
+    )
 
 
 def build_test_env_defaults() -> dict[str, str]:
