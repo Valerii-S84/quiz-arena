@@ -5,20 +5,11 @@ from datetime import UTC, datetime
 import pytest
 
 from app.db.models.friend_challenges import FriendChallenge
-from app.game.friend_challenges.constants import (
-    DUEL_STATUS_CANCELED,
-    DUEL_STATUS_COMPLETED,
-    DUEL_STATUS_EXPIRED,
-    DUEL_STATUS_LEGACY_ACTIVE,
+from app.game.sessions.errors import FriendChallengeCompletedError, FriendChallengeFullError
+from app.game.sessions.service import (
+    friend_challenges_round_challenge_state,
+    friend_challenges_rounds_state,
 )
-from app.game.sessions.errors import (
-    FriendChallengeAccessError,
-    FriendChallengeCompletedError,
-    FriendChallengeExpiredError,
-    FriendChallengeFullError,
-    FriendChallengeNotFoundError,
-)
-from app.game.sessions.service import friend_challenges_rounds_state
 from tests.type_helpers import AsyncSessionStub, build_friend_challenge
 
 NOW_UTC = datetime(2026, 3, 15, 12, 0, tzinfo=UTC)
@@ -26,14 +17,6 @@ NOW_UTC = datetime(2026, 3, 15, 12, 0, tzinfo=UTC)
 
 class _Session(AsyncSessionStub):
     pass
-
-
-def _async_return(value):
-    async def _inner(*args, **kwargs):
-        del args, kwargs
-        return value
-
-    return _inner
 
 
 def _challenge(**overrides: object) -> FriendChallenge:
@@ -46,169 +29,100 @@ def _challenge(**overrides: object) -> FriendChallenge:
 
 
 @pytest.mark.asyncio
-async def test_load_friend_challenge_round_context_raises_when_missing(
+@pytest.mark.parametrize(
+    ("user_id", "is_creator", "answered_round", "expected_next_round"),
+    [
+        (10, True, 1, 2),
+        (20, False, 3, 4),
+    ],
+    ids=["creator_context", "opponent_context"],
+)
+async def test_load_friend_challenge_round_context_delegates_and_builds_context(
     monkeypatch: pytest.MonkeyPatch,
+    user_id: int,
+    is_creator: bool,
+    answered_round: int,
+    expected_next_round: int,
 ) -> None:
-    monkeypatch.setattr(
-        friend_challenges_rounds_state.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(None),
-    )
-
-    with pytest.raises(FriendChallengeNotFoundError):
-        await friend_challenges_rounds_state.load_friend_challenge_round_context(
-            _Session(),
-            challenge_id=_challenge().id,
-            user_id=10,
-            now_utc=NOW_UTC,
-        )
-
-
-@pytest.mark.asyncio
-async def test_load_friend_challenge_round_context_normalizes_status_and_computes_next_round(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+    session = _Session()
     challenge = _challenge(
-        status=DUEL_STATUS_LEGACY_ACTIVE,
         creator_user_id=10,
         opponent_user_id=20,
-        creator_answered_round=1,
+        creator_answered_round=answered_round if is_creator else 0,
+        opponent_answered_round=0 if is_creator else answered_round,
     )
-    monkeypatch.setattr(
-        friend_challenges_rounds_state.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(challenge),
+    challenge_state = friend_challenges_round_challenge_state.FriendChallengeRoundChallengeState(
+        challenge=challenge,
+        has_opponent=True,
+        is_creator=is_creator,
     )
+    captured_kwargs: dict[str, object] = {}
+
+    async def _fake_load_round_friend_challenge(session, **kwargs):
+        captured_kwargs["session"] = session
+        captured_kwargs.update(kwargs)
+        return challenge_state
+
     monkeypatch.setattr(
         friend_challenges_rounds_state,
-        "_expire_friend_challenge_if_due",
-        lambda **_kwargs: False,
+        "load_round_friend_challenge",
+        _fake_load_round_friend_challenge,
     )
 
     context = await friend_challenges_rounds_state.load_friend_challenge_round_context(
-        _Session(),
+        session,
         challenge_id=challenge.id,
-        user_id=10,
+        user_id=user_id,
         now_utc=NOW_UTC,
     )
 
-    assert context.challenge is challenge
-    assert challenge.status == "ACCEPTED"
-    assert context.has_opponent is True
-    assert context.is_creator is True
-    assert context.next_round == 2
-
-
-@pytest.mark.asyncio
-async def test_load_friend_challenge_round_context_emits_expired_event_before_expired_error(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    challenge = _challenge(status="PENDING", creator_user_id=10, opponent_user_id=None)
-    expired_events: list[dict[str, object]] = []
-
-    def _fake_expire(*, challenge: FriendChallenge, now_utc: datetime) -> bool:
-        assert now_utc == NOW_UTC
-        challenge.status = DUEL_STATUS_EXPIRED
-        return True
-
-    async def _fake_emit_expired_event(*_args, **kwargs) -> None:
-        expired_events.append(kwargs)
-
-    monkeypatch.setattr(
-        friend_challenges_rounds_state.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(challenge),
+    assert context == friend_challenges_rounds_state._FriendChallengeRoundContext(
+        challenge=challenge,
+        has_opponent=True,
+        is_creator=is_creator,
+        next_round=expected_next_round,
     )
-    monkeypatch.setattr(
-        friend_challenges_rounds_state,
-        "_expire_friend_challenge_if_due",
-        _fake_expire,
-    )
-    monkeypatch.setattr(
-        friend_challenges_rounds_state,
-        "_emit_friend_challenge_expired_event",
-        _fake_emit_expired_event,
-    )
-
-    with pytest.raises(FriendChallengeExpiredError):
-        await friend_challenges_rounds_state.load_friend_challenge_round_context(
-            _Session(),
-            challenge_id=challenge.id,
-            user_id=10,
-            now_utc=NOW_UTC,
-        )
-
-    assert expired_events == [
-        {
-            "challenge": challenge,
-            "happened_at": NOW_UTC,
-            "source": friend_challenges_rounds_state.EVENT_SOURCE_BOT,
-        }
-    ]
-
-
-@pytest.mark.asyncio
-async def test_load_friend_challenge_round_context_rejects_outsider(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    challenge = _challenge(status="ACCEPTED", creator_user_id=10, opponent_user_id=20)
-    monkeypatch.setattr(
-        friend_challenges_rounds_state.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(challenge),
-    )
-    monkeypatch.setattr(
-        friend_challenges_rounds_state,
-        "_expire_friend_challenge_if_due",
-        lambda **_kwargs: False,
-    )
-
-    with pytest.raises(FriendChallengeAccessError):
-        await friend_challenges_rounds_state.load_friend_challenge_round_context(
-            _Session(),
-            challenge_id=challenge.id,
-            user_id=999,
-            now_utc=NOW_UTC,
-        )
+    assert captured_kwargs == {
+        "session": session,
+        "challenge_id": challenge.id,
+        "user_id": user_id,
+        "now_utc": NOW_UTC,
+    }
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("challenge", "expected_error"),
+    ("has_opponent", "expected_error"),
     [
-        (
-            _challenge(
-                status=DUEL_STATUS_CANCELED,
-                creator_user_id=10,
-                opponent_user_id=None,
-            ),
-            FriendChallengeFullError,
-        ),
-        (
-            _challenge(
-                status=DUEL_STATUS_COMPLETED,
-                creator_user_id=10,
-                opponent_user_id=20,
-            ),
-            FriendChallengeCompletedError,
-        ),
+        (False, FriendChallengeFullError),
+        (True, FriendChallengeCompletedError),
     ],
     ids=["full_without_opponent", "completed_with_opponent"],
 )
-async def test_load_friend_challenge_round_context_rejects_non_playable_states(
+async def test_load_friend_challenge_round_context_rejects_non_playable_context(
     monkeypatch: pytest.MonkeyPatch,
-    challenge: FriendChallenge,
+    has_opponent: bool,
     expected_error: type[Exception],
 ) -> None:
+    challenge = _challenge(opponent_user_id=20 if has_opponent else None)
+    challenge_state = friend_challenges_round_challenge_state.FriendChallengeRoundChallengeState(
+        challenge=challenge,
+        has_opponent=has_opponent,
+        is_creator=True,
+    )
+
+    async def _fake_load_round_friend_challenge(*_args, **_kwargs):
+        return challenge_state
+
     monkeypatch.setattr(
-        friend_challenges_rounds_state.FriendChallengesRepo,
-        "get_by_id_for_update",
-        _async_return(challenge),
+        friend_challenges_rounds_state,
+        "load_round_friend_challenge",
+        _fake_load_round_friend_challenge,
     )
     monkeypatch.setattr(
         friend_challenges_rounds_state,
-        "_expire_friend_challenge_if_due",
-        lambda **_kwargs: False,
+        "is_round_playable",
+        lambda *_args, **_kwargs: False,
     )
 
     with pytest.raises(expected_error):

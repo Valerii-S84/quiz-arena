@@ -6,25 +6,13 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.analytics_events import EVENT_SOURCE_BOT
 from app.db.models.friend_challenges import FriendChallenge
-from app.db.repo.friend_challenges_repo import FriendChallengesRepo
-from app.game.friend_challenges.constants import (
-    DUEL_STATUS_EXPIRED,
-    is_duel_playable_for_user,
-    normalize_duel_status,
-)
-from app.game.sessions.errors import (
-    FriendChallengeAccessError,
-    FriendChallengeCompletedError,
-    FriendChallengeExpiredError,
-    FriendChallengeFullError,
-    FriendChallengeNotFoundError,
-)
+from app.game.friend_challenges.constants import is_duel_playable_for_user
+from app.game.sessions.errors import FriendChallengeCompletedError, FriendChallengeFullError
 
-from .friend_challenges_expiry import (
-    _emit_friend_challenge_expired_event,
-    _expire_friend_challenge_if_due,
+from .friend_challenges_round_challenge_state import (
+    FriendChallengeRoundChallengeState,
+    load_round_friend_challenge,
 )
 
 
@@ -44,6 +32,23 @@ def is_round_playable(context: _FriendChallengeRoundContext) -> bool:
     )
 
 
+def _build_round_context(
+    challenge_state: FriendChallengeRoundChallengeState,
+) -> _FriendChallengeRoundContext:
+    context = _FriendChallengeRoundContext(
+        challenge=challenge_state.challenge,
+        has_opponent=challenge_state.has_opponent,
+        is_creator=challenge_state.is_creator,
+        next_round=(
+            challenge_state.challenge.creator_answered_round
+            if challenge_state.is_creator
+            else challenge_state.challenge.opponent_answered_round
+        )
+        + 1,
+    )
+    return context
+
+
 async def load_friend_challenge_round_context(
     session: AsyncSession,
     *,
@@ -51,40 +56,15 @@ async def load_friend_challenge_round_context(
     user_id: int,
     now_utc: datetime,
 ) -> _FriendChallengeRoundContext:
-    challenge = await FriendChallengesRepo.get_by_id_for_update(session, challenge_id)
-    if challenge is None:
-        raise FriendChallengeNotFoundError
-
-    has_opponent = challenge.opponent_user_id is not None
-    challenge.status = normalize_duel_status(
-        status=challenge.status,
-        has_opponent=has_opponent,
+    challenge_state = await load_round_friend_challenge(
+        session,
+        challenge_id=challenge_id,
+        user_id=user_id,
+        now_utc=now_utc,
     )
-    if _expire_friend_challenge_if_due(challenge=challenge, now_utc=now_utc):
-        await _emit_friend_challenge_expired_event(
-            session,
-            challenge=challenge,
-            happened_at=now_utc,
-            source=EVENT_SOURCE_BOT,
-        )
-    if challenge.status == DUEL_STATUS_EXPIRED:
-        raise FriendChallengeExpiredError
-
-    is_creator = challenge.creator_user_id == user_id
-    if not is_creator and challenge.opponent_user_id != user_id:
-        raise FriendChallengeAccessError
-
-    context = _FriendChallengeRoundContext(
-        challenge=challenge,
-        has_opponent=has_opponent,
-        is_creator=is_creator,
-        next_round=(
-            challenge.creator_answered_round if is_creator else challenge.opponent_answered_round
-        )
-        + 1,
-    )
+    context = _build_round_context(challenge_state)
     if not is_round_playable(context):
-        if not has_opponent:
+        if not challenge_state.has_opponent:
             raise FriendChallengeFullError
         raise FriendChallengeCompletedError
     return context
