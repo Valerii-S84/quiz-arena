@@ -6,8 +6,10 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.db.models.friend_challenges import FriendChallenge
-from app.game.sessions.errors import FriendChallengeAccessError
-from app.game.sessions.service import friend_challenges_series_drafts
+from app.game.sessions.service import (
+    friend_challenges_series_drafts,
+    friend_challenges_series_next_game_state,
+)
 from tests.type_helpers import AsyncSessionStub, build_friend_challenge
 
 NOW_UTC = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
@@ -99,10 +101,20 @@ async def test_build_series_next_game_friend_challenge_draft_uses_next_game_stat
         series_best_of=3,
         winner_user_id=101,
     )
+    load_calls: list[dict[str, object]] = []
+
+    async def _fake_load_next_game_state(*_args, **kwargs):
+        load_calls.append(kwargs)
+        return friend_challenges_series_next_game_state.FriendChallengeSeriesNextGameState(
+            series_id=SERIES_A_ID,
+            series_game_number=2,
+            series_best_of=3,
+        )
+
     monkeypatch.setattr(
-        friend_challenges_series_drafts.FriendChallengesRepo,
-        "list_by_series_id_for_update",
-        _async_return([challenge]),
+        friend_challenges_series_drafts,
+        "load_friend_challenge_series_next_game_state",
+        _fake_load_next_game_state,
     )
     monkeypatch.setattr(
         friend_challenges_series_drafts,
@@ -130,49 +142,4 @@ async def test_build_series_next_game_friend_challenge_draft_uses_next_game_stat
         series_best_of=3,
         status="ACCEPTED",
     )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("challenge", "series_challenges"),
-    [
-        (_challenge(series_id=None, series_best_of=1), []),
-        (
-            _challenge(series_id=SERIES_A_ID, series_game_number=2, series_best_of=3),
-            [
-                _challenge(
-                    series_id=SERIES_A_ID,
-                    series_game_number=1,
-                    series_best_of=3,
-                    winner_user_id=101,
-                ),
-                _challenge(
-                    series_id=SERIES_A_ID,
-                    series_game_number=2,
-                    series_best_of=3,
-                    winner_user_id=101,
-                ),
-            ],
-        ),
-    ],
-    ids=["missing_series_metadata", "winner_already_decided"],
-)
-async def test_build_series_next_game_friend_challenge_draft_rejects_ineligible_series(
-    monkeypatch: pytest.MonkeyPatch,
-    challenge: FriendChallenge,
-    series_challenges: list[FriendChallenge],
-) -> None:
-    monkeypatch.setattr(
-        friend_challenges_series_drafts.FriendChallengesRepo,
-        "list_by_series_id_for_update",
-        _async_return(series_challenges),
-    )
-
-    with pytest.raises(FriendChallengeAccessError):
-        await friend_challenges_series_drafts.build_series_next_game_friend_challenge_draft(
-            _Session(),
-            challenge=challenge,
-            initiator_user_id=101,
-            opponent_user_id=202,
-            now_utc=NOW_UTC,
-        )
+    assert load_calls == [{"challenge": challenge}]

@@ -7,12 +7,10 @@ from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.friend_challenges import FriendChallenge
-from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.game.friend_challenges.constants import DUEL_STATUS_ACCEPTED, DUEL_TYPE_DIRECT
-from app.game.sessions.errors import FriendChallengeAccessError
 
 from .friend_challenges_access import _resolve_friend_challenge_access_type
-from .friend_challenges_series_utils import _count_series_wins, _series_wins_needed
+from .friend_challenges_series_next_game_state import load_friend_challenge_series_next_game_state
 
 
 @dataclass(slots=True)
@@ -80,34 +78,6 @@ async def build_series_start_friend_challenge_draft(
     )
 
 
-async def _resolve_series_next_game_state(
-    session: AsyncSession,
-    *,
-    challenge: FriendChallenge,
-) -> tuple[UUID, int, int]:
-    if challenge.series_id is None or challenge.series_best_of <= 1:
-        raise FriendChallengeAccessError
-
-    series_challenges = await FriendChallengesRepo.list_by_series_id_for_update(
-        session,
-        series_id=challenge.series_id,
-    )
-    creator_wins, opponent_wins = _count_series_wins(
-        series_challenges=series_challenges,
-        creator_user_id=challenge.creator_user_id,
-        opponent_user_id=challenge.opponent_user_id,
-    )
-    wins_needed = _series_wins_needed(best_of=challenge.series_best_of)
-    max_wins = max(creator_wins, opponent_wins)
-    max_game_number = max(
-        (int(item.series_game_number) for item in series_challenges),
-        default=int(challenge.series_game_number),
-    )
-    if max_wins >= wins_needed or max_game_number >= challenge.series_best_of:
-        raise FriendChallengeAccessError
-    return challenge.series_id, max_game_number + 1, challenge.series_best_of
-
-
 async def build_series_next_game_friend_challenge_draft(
     session: AsyncSession,
     *,
@@ -116,7 +86,7 @@ async def build_series_next_game_friend_challenge_draft(
     opponent_user_id: int | None,
     now_utc: datetime,
 ) -> FriendChallengeSeriesDraft:
-    series_id, series_game_number, series_best_of = await _resolve_series_next_game_state(
+    next_game_state = await load_friend_challenge_series_next_game_state(
         session,
         challenge=challenge,
     )
@@ -126,7 +96,7 @@ async def build_series_next_game_friend_challenge_draft(
         initiator_user_id=initiator_user_id,
         opponent_user_id=opponent_user_id,
         now_utc=now_utc,
-        series_id=series_id,
-        series_game_number=series_game_number,
-        series_best_of=series_best_of,
+        series_id=next_game_state.series_id,
+        series_game_number=next_game_state.series_game_number,
+        series_best_of=next_game_state.series_best_of,
     )
