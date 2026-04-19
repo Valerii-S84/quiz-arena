@@ -8,13 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.analytics_events import EVENT_SOURCE_BOT
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.game.friend_challenges.constants import normalize_duel_status
-from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 from app.game.sessions.types import FriendChallengeSnapshot
 
 from .friend_challenges_expiry import (
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
 )
+from .friend_challenges_query_state import load_friend_challenge_for_user
 from .friend_challenges_records import _build_friend_challenge_snapshot
 from .friend_challenges_series_utils import _count_series_wins
 
@@ -26,22 +26,12 @@ async def get_friend_challenge_snapshot_for_user(
     challenge_id: UUID,
     now_utc: datetime,
 ) -> FriendChallengeSnapshot:
-    challenge = await FriendChallengesRepo.get_by_id_for_update(session, challenge_id)
-    if challenge is None:
-        raise FriendChallengeNotFoundError
-    challenge.status = normalize_duel_status(
-        status=challenge.status,
-        has_opponent=challenge.opponent_user_id is not None,
+    challenge = await load_friend_challenge_for_user(
+        session,
+        user_id=user_id,
+        challenge_id=challenge_id,
+        now_utc=now_utc,
     )
-    if _expire_friend_challenge_if_due(challenge=challenge, now_utc=now_utc):
-        await _emit_friend_challenge_expired_event(
-            session,
-            challenge=challenge,
-            happened_at=now_utc,
-            source=EVENT_SOURCE_BOT,
-        )
-    if user_id not in {challenge.creator_user_id, challenge.opponent_user_id}:
-        raise FriendChallengeAccessError
     return _build_friend_challenge_snapshot(challenge)
 
 
@@ -52,22 +42,12 @@ async def get_friend_series_score_for_user(
     challenge_id: UUID,
     now_utc: datetime,
 ) -> tuple[int, int, int, int]:
-    challenge = await FriendChallengesRepo.get_by_id_for_update(session, challenge_id)
-    if challenge is None:
-        raise FriendChallengeNotFoundError
-    challenge.status = normalize_duel_status(
-        status=challenge.status,
-        has_opponent=challenge.opponent_user_id is not None,
+    challenge = await load_friend_challenge_for_user(
+        session,
+        user_id=user_id,
+        challenge_id=challenge_id,
+        now_utc=now_utc,
     )
-    if _expire_friend_challenge_if_due(challenge=challenge, now_utc=now_utc):
-        await _emit_friend_challenge_expired_event(
-            session,
-            challenge=challenge,
-            happened_at=now_utc,
-            source=EVENT_SOURCE_BOT,
-        )
-    if user_id not in {challenge.creator_user_id, challenge.opponent_user_id}:
-        raise FriendChallengeAccessError
     if challenge.series_id is None or challenge.series_best_of <= 1:
         return (0, 0, 1, 1)
 
