@@ -21,6 +21,7 @@ from .constants import (
     LEVEL_ORDER,
     PERSISTENT_ADAPTIVE_MODE_BOUNDS,
 )
+from .friend_challenges_access import _resolve_friend_challenge_access_type
 from .friend_challenges_create import create_friend_challenge, create_friend_challenge_rematch
 from .friend_challenges_internal import (
     _build_friend_challenge_snapshot,
@@ -28,7 +29,6 @@ from .friend_challenges_internal import (
     _emit_friend_challenge_expired_event,
     _expire_friend_challenge_if_due,
     _friend_challenge_expires_at,
-    _resolve_friend_challenge_access_type,
 )
 from .friend_challenges_join import join_friend_challenge_by_id, join_friend_challenge_by_token
 from .friend_challenges_manage import (
