@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,54 +8,13 @@ from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.models.friend_challenges import FriendChallenge
 from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournaments import Tournament
-from app.game.tournaments.constants import (
-    TOURNAMENT_MATCH_STATUS_PENDING,
+from app.game.sessions.service.friend_challenges_tournament_daily_cup_deadline import (
+    should_continue_daily_cup_progress,
 )
 from app.game.sessions.service.friend_challenges_tournament_daily_cup_followups import (
     enqueue_daily_cup_completion_followups,
     send_daily_cup_match_results_if_ready,
 )
-
-_DAILY_CUP_CHALLENGE_AWAITING_RESPONSE = frozenset({"CREATOR_DONE", "OPPONENT_DONE"})
-_DAILY_CUP_CHALLENGE_FINISHED = frozenset({"COMPLETED", "WALKOVER"})
-
-
-def _tighten_daily_cup_deadline(
-    *,
-    challenge: FriendChallenge,
-    tournament_match: TournamentMatch,
-    tournament: Tournament,
-    now_utc: datetime,
-    grace_minutes: int,
-) -> None:
-    if challenge.status not in _DAILY_CUP_CHALLENGE_AWAITING_RESPONSE:
-        return
-    if tournament_match.status != TOURNAMENT_MATCH_STATUS_PENDING:
-        return
-    response_deadline = now_utc + timedelta(minutes=grace_minutes)
-    tightened_deadline = min(tournament_match.deadline, response_deadline)
-    if tightened_deadline < tournament_match.deadline:
-        tournament_match.deadline = tightened_deadline
-    if tournament.round_deadline is None or tightened_deadline < tournament.round_deadline:
-        tournament.round_deadline = tightened_deadline
-
-
-def _should_continue_daily_cup_progress(
-    *,
-    challenge: FriendChallenge,
-    tournament_match: TournamentMatch,
-    tournament: Tournament,
-    now_utc: datetime,
-    grace_minutes: int,
-) -> bool:
-    _tighten_daily_cup_deadline(
-        challenge=challenge,
-        tournament_match=tournament_match,
-        tournament=tournament,
-        now_utc=now_utc,
-        grace_minutes=grace_minutes,
-    )
-    return challenge.status in _DAILY_CUP_CHALLENGE_FINISHED
 
 
 async def _settle_daily_cup_match_and_advance_round(
@@ -164,7 +123,7 @@ async def handle_daily_cup_tournament_progress(
     tournament: Tournament,
     grace_minutes: int,
 ) -> None:
-    if not _should_continue_daily_cup_progress(
+    if not should_continue_daily_cup_progress(
         challenge=challenge,
         tournament_match=tournament_match,
         tournament=tournament,

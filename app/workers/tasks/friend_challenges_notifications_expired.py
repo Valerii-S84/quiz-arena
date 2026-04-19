@@ -1,161 +1,13 @@
 from __future__ import annotations
 
-from app.bot.keyboards.friend_challenge import (
-    build_friend_challenge_finished_keyboard,
-    build_friend_pending_expired_keyboard,
+from app.workers.tasks.friend_challenges_notifications_expired_delivery import (
+    deliver_expired_notice,
 )
-from app.workers.tasks.friend_challenges_notifications_delivery import send_message_safely
 from app.workers.tasks.friend_challenges_notifications_expired_payloads import (
     expired_notice_context,
     expired_notice_result,
     expired_scores,
 )
-
-
-async def _send_pending_expired_notice(
-    *, bot, challenge_id: str, creator_chat: int | None
-) -> tuple[int, int]:
-    sent = await send_message_safely(
-        bot=bot,
-        chat_id=creator_chat,
-        text="⏳ Niemand hat angenommen.",
-        reply_markup=build_friend_pending_expired_keyboard(challenge_id=challenge_id),
-    )
-    return int(sent), int(not sent)
-
-
-async def _send_finished_notice(
-    *,
-    bot,
-    challenge_id: str,
-    creator_chat: int | None,
-    opponent_chat: int | None,
-    creator_score: int,
-    opponent_score: int,
-    creator_text: str,
-    opponent_text: str,
-    has_opponent: bool,
-) -> tuple[int, int]:
-    sent_to = 0
-    failed_to = 0
-    reply_markup = build_friend_challenge_finished_keyboard(challenge_id=challenge_id)
-    creator_sent = await send_message_safely(
-        bot=bot,
-        chat_id=creator_chat,
-        text=creator_text,
-        reply_markup=reply_markup,
-    )
-    sent_to += int(creator_sent)
-    failed_to += int(not creator_sent)
-    if not has_opponent:
-        return sent_to, failed_to
-    opponent_sent = await send_message_safely(
-        bot=bot,
-        chat_id=opponent_chat,
-        text=opponent_text,
-        reply_markup=reply_markup,
-    )
-    sent_to += int(opponent_sent)
-    failed_to += int(not opponent_sent)
-    return sent_to, failed_to
-
-
-async def _send_walkover_notice(
-    *,
-    bot,
-    challenge_id: str,
-    creator_chat: int | None,
-    opponent_chat: int | None,
-    creator_score: int,
-    opponent_score: int,
-    has_opponent: bool,
-) -> tuple[int, int]:
-    return await _send_finished_notice(
-        bot=bot,
-        challenge_id=challenge_id,
-        creator_chat=creator_chat,
-        opponent_chat=opponent_chat,
-        creator_score=creator_score,
-        opponent_score=opponent_score,
-        creator_text=(
-            "⌛ Walkover. Duell beendet.\n"
-            f"Finaler Score: Du {creator_score} | Gegner {opponent_score}."
-        ),
-        opponent_text=(
-            "⌛ Walkover. Duell beendet.\n"
-            f"Finaler Score: Du {opponent_score} | Gegner {creator_score}."
-        ),
-        has_opponent=has_opponent,
-    )
-
-
-async def _send_standard_expired_notice(
-    *,
-    bot,
-    challenge_id: str,
-    creator_chat: int | None,
-    opponent_chat: int | None,
-    creator_score: int,
-    opponent_score: int,
-    has_opponent: bool,
-) -> tuple[int, int]:
-    return await _send_finished_notice(
-        bot=bot,
-        challenge_id=challenge_id,
-        creator_chat=creator_chat,
-        opponent_chat=opponent_chat,
-        creator_score=creator_score,
-        opponent_score=opponent_score,
-        creator_text=(
-            "⌛ Dein Duell ist wegen Zeitablauf beendet.\n"
-            f"Finaler Score: Du {creator_score} | Gegner {opponent_score}."
-        ),
-        opponent_text=(
-            "⌛ Dein Duell ist wegen Zeitablauf beendet.\n"
-            f"Finaler Score: Du {opponent_score} | Gegner {creator_score}."
-        ),
-        has_opponent=has_opponent,
-    )
-
-
-async def _deliver_expired_notice(
-    *,
-    bot,
-    item: dict[str, object],
-    challenge_id: str,
-    creator_chat: int | None,
-    opponent_chat: int | None,
-    creator_score: int,
-    opponent_score: int,
-    status: str,
-    previous_status: str,
-) -> tuple[int, int]:
-    has_opponent = isinstance(item["opponent_user_id"], int)
-    if status == "EXPIRED" and previous_status == "PENDING":
-        return await _send_pending_expired_notice(
-            bot=bot,
-            challenge_id=challenge_id,
-            creator_chat=creator_chat,
-        )
-    if status == "WALKOVER":
-        return await _send_walkover_notice(
-            bot=bot,
-            challenge_id=challenge_id,
-            creator_chat=creator_chat,
-            opponent_chat=opponent_chat,
-            creator_score=creator_score,
-            opponent_score=opponent_score,
-            has_opponent=has_opponent,
-        )
-    return await _send_standard_expired_notice(
-        bot=bot,
-        challenge_id=challenge_id,
-        creator_chat=creator_chat,
-        opponent_chat=opponent_chat,
-        creator_score=creator_score,
-        opponent_score=opponent_score,
-        has_opponent=has_opponent,
-    )
 
 
 async def _send_expired_notice_item(
@@ -172,9 +24,8 @@ async def _send_expired_notice_item(
         item=item,
         telegram_targets=telegram_targets,
     )
-    sent_to, failed_to = await _deliver_expired_notice(
+    sent_to, failed_to = await deliver_expired_notice(
         bot=bot,
-        item=item,
         challenge_id=challenge_id,
         creator_chat=creator_chat,
         opponent_chat=opponent_chat,
@@ -182,6 +33,7 @@ async def _send_expired_notice_item(
         opponent_score=opponent_score,
         status=status,
         previous_status=previous_status,
+        has_opponent=isinstance(item["opponent_user_id"], int),
     )
     return expired_notice_result(
         challenge_id=challenge_id,

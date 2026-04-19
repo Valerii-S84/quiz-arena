@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 
 from aiogram.types import CallbackQuery
 
+from app.bot.handlers.gameplay_flows.friend_answer_completion_context import (
+    FriendCompletionContext,
+    resolve_completion_context,
+)
 from app.bot.handlers.gameplay_flows.friend_answer_completion_delivery import (
-    Answerable,
     FriendCompletionCallbacks,
     notify_opponent_if_needed,
-    resolve_answerable,
     send_player_completion_message,
-)
-from app.bot.handlers.gameplay_flows.friend_answer_completion_state import (
-    FriendSeriesContext,
-    resolve_friend_series_context,
 )
 from app.bot.handlers.gameplay_flows.tournament_match_completion import (
     handle_completed_tournament_match,
@@ -27,35 +24,6 @@ from app.bot.handlers.gameplay_flows.tournament_match_post_flow import (
     resolve_tournament_place_for_user,
     resolve_tournament_view_callback_data_for_match,
 )
-
-
-@dataclass(frozen=True, slots=True)
-class _FriendCompletionContext:
-    answerable: Answerable
-    series_context: FriendSeriesContext
-
-
-async def _resolve_completion_context(
-    callback: CallbackQuery,
-    *,
-    challenge,
-    snapshot_user_id: int,
-    opponent_label: str,
-    now_utc: datetime,
-    session_local,
-    game_session_service,
-) -> _FriendCompletionContext:
-    return _FriendCompletionContext(
-        answerable=resolve_answerable(callback),
-        series_context=await resolve_friend_series_context(
-            challenge=challenge,
-            snapshot_user_id=snapshot_user_id,
-            opponent_label=opponent_label,
-            now_utc=now_utc,
-            session_local=session_local,
-            game_session_service=game_session_service,
-        ),
-    )
 
 
 async def _handle_tournament_completion(
@@ -110,7 +78,7 @@ async def _deliver_standard_completion(
     opponent_label: str,
     opponent_user_id: int | None,
     idempotent_replay: bool,
-    completion_context: _FriendCompletionContext,
+    completion_context: FriendCompletionContext,
     callbacks: FriendCompletionCallbacks,
 ) -> None:
     await send_player_completion_message(
@@ -151,7 +119,7 @@ async def handle_completed_friend_challenge(
     game_session_service,
     callbacks: FriendCompletionCallbacks,
 ) -> None:
-    completion_context = await _resolve_completion_context(
+    completion_context = await resolve_completion_context(
         callback,
         challenge=challenge,
         snapshot_user_id=snapshot_user_id,
