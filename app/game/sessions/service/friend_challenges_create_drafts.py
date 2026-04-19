@@ -1,32 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.friend_challenges import FriendChallenge
 from app.game.friend_challenges.constants import DUEL_STATUS_ACCEPTED, DUEL_TYPE_DIRECT
 
+from .friend_challenges_create_draft import FriendChallengeCreationDraft
 from .friend_challenges_create_rematch_series import resolve_friend_challenge_rematch_series_state
 from .friend_challenges_create_seed_state import load_friend_challenge_create_seed_state
-
-
-@dataclass(slots=True)
-class FriendChallengeCreationDraft:
-    challenge_id: UUID
-    creator_user_id: int
-    opponent_user_id: int | None
-    challenge_type: str
-    mode_code: str
-    access_type: str
-    total_rounds: int
-    question_ids: list[str]
-    status: str
-    series_id: UUID | None = None
-    series_game_number: int = 1
-    series_best_of: int = 1
+from .friend_challenges_create_standard_draft import (
+    build_create_friend_challenge_draft as build_standard_friend_challenge_draft,
+)
 
 
 async def build_create_friend_challenge_draft(
@@ -38,23 +24,13 @@ async def build_create_friend_challenge_draft(
     total_rounds: int,
     now_utc: datetime,
 ) -> FriendChallengeCreationDraft:
-    seed_state = await load_friend_challenge_create_seed_state(
+    return await build_standard_friend_challenge_draft(
         session,
         creator_user_id=creator_user_id,
+        challenge_type=challenge_type,
         mode_code=mode_code,
         total_rounds=total_rounds,
         now_utc=now_utc,
-    )
-    return FriendChallengeCreationDraft(
-        challenge_id=seed_state.challenge_id,
-        creator_user_id=creator_user_id,
-        opponent_user_id=None,
-        challenge_type=challenge_type,
-        mode_code=mode_code,
-        access_type=seed_state.access_type,
-        total_rounds=total_rounds,
-        question_ids=seed_state.question_ids,
-        status="PENDING",
     )
 
 

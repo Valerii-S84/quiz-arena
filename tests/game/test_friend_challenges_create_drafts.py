@@ -39,32 +39,8 @@ def _challenge(**overrides: object) -> FriendChallenge:
 async def test_build_create_friend_challenge_draft_uses_seed_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    load_calls: list[dict[str, object]] = []
-
-    async def _fake_load_seed_state(*_args, **kwargs):
-        load_calls.append(kwargs)
-        return friend_challenges_create_seed_state.FriendChallengeCreateSeedState(
-            challenge_id=CHALLENGE_ID,
-            access_type="FREE",
-            question_ids=["q-1", "q-2", "q-3"],
-        )
-
-    monkeypatch.setattr(
-        friend_challenges_create_drafts,
-        "load_friend_challenge_create_seed_state",
-        _fake_load_seed_state,
-    )
-
-    draft = await friend_challenges_create_drafts.build_create_friend_challenge_draft(
-        _Session(),
-        creator_user_id=101,
-        challenge_type="DIRECT",
-        mode_code="QUICK_MIX_A1A2",
-        total_rounds=3,
-        now_utc=NOW_UTC,
-    )
-
-    assert draft == friend_challenges_create_drafts.FriendChallengeCreationDraft(
+    session = _Session()
+    delegated_draft = friend_challenges_create_drafts.FriendChallengeCreationDraft(
         challenge_id=CHALLENGE_ID,
         creator_user_id=101,
         opponent_user_id=None,
@@ -75,14 +51,37 @@ async def test_build_create_friend_challenge_draft_uses_seed_state(
         question_ids=["q-1", "q-2", "q-3"],
         status="PENDING",
     )
-    assert load_calls == [
-        {
-            "creator_user_id": 101,
-            "mode_code": "QUICK_MIX_A1A2",
-            "total_rounds": 3,
-            "now_utc": NOW_UTC,
-        }
-    ]
+    captured_kwargs: dict[str, object] = {}
+
+    async def _fake_build_standard_draft(session_arg, **kwargs):
+        captured_kwargs["session"] = session_arg
+        captured_kwargs.update(kwargs)
+        return delegated_draft
+
+    monkeypatch.setattr(
+        friend_challenges_create_drafts,
+        "build_standard_friend_challenge_draft",
+        _fake_build_standard_draft,
+    )
+
+    draft = await friend_challenges_create_drafts.build_create_friend_challenge_draft(
+        session,
+        creator_user_id=101,
+        challenge_type="DIRECT",
+        mode_code="QUICK_MIX_A1A2",
+        total_rounds=3,
+        now_utc=NOW_UTC,
+    )
+
+    assert draft is delegated_draft
+    assert captured_kwargs == {
+        "session": session,
+        "creator_user_id": 101,
+        "challenge_type": "DIRECT",
+        "mode_code": "QUICK_MIX_A1A2",
+        "total_rounds": 3,
+        "now_utc": NOW_UTC,
+    }
 
 
 @pytest.mark.asyncio
