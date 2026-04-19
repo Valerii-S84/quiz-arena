@@ -10,7 +10,7 @@ from app.game.friend_challenges.constants import DUEL_TYPE_DIRECT
 from app.game.sessions.types import FriendChallengeSnapshot
 
 from .constants import FRIEND_CHALLENGE_TOTAL_ROUNDS
-from .friend_challenges_analytics import (
+from .friend_challenges_create_analytics import (
     emit_rematch_duel_created_events,
     emit_standard_duel_created_events,
 )

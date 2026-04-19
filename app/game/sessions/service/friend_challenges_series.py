@@ -8,13 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.analytics_events import EVENT_SOURCE_BOT
 from app.game.sessions.types import FriendChallengeSnapshot
 
-from .friend_challenges_analytics import (
-    emit_series_next_game_created_events,
-    emit_series_started_duel_created_events,
-)
 from .friend_challenges_records import (
     _build_friend_challenge_snapshot,
     _create_friend_challenge_row,
+)
+from .friend_challenges_series_analytics import (
+    emit_series_next_game_created_events,
+    emit_series_started_duel_created_events,
 )
 from .friend_challenges_series_drafts import (
     build_series_next_game_friend_challenge_draft,
