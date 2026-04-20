@@ -13,6 +13,7 @@ import {
   submitAdminLogin,
   usePublicStats,
 } from "./public-home-data";
+import { navigateTo } from "@/lib/browser-navigation";
 import { buildTrackedTelegramBotUrl } from "./public-home-helpers";
 import { PublicHomeAdminLoginModal } from "./public-home-admin-login-modal";
 import {
@@ -70,7 +71,7 @@ export default function PublicHomeClient() {
     );
 
     if (result.redirectTo) {
-      window.location.href = result.redirectTo;
+      navigateTo(result.redirectTo);
     }
 
     setLoginStatus(result.status);
