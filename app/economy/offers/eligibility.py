@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from app.economy.purchases.catalog import get_product, is_product_available_for_sale
+from app.economy.purchases.catalog import ProductSpec, get_product, is_product_available_for_sale
 
 
-def _premium_plan_rank(plan_code: str | None) -> int:
-    product = get_product(plan_code or "")
+def _get_premium_product(product_code: str | None) -> ProductSpec | None:
+    product = get_product(product_code or "")
     if product is None or product.product_type != "PREMIUM":
-        return 0
-    return product.premium_days
+        return None
+    return product
 
 
 def is_offer_cta_eligible(
@@ -18,14 +18,21 @@ def is_offer_cta_eligible(
     if not is_product_available_for_sale(product_code):
         return False
 
+    product = get_product(product_code)
+    if product is None:
+        return False
+
+    if product.product_type != "PREMIUM":
+        return True
+
     if active_premium_scope is None:
         return True
 
-    product = get_product(product_code)
-    if product is None or product.product_type != "PREMIUM":
-        return product is not None
+    active_premium_product = _get_premium_product(active_premium_scope)
+    if active_premium_product is None:
+        return False
 
-    return _premium_plan_rank(product_code) > _premium_plan_rank(active_premium_scope)
+    return product.premium_days > active_premium_product.premium_days
 
 
 def eligible_cta_product_codes(

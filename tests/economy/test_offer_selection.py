@@ -39,6 +39,17 @@ def test_selection_from_template_skips_premium_downgrade_codes_for_active_premiu
     assert selection.cta_product_codes == ("STREAK_SAVER_20",)
 
 
+def test_selection_from_template_blocks_unknown_premium_scope_from_premium_ctas() -> None:
+    selection = selection_from_template(
+        impression_id=13,
+        template=_template(cta_product_codes=("STREAK_SAVER_20", "PREMIUM_MONTH")),
+        idempotent_replay=False,
+        active_premium_scope="ADMIN_BONUS",
+    )
+
+    assert selection.cta_product_codes == ("STREAK_SAVER_20",)
+
+
 @pytest.mark.asyncio
 async def test_select_template_with_caps_skips_templates_with_only_downgrade_ctas(
     monkeypatch: pytest.MonkeyPatch,

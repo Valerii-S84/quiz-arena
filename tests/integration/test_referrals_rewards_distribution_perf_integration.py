@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import event, func, select
 from sqlalchemy.engine import Connection
 
+from app.db.models.purchases import Purchase
 from app.db.models.referrals import Referral
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal, engine
@@ -65,6 +66,40 @@ async def _create_referrals(
     await session.flush()
 
 
+async def _create_paid_purchase(
+    session,
+    *,
+    user_id: int,
+    now_utc: datetime,
+    stars_amount: int = 5,
+) -> None:
+    base_stars_amount = max(5, stars_amount)
+    session.add(
+        Purchase(
+            id=uuid4(),
+            user_id=user_id,
+            product_code="ENERGY_10",
+            product_type="MICRO",
+            base_stars_amount=base_stars_amount,
+            discount_stars_amount=base_stars_amount - stars_amount,
+            stars_amount=stars_amount,
+            currency="XTR",
+            status="CREDITED",
+            applied_promo_code_id=None,
+            idempotency_key=f"seed:paid-purchase:{user_id}:{uuid4().hex}",
+            invoice_payload=f"seed:invoice:{user_id}:{uuid4().hex}",
+            telegram_payment_charge_id=None,
+            telegram_pre_checkout_query_id=None,
+            raw_successful_payment=None,
+            created_at=now_utc,
+            paid_at=now_utc,
+            credited_at=now_utc,
+            refunded_at=None,
+        )
+    )
+    await session.flush()
+
+
 async def _count_status(session, *, referrer_user_id: int, status: str) -> int:
     stmt = select(func.count(Referral.id)).where(
         Referral.referrer_user_id == referrer_user_id,
@@ -81,6 +116,7 @@ async def test_reward_distribution_preserves_invariants_for_cap_status_and_sum()
 
     async with SessionLocal.begin() as session:
         referrer_open, ref_code_open = await _create_user(session, seed=1)
+        await _create_paid_purchase(session, user_id=referrer_open, now_utc=now_utc)
         await _create_referrals(
             session,
             referrer_user_id=referrer_open,
@@ -91,6 +127,7 @@ async def test_reward_distribution_preserves_invariants_for_cap_status_and_sum()
         )
 
         referrer_resume, ref_code_resume = await _create_user(session, seed=2)
+        await _create_paid_purchase(session, user_id=referrer_resume, now_utc=now_utc)
         await _create_referrals(
             session,
             referrer_user_id=referrer_resume,
@@ -101,6 +138,7 @@ async def test_reward_distribution_preserves_invariants_for_cap_status_and_sum()
         )
 
         referrer_capped, ref_code_capped = await _create_user(session, seed=3)
+        await _create_paid_purchase(session, user_id=referrer_capped, now_utc=now_utc)
         await _create_referrals(
             session,
             referrer_user_id=referrer_capped,
@@ -202,6 +240,7 @@ async def test_reward_distribution_query_count_is_bounded() -> None:
     async with SessionLocal.begin() as session:
         for referrer_seed in range(100, 160):
             referrer_user_id, referral_code = await _create_user(session, seed=referrer_seed)
+            await _create_paid_purchase(session, user_id=referrer_user_id, now_utc=now_utc)
             await _create_referrals(
                 session,
                 referrer_user_id=referrer_user_id,
