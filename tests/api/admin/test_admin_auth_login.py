@@ -13,19 +13,33 @@ ADMIN_RATE_LIMIT = auth.admin_rate_limit
 AUTH_HELPERS = auth.auth_helpers
 
 
+async def _rate_limit_false(**kwargs) -> bool:
+    del kwargs
+    return False
+
+
+async def _rate_limit_true(**kwargs) -> bool:
+    del kwargs
+    return True
+
+
+async def _rate_limit_noop(**kwargs) -> None:
+    del kwargs
+
+
 def test_admin_login_rejects_invalid_credentials(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     failures: list[tuple[str, int]] = []
     app.dependency_overrides[auth.get_settings] = lambda: settings_stub(two_fa_required=True)
     monkeypatch.setattr(AUTH_HELPERS, "rate_limit_bucket", lambda **kwargs: "bucket")
-    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", lambda **kwargs: False)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", _rate_limit_false)
     monkeypatch.setattr(ADMIN_AUTH, "verify_login_credentials", lambda **kwargs: False)
-    monkeypatch.setattr(
-        ADMIN_RATE_LIMIT,
-        "record_failure",
-        lambda *, bucket, window_seconds: failures.append((bucket, window_seconds)),
-    )
+
+    async def _record_failure(**kwargs) -> None:
+        failures.append((kwargs["bucket"], kwargs["window_seconds"]))
+
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "record_failure", _record_failure)
 
     response = client.post(
         "/admin/auth/login", json={"email": "admin@example.com", "password": "secret123"}
@@ -41,7 +55,7 @@ def test_admin_login_rejects_rate_limited_requests(
 ) -> None:
     app.dependency_overrides[auth.get_settings] = lambda: settings_stub(two_fa_required=True)
     monkeypatch.setattr(AUTH_HELPERS, "rate_limit_bucket", lambda **kwargs: "bucket")
-    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", lambda **kwargs: True)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", _rate_limit_true)
 
     response = client.post(
         "/admin/auth/login", json={"email": "admin@example.com", "password": "secret123"}
@@ -57,9 +71,9 @@ def test_admin_login_without_2fa_sets_full_auth_cookies(
     cookie_calls: list[dict[str, str]] = []
     app.dependency_overrides[auth.get_settings] = lambda: settings_stub(two_fa_required=False)
     monkeypatch.setattr(AUTH_HELPERS, "rate_limit_bucket", lambda **kwargs: "bucket")
-    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", lambda **kwargs: False)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", _rate_limit_false)
     monkeypatch.setattr(ADMIN_AUTH, "verify_login_credentials", lambda **kwargs: True)
-    monkeypatch.setattr(ADMIN_RATE_LIMIT, "clear_failures", lambda **kwargs: None)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "clear_failures", _rate_limit_noop)
     monkeypatch.setattr(ADMIN_AUTH, "build_access_token", lambda **kwargs: "access-token")
     monkeypatch.setattr(ADMIN_AUTH, "build_refresh_token", lambda **kwargs: "refresh-token")
     monkeypatch.setattr(
@@ -88,9 +102,9 @@ def test_admin_login_with_2fa_sets_partial_cookie(
     partial_cookie_calls: list[str] = []
     app.dependency_overrides[auth.get_settings] = lambda: settings_stub(two_fa_required=True)
     monkeypatch.setattr(AUTH_HELPERS, "rate_limit_bucket", lambda **kwargs: "bucket")
-    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", lambda **kwargs: False)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", _rate_limit_false)
     monkeypatch.setattr(ADMIN_AUTH, "verify_login_credentials", lambda **kwargs: True)
-    monkeypatch.setattr(ADMIN_RATE_LIMIT, "clear_failures", lambda **kwargs: None)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "clear_failures", _rate_limit_noop)
     monkeypatch.setattr(ADMIN_AUTH, "build_access_token", lambda **kwargs: "partial-access")
     monkeypatch.setattr(
         AUTH_HELPERS,
@@ -115,7 +129,7 @@ def test_admin_verify_2fa_rejects_rate_limited_requests(
         two_factor_verified=False
     )
     monkeypatch.setattr(AUTH_HELPERS, "rate_limit_bucket", lambda **kwargs: "bucket")
-    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", lambda **kwargs: True)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", _rate_limit_true)
 
     response = client.post("/admin/auth/2fa/verify", json={"code": "123456"})
 
@@ -132,12 +146,12 @@ def test_admin_verify_2fa_rejects_invalid_code(
         two_factor_verified=False
     )
     monkeypatch.setattr(AUTH_HELPERS, "rate_limit_bucket", lambda **kwargs: "bucket")
-    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", lambda **kwargs: False)
-    monkeypatch.setattr(
-        ADMIN_RATE_LIMIT,
-        "record_failure",
-        lambda *, bucket, window_seconds: failures.append((bucket, window_seconds)),
-    )
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", _rate_limit_false)
+
+    async def _record_failure(**kwargs) -> None:
+        failures.append((kwargs["bucket"], kwargs["window_seconds"]))
+
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "record_failure", _record_failure)
 
     async def _false_totp(**kwargs) -> bool:
         del kwargs
@@ -164,7 +178,7 @@ def test_admin_verify_2fa_returns_503_when_auth_state_is_unavailable(
         two_factor_verified=False
     )
     monkeypatch.setattr(AUTH_HELPERS, "rate_limit_bucket", lambda **kwargs: "bucket")
-    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", lambda **kwargs: False)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", _rate_limit_false)
     monkeypatch.setattr(ADMIN_AUTH, "verify_totp_code", _error_totp)
 
     response = client.post("/admin/auth/2fa/verify", json={"code": "123456"})
@@ -187,8 +201,8 @@ def test_admin_verify_2fa_success_sets_full_auth_cookies(
         two_factor_verified=False
     )
     monkeypatch.setattr(AUTH_HELPERS, "rate_limit_bucket", lambda **kwargs: "bucket")
-    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", lambda **kwargs: False)
-    monkeypatch.setattr(ADMIN_RATE_LIMIT, "clear_failures", lambda **kwargs: None)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", _rate_limit_false)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "clear_failures", _rate_limit_noop)
     monkeypatch.setattr(ADMIN_AUTH, "verify_totp_code", _true_totp)
     monkeypatch.setattr(ADMIN_AUTH, "build_access_token", lambda **kwargs: "verified-access")
     monkeypatch.setattr(ADMIN_AUTH, "build_refresh_token", lambda **kwargs: "verified-refresh")
@@ -232,8 +246,8 @@ def test_admin_verify_2fa_skips_totp_check_when_2fa_disabled(
         two_factor_verified=False
     )
     monkeypatch.setattr(AUTH_HELPERS, "rate_limit_bucket", lambda **kwargs: "bucket")
-    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", lambda **kwargs: False)
-    monkeypatch.setattr(ADMIN_RATE_LIMIT, "clear_failures", lambda **kwargs: None)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", _rate_limit_false)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "clear_failures", _rate_limit_noop)
     monkeypatch.setattr(ADMIN_AUTH, "verify_totp_code", _unexpected_totp)
     monkeypatch.setattr(ADMIN_AUTH, "build_access_token", lambda **kwargs: "verified-access")
     monkeypatch.setattr(ADMIN_AUTH, "build_refresh_token", lambda **kwargs: "verified-refresh")
@@ -252,3 +266,69 @@ def test_admin_verify_2fa_skips_totp_check_when_2fa_disabled(
     assert cookie_calls == [
         {"access_token": "verified-access", "refresh_token": "verified-refresh"}
     ]
+
+
+def test_admin_login_returns_503_when_rate_limit_state_is_unavailable(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _state_down(**kwargs) -> bool:
+        del kwargs
+        raise ADMIN_AUTH.AdminAuthStateError("down")
+
+    app.dependency_overrides[auth.get_settings] = lambda: settings_stub(two_fa_required=True)
+    monkeypatch.setattr(AUTH_HELPERS, "rate_limit_bucket", lambda **kwargs: "bucket")
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", _state_down)
+
+    response = client.post(
+        "/admin/auth/login", json={"email": "admin@example.com", "password": "secret123"}
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": {"code": "E_AUTH_STATE_UNAVAILABLE"}}
+
+
+def test_admin_login_returns_503_when_failure_cannot_be_recorded(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _state_down(**kwargs) -> None:
+        del kwargs
+        raise ADMIN_AUTH.AdminAuthStateError("down")
+
+    app.dependency_overrides[auth.get_settings] = lambda: settings_stub(two_fa_required=True)
+    monkeypatch.setattr(AUTH_HELPERS, "rate_limit_bucket", lambda **kwargs: "bucket")
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", _rate_limit_false)
+    monkeypatch.setattr(ADMIN_AUTH, "verify_login_credentials", lambda **kwargs: False)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "record_failure", _state_down)
+
+    response = client.post(
+        "/admin/auth/login", json={"email": "admin@example.com", "password": "secret123"}
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": {"code": "E_AUTH_STATE_UNAVAILABLE"}}
+
+
+def test_admin_verify_2fa_returns_503_when_failure_cannot_be_recorded(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _false_totp(**kwargs) -> bool:
+        del kwargs
+        return False
+
+    async def _state_down(**kwargs) -> None:
+        del kwargs
+        raise ADMIN_AUTH.AdminAuthStateError("down")
+
+    app.dependency_overrides[auth.get_settings] = lambda: settings_stub(two_fa_required=True)
+    app.dependency_overrides[admin_deps.get_pending_admin] = lambda: principal_stub(
+        two_factor_verified=False
+    )
+    monkeypatch.setattr(AUTH_HELPERS, "rate_limit_bucket", lambda **kwargs: "bucket")
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "is_rate_limited", _rate_limit_false)
+    monkeypatch.setattr(ADMIN_AUTH, "verify_totp_code", _false_totp)
+    monkeypatch.setattr(ADMIN_RATE_LIMIT, "record_failure", _state_down)
+
+    response = client.post("/admin/auth/2fa/verify", json={"code": "123456"})
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": {"code": "E_AUTH_STATE_UNAVAILABLE"}}

@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.config import Settings, get_settings
 from app.db.models.contact_requests import ContactRequest as ContactRequestModel
 from app.db.session import SessionLocal
+from app.services.admin.cache import get_redis_client
+from app.services.internal_auth import extract_client_ip
 
 router = APIRouter(tags=["public-site"])
+
+_PUBLIC_CONTACT_RATE_LIMIT_ATTEMPTS = 3
+_PUBLIC_CONTACT_RATE_LIMIT_WINDOW_SECONDS = 15 * 60
+_PUBLIC_CONTACT_RATE_LIMIT_KEY_PREFIX = "qa_public_contact:submit:"
 
 
 class ContactPayload(BaseModel):
@@ -30,6 +38,7 @@ class ContactPayload(BaseModel):
     student_count: str | None = Field(default=None, alias="studentCount", max_length=64)
     offerings: list[str] | None = Field(default=None)
     website: str | None = Field(default=None, max_length=200)
+    company: str | None = Field(default=None, max_length=120)
     idea: str | None = Field(default=None, max_length=1000)
     start_timeline: str | None = Field(default=None, alias="startTimeline", max_length=120)
     message: str | None = Field(default=None, max_length=500)
@@ -50,6 +59,46 @@ def _first_non_blank(*values: str | None) -> str | None:
         if value is not None and value.strip():
             return value
     return None
+
+
+def _contact_rate_limit_bucket(*, request: Request, settings: Settings) -> str:
+    client_ip = extract_client_ip(
+        request,
+        trusted_proxies=getattr(settings, "internal_api_trusted_proxies", ""),
+    )
+    if client_ip is not None:
+        return client_ip
+    return "unknown"
+
+
+def _contact_rate_limit_key(bucket: str) -> str:
+    bucket_hash = hashlib.sha256(bucket.encode("utf-8")).hexdigest()
+    return f"{_PUBLIC_CONTACT_RATE_LIMIT_KEY_PREFIX}{bucket_hash}"
+
+
+async def _enforce_contact_rate_limit(*, request: Request, settings: Settings) -> None:
+    client = await get_redis_client(settings)
+    if client is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "E_CONTACT_TEMPORARILY_UNAVAILABLE"},
+        )
+
+    key = _contact_rate_limit_key(_contact_rate_limit_bucket(request=request, settings=settings))
+    try:
+        attempts = await client.incr(key)
+        if attempts == 1 or await client.ttl(key) < 0:
+            await client.expire(key, _PUBLIC_CONTACT_RATE_LIMIT_WINDOW_SECONDS)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "E_CONTACT_TEMPORARILY_UNAVAILABLE"},
+        ) from exc
+
+    if attempts > _PUBLIC_CONTACT_RATE_LIMIT_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail={"code": "E_RATE_LIMITED"}
+        )
 
 
 def _validate_student_payload(payload: ContactPayload) -> None:
@@ -124,13 +173,23 @@ def _validate_partner_payload(payload: ContactPayload) -> None:
 # - reverse-proxy setups with stripped /api prefix use /contact
 @router.post("/contact", status_code=status.HTTP_202_ACCEPTED)
 @router.post("/api/contact", status_code=status.HTTP_202_ACCEPTED)
-async def submit_contact(payload: ContactPayload) -> dict[str, bool]:
+async def submit_contact(
+    payload: ContactPayload,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> dict[str, bool]:
+    if not _is_blank(payload.company):
+        return {"ok": True}
+
+    await _enforce_contact_rate_limit(request=request, settings=settings)
+
     if payload.request_type == "student":
         _validate_student_payload(payload)
     if payload.request_type == "partner":
         _validate_partner_payload(payload)
 
     normalized_payload = payload.model_dump(by_alias=True, exclude_none=True)
+    normalized_payload.pop("company", None)
     if payload.request_type == "partner":
         normalized_partner_type = _first_non_blank(payload.partner_type, payload.cooperation_type)
         if normalized_partner_type is not None:

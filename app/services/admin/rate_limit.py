@@ -1,41 +1,61 @@
 from __future__ import annotations
 
-from collections import deque
-from threading import Lock
-from time import monotonic
+import hashlib
+import time
+from uuid import uuid4
 
-_FAILED_ATTEMPTS: dict[str, deque[float]] = {}
-_LOCK = Lock()
+from app.core.config import Settings
 
+from .auth_common import _auth_state_unavailable
+from .auth_state import require_redis_client
 
-def _trim_attempts(attempts: deque[float], *, now: float, window_seconds: int) -> None:
-    cutoff = now - max(1, int(window_seconds))
-    while attempts and attempts[0] < cutoff:
-        attempts.popleft()
+_FAILED_ATTEMPTS_KEY_PREFIX = "qa_admin:failed_auth_attempts:"
 
 
-def is_rate_limited(*, bucket: str, limit: int, window_seconds: int) -> bool:
+def _bucket_key(bucket: str) -> str:
+    bucket_hash = hashlib.sha256(bucket.encode("utf-8")).hexdigest()
+    return f"{_FAILED_ATTEMPTS_KEY_PREFIX}{bucket_hash}"
+
+
+def _resolved_window_seconds(window_seconds: int) -> int:
+    return max(1, int(window_seconds))
+
+
+async def is_rate_limited(
+    *,
+    settings: Settings,
+    bucket: str,
+    limit: int,
+    window_seconds: int,
+) -> bool:
     resolved_limit = max(1, int(limit))
-    now = monotonic()
-    with _LOCK:
-        attempts = _FAILED_ATTEMPTS.get(bucket)
-        if attempts is None:
-            return False
-        _trim_attempts(attempts, now=now, window_seconds=window_seconds)
-        if not attempts:
-            _FAILED_ATTEMPTS.pop(bucket, None)
-            return False
-        return len(attempts) >= resolved_limit
+    resolved_window = _resolved_window_seconds(window_seconds)
+    now = time.time()
+    client = await require_redis_client(settings)
+    try:
+        await client.zremrangebyscore(_bucket_key(bucket), "-inf", f"({now - resolved_window}")
+        attempts = await client.zcard(_bucket_key(bucket))
+    except Exception as exc:
+        raise _auth_state_unavailable() from exc
+    return int(attempts or 0) >= resolved_limit
 
 
-def record_failure(*, bucket: str, window_seconds: int) -> None:
-    now = monotonic()
-    with _LOCK:
-        attempts = _FAILED_ATTEMPTS.setdefault(bucket, deque())
-        _trim_attempts(attempts, now=now, window_seconds=window_seconds)
-        attempts.append(now)
+async def record_failure(*, settings: Settings, bucket: str, window_seconds: int) -> None:
+    resolved_window = _resolved_window_seconds(window_seconds)
+    now = time.time()
+    key = _bucket_key(bucket)
+    client = await require_redis_client(settings)
+    try:
+        await client.zremrangebyscore(key, "-inf", f"({now - resolved_window}")
+        await client.zadd(key, {f"{now}:{uuid4().hex}": now})
+        await client.expire(key, resolved_window + 1)
+    except Exception as exc:
+        raise _auth_state_unavailable() from exc
 
 
-def clear_failures(*, bucket: str) -> None:
-    with _LOCK:
-        _FAILED_ATTEMPTS.pop(bucket, None)
+async def clear_failures(*, settings: Settings, bucket: str) -> None:
+    client = await require_redis_client(settings)
+    try:
+        await client.delete(_bucket_key(bucket))
+    except Exception as exc:
+        raise _auth_state_unavailable() from exc

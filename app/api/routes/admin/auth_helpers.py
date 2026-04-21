@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+
 from fastapi import HTTPException, Request, Response
 
 from app.api.routes.admin.deps import ALLOWED_ADMIN_ROLES, normalize_admin_role
@@ -27,13 +29,14 @@ def login_rate_limit_window_seconds(settings: Settings) -> int:
     return settings.admin_login_rate_limit_window_minutes * 60
 
 
-def ensure_not_rate_limited(
+async def ensure_not_rate_limited(
     *,
     bucket: str,
     settings: Settings,
-    is_rate_limited_fn,
+    is_rate_limited_fn: Callable[..., Awaitable[bool]],
 ) -> None:
-    if is_rate_limited_fn(
+    if await is_rate_limited_fn(
+        settings=settings,
         bucket=bucket,
         limit=settings.admin_login_rate_limit_attempts,
         window_seconds=login_rate_limit_window_seconds(settings),
