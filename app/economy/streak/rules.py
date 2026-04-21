@@ -6,8 +6,8 @@ from datetime import date, timedelta
 from app.economy.streak.constants import (
     MONTHLY_PREMIUM_FREEZE_LIMIT,
     PREMIUM_SCOPE_3_DAYS,
-    PREMIUM_SCOPE_WEEK,
     PREMIUM_SCOPE_SEASON,
+    PREMIUM_SCOPE_WEEK,
     PREMIUM_SCOPE_YEAR,
 )
 from app.economy.streak.time import berlin_local_date, berlin_week_start

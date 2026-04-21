@@ -15,6 +15,7 @@ class ProductSpec:
     grants_streak_saver: bool = False
     friend_challenge_tickets: int = 0
 
+
 PRODUCTS: dict[str, ProductSpec] = {
     "ENERGY_10": ProductSpec(
         product_code="ENERGY_10",

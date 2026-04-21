@@ -21,5 +21,6 @@ DEFAULT_REFERRAL_REWARD_CODE = REWARD_CODE_PREMIUM_WEEK
 def normalize_referral_reward_code(reward_code: str) -> str:
     return reward_code.strip().upper()
 
+
 FRAUD_SCORE_CYCLIC = Decimal("95.00")
 FRAUD_SCORE_VELOCITY = Decimal("80.00")
