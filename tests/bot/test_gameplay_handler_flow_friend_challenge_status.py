@@ -381,7 +381,21 @@ async def test_handle_friend_challenge_onboarding_info_expired_shows_finished_ke
         return SimpleNamespace(user_id=10, free_energy=20, paid_energy=0, current_streak=0)
 
     async def _fake_get_snapshot(*args, **kwargs):
-        raise FriendChallengeExpiredError()
+        return FriendChallengeSnapshot(
+            challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            invite_token="token",
+            challenge_type="DIRECT",
+            mode_code="QUICK_MIX_A1A2",
+            access_type="FREE",
+            status="EXPIRED",
+            creator_user_id=20,
+            opponent_user_id=10,
+            current_round=5,
+            total_rounds=5,
+            creator_score=2,
+            opponent_score=2,
+            winner_user_id=None,
+        )
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(

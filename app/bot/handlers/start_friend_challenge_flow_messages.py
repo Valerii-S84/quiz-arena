@@ -7,8 +7,10 @@ from app.bot.handlers.start_friend_challenge_flow_message_types import (
     error_key_for_friend_challenge_start_failure,
 )
 from app.bot.keyboards.friend_challenge import build_friend_challenge_onboarding_keyboard
+from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.core.config import get_settings
+from app.game.friend_challenges.constants import is_duel_playable_for_user
 
 __all__ = [
     "OutgoingStartMessage",
@@ -36,6 +38,14 @@ def _build_onboarding_start_message(
     return onboarding_message
 
 
+def _can_render_onboarding_message(*, challenge_snapshot, user_id: int) -> bool:
+    return is_duel_playable_for_user(
+        status=challenge_snapshot.status,
+        has_opponent=challenge_snapshot.opponent_user_id is not None,
+        is_creator=challenge_snapshot.creator_user_id == user_id,
+    )
+
+
 def build_start_friend_challenge_success_result(
     *,
     challenge_snapshot,
@@ -43,6 +53,19 @@ def build_start_friend_challenge_success_result(
     joiner_user_id: int,
     opponent_label: str,
 ) -> StartFriendChallengeHandlingResult:
+    if not _can_render_onboarding_message(
+        challenge_snapshot=challenge_snapshot,
+        user_id=joiner_user_id,
+    ):
+        return StartFriendChallengeHandlingResult(
+            handled=True,
+            messages=[
+                OutgoingStartMessage(
+                    text=TEXTS_DE["msg.friend.challenge.invalid"],
+                    reply_markup=build_home_keyboard(),
+                )
+            ],
+        )
     return StartFriendChallengeHandlingResult(
         handled=True,
         messages=[

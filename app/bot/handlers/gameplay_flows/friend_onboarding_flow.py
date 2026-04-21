@@ -13,6 +13,7 @@ from app.bot.keyboards.friend_challenge import (
 )
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.game.friend_challenges.constants import DUEL_STATUS_EXPIRED
 from app.game.sessions.errors import (
     FriendChallengeAccessError,
     FriendChallengeExpiredError,
@@ -63,6 +64,15 @@ async def _load_friend_challenge_context(
                 challenge_id=challenge_id,
                 now_utc=now_utc,
             )
+            if challenge.status == DUEL_STATUS_EXPIRED:
+                await answerable_message.answer(
+                    TEXTS_DE["msg.friend.challenge.expired"],
+                    reply_markup=build_friend_challenge_finished_keyboard(
+                        challenge_id=str(challenge_id)
+                    ),
+                )
+                await callback.answer()
+                return None
         except FriendChallengeExpiredError:
             await answerable_message.answer(
                 TEXTS_DE["msg.friend.challenge.expired"],

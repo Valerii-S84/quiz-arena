@@ -287,6 +287,68 @@ async def test_handle_start_duel_payload_sends_onboarding_photo_when_configured(
 
 
 @pytest.mark.asyncio
+async def test_handle_start_duel_payload_hides_onboarding_for_non_playable_snapshot(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
+        assert start_payload == "duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        return SimpleNamespace(user_id=9, free_energy=20, paid_energy=1, current_streak=1)
+
+    async def _fake_join_by_id(*args, **kwargs):
+        return FriendChallengeJoinResult(
+            snapshot=FriendChallengeSnapshot(
+                challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                invite_token="token",
+                challenge_type="DIRECT",
+                mode_code="QUICK_MIX_A1A2",
+                access_type="FREE",
+                status="COMPLETED",
+                creator_user_id=1,
+                opponent_user_id=9,
+                current_round=5,
+                total_rounds=5,
+                creator_score=2,
+                opponent_score=3,
+                winner_user_id=9,
+            ),
+            joined_now=False,
+        )
+
+    async def _fake_resolve_label(*, challenge, user_id):
+        del challenge, user_id
+        return "Freund"
+
+    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(start.GameSessionService, "join_friend_challenge_by_id", _fake_join_by_id)
+    monkeypatch.setattr(start.start_flow, "_resolve_opponent_label", _fake_resolve_label)
+
+    message = _StartMessage(
+        text="/start duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        from_user=SimpleNamespace(id=1, username="alice", first_name="Alice", language_code="de"),
+    )
+    await start.handle_start(message)
+
+    assert len(message.answers) == 1
+    response = message.answers[0]
+    assert response.text == TEXTS_DE["msg.friend.challenge.invalid"]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert callbacks == [
+        "daily_challenge",
+        "friend:challenge:create",
+        "play",
+        "mode:ARTIKEL_SPRINT",
+        "shop:open",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_handle_start_sends_home_and_offer_when_available(monkeypatch) -> None:
     monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
 
