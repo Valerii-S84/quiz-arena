@@ -53,6 +53,8 @@ async def evaluate_and_log_offer(
         user_id=user_id,
         trigger_codes=trigger_codes,
         now_utc=now_utc,
+        active_premium_scope=active_premium_scope,
+        resolve_active_premium_scope=False,
     )
     if selected_template is None:
         return None

@@ -28,6 +28,8 @@ async def select_template_with_caps(
     user_id: int,
     trigger_codes: set[str],
     now_utc: datetime,
+    active_premium_scope: str | None = None,
+    resolve_active_premium_scope: bool = True,
 ) -> OfferTemplate | None:
     if not trigger_codes:
         return None
@@ -49,11 +51,12 @@ async def select_template_with_caps(
         recent_impressions=recent_impressions,
         now_utc=now_utc,
     )
-    active_premium_scope = await EntitlementsRepo.get_active_premium_scope(
-        session,
-        user_id=user_id,
-        now_utc=now_utc,
-    )
+    if resolve_active_premium_scope:
+        active_premium_scope = await EntitlementsRepo.get_active_premium_scope(
+            session,
+            user_id=user_id,
+            now_utc=now_utc,
+        )
 
     order_map = {trigger_code: index for index, trigger_code in enumerate(TRIGGER_RESOLUTION_ORDER)}
     ordered_templates = sorted(
