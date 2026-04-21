@@ -121,6 +121,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         srcDoc={articleHtml}
         title={article.title}
         loading="lazy"
+        sandbox="allow-scripts"
         className="block h-[calc(100vh-61px)] w-full border-0 bg-white"
       />
     </main>

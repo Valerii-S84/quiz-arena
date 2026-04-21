@@ -20,19 +20,32 @@ async def login_admin(
 ) -> Response:
     bucket = auth_helpers.rate_limit_bucket(request=request, settings=settings)
     window_seconds = auth_helpers.login_rate_limit_window_seconds(settings)
-    auth_helpers.ensure_not_rate_limited(
-        bucket=bucket,
-        settings=settings,
-        is_rate_limited_fn=admin_rate_limit.is_rate_limited,
-    )
+    try:
+        await auth_helpers.ensure_not_rate_limited(
+            bucket=bucket,
+            settings=settings,
+            is_rate_limited_fn=admin_rate_limit.is_rate_limited,
+        )
+    except admin_auth.AdminAuthStateError as exc:
+        raise auth_responses.auth_state_unavailable_http_error() from exc
 
     if not admin_auth.verify_login_credentials(
         settings=settings, email=payload.email, password=payload.password
     ):
-        admin_rate_limit.record_failure(bucket=bucket, window_seconds=window_seconds)
+        try:
+            await admin_rate_limit.record_failure(
+                settings=settings,
+                bucket=bucket,
+                window_seconds=window_seconds,
+            )
+        except admin_auth.AdminAuthStateError as exc:
+            raise auth_responses.auth_state_unavailable_http_error() from exc
         raise HTTPException(status_code=401, detail={"code": "E_INVALID_CREDENTIALS"})
 
-    admin_rate_limit.clear_failures(bucket=bucket)
+    try:
+        await admin_rate_limit.clear_failures(settings=settings, bucket=bucket)
+    except admin_auth.AdminAuthStateError as exc:
+        raise auth_responses.auth_state_unavailable_http_error() from exc
     if not settings.admin_2fa_required:
         return auth_responses.issue_login_success_response(
             settings=settings,
@@ -69,11 +82,14 @@ async def verify_2fa(
     admin_deps.add_admin_noindex_header(response)
     bucket = auth_helpers.rate_limit_bucket(request=request, settings=settings)
     window_seconds = auth_helpers.login_rate_limit_window_seconds(settings)
-    auth_helpers.ensure_not_rate_limited(
-        bucket=bucket,
-        settings=settings,
-        is_rate_limited_fn=admin_rate_limit.is_rate_limited,
-    )
+    try:
+        await auth_helpers.ensure_not_rate_limited(
+            bucket=bucket,
+            settings=settings,
+            is_rate_limited_fn=admin_rate_limit.is_rate_limited,
+        )
+    except admin_auth.AdminAuthStateError as exc:
+        raise auth_responses.auth_state_unavailable_http_error() from exc
 
     if settings.admin_2fa_required:
         try:
@@ -84,10 +100,20 @@ async def verify_2fa(
         except admin_auth.AdminAuthStateError as exc:
             raise auth_responses.auth_state_unavailable_http_error() from exc
         if not is_valid_totp:
-            admin_rate_limit.record_failure(bucket=bucket, window_seconds=window_seconds)
+            try:
+                await admin_rate_limit.record_failure(
+                    settings=settings,
+                    bucket=bucket,
+                    window_seconds=window_seconds,
+                )
+            except admin_auth.AdminAuthStateError as exc:
+                raise auth_responses.auth_state_unavailable_http_error() from exc
             raise HTTPException(status_code=401, detail={"code": "E_INVALID_TOTP"})
 
-    admin_rate_limit.clear_failures(bucket=bucket)
+    try:
+        await admin_rate_limit.clear_failures(settings=settings, bucket=bucket)
+    except admin_auth.AdminAuthStateError as exc:
+        raise auth_responses.auth_state_unavailable_http_error() from exc
     return auth_responses.issue_verified_session_response(
         settings=settings,
         email=principal.email,

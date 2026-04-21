@@ -23,7 +23,7 @@ def _revoked_token_key(token: str) -> str:
 async def is_token_revoked(*, settings: Settings, token: str) -> bool:
     if not token:
         return False
-    client = await _require_redis_client(settings)
+    client = await require_redis_client(settings)
     try:
         value = await client.get(_revoked_token_key(token))
     except Exception as exc:
@@ -94,8 +94,12 @@ async def _get_redis_client(settings: Settings) -> redis.Redis | None:
     return _redis_client
 
 
-async def _require_redis_client(settings: Settings) -> redis.Redis:
+async def require_redis_client(settings: Settings) -> redis.Redis:
     client = await _get_redis_client(settings)
     if client is None:
         raise _auth_state_unavailable()
     return client
+
+
+async def _require_redis_client(settings: Settings) -> redis.Redis:
+    return await require_redis_client(settings)

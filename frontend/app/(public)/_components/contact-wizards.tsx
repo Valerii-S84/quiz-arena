@@ -9,6 +9,7 @@ type SubmitState = "idle" | "loading" | "success" | "error";
 
 type StudentFormState = {
   name: string;
+  company: string;
   ageGroup: string;
   level: string;
   goals: string[];
@@ -22,6 +23,7 @@ type StudentFormState = {
 
 type PartnerFormState = {
   name: string;
+  company: string;
   partnerType: string;
   country: string;
   studentCount: string;
@@ -141,6 +143,7 @@ const PARTNER_TIMELINE_OPTIONS: ChoiceOption[] = [
 
 const INITIAL_STUDENT_STATE: StudentFormState = {
   name: "",
+  company: "",
   ageGroup: "",
   level: "",
   goals: [],
@@ -154,6 +157,7 @@ const INITIAL_STUDENT_STATE: StudentFormState = {
 
 const INITIAL_PARTNER_STATE: PartnerFormState = {
   name: "",
+  company: "",
   partnerType: "",
   country: "",
   studentCount: "",
@@ -197,6 +201,32 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function HoneypotField({
+  fieldId,
+  value,
+  onChange,
+}: {
+  fieldId: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="absolute left-[-9999px] top-auto h-px w-px overflow-hidden">
+      <label htmlFor={fieldId}>
+        Firma
+        <input
+          id={fieldId}
+          name="company"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          tabIndex={-1}
+          autoComplete="organization"
+        />
+      </label>
     </div>
   );
 }
@@ -401,6 +431,7 @@ function StudentWizard({ onClose }: WizardProps) {
       await api.post("/api/contact", {
         type: "student",
         name: form.name.trim(),
+        company: form.company.trim(),
         ageGroup: form.ageGroup,
         level: form.level,
         goals: form.goals,
@@ -441,6 +472,11 @@ function StudentWizard({ onClose }: WizardProps) {
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
+      <HoneypotField
+        fieldId="student-contact-company"
+        value={form.company}
+        onChange={(value) => setForm((prev) => ({ ...prev, company: value }))}
+      />
       <StepIndicator current={step} total={3} />
 
       {step === 1 ? (
@@ -681,6 +717,7 @@ function PartnerWizard({ onClose }: WizardProps) {
       await api.post("/api/contact", {
         type: "partner",
         name: form.name.trim(),
+        company: form.company.trim(),
         partnerType: form.partnerType,
         country: form.country.trim(),
         studentCount: form.studentCount,
@@ -718,6 +755,11 @@ function PartnerWizard({ onClose }: WizardProps) {
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
+      <HoneypotField
+        fieldId="partner-contact-company"
+        value={form.company}
+        onChange={(value) => setForm((prev) => ({ ...prev, company: value }))}
+      />
       <StepIndicator current={step} total={2} />
 
       {step === 1 ? (
