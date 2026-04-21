@@ -163,6 +163,8 @@ async def test_reward_distribution_candidate_query_orders_by_oldest_qualified_at
     newer_referrer = await _create_user("referrer-candidate-newer")
     older_referred = await _create_user("referred-candidate-oldest")
     newer_referred = await _create_user("referred-candidate-newer")
+    await _create_paid_purchase(user_id=older_referrer.id, now_utc=now_utc)
+    await _create_paid_purchase(user_id=newer_referrer.id, now_utc=now_utc)
 
     await _create_referral_row(
         referrer_user_id=newer_referrer.id,
@@ -189,3 +191,51 @@ async def test_reward_distribution_candidate_query_orders_by_oldest_qualified_at
         )
 
     assert referrer_ids == [older_referrer.id]
+
+
+@pytest.mark.asyncio
+async def test_reward_distribution_batch_limit_skips_locked_referrers_before_selection() -> None:
+    now_utc = datetime(2026, 2, 26, 12, 0, tzinfo=UTC)
+
+    for idx in range(2):
+        locked_referrer = await _create_user(f"referrer-batch-locked-{idx}")
+        for referred_idx in range(3):
+            referred = await _create_user(f"referred-batch-locked-{idx}-{referred_idx}")
+            await _create_referral_row(
+                referrer_user_id=locked_referrer.id,
+                referred_user_id=referred.id,
+                referral_code=locked_referrer.referral_code,
+                status="QUALIFIED",
+                created_at=now_utc - timedelta(days=5),
+                qualified_at=now_utc - timedelta(hours=96 - idx),
+            )
+
+    unlocked_referrer = await _create_user("referrer-batch-unlocked")
+    await _create_paid_purchase(user_id=unlocked_referrer.id, now_utc=now_utc)
+    for referred_idx in range(3):
+        referred = await _create_user(f"referred-batch-unlocked-{referred_idx}")
+        await _create_referral_row(
+            referrer_user_id=unlocked_referrer.id,
+            referred_user_id=referred.id,
+            referral_code=unlocked_referrer.referral_code,
+            status="QUALIFIED",
+            created_at=now_utc - timedelta(days=4),
+            qualified_at=now_utc - timedelta(hours=72),
+        )
+
+    async with SessionLocal.begin() as session:
+        result = await ReferralService.run_reward_distribution(
+            session,
+            now_utc=now_utc,
+            batch_size=2,
+            reward_code=None,
+        )
+        assert result["referrers_examined"] == 1
+        assert result["awaiting_choice"] == 1
+        assert result["newly_notified"] == 1
+
+        unlocked_notified_stmt = select(func.count(Referral.id)).where(
+            Referral.referrer_user_id == unlocked_referrer.id,
+            Referral.notified_at.is_not(None),
+        )
+        assert int(await session.scalar(unlocked_notified_stmt) or 0) == 1

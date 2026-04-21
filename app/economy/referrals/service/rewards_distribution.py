@@ -4,7 +4,6 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.referrals_repo import ReferralsRepo
 from app.economy.referrals.constants import (
     DEFAULT_REFERRAL_REWARD_CODE,
@@ -35,10 +34,6 @@ async def run_reward_distribution(
         session,
         referrer_user_ids=referrer_ids,
     )
-    unlocked_referrer_ids = await PurchasesRepo.list_user_ids_with_paid_purchase_history(
-        session,
-        user_ids=referrer_ids,
-    )
 
     result = {
         "referrers_examined": len(referrer_ids),
@@ -55,8 +50,6 @@ async def run_reward_distribution(
 
         anchors = _build_reward_anchors(referrals)
         if not anchors:
-            continue
-        if referrer_user_id not in unlocked_referrer_ids:
             continue
 
         rewarded_this_month = sum(
