@@ -19,3 +19,9 @@ reports/
 tools
 docs
 tests
+.env
+.env.*
+.env.backup_*
+**/.env
+**/.env.*
+**/.env.backup_*
