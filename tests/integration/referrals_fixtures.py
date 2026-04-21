@@ -120,7 +120,9 @@ async def _create_paid_purchase(
     user_id: int,
     now_utc: datetime,
     product_code: str = "ENERGY_10",
+    stars_amount: int = 5,
 ) -> None:
+    base_stars_amount = max(5, stars_amount)
     async with SessionLocal.begin() as session:
         session.add(
             Purchase(
@@ -128,9 +130,9 @@ async def _create_paid_purchase(
                 user_id=user_id,
                 product_code=product_code,
                 product_type="MICRO",
-                base_stars_amount=5,
-                discount_stars_amount=0,
-                stars_amount=5,
+                base_stars_amount=base_stars_amount,
+                discount_stars_amount=base_stars_amount - stars_amount,
+                stars_amount=stars_amount,
                 currency="XTR",
                 status="CREDITED",
                 applied_promo_code_id=None,

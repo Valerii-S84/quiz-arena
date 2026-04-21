@@ -132,6 +132,7 @@ class PurchasesRepo:
         stmt = select(func.count(Purchase.id)).where(
             Purchase.user_id == user_id,
             Purchase.paid_at.is_not(None),
+            Purchase.stars_amount > 0,
         )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)

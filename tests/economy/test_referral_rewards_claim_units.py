@@ -91,11 +91,17 @@ async def test_claim_next_reward_choice_returns_monthly_cap_and_marks_anchor(
         return [anchor]
 
     def _fake_build_overview_from_referrals(
-        *, referral_code: str, referrals, now_utc: datetime, rewarded_this_month: int
+        *,
+        referral_code: str,
+        referrals,
+        now_utc: datetime,
+        rewarded_this_month: int,
+        rewards_unlocked: bool,
     ):
         assert referral_code == "REF-CAP"
         assert referrals is referrals
         assert rewarded_this_month == rewards_claim.REFERRAL_REWARDS_PER_MONTH_CAP
+        assert rewards_unlocked is True
         return _overview("cap")
 
     monkeypatch.setattr(rewards_claim.UsersRepo, "get_by_id", _fake_get_by_id)
@@ -158,12 +164,18 @@ async def test_claim_next_reward_choice_returns_too_early_for_delayed_reward(
         return [anchor]
 
     def _fake_build_overview_from_referrals(
-        *, referral_code: str, referrals, now_utc: datetime, rewarded_this_month: int
+        *,
+        referral_code: str,
+        referrals,
+        now_utc: datetime,
+        rewarded_this_month: int,
+        rewards_unlocked: bool,
     ):
         captured.append(
             {
                 "referral_code": referral_code,
                 "rewarded_this_month": rewarded_this_month,
+                "rewards_unlocked": rewards_unlocked,
             }
         )
         return _overview("early")
@@ -200,6 +212,7 @@ async def test_claim_next_reward_choice_returns_too_early_for_delayed_reward(
     assert result.status == "TOO_EARLY"
     assert result.reward_code is None
     assert captured[0]["referral_code"] == "REF-EARLY"
+    assert captured[0]["rewards_unlocked"] is True
 
 
 @pytest.mark.asyncio
@@ -243,9 +256,15 @@ async def test_claim_next_reward_choice_claims_reward_and_updates_anchor(
         return [anchor]
 
     def _fake_build_overview_from_referrals(
-        *, referral_code: str, referrals, now_utc: datetime, rewarded_this_month: int
+        *,
+        referral_code: str,
+        referrals,
+        now_utc: datetime,
+        rewarded_this_month: int,
+        rewards_unlocked: bool,
     ):
         assert rewarded_this_month == 1
+        assert rewards_unlocked is True
         return _overview("claimed")
 
     monkeypatch.setattr(rewards_claim.UsersRepo, "get_by_id", _fake_get_by_id)
@@ -324,10 +343,16 @@ async def test_claim_next_reward_choice_requires_paid_purchase_history(
         return [anchor]
 
     def _fake_build_overview_from_referrals(
-        *, referral_code: str, referrals, now_utc: datetime, rewarded_this_month: int
+        *,
+        referral_code: str,
+        referrals,
+        now_utc: datetime,
+        rewarded_this_month: int,
+        rewards_unlocked: bool,
     ):
         assert referral_code == "REF-NO-PAID"
         assert rewarded_this_month == 0
+        assert rewards_unlocked is False
         return _overview("no-paid-history")
 
     monkeypatch.setattr(rewards_claim.UsersRepo, "get_by_id", _fake_get_by_id)

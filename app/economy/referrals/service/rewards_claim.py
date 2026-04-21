@@ -101,6 +101,7 @@ async def claim_next_reward_choice(
         referrals=referrals,
         now_utc=now_utc,
         rewarded_this_month=rewarded_this_month,
+        rewards_unlocked=has_paid_purchase_history,
     )
     return ReferralClaimResult(
         status=status,
