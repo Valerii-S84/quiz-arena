@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from aiogram.types import User as TelegramUser
 
+from app.db.models.purchases import Purchase
 from app.db.models.quiz_attempts import QuizAttempt
 from app.db.models.quiz_sessions import QuizSession
 from app.db.models.referrals import Referral
@@ -109,6 +110,39 @@ async def _create_referral_row(
                 rewarded_at=None,
                 fraud_score=0,
                 created_at=created_at,
+            )
+        )
+        await session.flush()
+
+
+async def _create_paid_purchase(
+    *,
+    user_id: int,
+    now_utc: datetime,
+    product_code: str = "ENERGY_10",
+) -> None:
+    async with SessionLocal.begin() as session:
+        session.add(
+            Purchase(
+                id=uuid4(),
+                user_id=user_id,
+                product_code=product_code,
+                product_type="MICRO",
+                base_stars_amount=5,
+                discount_stars_amount=0,
+                stars_amount=5,
+                currency="XTR",
+                status="CREDITED",
+                applied_promo_code_id=None,
+                idempotency_key=f"seed:paid-purchase:{user_id}:{product_code}:{uuid4().hex}",
+                invoice_payload=f"seed:invoice:{user_id}:{product_code}:{uuid4().hex}",
+                telegram_payment_charge_id=None,
+                telegram_pre_checkout_query_id=None,
+                raw_successful_payment=None,
+                created_at=now_utc,
+                paid_at=now_utc,
+                credited_at=now_utc,
+                refunded_at=None,
             )
         )
         await session.flush()

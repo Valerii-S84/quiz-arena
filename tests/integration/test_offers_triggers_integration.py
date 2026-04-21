@@ -192,7 +192,7 @@ async def test_offer_blocking_modal_cap_blocks_new_blocking_offer_for_6h() -> No
 
 
 @pytest.mark.asyncio
-async def test_offer_daily_cap_blocks_after_three_impressions() -> None:
+async def test_offer_daily_cap_blocks_after_four_impressions() -> None:
     now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
     user_id = await _create_user_with_state(
         seed="offer-cap-daily",
@@ -200,7 +200,7 @@ async def test_offer_daily_cap_blocks_after_three_impressions() -> None:
         free_energy=0,
         paid_energy=0,
     )
-    for hour in (8, 9, 10):
+    for hour in (8, 9, 10, 11):
         await _insert_offer_impression(
             user_id=user_id,
             now_utc=now_utc.replace(hour=hour),
@@ -221,7 +221,7 @@ async def test_offer_daily_cap_blocks_after_three_impressions() -> None:
 
 
 @pytest.mark.asyncio
-async def test_offer_repeat_cap_blocks_same_offer_within_24h() -> None:
+async def test_offer_repeat_cap_blocks_same_offer_within_12h() -> None:
     now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
     user_id = await _create_user_with_state(
         seed="offer-cap-repeat",
@@ -249,7 +249,7 @@ async def test_offer_repeat_cap_blocks_same_offer_within_24h() -> None:
 
 
 @pytest.mark.asyncio
-async def test_offer_mute_window_blocks_offer_for_72h_after_not_show() -> None:
+async def test_offer_mute_window_blocks_offer_for_24h_after_not_show() -> None:
     now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
     user_id = await _create_user_with_state(
         seed="offer-cap-mute",

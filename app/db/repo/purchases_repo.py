@@ -128,6 +128,15 @@ class PurchasesRepo:
         return int(result.scalar_one() or 0)
 
     @staticmethod
+    async def count_paid_purchases_for_user(session: AsyncSession, *, user_id: int) -> int:
+        stmt = select(func.count(Purchase.id)).where(
+            Purchase.user_id == user_id,
+            Purchase.paid_at.is_not(None),
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
     async def count_paid_product_since(
         session: AsyncSession,
         *,

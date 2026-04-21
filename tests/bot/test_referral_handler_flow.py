@@ -52,6 +52,13 @@ def test_build_overview_text_uses_fallback_without_link() -> None:
     assert "ref_ABC123" in text
 
 
+def test_build_overview_text_names_the_single_reward_option() -> None:
+    text = referral._build_overview_text(overview=_overview(claimable=1), invite_link=None)
+
+    assert "Hol dir jetzt Premium Starter" in text
+    assert "Waehle deinen Bonus" not in text
+
+
 @pytest.mark.asyncio
 async def test_handle_referral_command_rejects_missing_user() -> None:
     message = _ReferralMessage(from_user=None)
