@@ -101,6 +101,8 @@ TEXTS_DE: dict[str, str] = {
     "msg.friend.challenge.link.copied": "Link gesendet.",
     "msg.friend.challenge.link.share.inline": "Nutze „📤 Teilen ->“ oder „⚔️ Herausforderung annehmen“.",
     "msg.friend.challenge.deleted": "🗑 Herausforderung geloescht.",
+    "msg.friend.challenge.onboarding": "⚔️ {challenger_name} fordert dich heraus!\n🇩🇪 Quiz Arena — Deutsch lernen im Wettkampf. Bereit?",
+    "msg.friend.challenge.info": "🇩🇪 Quiz Arena ist dein interaktiver Deutschtrainer im Telegram-Bot.\n\nHier kannst du:\n• jeden Tag eine Daily Challenge spielen\n• Freunde zu Duellen mit denselben Fragen herausfordern\n• schnelle Quizrunden zu Wortschatz, Grammatik und Artikeln starten\n• regelmaessig ueben, Punkte sammeln und dein Deutsch spielerisch verbessern",
     "msg.friend.challenge.my.title": "⚔️ Meine Duelle",
     "msg.friend.challenge.my.my_turn": "▶️ DRAN:",
     "msg.friend.challenge.my.waiting": "⏳ WARTET:",
