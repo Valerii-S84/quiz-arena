@@ -18,7 +18,11 @@ from app.bot.handlers.gameplay_flows import play_flow as _play_flow
 from app.bot.handlers.gameplay_friend_challenge import (  # noqa: F401
     handle_friend_challenge_create,
     handle_friend_challenge_create_selected,
+    handle_friend_challenge_finished_info,
+    handle_friend_challenge_finished_show,
     handle_friend_challenge_next,
+    handle_friend_challenge_onboarding_info,
+    handle_friend_challenge_onboarding_show,
     handle_friend_challenge_rematch,
     handle_friend_challenge_series_best3,
     handle_friend_challenge_series_next,

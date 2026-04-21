@@ -2,9 +2,12 @@ from app.bot.keyboards import friend_challenge as friend_challenge_keyboard
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
     build_friend_challenge_create_keyboard,
+    build_friend_challenge_finished_info_keyboard,
     build_friend_challenge_finished_keyboard,
     build_friend_challenge_limit_keyboard,
     build_friend_challenge_next_keyboard,
+    build_friend_challenge_onboarding_info_keyboard,
+    build_friend_challenge_onboarding_keyboard,
     build_friend_challenge_result_share_keyboard,
     build_friend_challenge_share_confirmed_keyboard,
     build_friend_challenge_share_keyboard,
@@ -26,6 +29,26 @@ def test_friend_challenge_back_keyboard_contains_home_only() -> None:
     keyboard = build_friend_challenge_back_keyboard()
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
     assert callbacks == ["home:open"]
+
+
+def test_friend_challenge_onboarding_keyboard_contains_play_and_info() -> None:
+    keyboard = build_friend_challenge_onboarding_keyboard(
+        challenge_id="00000000-0000-0000-0000-000000000001"
+    )
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    assert [button.text for button in buttons] == ["▶️ Spielen", "ℹ️ Was ist Quiz Arena?"]
+    assert [button.callback_data for button in buttons] == [
+        "friend:next:00000000-0000-0000-0000-000000000001",
+        "friend:onboarding:info:00000000-0000-0000-0000-000000000001",
+    ]
+
+
+def test_friend_challenge_onboarding_info_keyboard_contains_back_to_onboarding() -> None:
+    keyboard = build_friend_challenge_onboarding_info_keyboard(
+        challenge_id="00000000-0000-0000-0000-000000000001"
+    )
+    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert callbacks == ["friend:onboarding:show:00000000-0000-0000-0000-000000000001"]
 
 
 def test_friend_challenge_create_keyboard_hides_tournament_by_default() -> None:
@@ -62,9 +85,17 @@ def test_friend_challenge_finished_keyboard_contains_rematch_and_back() -> None:
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     labels = [button.text for button in buttons]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
-    assert labels == ["📤 Ergebnis teilen", "🔄 Revanche", "🏠 Menü"]
+    assert labels == [
+        "📤 Ergebnis teilen",
+        "🔥 Tägliche Challenge",
+        "🔄 Revanche",
+        "ℹ️ Was ist Quiz Arena?",
+        "🏠 Menü",
+    ]
     assert "friend:share:result:00000000-0000-0000-0000-000000000001" in callbacks
+    assert "daily_challenge" in callbacks
     assert "friend:rematch:00000000-0000-0000-0000-000000000001" in callbacks
+    assert "friend:finished:info:00000000-0000-0000-0000-000000000001" in callbacks
     assert "home:open" in callbacks
 
 
@@ -74,7 +105,9 @@ def test_friend_challenge_finished_keyboard_can_hide_share() -> None:
         include_share=False,
     )
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert "daily_challenge" in callbacks
     assert "friend:rematch:00000000-0000-0000-0000-000000000001" in callbacks
+    assert "friend:finished:info:00000000-0000-0000-0000-000000000001" in callbacks
     assert "friend:share:result:00000000-0000-0000-0000-000000000001" not in callbacks
     assert "home:open" in callbacks
 
@@ -87,6 +120,14 @@ def test_friend_challenge_finished_keyboard_ignores_direct_share_url() -> None:
     share_button = keyboard.inline_keyboard[0][0]
     assert share_button.url is None
     assert share_button.callback_data == "friend:share:result:00000000-0000-0000-0000-000000000001"
+
+
+def test_friend_challenge_finished_info_keyboard_contains_back_to_actions() -> None:
+    keyboard = build_friend_challenge_finished_info_keyboard(
+        challenge_id="00000000-0000-0000-0000-000000000001"
+    )
+    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert callbacks == ["friend:finished:show:00000000-0000-0000-0000-000000000001"]
 
 
 def test_friend_challenge_limit_keyboard_contains_buy_options_and_back() -> None:

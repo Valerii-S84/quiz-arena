@@ -18,7 +18,11 @@ from app.bot.handlers.gameplay_friend_challenge_manage import (
     handle_friend_open_repost,
 )
 from app.bot.handlers.gameplay_friend_challenge_progress import (
+    handle_friend_challenge_finished_info,
+    handle_friend_challenge_finished_show,
     handle_friend_challenge_next,
+    handle_friend_challenge_onboarding_info,
+    handle_friend_challenge_onboarding_show,
     handle_friend_challenge_rematch,
     handle_friend_challenge_series_best3,
     handle_friend_challenge_series_next,
@@ -55,6 +59,18 @@ def register(router: Router) -> None:
     )
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_SHARE_RESULT_RE))(
         handle_friend_challenge_share_result
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_ONBOARDING_SHOW_RE))(
+        handle_friend_challenge_onboarding_show
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_ONBOARDING_INFO_RE))(
+        handle_friend_challenge_onboarding_info
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_FINISHED_SHOW_RE))(
+        handle_friend_challenge_finished_show
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_FINISHED_INFO_RE))(
+        handle_friend_challenge_finished_info
     )
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_INVITE_SENT_RE))(
         handle_friend_challenge_invite_sent
