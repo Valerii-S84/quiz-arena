@@ -10,7 +10,7 @@ from app.db.session import SessionLocal
 from app.economy.referrals.constants import FRAUD_SCORE_VELOCITY
 
 from .internal_referrals_constants import REFERRAL_REVIEW_DECISIONS, REFERRAL_REVIEW_STATUSES
-from .internal_referrals_helpers import _as_review_case, _assert_internal_access
+from .internal_referrals_helpers import _as_review_case, _assert_ops_surface_access
 from .internal_referrals_models import ReferralReviewActionRequest, ReferralReviewActionResponse
 
 logger = structlog.get_logger(__name__)
@@ -38,7 +38,7 @@ async def apply_referral_review_decision(
     payload: ReferralReviewActionRequest,
     request: Request,
 ) -> ReferralReviewActionResponse:
-    _assert_internal_access(request)
+    await _assert_ops_surface_access(request)
     decision = payload.decision.strip().upper()
     if decision not in REFERRAL_REVIEW_DECISIONS:
         raise HTTPException(status_code=422, detail={"code": "E_REFERRAL_REVIEW_DECISION_INVALID"})

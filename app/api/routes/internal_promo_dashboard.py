@@ -13,7 +13,7 @@ from .internal_promo_constants import (
     PROMO_GUARD_MIN_DISTINCT_USERS,
     PROMO_GUARD_MIN_FAILED_ATTEMPTS,
 )
-from .internal_promo_helpers import _assert_internal_access, _safe_rate
+from .internal_promo_helpers import _assert_ops_surface_access, _safe_rate
 from .internal_promo_models import PromoDashboardResponse
 
 
@@ -22,7 +22,7 @@ async def get_promo_dashboard(
     request: Request,
     window_hours: int,
 ) -> PromoDashboardResponse:
-    _assert_internal_access(request)
+    await _assert_ops_surface_access(request)
 
     now_utc = datetime.now(timezone.utc)
     window_since_utc = now_utc - timedelta(hours=window_hours)
