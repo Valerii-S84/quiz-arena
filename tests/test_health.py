@@ -17,14 +17,7 @@ def test_health_ok(monkeypatch) -> None:
     client = TestClient(app)
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "ok",
-        "checks": {
-            "database": {"status": "ok"},
-            "redis": {"status": "ok"},
-            "celery": {"status": "ok"},
-        },
-    }
+    assert response.json() == {"status": "ok"}
 
 
 def test_live_ok() -> None:
@@ -46,10 +39,7 @@ def test_health_returns_503_when_dependency_failed(monkeypatch) -> None:
     response = client.get("/health")
 
     assert response.status_code == 503
-    payload = response.json()
-    assert payload["status"] == "degraded"
-    assert payload["checks"]["redis"]["status"] == "failed"
-    assert payload["checks"]["redis"]["error"] == "redis down"
+    assert response.json() == {"status": "degraded"}
 
 
 def test_ready_ok(monkeypatch) -> None:
