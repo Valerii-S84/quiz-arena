@@ -369,6 +369,10 @@ function formatHourRangeLabel(hour: number): string {
   return `${formatHourLabel(hour)}-${formatHourLabel(nextHour)}`;
 }
 
+function formatHourlyUsers(value: number): string {
+  return value.toLocaleString("de-DE", { maximumFractionDigits: 1 });
+}
+
 function formatShortDateLabel(value: string): string {
   return new Date(value).toLocaleDateString("de-DE", {
     day: "2-digit",
@@ -569,11 +573,11 @@ export default function DashboardPage() {
                   </p>
                   <h2 className="mt-1 text-2xl">Bot-Aktivität nach Uhrzeit</h2>
                   <p className="mt-1 text-sm text-ember/70">
-                    Zeigt, in welchen Berliner Stunden Nutzer im Bot wirklich aktiv sind.
+                    Zeigt, in welchen Berliner Stunden Nutzer im Bot im Schnitt aktiv sind.
                   </p>
                 </div>
                 <div className="rounded-full border border-ember/15 bg-white/80 px-3 py-1 text-xs text-ember/75">
-                  Berlin-Zeit · {data.hourly_activity_series?.length ?? 0} Stundenpunkte
+                  Berlin-Zeit · Durchschnitt pro Stunde im gewählten Zeitraum
                 </div>
               </div>
               <div className="mt-4 h-[24rem] rounded-[26px] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(41,80,101,0.16),transparent_38%),radial-gradient(circle_at_top_right,rgba(137,245,199,0.16),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.94),rgba(242,247,249,0.98))] p-3">
@@ -605,20 +609,20 @@ export default function DashboardPage() {
                       tick={CHART_AXIS_TICK}
                       axisLine={false}
                       tickLine={false}
-                      allowDecimals={false}
+                      allowDecimals
                     />
                     <Tooltip
                       cursor={{ fill: "rgba(41, 80, 101, 0.06)" }}
                       contentStyle={CHART_TOOLTIP_STYLE}
                       labelFormatter={(value) => `${formatHourLabel(Number(value))} Uhr`}
                       formatter={(value) => [
-                        `${Number(value).toLocaleString("de-DE")} Nutzer`,
-                        "Aktiv",
+                        `${formatHourlyUsers(Number(value))} Nutzer`,
+                        "Ø aktiv",
                       ]}
                     />
                     <Bar
                       dataKey="active_users"
-                      name="Aktiv"
+                      name="Ø aktiv"
                       fill="url(#dashboardHourlyGradient)"
                       radius={[12, 12, 0, 0]}
                     />
@@ -641,7 +645,7 @@ export default function DashboardPage() {
                   </p>
                   <p className="mt-1 text-sm text-ember/70">
                     {peakHourlyActivity
-                      ? `${peakHourlyActivity.active_users.toLocaleString("de-DE")} aktive Nutzer`
+                      ? `${formatHourlyUsers(peakHourlyActivity.active_users)} aktive Nutzer im Schnitt`
                       : "Im gewählten Zeitraum wurden noch keine Stundenwerte erfasst."}
                   </p>
                 </div>
@@ -654,7 +658,7 @@ export default function DashboardPage() {
                     {averageHourlyActivity.toLocaleString("de-DE", { maximumFractionDigits: 1 })}
                   </p>
                   <p className="mt-1 text-sm text-ember/70">
-                    Durchschnitt aktiver Nutzer über alle 24 Stunden.
+                    Durchschnittliche aktive Nutzer pro Stunde im gewählten Zeitraum.
                   </p>
                 </div>
 
@@ -673,7 +677,7 @@ export default function DashboardPage() {
                             {formatHourRangeLabel(item.hour)}
                           </span>
                           <span className="rounded-full bg-[#1f4257] px-2.5 py-1 text-xs font-semibold text-white">
-                            {item.active_users.toLocaleString("de-DE")}
+                            {formatHourlyUsers(item.active_users)}
                           </span>
                         </div>
                       ))

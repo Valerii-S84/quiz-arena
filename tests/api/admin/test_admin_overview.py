@@ -15,6 +15,7 @@ from app.api.routes.admin import (
     overview_activity_metrics,
     overview_metrics,
     overview_queries,
+    overview_series,
     overview_streak_metrics,
 )
 from app.main import app
@@ -230,10 +231,10 @@ async def test_build_overview_payload_builds_kpis_and_alerts() -> None:
     )
     now_utc = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
     payload = overview.OverviewResponse.model_validate(
-        await overview_queries.build_overview_payload(session, now_utc=now_utc, days=7)
+        await overview_queries.build_overview_payload(session, now_utc=now_utc, days=1)
     )
 
-    assert payload.period == "7d"
+    assert payload.period == "1d"
     assert payload.kpis["dau"].current == 100.0
     assert payload.kpis["start_users"].current == 20.0
     assert payload.kpis["conversion_start_to_quiz"].current == 35.0
@@ -252,6 +253,21 @@ async def test_build_overview_payload_builds_kpis_and_alerts() -> None:
         "conversion_drop",
         "suspicious_activity",
     ]
+
+
+@pytest.mark.asyncio
+async def test_fetch_hourly_activity_series_averages_daily_activity_across_window() -> None:
+    session = _SessionWithExec(_RowsResult([(10, 2), (11, 4)]))
+
+    result = await overview_series.fetch_hourly_activity_series(
+        session,
+        from_utc=datetime(2026, 3, 8, 12, 0, tzinfo=UTC),
+        to_utc=datetime(2026, 3, 10, 12, 0, tzinfo=UTC),
+    )
+
+    assert result[10] == {"hour": 10, "active_users": 1.0}
+    assert result[11] == {"hour": 11, "active_users": 2.0}
+    assert result[12] == {"hour": 12, "active_users": 0.0}
 
 
 @pytest.mark.asyncio
