@@ -11,10 +11,11 @@ import structlog
 from fastapi import HTTPException, Request
 
 from app.services.internal_auth import (
+    OPS_UI_SESSION_COOKIE,
     extract_client_ip,
     is_client_ip_allowed,
-    is_internal_request_authenticated,
 )
+from app.services.ops_auth import OpsSessionStateError, validate_ops_ui_session
 
 logger = structlog.get_logger(__name__)
 
@@ -33,6 +34,10 @@ def _assert_internal_ip_access(request: Request) -> str | None:
         logger.warning("ops_ui_auth_failed", reason="ip_not_allowed", client_ip=client_ip)
         raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
     return client_ip
+
+
+def _auth_state_unavailable_http_error() -> HTTPException:
+    return HTTPException(status_code=503, detail={"code": "E_AUTH_STATE_UNAVAILABLE"})
 
 
 def _normalized_origin(value: str | None) -> str | None:
@@ -131,9 +136,15 @@ def _clear_login_failures(client_ip: str | None) -> None:
         module._LOGIN_FAILED_ATTEMPTS.pop(key, None)
 
 
-def _is_ops_ui_authenticated(request: Request) -> bool:
+async def _is_ops_ui_authenticated(request: Request, *, client_ip: str | None = None) -> bool:
     settings = _ops_ui_module().get_settings()
-    return is_internal_request_authenticated(
-        request,
-        expected_token=settings.internal_api_token,
-    )
+    received_session = request.cookies.get(OPS_UI_SESSION_COOKIE)
+    try:
+        return await validate_ops_ui_session(settings=settings, session_id=received_session)
+    except OpsSessionStateError as exc:
+        logger.warning(
+            "ops_ui_auth_failed",
+            reason="auth_state_unavailable",
+            client_ip=client_ip,
+        )
+        raise _auth_state_unavailable_http_error() from exc

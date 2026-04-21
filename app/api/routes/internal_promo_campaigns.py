@@ -13,7 +13,7 @@ from .internal_promo_constants import (
     PROMO_CAMPAIGN_STATUSES,
     PROMO_MUTABLE_CAMPAIGN_STATUSES,
 )
-from .internal_promo_helpers import _assert_internal_access, _campaign_as_response
+from .internal_promo_helpers import _assert_ops_surface_access, _campaign_as_response
 from .internal_promo_models import (
     PromoCampaignListResponse,
     PromoCampaignResponse,
@@ -36,7 +36,7 @@ async def list_promo_campaigns(
     campaign_name: str | None,
     limit: int,
 ) -> PromoCampaignListResponse:
-    _assert_internal_access(request)
+    await _assert_ops_surface_access(request)
     normalized_status = _normalize_status(status)
     if normalized_status is not None and normalized_status not in PROMO_CAMPAIGN_STATUSES:
         raise HTTPException(status_code=422, detail={"code": "E_PROMO_STATUS_INVALID"})
@@ -59,7 +59,7 @@ async def update_promo_campaign_status(
     payload: PromoCampaignStatusUpdateRequest,
     request: Request,
 ) -> PromoCampaignResponse:
-    _assert_internal_access(request)
+    await _assert_ops_surface_access(request)
     desired_status = payload.status.strip().upper()
     if desired_status not in PROMO_MUTABLE_CAMPAIGN_STATUSES:
         raise HTTPException(status_code=422, detail={"code": "E_PROMO_STATUS_INVALID"})

@@ -11,7 +11,7 @@ from app.services.referrals_observability import (
     get_referrals_alert_thresholds,
 )
 
-from .internal_referrals_helpers import _assert_internal_access
+from .internal_referrals_helpers import _assert_ops_surface_access
 from .internal_referrals_models import (
     ReferralDashboardAlertsResponse,
     ReferralDashboardResponse,
@@ -36,7 +36,7 @@ async def get_referrals_dashboard(
     request: Request,
     window_hours: int,
 ) -> ReferralDashboardResponse:
-    _assert_internal_access(request)
+    await _assert_ops_surface_access(request)
     now_utc = datetime.now(timezone.utc)
     settings = _get_settings()
     thresholds = get_referrals_alert_thresholds(settings)
