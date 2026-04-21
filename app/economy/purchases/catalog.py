@@ -15,7 +15,6 @@ class ProductSpec:
     grants_streak_saver: bool = False
     friend_challenge_tickets: int = 0
 
-
 PRODUCTS: dict[str, ProductSpec] = {
     "ENERGY_10": ProductSpec(
         product_code="ENERGY_10",
@@ -43,10 +42,19 @@ PRODUCTS: dict[str, ProductSpec] = {
         energy_credit=0,
         friend_challenge_tickets=1,
     ),
-    "PREMIUM_STARTER": ProductSpec(
-        product_code="PREMIUM_STARTER",
+    "PREMIUM_3_DAYS": ProductSpec(
+        product_code="PREMIUM_3_DAYS",
         product_type="PREMIUM",
-        title="Premium Starter",
+        title="Premium 3 Tage",
+        description="3 Tage Premium-Zugang.",
+        stars_amount=0,
+        energy_credit=0,
+        premium_days=3,
+    ),
+    "PREMIUM_WEEK": ProductSpec(
+        product_code="PREMIUM_WEEK",
+        product_type="PREMIUM",
+        title="PREMIUM_WEEK",
         description="7 Tage unbegrenzte Duelle und Spielen ohne Energie-Pausen.",
         stars_amount=29,
         energy_credit=0,
@@ -81,7 +89,7 @@ PRODUCTS: dict[str, ProductSpec] = {
     ),
 }
 
-SOFT_DISABLED_PRODUCT_CODES: frozenset[str] = frozenset(set())
+SOFT_DISABLED_PRODUCT_CODES: frozenset[str] = frozenset({"PREMIUM_3_DAYS"})
 
 
 def get_product(product_code: str) -> ProductSpec | None:

@@ -80,14 +80,14 @@ async def build_trigger_codes(
         if (berlin_today - last_activity_local_date).days >= COMEBACK_WINDOW_DAYS:
             trigger_codes.add(TRG_COMEBACK_3D)
 
-    starter_expired_recently = await EntitlementsRepo.has_recently_ended_premium_scope(
+    week_expired_recently = await EntitlementsRepo.has_recently_ended_premium_scope(
         session,
         user_id=user_id,
-        scope="PREMIUM_STARTER",
+        scope="PREMIUM_WEEK",
         since_utc=now_utc - STARTER_EXPIRED_WINDOW,
         until_utc=now_utc,
     )
-    if not premium_active and starter_expired_recently:
+    if not premium_active and week_expired_recently:
         trigger_codes.add(TRG_STARTER_EXPIRED)
 
     month_expiring = await EntitlementsRepo.has_active_premium_scope_ending_within(

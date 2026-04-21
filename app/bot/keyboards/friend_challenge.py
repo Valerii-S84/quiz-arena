@@ -185,7 +185,7 @@ def build_friend_challenge_limit_keyboard() -> InlineKeyboardMarkup:
                     text="🎟 1 DUELL  |  5⭐", callback_data="buy:FRIEND_CHALLENGE_5"
                 )
             ],
-            [InlineKeyboardButton(text="💎 PREMIUM STARTER", callback_data="buy:PREMIUM_STARTER")],
+            [InlineKeyboardButton(text="💎 PREMIUM_WEEK", callback_data="buy:PREMIUM_WEEK")],
             [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
         ]
     )

@@ -8,7 +8,7 @@ import pytest
 
 from app.bot.handlers import referral
 from app.bot.texts.de import TEXTS_DE
-from app.economy.referrals.constants import REWARD_CODE_PREMIUM_STARTER
+from app.economy.referrals.constants import REWARD_CODE_PREMIUM_WEEK
 from app.economy.referrals.service import ReferralClaimResult, ReferralOverview
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
@@ -36,7 +36,7 @@ def _overview(*, claimable: int = 0) -> ReferralOverview:
 def test_build_claim_status_text_variants() -> None:
     claim = ReferralClaimResult(
         status="CLAIMED",
-        reward_code=REWARD_CODE_PREMIUM_STARTER,
+        reward_code=REWARD_CODE_PREMIUM_WEEK,
         overview=_overview(),
     )
     assert (
@@ -55,7 +55,7 @@ def test_build_overview_text_uses_fallback_without_link() -> None:
 def test_build_overview_text_names_the_single_reward_option() -> None:
     text = referral._build_overview_text(overview=_overview(claimable=1), invite_link=None)
 
-    assert "Hol dir jetzt Premium Starter" in text
+    assert "Hol dir jetzt PREMIUM_WEEK" in text
     assert "Waehle deinen Bonus" not in text
 
 
@@ -152,7 +152,7 @@ async def test_handle_referral_reward_choice_success(monkeypatch) -> None:
     monkeypatch.setattr(referral, "emit_analytics_event", _fake_emit)
 
     callback = DummyCallback(
-        data="referral:reward:PREMIUM_STARTER",
+        data="referral:reward:PREMIUM_WEEK",
         from_user=SimpleNamespace(id=9),
     )
     await referral.handle_referral_reward_choice(callback)
