@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from app.db.models.entitlements import Entitlement
 from app.db.models.referrals import Referral
 from app.db.session import SessionLocal
-from app.economy.referrals.constants import REWARD_CODE_PREMIUM_STARTER
+from app.economy.referrals.constants import REWARD_CODE_PREMIUM_WEEK
 from app.economy.referrals.service import ReferralService
 from tests.integration.referrals_fixtures import (
     UTC,
@@ -40,12 +40,12 @@ async def test_claim_next_reward_choice_grants_selected_reward() -> None:
         claim = await ReferralService.claim_next_reward_choice(
             session,
             user_id=referrer.id,
-            reward_code=REWARD_CODE_PREMIUM_STARTER,
+            reward_code=REWARD_CODE_PREMIUM_WEEK,
             now_utc=now_utc,
         )
         assert claim is not None
         assert claim.status == "CLAIMED"
-        assert claim.reward_code == REWARD_CODE_PREMIUM_STARTER
+        assert claim.reward_code == REWARD_CODE_PREMIUM_WEEK
         assert claim.overview.rewarded_total == 1
 
         rewarded_stmt = select(func.count(Referral.id)).where(
@@ -83,13 +83,13 @@ async def test_claim_next_reward_choice_is_idempotent_on_duplicate_tap() -> None
         first = await ReferralService.claim_next_reward_choice(
             session,
             user_id=referrer.id,
-            reward_code=REWARD_CODE_PREMIUM_STARTER,
+            reward_code=REWARD_CODE_PREMIUM_WEEK,
             now_utc=now_utc,
         )
         second = await ReferralService.claim_next_reward_choice(
             session,
             user_id=referrer.id,
-            reward_code=REWARD_CODE_PREMIUM_STARTER,
+            reward_code=REWARD_CODE_PREMIUM_WEEK,
             now_utc=now_utc,
         )
 
@@ -135,7 +135,7 @@ async def test_claim_next_reward_choice_is_safe_under_concurrent_duplicate_callb
             claim = await ReferralService.claim_next_reward_choice(
                 session,
                 user_id=referrer.id,
-                reward_code=REWARD_CODE_PREMIUM_STARTER,
+                reward_code=REWARD_CODE_PREMIUM_WEEK,
                 now_utc=now_utc,
             )
             assert claim is not None
@@ -190,7 +190,7 @@ async def test_worker_awaiting_choice_and_user_claim_race_is_stable() -> None:
             claim = await ReferralService.claim_next_reward_choice(
                 session,
                 user_id=referrer.id,
-                reward_code=REWARD_CODE_PREMIUM_STARTER,
+                reward_code=REWARD_CODE_PREMIUM_WEEK,
                 now_utc=now_utc,
             )
             assert claim is not None

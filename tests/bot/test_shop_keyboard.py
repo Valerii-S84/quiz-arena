@@ -9,7 +9,7 @@ def test_shop_keyboard_contains_products_and_back() -> None:
     assert texts == [
         "⚡ Energie +10 | 5⭐",
         "⚔️ Duell-Ticket | 5⭐",
-        "💎 Premium Starter | 29⭐",
+        "💎 PREMIUM_WEEK | 29⭐",
         "💎 Premium Monat | 99⭐",
         "💎 Premium Season | 249⭐",
         "💎 Premium Year | 499⭐",
@@ -20,7 +20,7 @@ def test_shop_keyboard_contains_products_and_back() -> None:
     ]
     assert "buy:ENERGY_10" in callbacks
     assert "buy:FRIEND_CHALLENGE_5" in callbacks
-    assert "buy:PREMIUM_STARTER" in callbacks
+    assert "buy:PREMIUM_WEEK" in callbacks
     assert "buy:PREMIUM_MONTH" in callbacks
     assert "buy:PREMIUM_SEASON" in callbacks
     assert "buy:PREMIUM_YEAR" in callbacks

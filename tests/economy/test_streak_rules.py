@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 from app.economy.streak.constants import (
     PREMIUM_SCOPE_MONTH,
     PREMIUM_SCOPE_SEASON,
-    PREMIUM_SCOPE_STARTER,
+    PREMIUM_SCOPE_WEEK,
 )
 from app.economy.streak.rules import (
     apply_day_end,
@@ -161,7 +161,7 @@ def test_transition_at_risk_to_no_streak_without_freeze() -> None:
     )
 
     state_after = apply_day_end(
-        state_before, day=date(2026, 2, 18), premium_scope=PREMIUM_SCOPE_STARTER
+        state_before, day=date(2026, 2, 18), premium_scope=PREMIUM_SCOPE_WEEK
     )
 
     assert state_after.current_streak == 0

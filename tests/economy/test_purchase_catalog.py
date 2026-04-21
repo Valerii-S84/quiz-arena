@@ -13,7 +13,8 @@ def test_purchase_catalog_contains_core_micro_products() -> None:
 
 def test_purchase_catalog_contains_core_premium_products() -> None:
     assert {
-        "PREMIUM_STARTER",
+        "PREMIUM_3_DAYS",
+        "PREMIUM_WEEK",
         "PREMIUM_MONTH",
         "PREMIUM_SEASON",
         "PREMIUM_YEAR",
@@ -26,13 +27,15 @@ def test_get_product_returns_none_for_unknown_code() -> None:
 
 def test_all_catalog_products_are_available_for_sale() -> None:
     assert is_product_available_for_sale("ENERGY_10") is True
+    assert is_product_available_for_sale("PREMIUM_3_DAYS") is False
+    assert is_product_available_for_sale("PREMIUM_WEEK") is True
     assert is_product_available_for_sale("PREMIUM_MONTH") is True
     assert is_product_available_for_sale("PREMIUM_SEASON") is True
     assert is_product_available_for_sale("PREMIUM_YEAR") is True
 
 
 def test_premium_catalog_descriptions_explain_clear_benefits() -> None:
-    assert "unbegrenzte Duelle" in PRODUCTS["PREMIUM_STARTER"].description
+    assert "unbegrenzte Duelle" in PRODUCTS["PREMIUM_WEEK"].description
     assert "ohne Pausen" in PRODUCTS["PREMIUM_MONTH"].description
     assert "spare Sterne" in PRODUCTS["PREMIUM_SEASON"].description
     assert "besten Sterne-Preis" in PRODUCTS["PREMIUM_YEAR"].description

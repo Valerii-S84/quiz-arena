@@ -56,7 +56,7 @@ async def test_claim_next_reward_choice_returns_none_for_missing_user(
     result = await rewards_claim.claim_next_reward_choice(
         _Session(),
         user_id=7,
-        reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
+        reward_code=rewards_claim.REWARD_CODE_PREMIUM_WEEK,
         now_utc=datetime.now(UTC),
     )
 
@@ -128,7 +128,7 @@ async def test_claim_next_reward_choice_returns_monthly_cap_and_marks_anchor(
     result = await rewards_claim.claim_next_reward_choice(
         _Session(),
         user_id=7,
-        reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
+        reward_code=rewards_claim.REWARD_CODE_PREMIUM_WEEK,
         now_utc=now_utc,
     )
 
@@ -204,7 +204,7 @@ async def test_claim_next_reward_choice_returns_too_early_for_delayed_reward(
     result = await rewards_claim.claim_next_reward_choice(
         _Session(),
         user_id=7,
-        reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
+        reward_code=rewards_claim.REWARD_CODE_PREMIUM_WEEK,
         now_utc=now_utc,
     )
 
@@ -292,18 +292,18 @@ async def test_claim_next_reward_choice_claims_reward_and_updates_anchor(
     result = await rewards_claim.claim_next_reward_choice(
         _Session(),
         user_id=7,
-        reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
+        reward_code=rewards_claim.REWARD_CODE_PREMIUM_WEEK,
         now_utc=now_utc,
     )
 
     assert result is not None
     assert result.status == "CLAIMED"
-    assert result.reward_code == rewards_claim.REWARD_CODE_PREMIUM_STARTER
+    assert result.reward_code == rewards_claim.REWARD_CODE_PREMIUM_WEEK
     assert granted == [
         {
             "user_id": 7,
             "referral_id": 43,
-            "reward_code": rewards_claim.REWARD_CODE_PREMIUM_STARTER,
+            "reward_code": rewards_claim.REWARD_CODE_PREMIUM_WEEK,
             "now_utc": now_utc,
         }
     ]
@@ -380,7 +380,7 @@ async def test_claim_next_reward_choice_requires_paid_purchase_history(
     result = await rewards_claim.claim_next_reward_choice(
         _Session(),
         user_id=7,
-        reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
+        reward_code=rewards_claim.REWARD_CODE_PREMIUM_WEEK,
         now_utc=now_utc,
     )
 

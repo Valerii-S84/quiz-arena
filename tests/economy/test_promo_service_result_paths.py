@@ -52,7 +52,7 @@ async def test_redeem_applies_premium_grant_and_records_attempt(
         discount_type=None,
         discount_percent=None,
         grant_premium_days=7,
-        target_scope="PREMIUM_STARTER",
+        target_scope="PREMIUM_WEEK",
     )
 
     async def _fake_get_redemption_by_idempotency_key_for_update(_session, _idempotency_key):

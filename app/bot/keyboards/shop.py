@@ -27,8 +27,8 @@ def build_shop_keyboard(*, channel_bonus_claimed: bool = False) -> InlineKeyboar
             ],
             [
                 InlineKeyboardButton(
-                    text="💎 Premium Starter | 29⭐",
-                    callback_data="buy:PREMIUM_STARTER",
+                    text="💎 PREMIUM_WEEK | 29⭐",
+                    callback_data="buy:PREMIUM_WEEK",
                 )
             ],
             [

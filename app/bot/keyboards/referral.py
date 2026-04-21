@@ -36,8 +36,8 @@ def build_referral_keyboard(
         rows.append(
             [
                 InlineKeyboardButton(
-                    text="Premium Starter",
-                    callback_data="referral:reward:PREMIUM_STARTER",
+                    text="PREMIUM_WEEK",
+                    callback_data="referral:reward:PREMIUM_WEEK",
                 ),
             ]
         )
