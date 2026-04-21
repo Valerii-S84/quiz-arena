@@ -12,6 +12,7 @@ from app.db.models.referrals import Referral
 from app.db.session import SessionLocal
 from app.economy.referrals.service import ReferralService
 from app.main import app
+from tests.integration.referrals_fixtures import _create_paid_purchase
 from tests.integration.telegram_sandbox_smoke_bot import _BotApiStub, _configure_webhook_processing
 from tests.integration.telegram_sandbox_smoke_fixtures import (
     UTC,
@@ -31,6 +32,7 @@ async def test_telegram_webhook_smoke_referral_reward_choice_duplicate_replay(
         await _create_user(telegram_user_id=90_000_000_110 + idx, first_name=f"Referred{idx}")
         for idx in range(3)
     ]
+    await _create_paid_purchase(user_id=referrer.id, now_utc=now_utc - timedelta(days=1))
 
     async with SessionLocal.begin() as session:
         for referred in referred_users:

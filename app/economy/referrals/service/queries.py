@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.referrals_repo import ReferralsRepo
 from app.db.repo.users_repo import UsersRepo
 
@@ -33,9 +34,17 @@ async def get_referrer_overview(
         from_utc=month_start_utc,
         to_utc=next_month_start_utc,
     )
+    has_paid_purchase_history = (
+        await PurchasesRepo.count_paid_purchases_for_user(
+            session,
+            user_id=user_id,
+        )
+        > 0
+    )
     return _build_overview_from_referrals(
         referral_code=user.referral_code,
         referrals=referrals,
         now_utc=now_utc,
         rewarded_this_month=rewarded_this_month,
+        rewards_unlocked=has_paid_purchase_history,
     )

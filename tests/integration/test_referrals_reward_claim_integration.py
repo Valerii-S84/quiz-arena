@@ -11,7 +11,12 @@ from app.db.models.referrals import Referral
 from app.db.session import SessionLocal
 from app.economy.referrals.constants import REWARD_CODE_PREMIUM_STARTER
 from app.economy.referrals.service import ReferralService
-from tests.integration.referrals_fixtures import UTC, _create_referral_row, _create_user
+from tests.integration.referrals_fixtures import (
+    UTC,
+    _create_paid_purchase,
+    _create_referral_row,
+    _create_user,
+)
 
 
 @pytest.mark.asyncio
@@ -19,6 +24,7 @@ async def test_claim_next_reward_choice_grants_selected_reward() -> None:
     now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
     referrer = await _create_user("referrer-claim-choice")
     referred_users = [await _create_user(f"referred-claim-choice-{idx}") for idx in range(3)]
+    await _create_paid_purchase(user_id=referrer.id, now_utc=now_utc - timedelta(days=1))
 
     for referred in referred_users:
         await _create_referral_row(
@@ -61,6 +67,7 @@ async def test_claim_next_reward_choice_is_idempotent_on_duplicate_tap() -> None
     now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
     referrer = await _create_user("referrer-claim-idempotent")
     referred_users = [await _create_user(f"referred-claim-idempotent-{idx}") for idx in range(3)]
+    await _create_paid_purchase(user_id=referrer.id, now_utc=now_utc - timedelta(days=1))
 
     for referred in referred_users:
         await _create_referral_row(
@@ -111,6 +118,7 @@ async def test_claim_next_reward_choice_is_safe_under_concurrent_duplicate_callb
     now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
     referrer = await _create_user("referrer-claim-concurrent")
     referred_users = [await _create_user(f"referred-claim-concurrent-{idx}") for idx in range(3)]
+    await _create_paid_purchase(user_id=referrer.id, now_utc=now_utc - timedelta(days=1))
 
     for referred in referred_users:
         await _create_referral_row(
@@ -157,6 +165,7 @@ async def test_worker_awaiting_choice_and_user_claim_race_is_stable() -> None:
     now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
     referrer = await _create_user("referrer-worker-choice-race")
     referred_users = [await _create_user(f"referred-worker-choice-race-{idx}") for idx in range(3)]
+    await _create_paid_purchase(user_id=referrer.id, now_utc=now_utc - timedelta(days=1))
 
     for referred in referred_users:
         await _create_referral_row(

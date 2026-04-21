@@ -128,6 +128,37 @@ class PurchasesRepo:
         return int(result.scalar_one() or 0)
 
     @staticmethod
+    async def count_paid_purchases_for_user(session: AsyncSession, *, user_id: int) -> int:
+        stmt = select(func.count(Purchase.id)).where(
+            Purchase.user_id == user_id,
+            Purchase.paid_at.is_not(None),
+            Purchase.stars_amount > 0,
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def list_user_ids_with_paid_purchase_history(
+        session: AsyncSession,
+        *,
+        user_ids: list[int],
+    ) -> set[int]:
+        if not user_ids:
+            return set()
+
+        stmt = (
+            select(Purchase.user_id)
+            .distinct()
+            .where(
+                Purchase.user_id.in_(user_ids),
+                Purchase.paid_at.is_not(None),
+                Purchase.stars_amount > 0,
+            )
+        )
+        result = await session.execute(stmt)
+        return {int(user_id) for user_id in result.scalars().all()}
+
+    @staticmethod
     async def count_paid_product_since(
         session: AsyncSession,
         *,

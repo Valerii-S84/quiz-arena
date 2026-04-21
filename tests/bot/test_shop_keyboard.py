@@ -11,6 +11,8 @@ def test_shop_keyboard_contains_products_and_back() -> None:
         "⚔️ Duell-Ticket | 5⭐",
         "💎 Premium Starter | 29⭐",
         "💎 Premium Monat | 99⭐",
+        "💎 Premium Season | 249⭐",
+        "💎 Premium Year | 499⭐",
         "📺 Kanal abonnieren → volle Energie",
         "👥 Freunde einladen → Belohnung",
         "🎟️ Promo-Code eingeben",
@@ -20,8 +22,8 @@ def test_shop_keyboard_contains_products_and_back() -> None:
     assert "buy:FRIEND_CHALLENGE_5" in callbacks
     assert "buy:PREMIUM_STARTER" in callbacks
     assert "buy:PREMIUM_MONTH" in callbacks
-    assert "buy:PREMIUM_SEASON" not in callbacks
-    assert "buy:PREMIUM_YEAR" not in callbacks
+    assert "buy:PREMIUM_SEASON" in callbacks
+    assert "buy:PREMIUM_YEAR" in callbacks
     assert "channel_bonus:open" in callbacks
     assert "friend:challenge:type:tournament" not in callbacks
     assert "referral:open" in callbacks
@@ -34,6 +36,6 @@ def test_shop_keyboard_marks_channel_bonus_when_already_claimed() -> None:
     texts = [button.text for row in keyboard.inline_keyboard for button in row]
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
 
-    assert texts[4] == "✅ Kanal-Bonus bereits erhalten"
+    assert texts[6] == "✅ Kanal-Bonus bereits erhalten"
     assert "channel_bonus:open" not in callbacks
     assert "channel_bonus:claimed" in callbacks

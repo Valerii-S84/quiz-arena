@@ -4,6 +4,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.referrals_repo import ReferralsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.economy.referrals.constants import (
@@ -44,6 +45,13 @@ async def claim_next_reward_choice(
         from_utc=month_start_utc,
         to_utc=next_month_start_utc,
     )
+    has_paid_purchase_history = (
+        await PurchasesRepo.count_paid_purchases_for_user(
+            session,
+            user_id=user_id,
+        )
+        > 0
+    )
 
     anchors = _build_reward_anchors(referrals)
     eligible_before_utc = now_utc - REWARD_DELAY
@@ -58,6 +66,9 @@ async def claim_next_reward_choice(
             available_at_utc = anchor.qualified_at + REWARD_DELAY
             if next_reward_at_utc is None or available_at_utc < next_reward_at_utc:
                 next_reward_at_utc = available_at_utc
+            continue
+
+        if not has_paid_purchase_history:
             continue
 
         if rewarded_this_month >= REFERRAL_REWARDS_PER_MONTH_CAP:
@@ -90,6 +101,7 @@ async def claim_next_reward_choice(
         referrals=referrals,
         now_utc=now_utc,
         rewarded_this_month=rewarded_this_month,
+        rewards_unlocked=has_paid_purchase_history,
     )
     return ReferralClaimResult(
         status=status,
