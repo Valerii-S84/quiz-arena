@@ -98,33 +98,3 @@ async def _build_start_result_from_existing_session(
         energy_paid=0,
         idempotent_replay=idempotent_replay,
     )
-
-
-def _build_start_result_from_created_session(
-    *,
-    created: QuizSession,
-    question: QuizQuestion,
-    energy_free: int,
-    energy_paid: int,
-    friend_challenge_total_rounds: int | None,
-) -> StartSessionResult:
-    return StartSessionResult(
-        session=SessionQuestionView(
-            session_id=created.id,
-            question_id=question.question_id,
-            text=question.text,
-            options=question.options,
-            mode_code=created.mode_code,
-            source=created.source,
-            category=question.category,
-            question_number=(
-                created.friend_challenge_round if created.source == "FRIEND_CHALLENGE" else 1
-            ),
-            total_questions=(
-                friend_challenge_total_rounds if created.source == "FRIEND_CHALLENGE" else 1
-            ),
-        ),
-        energy_free=energy_free,
-        energy_paid=energy_paid,
-        idempotent_replay=False,
-    )

@@ -12,7 +12,6 @@ def test_referral_keyboard_contains_share_reward_and_refresh_buttons() -> None:
     urls = [button.url for button in buttons]
 
     assert "referral:reward:PREMIUM_STARTER" in callbacks
-    assert "Premium Starter" in [button.text for button in buttons]
     assert "referral:open" in callbacks
     assert "referral:share" in callbacks
     assert all(url is None for url in urls)

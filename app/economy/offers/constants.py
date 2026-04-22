@@ -31,9 +31,9 @@ TRIGGER_RESOLUTION_ORDER: tuple[str, ...] = (
 OFFER_NOT_SHOW_DISMISS_REASON = "NOT_SHOW"
 
 BLOCKING_MODAL_COOLDOWN = timedelta(hours=6)
-MONETIZATION_IMPRESSIONS_PER_DAY_CAP = 4
-OFFER_REPEAT_COOLDOWN = timedelta(hours=12)
-OFFER_MUTE_WINDOW = timedelta(hours=24)
+MONETIZATION_IMPRESSIONS_PER_DAY_CAP = 3
+OFFER_REPEAT_COOLDOWN = timedelta(hours=24)
+OFFER_MUTE_WINDOW = timedelta(hours=72)
 
 ENERGY10_SECOND_BUY_WINDOW = timedelta(days=7)
 COMEBACK_WINDOW_DAYS = 3
@@ -62,7 +62,7 @@ OFFER_TEMPLATES: dict[str, OfferTemplate] = {
         trigger_code=TRG_ENERGY10_SECOND_BUY,
         priority=80,
         text_key="msg.offer.mega.after_second_energy",
-        cta_product_codes=("PREMIUM_WEEK",),
+        cta_product_codes=("PREMIUM_STARTER",),
         blocking_modal=True,
     ),
     TRG_STREAK_GT7: OfferTemplate(
@@ -70,7 +70,7 @@ OFFER_TEMPLATES: dict[str, OfferTemplate] = {
         trigger_code=TRG_STREAK_GT7,
         priority=50,
         text_key="msg.offer.streak.gt7",
-        cta_product_codes=("PREMIUM_WEEK",),
+        cta_product_codes=("PREMIUM_STARTER",),
         blocking_modal=True,
     ),
     TRG_STREAK_RISK_22: OfferTemplate(
@@ -94,7 +94,7 @@ OFFER_TEMPLATES: dict[str, OfferTemplate] = {
         trigger_code=TRG_COMEBACK_3D,
         priority=85,
         text_key="msg.offer.comeback",
-        cta_product_codes=("PREMIUM_WEEK",),
+        cta_product_codes=("PREMIUM_STARTER",),
         blocking_modal=True,
     ),
     TRG_STARTER_EXPIRED: OfferTemplate(
@@ -118,7 +118,7 @@ OFFER_TEMPLATES: dict[str, OfferTemplate] = {
         trigger_code=TRG_WEEKEND_FLASH,
         priority=40,
         text_key="msg.offer.weekend.flash",
-        cta_product_codes=("PREMIUM_WEEK",),
+        cta_product_codes=("PREMIUM_STARTER",),
         blocking_modal=False,
     ),
 }

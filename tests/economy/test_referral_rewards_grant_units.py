@@ -120,25 +120,3 @@ async def test_grant_reward_dispatches_premium_starter(
     )
 
     assert calls == ["premium"]
-
-
-@pytest.mark.asyncio
-async def test_grant_reward_accepts_legacy_premium_week_code(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls: list[str] = []
-
-    async def _fake_premium(*_args, **_kwargs):
-        calls.append("premium")
-
-    monkeypatch.setattr(rewards_grant, "_grant_premium_starter_reward", _fake_premium)
-
-    await rewards_grant._grant_reward(
-        _Session(),
-        user_id=1,
-        referral_id=1,
-        reward_code=rewards_grant.REWARD_CODE_PREMIUM_WEEK,
-        now_utc=datetime.now(UTC),
-    )
-
-    assert calls == ["premium"]

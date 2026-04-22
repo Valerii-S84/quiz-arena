@@ -8,7 +8,7 @@ from app.db.models.entitlements import Entitlement
 from app.db.models.ledger_entries import LedgerEntry
 from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.ledger_repo import LedgerRepo
-from app.economy.referrals.constants import REWARD_CODE_PREMIUM_STARTER, REWARD_CODE_PREMIUM_WEEK
+from app.economy.referrals.constants import REWARD_CODE_PREMIUM_STARTER
 
 
 async def _grant_premium_starter_reward(
@@ -65,21 +65,6 @@ async def _grant_premium_starter_reward(
     )
 
 
-async def _grant_premium_week_reward(
-    session: AsyncSession,
-    *,
-    user_id: int,
-    referral_id: int,
-    now_utc: datetime,
-) -> None:
-    await _grant_premium_starter_reward(
-        session,
-        user_id=user_id,
-        referral_id=referral_id,
-        now_utc=now_utc,
-    )
-
-
 async def _grant_reward(
     session: AsyncSession,
     *,
@@ -88,7 +73,7 @@ async def _grant_reward(
     reward_code: str,
     now_utc: datetime,
 ) -> None:
-    if reward_code not in {REWARD_CODE_PREMIUM_WEEK, REWARD_CODE_PREMIUM_STARTER}:
+    if reward_code != REWARD_CODE_PREMIUM_STARTER:
         raise ValueError(f"unsupported reward code: {reward_code}")
     await _grant_premium_starter_reward(
         session,

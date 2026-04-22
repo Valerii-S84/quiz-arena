@@ -4,7 +4,6 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.offers_repo import OffersRepo
 from app.economy.offers.constants import (
     MONETIZATION_IMPRESSIONS_PER_DAY_CAP,
@@ -12,7 +11,6 @@ from app.economy.offers.constants import (
     OFFER_TEMPLATES,
     TRIGGER_RESOLUTION_ORDER,
 )
-from app.economy.offers.eligibility import eligible_cta_product_codes
 from app.economy.offers.muting import (
     has_recent_blocking_modal,
     is_offer_muted,
@@ -20,6 +18,7 @@ from app.economy.offers.muting import (
 )
 from app.economy.offers.time_utils import berlin_now
 from app.economy.offers.types import OfferTemplate
+from app.economy.purchases.catalog import is_product_available_for_sale
 
 
 async def select_template_with_caps(
@@ -28,8 +27,6 @@ async def select_template_with_caps(
     user_id: int,
     trigger_codes: set[str],
     now_utc: datetime,
-    active_premium_scope: str | None = None,
-    resolve_active_premium_scope: bool = True,
 ) -> OfferTemplate | None:
     if not trigger_codes:
         return None
@@ -51,12 +48,6 @@ async def select_template_with_caps(
         recent_impressions=recent_impressions,
         now_utc=now_utc,
     )
-    if resolve_active_premium_scope:
-        active_premium_scope = await EntitlementsRepo.get_active_premium_scope(
-            session,
-            user_id=user_id,
-            now_utc=now_utc,
-        )
 
     order_map = {trigger_code: index for index, trigger_code in enumerate(TRIGGER_RESOLUTION_ORDER)}
     ordered_templates = sorted(
@@ -68,11 +59,7 @@ async def select_template_with_caps(
     )
 
     for template in ordered_templates:
-        eligible_codes = eligible_cta_product_codes(
-            template.cta_product_codes,
-            active_premium_scope=active_premium_scope,
-        )
-        if not eligible_codes:
+        if not any(is_product_available_for_sale(code) for code in template.cta_product_codes):
             continue
         if template.blocking_modal and blocking_recently_shown:
             continue

@@ -10,10 +10,16 @@ deutchquizarena.de {
   }
 
   @health_legacy path /health
+  @internal_ready path /api/ready /api/ready/*
 
-  # Backward-compatible health endpoint for legacy checks.
+  # Keep the legacy public health endpoint, but only with the sanitized backend payload.
   handle @health_legacy {
     reverse_proxy api:8000
+  }
+
+  # Detailed readiness remains container-local and must not be exposed publicly.
+  handle @internal_ready {
+    respond "Not Found" 404
   }
 
   handle_path /api/* {

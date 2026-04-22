@@ -14,10 +14,11 @@ from app.workers.tasks.retention_cleanup_runtime import (
     log_cleanup_result,
     run_cleanup_tables,
 )
-from app.workers.tasks.retention_cleanup_settings import resolve_cleanup_schedule
+from app.workers.tasks.retention_cleanup_settings import (
+    resolve_cleanup_schedule,
+)
 
 logger = structlog.get_logger(__name__)
-
 
 async def run_retention_cleanup_async() -> dict[str, object]:
     settings = get_settings()

@@ -12,7 +12,7 @@ from app.economy.streak.service import StreakService
 from app.game.friend_challenges.constants import is_duel_playable_for_user, normalize_duel_status
 from app.game.sessions.types import AnswerSessionResult
 
-from .friend_challenges_records import _build_friend_challenge_snapshot
+from .friend_challenges_internal import _build_friend_challenge_snapshot
 from .sessions_submit_daily import build_daily_replay_state
 
 

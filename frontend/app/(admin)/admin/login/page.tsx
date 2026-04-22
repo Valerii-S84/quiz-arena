@@ -6,7 +6,6 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
-import { navigateTo } from "@/lib/browser-navigation";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -36,7 +35,7 @@ export default function AdminLoginPage() {
         setRequires2FA(true);
         return;
       }
-      navigateTo("/admin/dashboard");
+      window.location.href = "/admin/dashboard";
     } catch (error) {
       setErrorMessage("Не вдалося увійти. Перевір email/password.");
       setRequires2FA(false);
@@ -47,7 +46,7 @@ export default function AdminLoginPage() {
     setErrorMessage(null);
     try {
       await api.post("/admin/auth/2fa/verify", { code: totpCode });
-      navigateTo("/admin/dashboard");
+      window.location.href = "/admin/dashboard";
     } catch {
       setErrorMessage("Невірний 2FA код.");
     }

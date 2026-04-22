@@ -19,7 +19,7 @@ def test_offer_keyboard_contains_only_cta_buttons() -> None:
     assert "offer:dismiss:42" not in callbacks
 
 
-def test_offer_keyboard_skips_unknown_products_only() -> None:
+def test_offer_keyboard_skips_soft_disabled_products() -> None:
     selection = OfferSelection(
         impression_id=77,
         offer_code="OFFER_ENERGY_ZERO",
@@ -32,8 +32,4 @@ def test_offer_keyboard_skips_unknown_products_only() -> None:
 
     keyboard = build_offer_keyboard(selection)
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
-    assert callbacks == [
-        "buy:PREMIUM_SEASON:offer:77",
-        "buy:PREMIUM_YEAR:offer:77",
-        "buy:PREMIUM_MONTH:offer:77",
-    ]
+    assert callbacks == ["buy:PREMIUM_MONTH:offer:77"]

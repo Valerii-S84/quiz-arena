@@ -90,11 +90,8 @@
     if (value === "FRIEND_CHALLENGE_5") {
       return "Duell-Ticket";
     }
-    if (value === "PREMIUM_3_DAYS") {
-      return "Premium 3 Tage";
-    }
-    if (value === "PREMIUM_WEEK") {
-      return "PREMIUM_WEEK";
+    if (value === "PREMIUM_STARTER") {
+      return "Premium Start";
     }
     if (value === "PREMIUM_MONTH") {
       return "Premium Monat";

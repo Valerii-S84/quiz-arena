@@ -20,9 +20,7 @@ def build_series_reply_markup(*, challenge_id: str):
     return build_friend_challenge_next_keyboard(challenge_id=challenge_id)
 
 
-async def handle_series_flow_error(
-    *, callback: CallbackQuery, message: Any, exc: Exception
-) -> None:
+async def handle_series_flow_error(*, callback: CallbackQuery, message: Any, exc: Exception) -> None:
     if isinstance(exc, (FriendChallengePaymentRequiredError, FriendChallengeLimitExceededError)):
         await message.answer(
             TEXTS_DE["msg.friend.challenge.limit.reached"],

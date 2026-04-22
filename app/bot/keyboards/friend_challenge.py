@@ -1,25 +1,16 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.bot.keyboards.friend_challenge_share import (
-    build_friend_challenge_result_share_keyboard,
-    build_friend_challenge_share_confirmed_keyboard,
-    build_friend_challenge_share_keyboard,
-    build_friend_challenge_share_url,
-)
+from app.bot.keyboards import friend_challenge_share
 from app.core.config import get_settings
 
-__all__ = [
-    "build_friend_challenge_result_share_keyboard",
-    "build_friend_challenge_share_confirmed_keyboard",
-    "build_friend_challenge_share_keyboard",
-    "build_friend_challenge_share_url",
-]
-
-
-def _single_button_keyboard(*, text: str, callback_data: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text=text, callback_data=callback_data)]]
-    )
+build_friend_challenge_share_url = friend_challenge_share.build_friend_challenge_share_url
+build_friend_challenge_share_keyboard = friend_challenge_share.build_friend_challenge_share_keyboard
+build_friend_challenge_share_confirmed_keyboard = (
+    friend_challenge_share.build_friend_challenge_share_confirmed_keyboard
+)
+build_friend_challenge_result_share_keyboard = (
+    friend_challenge_share.build_friend_challenge_result_share_keyboard
+)
 
 
 def build_friend_challenge_create_keyboard() -> InlineKeyboardMarkup:
@@ -83,47 +74,25 @@ def build_friend_challenge_next_keyboard(*, challenge_id: str) -> InlineKeyboard
     )
 
 
-def build_friend_challenge_onboarding_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:
+def build_friend_challenge_start_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="▶️ Spielen",
+                    text="⚔️ Jetzt spielen",
                     callback_data=f"friend:next:{challenge_id}",
                 )
             ],
-            [
-                InlineKeyboardButton(
-                    text="ℹ️ Was ist Quiz Arena?",
-                    callback_data=f"friend:onboarding:info:{challenge_id}",
-                )
-            ],
         ]
-    )
-
-
-def build_friend_challenge_onboarding_info_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="↩️ Zurück",
-                    callback_data=f"friend:onboarding:show:{challenge_id}",
-                )
-            ],
-        ]
-    )
-
-
-def build_friend_challenge_start_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:
-    return _single_button_keyboard(
-        text="⚔️ Jetzt spielen",
-        callback_data=f"friend:next:{challenge_id}",
     )
 
 
 def build_friend_challenge_back_keyboard() -> InlineKeyboardMarkup:
-    return _single_button_keyboard(text="↩️ Zurück", callback_data="home:open")
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
+        ]
+    )
 
 
 def build_friend_challenge_finished_keyboard(
@@ -146,28 +115,10 @@ def build_friend_challenge_finished_keyboard(
             ]
         )
     rows.append(
-        [InlineKeyboardButton(text="🔥 Tägliche Challenge", callback_data="daily_challenge")]
-    )
-    rows.append(
         [InlineKeyboardButton(text="🔄 Revanche", callback_data=f"friend:rematch:{challenge_id}")]
-    )
-    rows.append(
-        [
-            InlineKeyboardButton(
-                text="ℹ️ Was ist Quiz Arena?",
-                callback_data=f"friend:finished:info:{challenge_id}",
-            )
-        ]
     )
     rows.append([InlineKeyboardButton(text="🏠 Menü", callback_data="home:open")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
-def build_friend_challenge_finished_info_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:
-    return _single_button_keyboard(
-        text="↩️ Zurück",
-        callback_data=f"friend:finished:show:{challenge_id}",
-    )
 
 
 def build_friend_challenge_limit_keyboard() -> InlineKeyboardMarkup:
@@ -178,7 +129,7 @@ def build_friend_challenge_limit_keyboard() -> InlineKeyboardMarkup:
                     text="🎟 1 DUELL  |  5⭐", callback_data="buy:FRIEND_CHALLENGE_5"
                 )
             ],
-            [InlineKeyboardButton(text="💎 PREMIUM_WEEK", callback_data="buy:PREMIUM_WEEK")],
+            [InlineKeyboardButton(text="💎 PREMIUM STARTER", callback_data="buy:PREMIUM_STARTER")],
             [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
         ]
     )

@@ -24,7 +24,7 @@ from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="referral")
 
-REWARD_CHOICE_RE = re.compile(r"^referral:reward:(PREMIUM_WEEK|PREMIUM_STARTER)$")
+REWARD_CHOICE_RE = re.compile(r"^referral:reward:(PREMIUM_STARTER)$")
 SHARE_RE = re.compile(r"^referral:(share|prompt:share)$")
 
 

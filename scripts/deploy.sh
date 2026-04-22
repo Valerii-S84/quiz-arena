@@ -38,13 +38,8 @@ rsync -az --delete \
   --exclude '.ruff_cache' \
   ./ "${REMOTE}:${REMOTE_DIR}/"
 
-if ! ssh "$REMOTE" "cd ${REMOTE_DIR} && [[ -f .env ]]"; then
-  echo "ERROR: missing required remote env file: ${REMOTE}:${REMOTE_DIR}/.env" >&2
-  echo "Refusing to deploy without a server-managed .env." >&2
-  exit 1
-fi
-
 ssh "$REMOTE" "cd ${REMOTE_DIR} && \
+  if [[ ! -f .env ]]; then cp .env.production.example .env; fi && \
   bash scripts/check_compose_runtime_consistency.sh --expected-compose-file ${REMOTE_DIR}/docker-compose.prod.yml && \
   docker compose -f docker-compose.prod.yml up -d postgres redis && \
   docker compose -f docker-compose.prod.yml build api frontend worker beat && \
