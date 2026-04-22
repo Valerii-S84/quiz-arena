@@ -8,10 +8,10 @@ from app.db.models.entitlements import Entitlement
 from app.db.models.ledger_entries import LedgerEntry
 from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.ledger_repo import LedgerRepo
-from app.economy.referrals.constants import REWARD_CODE_PREMIUM_STARTER
+from app.economy.referrals.constants import REWARD_CODE_PREMIUM_WEEK
 
 
-async def _grant_premium_starter_reward(
+async def _grant_premium_week_reward(
     session: AsyncSession,
     *,
     user_id: int,
@@ -35,13 +35,13 @@ async def _grant_premium_starter_reward(
             entitlement=Entitlement(
                 user_id=user_id,
                 entitlement_type="PREMIUM",
-                scope="PREMIUM_STARTER",
+                scope="PREMIUM_WEEK",
                 status="ACTIVE",
                 starts_at=now_utc,
                 ends_at=now_utc + timedelta(days=7),
                 source_purchase_id=None,
                 idempotency_key=f"referral:reward:premium:{referral_id}",
-                metadata_={"reward_code": REWARD_CODE_PREMIUM_STARTER},
+                metadata_={"reward_code": REWARD_CODE_PREMIUM_WEEK},
                 created_at=now_utc,
                 updated_at=now_utc,
             ),
@@ -59,7 +59,7 @@ async def _grant_premium_starter_reward(
             balance_after=None,
             source="REFERRAL",
             idempotency_key=f"referral:reward:premium_ledger:{referral_id}",
-            metadata_={"reward_code": REWARD_CODE_PREMIUM_STARTER},
+            metadata_={"reward_code": REWARD_CODE_PREMIUM_WEEK},
             created_at=now_utc,
         ),
     )
@@ -73,9 +73,9 @@ async def _grant_reward(
     reward_code: str,
     now_utc: datetime,
 ) -> None:
-    if reward_code != REWARD_CODE_PREMIUM_STARTER:
+    if reward_code != REWARD_CODE_PREMIUM_WEEK:
         raise ValueError(f"unsupported reward code: {reward_code}")
-    await _grant_premium_starter_reward(
+    await _grant_premium_week_reward(
         session,
         user_id=user_id,
         referral_id=referral_id,

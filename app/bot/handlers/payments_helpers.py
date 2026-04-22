@@ -52,6 +52,7 @@ def success_text_key(product_code: str) -> str:
         "FRIEND_CHALLENGE_5": "msg.purchase.success.friend_challenge_ticket",
         "STREAK_SAVER_20": "msg.purchase.success.streaksaver",
         "PREMIUM_STARTER": "msg.purchase.success.premium",
+        "PREMIUM_WEEK": "msg.purchase.success.premium",
         "PREMIUM_MONTH": "msg.purchase.success.premium",
         "PREMIUM_SEASON": "msg.purchase.success.premium",
         "PREMIUM_YEAR": "msg.purchase.success.premium",

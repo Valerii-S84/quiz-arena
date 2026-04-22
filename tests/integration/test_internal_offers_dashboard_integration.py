@@ -76,7 +76,7 @@ async def _seed_offer_dashboard_dataset(now_utc: datetime) -> None:
     purchase_2 = _purchase(
         purchase_id="p2",
         user_id=user_3,
-        product_code="PREMIUM_STARTER",
+        product_code="PREMIUM_WEEK",
         created_at=now_utc - timedelta(hours=1),
     )
 

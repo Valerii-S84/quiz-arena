@@ -9,7 +9,7 @@ from app.economy.promo.runtime import (
     resolve_discount_type,
     resolve_discount_value,
 )
-from app.economy.purchases.catalog import ProductSpec
+from app.economy.purchases.catalog import ProductSpec, canonical_product_code
 
 from .constants import PREMIUM_PLAN_RANKS
 
@@ -19,7 +19,7 @@ def _build_invoice_payload() -> str:
 
 
 def _premium_plan_rank(plan_code: str | None) -> int:
-    return PREMIUM_PLAN_RANKS.get(plan_code or "", 0)
+    return PREMIUM_PLAN_RANKS.get(canonical_product_code(plan_code or ""), 0)
 
 
 def _calculate_discount_amount(

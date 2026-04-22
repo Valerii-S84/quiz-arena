@@ -88,6 +88,76 @@ async def test_apply_successful_payment_rejects_invalid_purchase_status(
 
 
 @pytest.mark.asyncio
+async def test_apply_successful_payment_credits_legacy_premium_starter_as_premium_week(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now_utc = datetime.now(UTC)
+    purchase = _purchase(status="INVOICE_SENT", stars_amount=29)
+    purchase.product_code = "PREMIUM_STARTER"
+    events: list[str] = []
+    credit_calls: list[dict[str, object]] = []
+
+    async def _fake_get_by_invoice_payload_for_update(_session, _invoice_payload):
+        return purchase
+
+    async def _fake_emit_purchase_event(
+        _session,
+        *,
+        event_type: str,
+        purchase,
+        happened_at: datetime,
+        extra_payload: dict[str, object],
+    ) -> None:
+        del purchase, happened_at, extra_payload
+        events.append(event_type)
+
+    async def _fake_credit_purchase_assets(
+        _session, *, user_id: int, purchase, product: ProductSpec, now_utc: datetime
+    ) -> None:
+        credit_calls.append(
+            {
+                "user_id": user_id,
+                "purchase_id": purchase.id,
+                "product_code": product.product_code,
+                "now_utc": now_utc,
+            }
+        )
+        purchase.status = "CREDITED"
+
+    monkeypatch.setattr(
+        purchase_credit.PurchasesRepo,
+        "get_by_invoice_payload_for_update",
+        _fake_get_by_invoice_payload_for_update,
+    )
+    monkeypatch.setattr(purchase_credit, "_emit_purchase_event", _fake_emit_purchase_event)
+    monkeypatch.setattr(purchase_credit, "credit_purchase_assets", _fake_credit_purchase_assets)
+
+    result = await purchase_credit.apply_successful_payment(
+        _Session(),
+        user_id=7,
+        invoice_payload="inv-starter",
+        telegram_payment_charge_id="charge-1",
+        raw_successful_payment={"invoice_payload": "inv-starter"},
+        now_utc=now_utc,
+    )
+
+    assert purchase.paid_at == now_utc
+    assert events == ["purchase_paid_uncredited"]
+    assert credit_calls == [
+        {
+            "user_id": 7,
+            "purchase_id": purchase.id,
+            "product_code": "PREMIUM_WEEK",
+            "now_utc": now_utc,
+        }
+    ]
+    assert result.purchase_id == purchase.id
+    assert result.product_code == "PREMIUM_WEEK"
+    assert result.status == "CREDITED"
+    assert result.idempotent_replay is False
+
+
+@pytest.mark.asyncio
 async def test_apply_zero_cost_purchase_replays_already_credited_purchase(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
