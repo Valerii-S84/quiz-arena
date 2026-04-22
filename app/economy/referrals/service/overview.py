@@ -32,7 +32,6 @@ def _build_overview_from_referrals(
     referrals: list[Referral],
     now_utc: datetime,
     rewarded_this_month: int,
-    rewards_unlocked: bool = True,
 ) -> ReferralOverview:
     anchors = _build_reward_anchors(referrals)
     qualified_total = sum(
@@ -59,8 +58,6 @@ def _build_overview_from_referrals(
             available_at_utc = anchor.qualified_at + REWARD_DELAY
             if next_reward_at_utc is None or available_at_utc < next_reward_at_utc:
                 next_reward_at_utc = available_at_utc
-            continue
-        if not rewards_unlocked:
             continue
         if monthly_slots_used >= REFERRAL_REWARDS_PER_MONTH_CAP:
             deferred_rewards += 1
