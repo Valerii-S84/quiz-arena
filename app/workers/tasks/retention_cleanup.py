@@ -7,10 +7,14 @@ import structlog
 from app.core.config import get_settings
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
-from app.workers.tasks.retention_cleanup_reporting import build_cleanup_result, log_cleanup_result
-from app.workers.tasks.retention_cleanup_runtime import build_cleanup_config, run_cleanup_tables
+from app.workers.tasks.retention_cleanup_runtime import (
+    build_cleanup_config,
+    build_cleanup_result,
+    build_cleanup_table_specs,
+    log_cleanup_result,
+    run_cleanup_tables,
+)
 from app.workers.tasks.retention_cleanup_settings import resolve_cleanup_schedule
-from app.workers.tasks.retention_cleanup_tables import build_cleanup_table_specs
 
 logger = structlog.get_logger(__name__)
 

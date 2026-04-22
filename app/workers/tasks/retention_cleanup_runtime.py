@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from datetime import datetime
 from random import randint
 from time import perf_counter
 
@@ -16,7 +17,7 @@ from .retention_cleanup_settings import (
     clamp_runtime_seconds,
     resolve_sleep_range_ms,
 )
-from .retention_cleanup_tables import CleanupTableSpec
+from .retention_cleanup_tables import CleanupTableSpec, build_cleanup_table_specs
 
 logger = structlog.get_logger(__name__)
 
@@ -156,11 +157,43 @@ async def run_cleanup_tables(
     return table_results, total_rows_deleted, total_errors
 
 
+def build_cleanup_result(
+    *,
+    now_utc: datetime,
+    config: CleanupConfig,
+    table_results: list[dict[str, object]],
+    total_rows_deleted: int,
+    total_errors: int,
+) -> dict[str, object]:
+    return {
+        "generated_at": now_utc.isoformat(),
+        "batch_size": config.batch_size,
+        "max_batches_per_table": config.max_batches_per_table,
+        "max_runtime_seconds": config.max_runtime_seconds,
+        "batch_sleep_min_ms": config.sleep_range_ms[0],
+        "batch_sleep_max_ms": config.sleep_range_ms[1],
+        "tables": table_results,
+        "rows_deleted_total": total_rows_deleted,
+        "error_count": total_errors,
+    }
+
+
+def log_cleanup_result(result: dict[str, object]) -> None:
+    error_count = result.get("error_count", 0)
+    if isinstance(error_count, int) and error_count > 0:
+        logger.warning("retention_cleanup_finished_with_errors", **result)
+        return
+    logger.info("retention_cleanup_finished", **result)
+
+
 __all__ = [
     "CleanupConfig",
     "CleanupTableSpec",
     "build_cleanup_config",
+    "build_cleanup_result",
+    "build_cleanup_table_specs",
     "cleanup_table_batched",
+    "log_cleanup_result",
     "run_cleanup_table",
     "run_cleanup_tables",
 ]
