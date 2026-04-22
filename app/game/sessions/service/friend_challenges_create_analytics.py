@@ -7,10 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.friend_challenges import FriendChallenge
 
-from .friend_challenges_create_rematch_analytics import (
+from .friend_challenges_analytics import (
     emit_rematch_duel_created_events as emit_rematch_duel_created_events_impl,
 )
-from .friend_challenges_create_standard_analytics import (
+from .friend_challenges_analytics import (
     emit_standard_duel_created_events as emit_standard_duel_created_events_impl,
 )
 
