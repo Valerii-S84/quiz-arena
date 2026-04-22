@@ -21,7 +21,7 @@ async def test_post_game_referral_prompt_is_reserved_once() -> None:
     user = await _create_user("referral-prompt-once")
     await _seed_attempts(
         user_id=user.id,
-        attempts_per_day=3,
+        attempts_per_day=1,
         day_offsets=(1,),
         now_utc=now_utc,
     )
@@ -52,7 +52,7 @@ async def test_post_game_referral_prompt_is_blocked_when_referrals_started() -> 
     referred = await _create_user("referral-prompt-blocked-referred")
     await _seed_attempts(
         user_id=referrer.id,
-        attempts_per_day=3,
+        attempts_per_day=1,
         day_offsets=(1,),
         now_utc=now_utc,
     )

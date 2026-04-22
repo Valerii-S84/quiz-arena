@@ -16,8 +16,10 @@ class _Session(AsyncSessionStub):
 
 
 @pytest.mark.asyncio
-async def test_reserve_post_game_prompt_marks_user_on_third_completed_session(
+@pytest.mark.parametrize("completed_sessions", [1, 2])
+async def test_reserve_post_game_prompt_marks_user_on_early_completed_sessions(
     monkeypatch: pytest.MonkeyPatch,
+    completed_sessions: int,
 ) -> None:
     user = SimpleNamespace(referral_prompt_shown_at=None)
     now_utc = datetime.now(UTC)
@@ -28,7 +30,7 @@ async def test_reserve_post_game_prompt_marks_user_on_third_completed_session(
 
     async def _fake_count_completed_for_user(_session, *, user_id: int):
         assert user_id == 17
-        return 3
+        return completed_sessions
 
     async def _fake_count_for_referrer(_session, *, referrer_user_id: int):
         assert referrer_user_id == 17
@@ -59,7 +61,7 @@ async def test_reserve_post_game_prompt_marks_user_on_third_completed_session(
 
 
 @pytest.mark.asyncio
-async def test_reserve_post_game_prompt_skips_second_completed_session(
+async def test_reserve_post_game_prompt_skips_third_completed_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def _fake_get_by_id_for_update(_session, user_id: int):
@@ -68,7 +70,7 @@ async def test_reserve_post_game_prompt_skips_second_completed_session(
 
     async def _fake_count_completed_for_user(_session, *, user_id: int):
         assert user_id == 17
-        return 2
+        return 3
 
     async def _fake_count_for_referrer(*_args, **_kwargs):
         raise AssertionError("referrals must not be checked before the session threshold")
