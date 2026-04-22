@@ -102,20 +102,27 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env \
 docker compose -f docker-compose.prod.yml ps
 bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/quiz-arena/docker-compose.prod.yml
 ```
-2. Health endpoint:
+2. Public health endpoint:
 ```bash
-curl -sS https://deutchquizarena.de/api/health
+curl -sS https://deutchquizarena.de/health
 ```
-Очікування: `status=ok`, `database=ok`, `redis=ok`, `celery=ok`.
+Очікування: `status=ok`.
 
-3. Celery стан:
+3. Internal readiness endpoint:
+```bash
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env \
+  exec -T api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=2).read().decode())"
+```
+Очікування: `status=ready`, `database=ok`, `redis=ok`.
+
+4. Celery стан:
 ```bash
 docker compose -f docker-compose.prod.yml exec -T worker celery -A app.workers.celery_app inspect active
 docker compose -f docker-compose.prod.yml exec -T worker celery -A app.workers.celery_app inspect reserved
 ```
 Очікування: без "залиплих" задач.
 
-4. Redis черги:
+5. Redis черги:
 ```bash
 docker compose -f docker-compose.prod.yml exec -T redis redis-cli LLEN q_normal
 docker compose -f docker-compose.prod.yml exec -T redis redis-cli LLEN q_critical

@@ -74,13 +74,16 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d 
 cd /opt/quiz-arena
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env ps
 bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/quiz-arena/docker-compose.prod.yml
-curl -sS https://deutchquizarena.de/api/health
+curl -sS https://deutchquizarena.de/health
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env \
+  exec -T api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=2).read().decode())"
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env run --rm api python -m scripts.post_deploy_gate
 ```
 
 Expected:
 - all services `Up`,
-- health: `status=ok`, `database=ok`, `redis=ok`, `celery=ok`,
+- public health: `status=ok`,
+- internal readiness: `status=ready`, `database=ok`, `redis=ok`,
 - post-deploy gate: `all checks passed`.
 
 ## 5) Webhook setup
@@ -139,7 +142,9 @@ After rollback:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env ps
-curl -sS https://deutchquizarena.de/api/health
+curl -sS https://deutchquizarena.de/health
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env \
+  exec -T api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=2).read().decode())"
 ```
 
 ## 8) Operational references
