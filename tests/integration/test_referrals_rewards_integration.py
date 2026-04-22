@@ -112,6 +112,8 @@ async def test_reward_distribution_without_reward_code_keeps_reward_for_choice()
             Referral.status == "REWARDED",
         )
         assert int(await session.scalar(rewarded_stmt) or 0) == 0
+
+
 @pytest.mark.asyncio
 async def test_reward_distribution_candidate_query_orders_by_oldest_qualified_at() -> None:
     now_utc = datetime(2026, 2, 26, 12, 0, tzinfo=UTC)
