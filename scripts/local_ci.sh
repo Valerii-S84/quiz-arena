@@ -23,7 +23,21 @@ if [[ ! -f "$PYTHON_BIN" ]]; then
 fi
 
 export APP_ENV=${APP_ENV:-test}
-eval "$("$PYTHON_BIN" -m app.core.test_env)"
+export LOG_LEVEL=${LOG_LEVEL:-INFO}
+export TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-ci-test-token}
+export TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET:-ci-test-secret}
+export ADMIN_PASSWORD_PLAIN=${ADMIN_PASSWORD_PLAIN:-ci-test-admin-password}
+export ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET:-ci-test-admin-jwt-secret}
+export ADMIN_REFRESH_SECRET=${ADMIN_REFRESH_SECRET:-ci-test-admin-refresh-secret}
+export INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-ci-internal-token}
+export PROMO_SECRET_PEPPER=${PROMO_SECRET_PEPPER:-ci-test-promo-pepper}
+export PROMO_ENCRYPTION_KEY=${PROMO_ENCRYPTION_KEY:-MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY}
+export TEST_DATABASE_URL=${TEST_DATABASE_URL:-postgresql+asyncpg://quiz:quiz@127.0.0.1:5432/quiz_arena_test}
+export DATABASE_URL=${DATABASE_URL:-$TEST_DATABASE_URL}
+export REDIS_URL=${REDIS_URL:-redis://127.0.0.1:6379/0}
+export CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://127.0.0.1:6379/1}
+export CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://127.0.0.1:6379/2}
+export TMPDIR=${TMPDIR:-/tmp}
 
 run_step() {
   local title=$1

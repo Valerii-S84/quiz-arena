@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import importlib
+import os
 import sys
+import tempfile
 
-from app.core.test_env import apply_test_env_defaults
+TEST_DATABASE_URL = "postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test"
+TEST_REDIS_URL = "redis://localhost:6379/15"
+TEST_PROMO_ENCRYPTION_KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY"
 
 _BOOTSTRAPPED = False
 
@@ -13,7 +17,18 @@ def bootstrap_pytest_env() -> None:
     if _BOOTSTRAPPED:
         return
 
-    apply_test_env_defaults(force_database_url_to_test=True)
+    os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+    os.environ.setdefault("TMPDIR", tempfile.gettempdir())
+    os.environ.setdefault("REDIS_URL", TEST_REDIS_URL)
+    os.environ.setdefault("CELERY_BROKER_URL", TEST_REDIS_URL)
+    os.environ.setdefault("CELERY_RESULT_BACKEND", TEST_REDIS_URL)
+    os.environ.setdefault("APP_ENV", "test")
+    os.environ.setdefault("ADMIN_PASSWORD_PLAIN", "ci-test-admin-password")
+    os.environ.setdefault("ADMIN_JWT_SECRET", "ci-test-admin-jwt-secret")
+    os.environ.setdefault("ADMIN_REFRESH_SECRET", "ci-test-admin-refresh-secret")
+    os.environ.setdefault("INTERNAL_API_TOKEN", "ci-test-internal-token")
+    os.environ.setdefault("PROMO_SECRET_PEPPER", "ci-test-promo-pepper")
+    os.environ.setdefault("PROMO_ENCRYPTION_KEY", TEST_PROMO_ENCRYPTION_KEY)
 
     if "app.core.config" in sys.modules:
         config_module = sys.modules["app.core.config"]
