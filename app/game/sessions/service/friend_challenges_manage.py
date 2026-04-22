@@ -7,10 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.game.sessions.types import FriendChallengeSnapshot
 
-from .friend_challenges_manage_cancel import (
+from .friend_challenges_manage_runtime import (
     cancel_friend_challenge_by_creator as manage_cancel_friend_challenge_by_creator,
 )
-from .friend_challenges_manage_repost import (
+from .friend_challenges_manage_runtime import (
     repost_friend_challenge_as_open as manage_repost_friend_challenge_as_open,
 )
 
