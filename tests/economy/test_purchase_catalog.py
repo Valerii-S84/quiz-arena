@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from app.economy.purchases.catalog import PRODUCTS, get_product, is_product_available_for_sale
+from app.economy.purchases.catalog import (
+    LEGACY_PRODUCT_CODE_PREMIUM_STARTER,
+    PRODUCTS,
+    canonical_product_code,
+    get_product,
+    is_product_available_for_sale,
+)
 
 
 def test_purchase_catalog_contains_core_micro_products() -> None:
@@ -23,6 +29,15 @@ def test_purchase_catalog_contains_core_premium_products() -> None:
 
 def test_get_product_returns_none_for_unknown_code() -> None:
     assert get_product("UNKNOWN") is None
+
+
+def test_legacy_premium_starter_alias_resolves_to_premium_week() -> None:
+    product = get_product(LEGACY_PRODUCT_CODE_PREMIUM_STARTER)
+
+    assert product is not None
+    assert product.product_code == "PREMIUM_WEEK"
+    assert canonical_product_code(LEGACY_PRODUCT_CODE_PREMIUM_STARTER) == "PREMIUM_WEEK"
+    assert is_product_available_for_sale(LEGACY_PRODUCT_CODE_PREMIUM_STARTER) is False
 
 
 def test_all_catalog_products_are_available_for_sale() -> None:

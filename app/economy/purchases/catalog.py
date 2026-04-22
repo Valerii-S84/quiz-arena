@@ -16,6 +16,12 @@ class ProductSpec:
     friend_challenge_tickets: int = 0
 
 
+LEGACY_PRODUCT_CODE_PREMIUM_STARTER = "PREMIUM_STARTER"
+PRODUCT_CODE_ALIASES: dict[str, str] = {
+    LEGACY_PRODUCT_CODE_PREMIUM_STARTER: "PREMIUM_WEEK",
+}
+
+
 PRODUCTS: dict[str, ProductSpec] = {
     "ENERGY_10": ProductSpec(
         product_code="ENERGY_10",
@@ -93,9 +99,19 @@ PRODUCTS: dict[str, ProductSpec] = {
 SOFT_DISABLED_PRODUCT_CODES: frozenset[str] = frozenset({"PREMIUM_3_DAYS"})
 
 
+def canonical_product_code(product_code: str) -> str:
+    normalized_product_code = product_code.strip().upper()
+    return PRODUCT_CODE_ALIASES.get(normalized_product_code, normalized_product_code)
+
+
 def get_product(product_code: str) -> ProductSpec | None:
-    return PRODUCTS.get(product_code)
+    return PRODUCTS.get(canonical_product_code(product_code))
 
 
 def is_product_available_for_sale(product_code: str) -> bool:
-    return product_code in PRODUCTS and product_code not in SOFT_DISABLED_PRODUCT_CODES
+    canonical_code = canonical_product_code(product_code)
+    return (
+        product_code == canonical_code
+        and canonical_code in PRODUCTS
+        and canonical_code not in SOFT_DISABLED_PRODUCT_CODES
+    )

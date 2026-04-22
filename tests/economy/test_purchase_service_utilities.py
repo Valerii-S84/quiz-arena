@@ -86,4 +86,5 @@ def test_is_promo_scope_applicable_honors_any_and_type_scopes() -> None:
 def test_premium_plan_rank_returns_zero_for_unknown_or_empty_plan() -> None:
     assert _premium_plan_rank(None) == 0
     assert _premium_plan_rank("UNKNOWN") == 0
+    assert _premium_plan_rank("PREMIUM_STARTER") == _premium_plan_rank("PREMIUM_WEEK")
     assert _premium_plan_rank("PREMIUM_YEAR") > _premium_plan_rank("PREMIUM_MONTH")

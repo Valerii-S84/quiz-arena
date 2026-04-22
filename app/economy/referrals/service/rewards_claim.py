@@ -9,9 +9,9 @@ from app.db.repo.referrals_repo import ReferralsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.economy.referrals.constants import (
     REFERRAL_REWARDS_PER_MONTH_CAP,
-    canonical_reward_code,
     REWARD_CODE_PREMIUM_WEEK,
     REWARD_DELAY,
+    canonical_reward_code,
 )
 
 from .models import ReferralClaimResult

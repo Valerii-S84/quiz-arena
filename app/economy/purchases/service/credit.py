@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repo.purchases_repo import PurchasesRepo
-from app.economy.purchases.catalog import get_product
+from app.economy.purchases.catalog import canonical_product_code, get_product
 from app.economy.purchases.errors import (
     ProductNotFoundError,
     PurchaseNotFoundError,
@@ -34,7 +34,7 @@ async def apply_successful_payment(
     if purchase.status == "CREDITED":
         return PurchaseCreditResult(
             purchase_id=purchase.id,
-            product_code=purchase.product_code,
+            product_code=canonical_product_code(purchase.product_code),
             status=purchase.status,
             idempotent_replay=True,
         )
@@ -76,7 +76,7 @@ async def apply_successful_payment(
 
     return PurchaseCreditResult(
         purchase_id=purchase.id,
-        product_code=purchase.product_code,
+        product_code=product.product_code,
         status=purchase.status,
         idempotent_replay=False,
     )
@@ -95,7 +95,7 @@ async def apply_zero_cost_purchase(
     if purchase.status == "CREDITED":
         return PurchaseCreditResult(
             purchase_id=purchase.id,
-            product_code=purchase.product_code,
+            product_code=canonical_product_code(purchase.product_code),
             status=purchase.status,
             idempotent_replay=True,
         )
@@ -128,7 +128,7 @@ async def apply_zero_cost_purchase(
     )
     return PurchaseCreditResult(
         purchase_id=purchase.id,
-        product_code=purchase.product_code,
+        product_code=product.product_code,
         status=purchase.status,
         idempotent_replay=False,
     )
