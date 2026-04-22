@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.api.routes.admin.overview_activity_metrics import (
-    build_activity_day_hours_subquery,
     build_activity_days_subquery,
+    build_activity_hours_subquery,
 )
 from app.api.routes.admin.overview_metrics import STAR_TO_EUR_RATE
 from app.db.models.outbox_events import OutboxEvent
@@ -139,48 +139,24 @@ async def fetch_hourly_activity_series(
     *,
     from_utc: datetime,
     to_utc: datetime,
-) -> list[dict[str, float]]:
-    activity_day_hours = build_activity_day_hours_subquery(from_utc=from_utc, to_utc=to_utc)
-    per_day_hour_activity = (
-        select(
-            activity_day_hours.c.local_date_berlin.label("local_date_berlin"),
-            activity_day_hours.c.local_hour_berlin.label("local_hour_berlin"),
-            func.count(distinct(activity_day_hours.c.user_id)).label("active_users"),
-        )
-        .where(
-            activity_day_hours.c.local_date_berlin.is_not(None),
-            activity_day_hours.c.local_hour_berlin.is_not(None),
-        )
-        .group_by(
-            activity_day_hours.c.local_date_berlin,
-            activity_day_hours.c.local_hour_berlin,
-        )
-        .subquery()
-    )
-    window_days = max(
-        1, int((to_utc - from_utc).total_seconds() / timedelta(days=1).total_seconds())
-    )
-    hourly_totals = {
+) -> list[dict[str, int]]:
+    activity_hours = build_activity_hours_subquery(from_utc=from_utc, to_utc=to_utc)
+    active_by_hour = {
         int(hour): int(total)
         for hour, total in (
             await session.execute(
                 select(
-                    per_day_hour_activity.c.local_hour_berlin,
-                    func.coalesce(func.sum(per_day_hour_activity.c.active_users), 0),
+                    activity_hours.c.local_hour_berlin,
+                    func.count(distinct(activity_hours.c.user_id)),
                 )
-                .group_by(per_day_hour_activity.c.local_hour_berlin)
-                .order_by(per_day_hour_activity.c.local_hour_berlin)
+                .where(activity_hours.c.local_hour_berlin.is_not(None))
+                .group_by(activity_hours.c.local_hour_berlin)
+                .order_by(activity_hours.c.local_hour_berlin)
             )
         ).all()
         if hour is not None
     }
-    return [
-        {
-            "hour": hour,
-            "active_users": round(hourly_totals.get(hour, 0) / window_days, 2),
-        }
-        for hour in range(24)
-    ]
+    return [{"hour": hour, "active_users": active_by_hour.get(hour, 0)} for hour in range(24)]
 
 
 async def fetch_top_products(
