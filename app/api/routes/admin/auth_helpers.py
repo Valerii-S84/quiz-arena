@@ -1,13 +1,24 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+import hashlib
+import inspect
+from dataclasses import dataclass
 
+import structlog
 from fastapi import HTTPException, Request, Response
 
 from app.api.routes.admin.deps import ALLOWED_ADMIN_ROLES, normalize_admin_role
 from app.core.config import Settings
 from app.services.admin.auth import ADMIN_ACCESS_COOKIE
 from app.services.internal_auth import extract_client_ip
+
+logger = structlog.get_logger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class RateLimitBuckets:
+    keys: tuple[str, ...]
+    client_ip: str | None
 
 
 def configured_admin_role(settings: Settings) -> str:
@@ -17,30 +28,84 @@ def configured_admin_role(settings: Settings) -> str:
     return "admin"
 
 
-def rate_limit_bucket(*, request: Request, settings: Settings) -> str:
-    client_ip = extract_client_ip(
+def _rate_limit_client_ip(*, request: Request, settings: Settings) -> str | None:
+    return extract_client_ip(
         request,
         trusted_proxies=getattr(settings, "internal_api_trusted_proxies", ""),
     )
-    return client_ip or "unknown"
+
+
+def _hashed_rate_limit_email(email: str) -> str:
+    normalized = email.strip().lower()
+    if not normalized:
+        return "missing"
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def login_rate_limit_buckets(
+    *,
+    request: Request,
+    settings: Settings,
+    email: str,
+) -> RateLimitBuckets:
+    client_ip = _rate_limit_client_ip(request=request, settings=settings)
+    return RateLimitBuckets(
+        keys=(
+            f"admin_login:ip:{client_ip or 'unknown'}",
+            f"admin_login:email:{_hashed_rate_limit_email(email)}",
+        ),
+        client_ip=client_ip,
+    )
+
+
+def verify_2fa_rate_limit_buckets(
+    *,
+    request: Request,
+    settings: Settings,
+    email: str,
+) -> RateLimitBuckets:
+    client_ip = _rate_limit_client_ip(request=request, settings=settings)
+    return RateLimitBuckets(
+        keys=(
+            f"admin_2fa:ip:{client_ip or 'unknown'}",
+            f"admin_2fa:email:{_hashed_rate_limit_email(email)}",
+        ),
+        client_ip=client_ip,
+    )
 
 
 def login_rate_limit_window_seconds(settings: Settings) -> int:
     return settings.admin_login_rate_limit_window_minutes * 60
 
 
+async def _maybe_await(result):
+    if inspect.isawaitable(result):
+        return await result
+    return result
+
+
 async def ensure_not_rate_limited(
     *,
-    bucket: str,
+    buckets: RateLimitBuckets,
     settings: Settings,
-    is_rate_limited_fn: Callable[..., Awaitable[bool]],
+    is_rate_limited_fn,
+    action: str,
 ) -> None:
-    if await is_rate_limited_fn(
-        settings=settings,
-        bucket=bucket,
-        limit=settings.admin_login_rate_limit_attempts,
-        window_seconds=login_rate_limit_window_seconds(settings),
-    ):
+    is_limited = await _maybe_await(
+        is_rate_limited_fn(
+            settings=settings,
+            buckets=buckets.keys,
+            limit=settings.admin_login_rate_limit_attempts,
+            window_seconds=login_rate_limit_window_seconds(settings),
+        )
+    )
+    if is_limited:
+        logger.warning(
+            "admin_auth_rate_limited",
+            action=action,
+            reason="rate_limited",
+            client_ip=buckets.client_ip,
+        )
         raise HTTPException(status_code=429, detail={"code": "E_RATE_LIMITED"})
 
 
@@ -71,10 +136,12 @@ def set_partial_access_cookie(*, settings: Settings, response: Response, access_
 
 
 __all__ = [
+    "RateLimitBuckets",
     "configured_admin_role",
     "ensure_allowed_admin_session",
     "ensure_not_rate_limited",
     "login_rate_limit_window_seconds",
-    "rate_limit_bucket",
+    "login_rate_limit_buckets",
     "set_partial_access_cookie",
+    "verify_2fa_rate_limit_buckets",
 ]

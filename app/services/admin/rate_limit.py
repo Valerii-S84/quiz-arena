@@ -1,61 +1,102 @@
 from __future__ import annotations
 
-import hashlib
-import time
-from uuid import uuid4
+from collections.abc import Iterable
 
 from app.core.config import Settings
 
 from .auth_common import _auth_state_unavailable
-from .auth_state import require_redis_client
+from .auth_state import _require_redis_client
 
-_FAILED_ATTEMPTS_KEY_PREFIX = "qa_admin:failed_auth_attempts:"
-
-
-def _bucket_key(bucket: str) -> str:
-    bucket_hash = hashlib.sha256(bucket.encode("utf-8")).hexdigest()
-    return f"{_FAILED_ATTEMPTS_KEY_PREFIX}{bucket_hash}"
+_ADMIN_RATE_LIMIT_KEY_PREFIX = "qa_admin:rate_limit:"
 
 
-def _resolved_window_seconds(window_seconds: int) -> int:
-    return max(1, int(window_seconds))
+def _rate_limit_key(bucket: str) -> str:
+    return f"{_ADMIN_RATE_LIMIT_KEY_PREFIX}{bucket}"
+
+
+def _normalize_buckets(buckets: Iterable[str]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw_bucket in buckets:
+        bucket = raw_bucket.strip()
+        if not bucket or bucket in seen:
+            continue
+        seen.add(bucket)
+        normalized.append(bucket)
+    return tuple(normalized)
 
 
 async def is_rate_limited(
     *,
     settings: Settings,
-    bucket: str,
+    buckets: Iterable[str],
     limit: int,
     window_seconds: int,
 ) -> bool:
+    del window_seconds
+    resolved_buckets = _normalize_buckets(buckets)
+    if not resolved_buckets:
+        return False
+
+    client = await _require_redis_client(settings)
     resolved_limit = max(1, int(limit))
-    resolved_window = _resolved_window_seconds(window_seconds)
-    now = time.time()
-    client = await require_redis_client(settings)
     try:
-        await client.zremrangebyscore(_bucket_key(bucket), "-inf", f"({now - resolved_window}")
-        attempts = await client.zcard(_bucket_key(bucket))
-    except Exception as exc:
-        raise _auth_state_unavailable() from exc
-    return int(attempts or 0) >= resolved_limit
-
-
-async def record_failure(*, settings: Settings, bucket: str, window_seconds: int) -> None:
-    resolved_window = _resolved_window_seconds(window_seconds)
-    now = time.time()
-    key = _bucket_key(bucket)
-    client = await require_redis_client(settings)
-    try:
-        await client.zremrangebyscore(key, "-inf", f"({now - resolved_window}")
-        await client.zadd(key, {f"{now}:{uuid4().hex}": now})
-        await client.expire(key, resolved_window + 1)
+        counts = await client.mget([_rate_limit_key(bucket) for bucket in resolved_buckets])
     except Exception as exc:
         raise _auth_state_unavailable() from exc
 
+    for raw_count in counts:
+        if raw_count is None:
+            continue
+        try:
+            if int(raw_count) >= resolved_limit:
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
 
-async def clear_failures(*, settings: Settings, bucket: str) -> None:
-    client = await require_redis_client(settings)
+
+async def record_failure(
+    *,
+    settings: Settings,
+    buckets: Iterable[str],
+    window_seconds: int,
+) -> None:
+    resolved_buckets = _normalize_buckets(buckets)
+    if not resolved_buckets:
+        return
+
+    client = await _require_redis_client(settings)
+    ttl_seconds = max(1, int(window_seconds))
     try:
-        await client.delete(_bucket_key(bucket))
+        pipeline = client.pipeline()
+        for bucket in resolved_buckets:
+            pipeline.incr(_rate_limit_key(bucket))
+        counts = await pipeline.execute()
+
+        expiry_pipeline = client.pipeline()
+        has_new_keys = False
+        for bucket, raw_count in zip(resolved_buckets, counts, strict=False):
+            try:
+                count = int(raw_count)
+            except (TypeError, ValueError):
+                continue
+            if count == 1:
+                expiry_pipeline.expire(_rate_limit_key(bucket), ttl_seconds)
+                has_new_keys = True
+        if has_new_keys:
+            await expiry_pipeline.execute()
+    except Exception as exc:
+        raise _auth_state_unavailable() from exc
+
+
+async def clear_failures(*, settings: Settings, buckets: Iterable[str]) -> None:
+    resolved_buckets = _normalize_buckets(buckets)
+    if not resolved_buckets:
+        return
+
+    client = await _require_redis_client(settings)
+    try:
+        await client.delete(*[_rate_limit_key(bucket) for bucket in resolved_buckets])
     except Exception as exc:
         raise _auth_state_unavailable() from exc
