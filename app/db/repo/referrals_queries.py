@@ -7,7 +7,6 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.purchases import Purchase
 from app.db.models.referrals import Referral
 
 
@@ -68,22 +67,12 @@ async def list_referrer_ids_with_reward_candidates(
     qualified_before_utc: datetime,
     limit: int = 200,
 ) -> list[int]:
-    paid_purchase_history_exists = (
-        select(Purchase.id)
-        .where(
-            Purchase.user_id == Referral.referrer_user_id,
-            Purchase.paid_at.is_not(None),
-            Purchase.stars_amount > 0,
-        )
-        .exists()
-    )
     stmt = (
         select(Referral.referrer_user_id)
         .where(
             Referral.status.in_(("QUALIFIED", "DEFERRED_LIMIT")),
             Referral.qualified_at.is_not(None),
             Referral.qualified_at <= qualified_before_utc,
-            paid_purchase_history_exists,
         )
         .group_by(Referral.referrer_user_id)
         .order_by(func.min(Referral.qualified_at).asc(), Referral.referrer_user_id.asc())

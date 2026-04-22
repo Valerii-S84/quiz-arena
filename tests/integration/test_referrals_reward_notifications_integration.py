@@ -9,12 +9,7 @@ from app.db.models.referrals import Referral
 from app.db.session import SessionLocal
 from app.workers.tasks import referrals as referrals_task
 from app.workers.tasks import referrals_notifications
-from tests.integration.referrals_fixtures import (
-    UTC,
-    _create_paid_purchase,
-    _create_referral_row,
-    _create_user,
-)
+from tests.integration.referrals_fixtures import UTC, _create_referral_row, _create_user
 
 
 class _FrozenDateTime(datetime):
@@ -47,7 +42,6 @@ class _DummyBot:
 async def test_referral_reward_notification_sent_once(monkeypatch) -> None:
     now_utc = datetime(2026, 2, 26, 12, 0, tzinfo=UTC)
     referrer = await _create_user("referrer-reward-notified-once")
-    await _create_paid_purchase(user_id=referrer.id, now_utc=now_utc)
     referred_users = [await _create_user(f"referred-reward-notified-{idx}") for idx in range(3)]
 
     for referred in referred_users:
