@@ -18,30 +18,17 @@ def _pair_key(*, user_a: int, user_b: int) -> frozenset[int]:
     return frozenset((user_a, user_b))
 
 
-def _candidate_ids(
+def _build_pairs_backtracking(
     *,
-    tail: tuple[int, ...],
-    user_a: int,
-    previous_pairs: frozenset[frozenset[int]],
-    allow_rematch: bool,
-) -> tuple[int, ...]:
-    return tuple(
-        candidate_id
-        for candidate_id in tail
-        if allow_rematch or _pair_key(user_a=user_a, user_b=candidate_id) not in previous_pairs
-    )
-
-
-def _resolve_pairs(
-    *,
-    user_ids: tuple[int, ...],
+    participants: list[SwissParticipant],
     previous_pairs: set[frozenset[int]],
-) -> tuple[tuple[int, int], ...] | None:
-    previous_pairs_key = frozenset(previous_pairs)
+) -> list[SwissPair]:
+    user_ids = tuple(participant.user_id for participant in participants)
 
     @lru_cache(maxsize=None)
-    def _search_pairs(
+    def _search(
         remaining_ids: tuple[int, ...],
+        *,
         allow_rematch: bool,
     ) -> tuple[tuple[int, int], ...] | None:
         if not remaining_ids:
@@ -49,22 +36,29 @@ def _resolve_pairs(
 
         user_a = remaining_ids[0]
         tail = remaining_ids[1:]
-        for candidate_id in _candidate_ids(
-            tail=tail,
-            user_a=user_a,
-            previous_pairs=previous_pairs_key,
-            allow_rematch=allow_rematch,
-        ):
+        candidate_ids = [
+            candidate_id
+            for candidate_id in tail
+            if allow_rematch or _pair_key(user_a=user_a, user_b=candidate_id) not in previous_pairs
+        ]
+        if not candidate_ids:
+            return None
+
+        for candidate_id in candidate_ids:
             next_remaining = tuple(user_id for user_id in tail if user_id != candidate_id)
-            nested_pairs = _search_pairs(next_remaining, allow_rematch)
-            if nested_pairs is not None:
-                return ((user_a, candidate_id),) + nested_pairs
+            nested = _search(next_remaining, allow_rematch=allow_rematch)
+            if nested is None:
+                continue
+            return ((user_a, candidate_id),) + nested
         return None
 
-    pairs = _search_pairs(user_ids, False)
-    if pairs is not None:
-        return pairs
-    return _search_pairs(user_ids, True)
+    pairs = _search(user_ids, allow_rematch=False)
+    if pairs is None:
+        pairs = _search(user_ids, allow_rematch=True)
+    if pairs is None:
+        return []
+
+    return [SwissPair(user_a=user_a, user_b=user_b) for user_a, user_b in pairs]
 
 
 def _pick_bye_participant(
@@ -95,25 +89,30 @@ def build_swiss_pairs(
 ) -> list[SwissPair]:
     ordered = sorted(participants, key=_participant_sort_key)
     remaining = list(ordered)
+    pairs: list[SwissPair] = []
+    resolved_bye_history = bye_history or set()
     bye_pair: SwissPair | None = None
 
     if len(remaining) % 2 == 1:
         bye_participant = _pick_bye_participant(
             participants=remaining,
-            bye_history=bye_history or set(),
+            bye_history=resolved_bye_history,
         )
-        remaining = [participant for participant in remaining if participant != bye_participant]
+        remaining = [
+            participant
+            for participant in remaining
+            if participant.user_id != bye_participant.user_id
+        ]
         bye_pair = SwissPair(user_a=bye_participant.user_id, user_b=None)
 
-    resolved_pairs = _resolve_pairs(
-        user_ids=tuple(participant.user_id for participant in remaining),
-        previous_pairs=previous_pairs,
+    pairs.extend(
+        _build_pairs_backtracking(
+            participants=remaining,
+            previous_pairs=previous_pairs,
+        )
     )
-    pairs = (
-        []
-        if resolved_pairs is None
-        else [SwissPair(user_a=user_a, user_b=user_b) for user_a, user_b in resolved_pairs]
-    )
+
     if bye_pair is not None:
         pairs.append(bye_pair)
+
     return pairs
