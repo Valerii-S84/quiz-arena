@@ -15,12 +15,15 @@ source /opt/quiz-arena/.env
 ```bash
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env ps
 bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/quiz-arena/docker-compose.prod.yml
-curl -sS https://deutchquizarena.de/api/health
+curl -sS https://deutchquizarena.de/health
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env \
+  exec -T api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=2).read().decode())"
 ```
 
 Expected:
 - `api`, `worker`, `beat`, `postgres`, `redis`, `caddy` are `Up`.
-- health payload from `/api/health` is `status=ok` and `database/redis/celery=status=ok`.
+- public health payload from `/health` is `status=ok`.
+- internal readiness payload from `/ready` is `status=ready` and `database/redis=status=ok`.
 
 ## 2) Telegram webhook status
 
