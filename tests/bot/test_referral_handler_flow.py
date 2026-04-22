@@ -8,7 +8,10 @@ import pytest
 
 from app.bot.handlers import referral
 from app.bot.texts.de import TEXTS_DE
-from app.economy.referrals.constants import REWARD_CODE_PREMIUM_WEEK
+from app.economy.referrals.constants import (
+    LEGACY_REWARD_CODE_PREMIUM_STARTER,
+    REWARD_CODE_PREMIUM_WEEK,
+)
 from app.economy.referrals.service import ReferralClaimResult, ReferralOverview
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
@@ -154,6 +157,46 @@ async def test_handle_referral_reward_choice_success(monkeypatch) -> None:
     assert TEXTS_DE["msg.referral.reward.claimed.premium"] in (response.text or "")
     assert "https://t.me/" not in (response.text or "")
     assert "referral_reward_claimed" in emitted_events
+
+
+@pytest.mark.asyncio
+async def test_handle_referral_reward_choice_accepts_legacy_callback(monkeypatch) -> None:
+    monkeypatch.setattr(referral, "SessionLocal", DummySessionLocal())
+    captured_reward_codes: list[str] = []
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        del session, telegram_user
+        return SimpleNamespace(user_id=42)
+
+    async def _fake_claim(*args, **kwargs):
+        del args
+        captured_reward_codes.append(kwargs["reward_code"])
+        return ReferralClaimResult(
+            status="CLAIMED",
+            reward_code=kwargs["reward_code"],
+            overview=_overview(claimable=0),
+        )
+
+    async def _fake_invite_link(bot, *, referral_code: str):
+        del bot, referral_code
+        return "https://t.me/testbot?start=ref_ABC123"
+
+    async def _fake_emit(*args, **kwargs):
+        del args, kwargs
+        return None
+
+    monkeypatch.setattr(referral.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(referral.ReferralService, "claim_next_reward_choice", _fake_claim)
+    monkeypatch.setattr(referral, "_build_invite_link", _fake_invite_link)
+    monkeypatch.setattr(referral, "emit_analytics_event", _fake_emit)
+
+    callback = DummyCallback(
+        data=f"referral:reward:{LEGACY_REWARD_CODE_PREMIUM_STARTER}",
+        from_user=SimpleNamespace(id=9),
+    )
+    await referral.handle_referral_reward_choice(callback)
+
+    assert captured_reward_codes == [REWARD_CODE_PREMIUM_WEEK]
 
 
 @pytest.mark.asyncio

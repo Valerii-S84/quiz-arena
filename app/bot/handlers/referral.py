@@ -19,12 +19,19 @@ from app.bot.texts.de import TEXTS_DE
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.core.telegram_links import public_bot_start_link
 from app.db.session import SessionLocal
+from app.economy.referrals.constants import (
+    LEGACY_REWARD_CODE_PREMIUM_STARTER,
+    REWARD_CODE_PREMIUM_WEEK,
+    canonical_reward_code,
+)
 from app.economy.referrals.service import ReferralOverview, ReferralService
 from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="referral")
 
-REWARD_CHOICE_RE = re.compile(r"^referral:reward:(PREMIUM_WEEK)$")
+REWARD_CHOICE_RE = re.compile(
+    rf"^referral:reward:({REWARD_CODE_PREMIUM_WEEK}|{LEGACY_REWARD_CODE_PREMIUM_STARTER})$"
+)
 SHARE_RE = re.compile(r"^referral:(share|prompt:share)$")
 
 
@@ -110,7 +117,7 @@ async def handle_referral_reward_choice(callback: CallbackQuery) -> None:
     if matched is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
-    reward_code = matched.group(1)
+    reward_code = canonical_reward_code(matched.group(1))
 
     now_utc = datetime.now(timezone.utc)
     async with SessionLocal.begin() as session:
