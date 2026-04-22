@@ -17,7 +17,7 @@ class _Session(AsyncSessionStub):
 
 
 @pytest.mark.asyncio
-async def test_grant_premium_week_reward_extends_active_entitlement(
+async def test_grant_premium_starter_reward_extends_active_entitlement(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now_utc = datetime.now(UTC)
@@ -46,7 +46,7 @@ async def test_grant_premium_week_reward_extends_active_entitlement(
     monkeypatch.setattr(rewards_grant.EntitlementsRepo, "create", _fake_create_entitlement)
     monkeypatch.setattr(rewards_grant.LedgerRepo, "create", _fake_create_ledger)
 
-    await rewards_grant._grant_premium_week_reward(
+    await rewards_grant._grant_premium_starter_reward(
         _Session(),
         user_id=9,
         referral_id=44,
@@ -60,7 +60,7 @@ async def test_grant_premium_week_reward_extends_active_entitlement(
 
 
 @pytest.mark.asyncio
-async def test_grant_premium_week_reward_creates_new_entitlement_when_missing(
+async def test_grant_premium_starter_reward_creates_new_entitlement_when_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now_utc = datetime.now(UTC)
@@ -85,7 +85,7 @@ async def test_grant_premium_week_reward_creates_new_entitlement_when_missing(
     monkeypatch.setattr(rewards_grant.EntitlementsRepo, "create", _fake_create_entitlement)
     monkeypatch.setattr(rewards_grant.LedgerRepo, "create", _fake_create_ledger)
 
-    await rewards_grant._grant_premium_week_reward(
+    await rewards_grant._grant_premium_starter_reward(
         _Session(),
         user_id=9,
         referral_id=45,
@@ -94,10 +94,10 @@ async def test_grant_premium_week_reward_creates_new_entitlement_when_missing(
 
     entitlement = created_entitlements[0]
     assert entitlement.user_id == 9
-    assert entitlement.scope == "PREMIUM_WEEK"
+    assert entitlement.scope == "PREMIUM_STARTER"
     assert entitlement.idempotency_key == "referral:reward:premium:45"
     assert entitlement.ends_at == now_utc + timedelta(days=7)
-    assert ledger_entries[0].metadata_ == {"reward_code": rewards_grant.REWARD_CODE_PREMIUM_WEEK}
+    assert ledger_entries[0].metadata_ == {"reward_code": rewards_grant.REWARD_CODE_PREMIUM_STARTER}
 
 
 @pytest.mark.asyncio
@@ -109,7 +109,29 @@ async def test_grant_reward_dispatches_premium_starter(
     async def _fake_premium(*_args, **_kwargs):
         calls.append("premium")
 
-    monkeypatch.setattr(rewards_grant, "_grant_premium_week_reward", _fake_premium)
+    monkeypatch.setattr(rewards_grant, "_grant_premium_starter_reward", _fake_premium)
+
+    await rewards_grant._grant_reward(
+        _Session(),
+        user_id=1,
+        referral_id=1,
+        reward_code=rewards_grant.REWARD_CODE_PREMIUM_STARTER,
+        now_utc=datetime.now(UTC),
+    )
+
+    assert calls == ["premium"]
+
+
+@pytest.mark.asyncio
+async def test_grant_reward_accepts_legacy_premium_week_code(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    async def _fake_premium(*_args, **_kwargs):
+        calls.append("premium")
+
+    monkeypatch.setattr(rewards_grant, "_grant_premium_starter_reward", _fake_premium)
 
     await rewards_grant._grant_reward(
         _Session(),

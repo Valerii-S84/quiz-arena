@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 import app.economy.referrals.service.rewards_claim as rewards_claim
+from app.economy.referrals.constants import REWARD_CODE_PREMIUM_WEEK
 from tests.type_helpers import AsyncSessionStub
 
 UTC = timezone.utc
@@ -56,7 +57,7 @@ async def test_claim_next_reward_choice_returns_none_for_missing_user(
     result = await rewards_claim.claim_next_reward_choice(
         _Session(),
         user_id=7,
-        reward_code=rewards_claim.REWARD_CODE_PREMIUM_WEEK,
+        reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
         now_utc=datetime.now(UTC),
     )
 
@@ -113,7 +114,7 @@ async def test_claim_next_reward_choice_returns_monthly_cap_and_marks_anchor(
     result = await rewards_claim.claim_next_reward_choice(
         _Session(),
         user_id=7,
-        reward_code=rewards_claim.REWARD_CODE_PREMIUM_WEEK,
+        reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
         now_utc=now_utc,
     )
 
@@ -174,7 +175,7 @@ async def test_claim_next_reward_choice_returns_too_early_for_delayed_reward(
     result = await rewards_claim.claim_next_reward_choice(
         _Session(),
         user_id=7,
-        reward_code=rewards_claim.REWARD_CODE_PREMIUM_WEEK,
+        reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
         now_utc=now_utc,
     )
 
@@ -246,20 +247,76 @@ async def test_claim_next_reward_choice_claims_reward_and_updates_anchor(
     result = await rewards_claim.claim_next_reward_choice(
         _Session(),
         user_id=7,
-        reward_code=rewards_claim.REWARD_CODE_PREMIUM_WEEK,
+        reward_code=rewards_claim.REWARD_CODE_PREMIUM_STARTER,
         now_utc=now_utc,
     )
 
     assert result is not None
     assert result.status == "CLAIMED"
-    assert result.reward_code == rewards_claim.REWARD_CODE_PREMIUM_WEEK
+    assert result.reward_code == rewards_claim.REWARD_CODE_PREMIUM_STARTER
     assert granted == [
         {
             "user_id": 7,
             "referral_id": 43,
-            "reward_code": rewards_claim.REWARD_CODE_PREMIUM_WEEK,
+            "reward_code": rewards_claim.REWARD_CODE_PREMIUM_STARTER,
             "now_utc": now_utc,
         }
     ]
     assert anchor.status == "REWARDED"
     assert anchor.rewarded_at == now_utc
+
+
+@pytest.mark.asyncio
+async def test_claim_next_reward_choice_maps_legacy_week_reward_code_to_starter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now_utc = datetime.now(UTC)
+    user = SimpleNamespace(referral_code="REF-CLAIM")
+    anchor = _anchor(
+        referral_id=44, qualified_at=now_utc - rewards_claim.REWARD_DELAY - timedelta(minutes=1)
+    )
+    granted_codes: list[str] = []
+
+    async def _fake_get_by_id(_session, _user_id):
+        return user
+
+    async def _fake_list_for_referrer_for_update(_session, *, referrer_user_id: int):
+        return [SimpleNamespace(id=1)]
+
+    async def _fake_count_rewards_for_referrer_between(_session, **_kwargs):
+        return 0
+
+    async def _fake_grant_reward(
+        _session, *, user_id: int, referral_id: int, reward_code: str, now_utc: datetime
+    ):
+        granted_codes.append(reward_code)
+
+    monkeypatch.setattr(rewards_claim.UsersRepo, "get_by_id", _fake_get_by_id)
+    monkeypatch.setattr(
+        rewards_claim.ReferralsRepo,
+        "list_for_referrer_for_update",
+        _fake_list_for_referrer_for_update,
+    )
+    monkeypatch.setattr(
+        rewards_claim.ReferralsRepo,
+        "count_rewards_for_referrer_between",
+        _fake_count_rewards_for_referrer_between,
+    )
+    monkeypatch.setattr(rewards_claim, "_grant_reward", _fake_grant_reward)
+    monkeypatch.setattr(rewards_claim, "_build_reward_anchors", lambda _referrals: [anchor])
+    monkeypatch.setattr(
+        rewards_claim,
+        "_build_overview_from_referrals",
+        lambda **_kwargs: _overview("claimed"),
+    )
+
+    result = await rewards_claim.claim_next_reward_choice(
+        _Session(),
+        user_id=7,
+        reward_code=REWARD_CODE_PREMIUM_WEEK,
+        now_utc=now_utc,
+    )
+
+    assert result is not None
+    assert result.reward_code == rewards_claim.REWARD_CODE_PREMIUM_STARTER
+    assert granted_codes == [rewards_claim.REWARD_CODE_PREMIUM_STARTER]

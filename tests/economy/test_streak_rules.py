@@ -5,6 +5,7 @@ from datetime import date, datetime, timezone
 from app.economy.streak.constants import (
     PREMIUM_SCOPE_MONTH,
     PREMIUM_SCOPE_SEASON,
+    PREMIUM_SCOPE_STARTER,
     PREMIUM_SCOPE_WEEK,
 )
 from app.economy.streak.rules import (
@@ -161,12 +162,28 @@ def test_transition_at_risk_to_no_streak_without_freeze() -> None:
     )
 
     state_after = apply_day_end(
-        state_before, day=date(2026, 2, 18), premium_scope=PREMIUM_SCOPE_WEEK
+        state_before, day=date(2026, 2, 18), premium_scope=PREMIUM_SCOPE_STARTER
     )
 
     assert state_after.current_streak == 0
     assert state_after.today_status == StreakTodayStatus.NO_ACTIVITY
     assert classify_streak_state(state_after) == StreakStateLabel.NO_STREAK
+
+
+def test_transition_at_risk_to_no_streak_without_freeze_for_legacy_week_scope() -> None:
+    state_before = snapshot(
+        current_streak=8,
+        best_streak=9,
+        today_status=StreakTodayStatus.NO_ACTIVITY,
+        updated_at=datetime(2026, 2, 18, 20, 0, tzinfo=UTC),
+    )
+
+    state_after = apply_day_end(
+        state_before, day=date(2026, 2, 18), premium_scope=PREMIUM_SCOPE_WEEK
+    )
+
+    assert state_after.current_streak == 0
+    assert state_after.today_status == StreakTodayStatus.NO_ACTIVITY
 
 
 def test_transition_frozen_today_to_at_risk_on_day_start() -> None:

@@ -8,7 +8,7 @@ import pytest
 
 from app.bot.handlers import referral
 from app.bot.texts.de import TEXTS_DE
-from app.economy.referrals.constants import REWARD_CODE_PREMIUM_WEEK
+from app.economy.referrals.constants import REWARD_CODE_PREMIUM_STARTER, REWARD_CODE_PREMIUM_WEEK
 from app.economy.referrals.service import ReferralClaimResult, ReferralOverview
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
@@ -36,7 +36,7 @@ def _overview(*, claimable: int = 0) -> ReferralOverview:
 def test_build_claim_status_text_variants() -> None:
     claim = ReferralClaimResult(
         status="CLAIMED",
-        reward_code=REWARD_CODE_PREMIUM_WEEK,
+        reward_code=REWARD_CODE_PREMIUM_STARTER,
         overview=_overview(),
     )
     assert (
@@ -55,8 +55,8 @@ def test_build_overview_text_uses_fallback_without_link() -> None:
 def test_build_overview_text_names_the_single_reward_option() -> None:
     text = referral._build_overview_text(overview=_overview(claimable=1), invite_link=None)
 
-    assert "Hol dir jetzt PREMIUM_WEEK" in text
-    assert "Waehle deinen Bonus" not in text
+    assert "Waehle deinen Bonus" in text
+    assert "PREMIUM_WEEK" not in text
 
 
 @pytest.mark.asyncio
@@ -126,11 +126,13 @@ async def test_handle_referral_reward_choice_rejects_invalid_callback() -> None:
 async def test_handle_referral_reward_choice_success(monkeypatch) -> None:
     monkeypatch.setattr(referral, "SessionLocal", DummySessionLocal())
     emitted_events: list[str] = []
+    claimed_reward_codes: list[str] = []
 
     async def _fake_home_snapshot(session, *, telegram_user):
         return SimpleNamespace(user_id=42)
 
     async def _fake_claim(*args, **kwargs):
+        claimed_reward_codes.append(kwargs["reward_code"])
         return ReferralClaimResult(
             status="CLAIMED",
             reward_code=kwargs["reward_code"],
@@ -152,7 +154,7 @@ async def test_handle_referral_reward_choice_success(monkeypatch) -> None:
     monkeypatch.setattr(referral, "emit_analytics_event", _fake_emit)
 
     callback = DummyCallback(
-        data="referral:reward:PREMIUM_WEEK",
+        data="referral:reward:PREMIUM_STARTER",
         from_user=SimpleNamespace(id=9),
     )
     await referral.handle_referral_reward_choice(callback)
@@ -161,6 +163,46 @@ async def test_handle_referral_reward_choice_success(monkeypatch) -> None:
     assert TEXTS_DE["msg.referral.reward.claimed.premium"] in (response.text or "")
     assert "https://t.me/" not in (response.text or "")
     assert "referral_reward_claimed" in emitted_events
+    assert claimed_reward_codes == ["PREMIUM_STARTER"]
+
+
+@pytest.mark.asyncio
+async def test_handle_referral_reward_choice_accepts_legacy_premium_week_callback(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(referral, "SessionLocal", DummySessionLocal())
+    claimed_reward_codes: list[str] = []
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        return SimpleNamespace(user_id=42)
+
+    async def _fake_claim(*args, **kwargs):
+        claimed_reward_codes.append(kwargs["reward_code"])
+        return ReferralClaimResult(
+            status="CLAIMED",
+            reward_code=REWARD_CODE_PREMIUM_STARTER,
+            overview=_overview(claimable=0),
+        )
+
+    async def _fake_invite_link(bot, *, referral_code: str):
+        return "https://t.me/testbot?start=ref_ABC123"
+
+    async def _fake_emit(*args, **kwargs):
+        del args, kwargs
+        return None
+
+    monkeypatch.setattr(referral.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(referral.ReferralService, "claim_next_reward_choice", _fake_claim)
+    monkeypatch.setattr(referral, "_build_invite_link", _fake_invite_link)
+    monkeypatch.setattr(referral, "emit_analytics_event", _fake_emit)
+
+    callback = DummyCallback(
+        data=f"referral:reward:{REWARD_CODE_PREMIUM_WEEK}",
+        from_user=SimpleNamespace(id=9),
+    )
+    await referral.handle_referral_reward_choice(callback)
+
+    assert claimed_reward_codes == [REWARD_CODE_PREMIUM_WEEK]
 
 
 @pytest.mark.asyncio
