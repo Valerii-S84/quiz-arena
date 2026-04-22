@@ -83,7 +83,7 @@ async def build_trigger_codes(
     starter_expired_recently = await EntitlementsRepo.has_recently_ended_premium_scope(
         session,
         user_id=user_id,
-        scope="PREMIUM_STARTER",
+        scope="PREMIUM_WEEK",
         since_utc=now_utc - STARTER_EXPIRED_WINDOW,
         until_utc=now_utc,
     )

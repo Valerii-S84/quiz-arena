@@ -8,7 +8,7 @@ import pytest
 
 from app.bot.handlers import referral
 from app.bot.texts.de import TEXTS_DE
-from app.economy.referrals.constants import REWARD_CODE_PREMIUM_STARTER
+from app.economy.referrals.constants import REWARD_CODE_PREMIUM_WEEK
 from app.economy.referrals.service import ReferralClaimResult, ReferralOverview
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
@@ -36,7 +36,7 @@ def _overview(*, claimable: int = 0) -> ReferralOverview:
 def test_build_claim_status_text_variants() -> None:
     claim = ReferralClaimResult(
         status="CLAIMED",
-        reward_code=REWARD_CODE_PREMIUM_STARTER,
+        reward_code=REWARD_CODE_PREMIUM_WEEK,
         overview=_overview(),
     )
     assert (
@@ -145,7 +145,7 @@ async def test_handle_referral_reward_choice_success(monkeypatch) -> None:
     monkeypatch.setattr(referral, "emit_analytics_event", _fake_emit)
 
     callback = DummyCallback(
-        data="referral:reward:PREMIUM_STARTER",
+        data="referral:reward:PREMIUM_WEEK",
         from_user=SimpleNamespace(id=9),
     )
     await referral.handle_referral_reward_choice(callback)

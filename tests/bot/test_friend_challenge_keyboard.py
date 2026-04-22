@@ -93,7 +93,7 @@ def test_friend_challenge_limit_keyboard_contains_buy_options_and_back() -> None
     keyboard = build_friend_challenge_limit_keyboard()
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
     assert "buy:FRIEND_CHALLENGE_5" in callbacks
-    assert "buy:PREMIUM_STARTER" in callbacks
+    assert "buy:PREMIUM_WEEK" in callbacks
     assert "home:open" in callbacks
 
 

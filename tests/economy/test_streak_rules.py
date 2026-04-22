@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 
 from app.economy.streak.constants import (
+    PREMIUM_SCOPE_3_DAYS,
     PREMIUM_SCOPE_MONTH,
     PREMIUM_SCOPE_SEASON,
-    PREMIUM_SCOPE_STARTER,
+    PREMIUM_SCOPE_WEEK,
 )
 from app.economy.streak.rules import (
     apply_day_end,
@@ -144,7 +145,7 @@ def test_transition_at_risk_to_frozen_today_with_premium() -> None:
     state_after = apply_day_end(
         state_before,
         day=date(2026, 2, 18),
-        premium_scope=PREMIUM_SCOPE_MONTH,
+        premium_scope=PREMIUM_SCOPE_WEEK,
     )
 
     assert state_after.current_streak == 8
@@ -160,9 +161,7 @@ def test_transition_at_risk_to_no_streak_without_freeze() -> None:
         updated_at=datetime(2026, 2, 18, 20, 0, tzinfo=UTC),
     )
 
-    state_after = apply_day_end(
-        state_before, day=date(2026, 2, 18), premium_scope=PREMIUM_SCOPE_STARTER
-    )
+    state_after = apply_day_end(state_before, day=date(2026, 2, 18), premium_scope=None)
 
     assert state_after.current_streak == 0
     assert state_after.today_status == StreakTodayStatus.NO_ACTIVITY
@@ -206,6 +205,24 @@ def test_month_premium_freeze_limited_per_week() -> None:
     assert state_after.current_streak == 0
     assert state_after.premium_freezes_used_week == 1
     assert state_after.premium_freeze_week_start_local_date == monday
+
+
+def test_three_day_premium_freeze_is_enabled() -> None:
+    state_before = snapshot(
+        current_streak=5,
+        best_streak=5,
+        today_status=StreakTodayStatus.NO_ACTIVITY,
+        updated_at=datetime(2026, 2, 18, 20, 0, tzinfo=UTC),
+    )
+
+    state_after = apply_day_end(
+        state_before,
+        day=date(2026, 2, 18),
+        premium_scope=PREMIUM_SCOPE_3_DAYS,
+    )
+
+    assert state_after.current_streak == 5
+    assert state_after.today_status == StreakTodayStatus.FROZEN
 
 
 def test_season_premium_freeze_is_unlimited() -> None:

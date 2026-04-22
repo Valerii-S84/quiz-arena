@@ -6,7 +6,7 @@ PROMO_PRODUCT_LABELS = {
     "ENERGY_10": "+10 Energie",
     "STREAK_SAVER_20": "Serien-Schutz",
     "FRIEND_CHALLENGE_5": "Duell-Ticket",
-    "PREMIUM_STARTER": "Premium Start",
+    "PREMIUM_WEEK": "Premium Woche",
     "PREMIUM_MONTH": "Premium Monat",
     "PREMIUM_SEASON": "Premium Saison",
     "PREMIUM_YEAR": "Premium Jahr",

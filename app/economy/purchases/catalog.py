@@ -43,11 +43,20 @@ PRODUCTS: dict[str, ProductSpec] = {
         energy_credit=0,
         friend_challenge_tickets=1,
     ),
-    "PREMIUM_STARTER": ProductSpec(
-        product_code="PREMIUM_STARTER",
+    "PREMIUM_3_DAYS": ProductSpec(
+        product_code="PREMIUM_3_DAYS",
         product_type="PREMIUM",
-        title="Premium Starter",
-        description="7 Tage Premium ohne Limits.",
+        title="Premium 3 Tage",
+        description="3 Tage Premium ohne Limits und mit Streak Freeze.",
+        stars_amount=0,
+        energy_credit=0,
+        premium_days=3,
+    ),
+    "PREMIUM_WEEK": ProductSpec(
+        product_code="PREMIUM_WEEK",
+        product_type="PREMIUM",
+        title="Premium Woche",
+        description="7 Tage Premium ohne Limits und mit Streak Freeze.",
         stars_amount=29,
         energy_credit=0,
         premium_days=7,
@@ -56,7 +65,7 @@ PRODUCTS: dict[str, ProductSpec] = {
         product_code="PREMIUM_MONTH",
         product_type="PREMIUM",
         title="Premium Month",
-        description="30 Tage Premium ohne Limits.",
+        description="30 Tage Premium mit unbegrenzten Duellen und mehr Spielzeit ohne Pausen.",
         stars_amount=99,
         energy_credit=0,
         premium_days=30,
@@ -65,7 +74,7 @@ PRODUCTS: dict[str, ProductSpec] = {
         product_code="PREMIUM_SEASON",
         product_type="PREMIUM",
         title="Premium Season",
-        description="90 Tage Premium ohne Limits.",
+        description="90 Tage Premium: spare Sterne und spiele lange ohne Limits weiter.",
         stars_amount=249,
         energy_credit=0,
         premium_days=90,
@@ -74,19 +83,14 @@ PRODUCTS: dict[str, ProductSpec] = {
         product_code="PREMIUM_YEAR",
         product_type="PREMIUM",
         title="Premium Year",
-        description="365 Tage Premium ohne Limits.",
+        description="365 Tage Premium mit dem besten Sterne-Preis fuer unbegrenzte Duelle.",
         stars_amount=499,
         energy_credit=0,
         premium_days=365,
     ),
 }
 
-SOFT_DISABLED_PRODUCT_CODES: frozenset[str] = frozenset(
-    {
-        "PREMIUM_SEASON",
-        "PREMIUM_YEAR",
-    }
-)
+SOFT_DISABLED_PRODUCT_CODES: frozenset[str] = frozenset({"PREMIUM_3_DAYS"})
 
 
 def get_product(product_code: str) -> ProductSpec | None:

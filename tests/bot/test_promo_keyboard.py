@@ -32,7 +32,7 @@ def test_build_promo_discount_keyboard_for_unknown_scope_returns_none() -> None:
     assert keyboard is None
 
 
-def test_build_promo_discount_keyboard_skips_soft_disabled_products() -> None:
+def test_build_promo_discount_keyboard_includes_all_saleable_premium_products() -> None:
     keyboard = build_promo_discount_keyboard(
         redemption_id=uuid4(),
         target_scope="PREMIUM_ANY",
@@ -41,6 +41,11 @@ def test_build_promo_discount_keyboard_skips_soft_disabled_products() -> None:
 
     assert keyboard is not None
     rows = keyboard.inline_keyboard
-    assert len(rows) == 3
+    assert len(rows) == 5
     texts = [row[0].text for row in rows[:-1]]
-    assert texts == ["Premium Start (27⭐)", "Premium Monat (90⭐)"]
+    assert texts == [
+        "Premium Woche (27⭐)",
+        "Premium Monat (90⭐)",
+        "Premium Saison (225⭐)",
+        "Premium Jahr (450⭐)",
+    ]

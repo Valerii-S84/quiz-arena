@@ -253,7 +253,9 @@ async def test_redeem_promo_from_reply_marks_button_source(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_redeem_promo_from_text_reports_unavailable_discount_targets(monkeypatch) -> None:
+async def test_redeem_promo_from_text_accepts_discount_targets_that_are_now_saleable(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(promo, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
@@ -275,4 +277,11 @@ async def test_redeem_promo_from_text_reports_unavailable_discount_targets(monke
     message = _PromoMessage(text="/promo YEAR25", from_user=SimpleNamespace(id=7))
     await promo._redeem_promo_from_text(message)
 
-    assert message.answers[0].text == TEXTS_DE["msg.promo.discount.unavailable"]
+    assert message.answers[0].text == TEXTS_DE["msg.promo.success.discount"]
+    callbacks = [
+        button.callback_data
+        for row in message.answers[0].kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert any(callback.startswith("buy:PREMIUM_YEAR:promo:") for callback in callbacks)

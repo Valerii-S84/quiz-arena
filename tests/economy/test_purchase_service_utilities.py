@@ -50,9 +50,7 @@ def test_calculate_discount_amount_for_promo_uses_runtime_discount_resolution() 
 
 
 def test_is_promo_scope_applicable_honors_explicit_product_lists() -> None:
-    promo_code = _promo_code(
-        target_scope="MULTI", applicable_products=["ENERGY_10", "PREMIUM_STARTER"]
-    )
+    promo_code = _promo_code(target_scope="MULTI", applicable_products=["ENERGY_10", "PREMIUM_WEEK"])
 
     assert _is_promo_scope_applicable(
         promo_code,

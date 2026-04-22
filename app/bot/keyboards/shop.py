@@ -27,13 +27,25 @@ def build_shop_keyboard(*, channel_bonus_claimed: bool = False) -> InlineKeyboar
             ],
             [
                 InlineKeyboardButton(
-                    text="💎 Premium Starter | 29⭐",
-                    callback_data="buy:PREMIUM_STARTER",
+                    text="💎 Premium Woche | 29⭐",
+                    callback_data="buy:PREMIUM_WEEK",
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="💎 Premium Monat | 99⭐", callback_data="buy:PREMIUM_MONTH"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="💎 Premium Season | 249⭐",
+                    callback_data="buy:PREMIUM_SEASON",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="💎 Premium Year | 499⭐",
+                    callback_data="buy:PREMIUM_YEAR",
                 )
             ],
             channel_bonus_row,
