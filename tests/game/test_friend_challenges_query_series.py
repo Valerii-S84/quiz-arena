@@ -4,7 +4,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.game.sessions.service import friend_challenges_queries, friend_challenges_query_series
+from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
+from app.game.sessions.service import friend_challenges_queries
 from tests.game.friend_challenges_queries_test_support import (
     NOW_UTC,
     FriendChallengeQueriesSession,
@@ -14,38 +15,49 @@ from tests.game.friend_challenges_queries_test_support import (
 
 
 @pytest.mark.asyncio
-async def test_get_friend_series_score_for_user_delegates_to_shared_loader_for_non_series(
+async def test_get_friend_series_score_for_user_returns_default_for_non_series(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     challenge = build_challenge(series_id=None, series_best_of=1)
-    captured_kwargs: dict[str, object] = {}
-    session = FriendChallengeQueriesSession()
-
-    async def _fake_load_friend_challenge_for_user(session, **kwargs):
-        captured_kwargs["session"] = session
-        captured_kwargs.update(kwargs)
-        return challenge
 
     monkeypatch.setattr(
-        friend_challenges_query_series,
-        "load_friend_challenge_for_user",
-        _fake_load_friend_challenge_for_user,
+        friend_challenges_queries.FriendChallengesRepo,
+        "get_by_id_for_update",
+        async_return(challenge),
+    )
+    monkeypatch.setattr(
+        friend_challenges_queries,
+        "_expire_friend_challenge_if_due",
+        lambda **_kwargs: False,
     )
 
-    result = await friend_challenges_query_series.get_friend_series_score_for_user(
-        session,
+    result = await friend_challenges_queries.get_friend_series_score_for_user(
+        FriendChallengeQueriesSession(),
         user_id=11,
         challenge_id=challenge.id,
         now_utc=NOW_UTC,
     )
 
     assert result == (0, 0, 1, 1)
-    assert captured_kwargs == {
-        "session": session,
-        "user_id": 11,
-        "challenge_id": challenge.id,
-        "now_utc": NOW_UTC,
-    }
+
+
+@pytest.mark.asyncio
+async def test_get_friend_series_score_for_user_raises_when_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        friend_challenges_queries.FriendChallengesRepo,
+        "get_by_id_for_update",
+        async_return(None),
+    )
+
+    with pytest.raises(FriendChallengeNotFoundError):
+        await friend_challenges_queries.get_friend_series_score_for_user(
+            FriendChallengeQueriesSession(),
+            user_id=11,
+            challenge_id=uuid4(),
+            now_utc=NOW_UTC,
+        )
 
 
 @pytest.mark.asyncio
@@ -85,17 +97,22 @@ async def test_get_friend_series_score_for_user_swaps_perspective_for_opponent(
     ]
 
     monkeypatch.setattr(
-        friend_challenges_query_series,
-        "load_friend_challenge_for_user",
+        friend_challenges_queries.FriendChallengesRepo,
+        "get_by_id_for_update",
         async_return(challenge),
     )
     monkeypatch.setattr(
-        friend_challenges_query_series.FriendChallengesRepo,
+        friend_challenges_queries,
+        "_expire_friend_challenge_if_due",
+        lambda **_kwargs: False,
+    )
+    monkeypatch.setattr(
+        friend_challenges_queries.FriendChallengesRepo,
         "list_by_series_id_for_update",
         async_return(series_challenges),
     )
 
-    result = await friend_challenges_query_series.get_friend_series_score_for_user(
+    result = await friend_challenges_queries.get_friend_series_score_for_user(
         FriendChallengeQueriesSession(),
         user_id=22,
         challenge_id=challenge.id,
@@ -103,6 +120,55 @@ async def test_get_friend_series_score_for_user_swaps_perspective_for_opponent(
     )
 
     assert result == (1, 1, 3, 5)
+
+
+@pytest.mark.asyncio
+async def test_get_friend_series_score_for_user_emits_expired_event_before_access_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    challenge = build_challenge(
+        status="ACTIVE",
+        opponent_user_id=None,
+        series_id=uuid4(),
+        series_best_of=3,
+    )
+    expired_events: list[dict[str, object]] = []
+
+    def _fake_expire(*, challenge, now_utc) -> bool:
+        assert now_utc == NOW_UTC
+        challenge.status = "EXPIRED"
+        return True
+
+    async def _fake_emit_expired_event(*_args, **kwargs) -> None:
+        expired_events.append(kwargs)
+
+    monkeypatch.setattr(
+        friend_challenges_queries.FriendChallengesRepo,
+        "get_by_id_for_update",
+        async_return(challenge),
+    )
+    monkeypatch.setattr(friend_challenges_queries, "_expire_friend_challenge_if_due", _fake_expire)
+    monkeypatch.setattr(
+        friend_challenges_queries,
+        "_emit_friend_challenge_expired_event",
+        _fake_emit_expired_event,
+    )
+
+    with pytest.raises(FriendChallengeAccessError):
+        await friend_challenges_queries.get_friend_series_score_for_user(
+            FriendChallengeQueriesSession(),
+            user_id=999,
+            challenge_id=challenge.id,
+            now_utc=NOW_UTC,
+        )
+
+    assert expired_events == [
+        {
+            "challenge": challenge,
+            "happened_at": NOW_UTC,
+            "source": friend_challenges_queries.EVENT_SOURCE_BOT,
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -135,17 +201,22 @@ async def test_get_friend_series_score_for_user_returns_creator_perspective(
     ]
 
     monkeypatch.setattr(
-        friend_challenges_query_series,
-        "load_friend_challenge_for_user",
+        friend_challenges_queries.FriendChallengesRepo,
+        "get_by_id_for_update",
         async_return(challenge),
     )
     monkeypatch.setattr(
-        friend_challenges_query_series.FriendChallengesRepo,
+        friend_challenges_queries,
+        "_expire_friend_challenge_if_due",
+        lambda **_kwargs: False,
+    )
+    monkeypatch.setattr(
+        friend_challenges_queries.FriendChallengesRepo,
         "list_by_series_id_for_update",
         async_return(series_challenges),
     )
 
-    result = await friend_challenges_query_series.get_friend_series_score_for_user(
+    result = await friend_challenges_queries.get_friend_series_score_for_user(
         FriendChallengeQueriesSession(),
         user_id=11,
         challenge_id=challenge.id,
@@ -153,38 +224,3 @@ async def test_get_friend_series_score_for_user_returns_creator_perspective(
     )
 
     assert result == (1, 1, 2, 3)
-
-
-@pytest.mark.asyncio
-async def test_queries_get_friend_series_score_for_user_delegates_to_query_series(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    captured_kwargs: dict[str, object] = {}
-    session = FriendChallengeQueriesSession()
-    challenge_id = uuid4()
-
-    async def _fake_get_friend_series_score_for_user(session, **kwargs):
-        captured_kwargs["session"] = session
-        captured_kwargs.update(kwargs)
-        return (4, 2, 3, 5)
-
-    monkeypatch.setattr(
-        friend_challenges_queries,
-        "load_friend_series_score_for_user",
-        _fake_get_friend_series_score_for_user,
-    )
-
-    result = await friend_challenges_queries.get_friend_series_score_for_user(
-        session,
-        user_id=22,
-        challenge_id=challenge_id,
-        now_utc=NOW_UTC,
-    )
-
-    assert result == (4, 2, 3, 5)
-    assert captured_kwargs == {
-        "session": session,
-        "user_id": 22,
-        "challenge_id": challenge_id,
-        "now_utc": NOW_UTC,
-    }

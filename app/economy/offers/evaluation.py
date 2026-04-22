@@ -4,7 +4,6 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.offers_repo import OffersRepo
 from app.economy.offers.errors import OfferLoggingError
 from app.economy.offers.selection import selection_from_impression, selection_from_template
@@ -22,22 +21,13 @@ async def evaluate_and_log_offer(
     now_utc: datetime,
     trigger_event: str | None = None,
 ) -> OfferSelection | None:
-    active_premium_scope = await EntitlementsRepo.get_active_premium_scope(
-        session,
-        user_id=user_id,
-        now_utc=now_utc,
-    )
     existing = await OffersRepo.get_by_idempotency_key(
         session,
         user_id=user_id,
         idempotency_key=idempotency_key,
     )
     if existing is not None:
-        return selection_from_impression(
-            existing,
-            idempotent_replay=True,
-            active_premium_scope=active_premium_scope,
-        )
+        return selection_from_impression(existing, idempotent_replay=True)
 
     trigger_codes = await build_trigger_codes(
         session,
@@ -53,8 +43,6 @@ async def evaluate_and_log_offer(
         user_id=user_id,
         trigger_codes=trigger_codes,
         now_utc=now_utc,
-        active_premium_scope=active_premium_scope,
-        resolve_active_premium_scope=False,
     )
     if selected_template is None:
         return None
@@ -77,15 +65,10 @@ async def evaluate_and_log_offer(
         )
         if replay is None:
             raise OfferLoggingError("offer impression logging failed")
-        return selection_from_impression(
-            replay,
-            idempotent_replay=True,
-            active_premium_scope=active_premium_scope,
-        )
+        return selection_from_impression(replay, idempotent_replay=True)
 
     return selection_from_template(
         impression_id=impression_id,
         template=selected_template,
         idempotent_replay=False,
-        active_premium_scope=active_premium_scope,
     )

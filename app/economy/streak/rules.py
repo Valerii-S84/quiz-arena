@@ -5,10 +5,8 @@ from datetime import date, timedelta
 
 from app.economy.streak.constants import (
     MONTHLY_PREMIUM_FREEZE_LIMIT,
-    PREMIUM_SCOPE_3_DAYS,
     PREMIUM_SCOPE_SEASON,
     PREMIUM_SCOPE_STARTER,
-    PREMIUM_SCOPE_WEEK,
     PREMIUM_SCOPE_YEAR,
 )
 from app.economy.streak.time import berlin_local_date, berlin_week_start
@@ -26,12 +24,7 @@ def classify_streak_state(snapshot: StreakSnapshot) -> StreakStateLabel:
 
 
 def _premium_freeze_allowed(snapshot: StreakSnapshot, day: date, premium_scope: str | None) -> bool:
-    if premium_scope in {
-        None,
-        PREMIUM_SCOPE_3_DAYS,
-        PREMIUM_SCOPE_STARTER,
-        PREMIUM_SCOPE_WEEK,
-    }:
+    if premium_scope in {None, PREMIUM_SCOPE_STARTER}:
         return False
     if premium_scope in {PREMIUM_SCOPE_SEASON, PREMIUM_SCOPE_YEAR}:
         return True

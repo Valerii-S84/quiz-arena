@@ -14,17 +14,8 @@ REFERRAL_REWARDS_PER_MONTH_CAP = 2
 REFERRAL_CYCLE_WINDOW = timedelta(days=30)
 REFERRAL_STARTS_DAILY_LIMIT = 10
 
-REWARD_CODE_PREMIUM_WEEK = "PREMIUM_WEEK"
 REWARD_CODE_PREMIUM_STARTER = "PREMIUM_STARTER"
 DEFAULT_REFERRAL_REWARD_CODE = REWARD_CODE_PREMIUM_STARTER
-
-
-def normalize_referral_reward_code(reward_code: str) -> str:
-    normalized = reward_code.strip().upper()
-    if normalized == REWARD_CODE_PREMIUM_WEEK:
-        return REWARD_CODE_PREMIUM_STARTER
-    return normalized
-
 
 FRAUD_SCORE_CYCLIC = Decimal("95.00")
 FRAUD_SCORE_VELOCITY = Decimal("80.00")

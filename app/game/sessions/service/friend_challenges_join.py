@@ -5,16 +5,30 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.analytics_events import EVENT_SOURCE_BOT
+from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
+from app.db.repo.friend_challenges_repo import FriendChallengesRepo
+from app.game.friend_challenges.constants import (
+    DUEL_STATUS_ACCEPTED,
+    DUEL_STATUS_CREATOR_DONE,
+    DUEL_STATUS_LEGACY_ACTIVE,
+    DUEL_STATUS_OPPONENT_DONE,
+    DUEL_STATUS_PENDING,
+    normalize_duel_status,
+)
+from app.game.sessions.errors import (
+    FriendChallengeCompletedError,
+    FriendChallengeExpiredError,
+    FriendChallengeFullError,
+    FriendChallengeNotFoundError,
+)
 from app.game.sessions.types import FriendChallengeJoinResult
 
-from .friend_challenges_join_analytics import emit_friend_challenge_joined_events
-from .friend_challenges_join_state import (
-    FriendChallengeJoinState,
-    load_joinable_friend_challenge_by_id,
-    load_joinable_friend_challenge_by_token,
+from .friend_challenges_internal import (
+    _build_friend_challenge_snapshot,
+    _emit_friend_challenge_expired_event,
+    _expire_friend_challenge_if_due,
+    _friend_challenge_expires_at_accepted,
 )
-from .friend_challenges_records import _build_friend_challenge_snapshot
 
 
 async def join_friend_challenge_by_token(
@@ -24,17 +38,9 @@ async def join_friend_challenge_by_token(
     invite_token: str,
     now_utc: datetime,
 ) -> FriendChallengeJoinResult:
-    join_state = await load_joinable_friend_challenge_by_token(
-        session,
-        user_id=user_id,
-        invite_token=invite_token,
-        now_utc=now_utc,
-    )
-    return await _build_join_result(
-        session,
-        user_id=user_id,
-        join_state=join_state,
-        now_utc=now_utc,
+    challenge = await FriendChallengesRepo.get_by_invite_token_for_update(session, invite_token)
+    return await _join_friend_challenge_locked(
+        session, user_id=user_id, challenge=challenge, now_utc=now_utc
     )
 
 
@@ -45,36 +51,88 @@ async def join_friend_challenge_by_id(
     challenge_id: UUID,
     now_utc: datetime,
 ) -> FriendChallengeJoinResult:
-    join_state = await load_joinable_friend_challenge_by_id(
-        session,
-        user_id=user_id,
-        challenge_id=challenge_id,
-        now_utc=now_utc,
-    )
-    return await _build_join_result(
-        session,
-        user_id=user_id,
-        join_state=join_state,
-        now_utc=now_utc,
+    challenge = await FriendChallengesRepo.get_by_id_for_update(session, challenge_id)
+    return await _join_friend_challenge_locked(
+        session, user_id=user_id, challenge=challenge, now_utc=now_utc
     )
 
 
-async def _build_join_result(
+async def _join_friend_challenge_locked(
     session: AsyncSession,
     *,
     user_id: int,
-    join_state: FriendChallengeJoinState,
+    challenge,
     now_utc: datetime,
 ) -> FriendChallengeJoinResult:
-    if join_state.joined_now:
-        await emit_friend_challenge_joined_events(
+    if challenge is None:
+        raise FriendChallengeNotFoundError
+    challenge.status = normalize_duel_status(
+        status=challenge.status,
+        has_opponent=challenge.opponent_user_id is not None,
+    )
+    if _expire_friend_challenge_if_due(challenge=challenge, now_utc=now_utc):
+        await _emit_friend_challenge_expired_event(
             session,
-            challenge=join_state.challenge,
+            challenge=challenge,
             happened_at=now_utc,
             source=EVENT_SOURCE_BOT,
-            user_id=user_id,
         )
-    return FriendChallengeJoinResult(
-        snapshot=_build_friend_challenge_snapshot(join_state.challenge),
-        joined_now=join_state.joined_now,
-    )
+    if challenge.status == "EXPIRED":
+        raise FriendChallengeExpiredError
+    if challenge.status not in {
+        DUEL_STATUS_PENDING,
+        DUEL_STATUS_ACCEPTED,
+        DUEL_STATUS_CREATOR_DONE,
+        DUEL_STATUS_OPPONENT_DONE,
+        DUEL_STATUS_LEGACY_ACTIVE,
+    }:
+        raise FriendChallengeCompletedError
+    if challenge.creator_user_id == user_id:
+        return FriendChallengeJoinResult(
+            snapshot=_build_friend_challenge_snapshot(challenge),
+            joined_now=False,
+        )
+    if challenge.opponent_user_id is None:
+        challenge.opponent_user_id = user_id
+        challenge.status = DUEL_STATUS_ACCEPTED
+        challenge.expires_at = _friend_challenge_expires_at_accepted(now_utc=now_utc)
+        challenge.updated_at = now_utc
+        await emit_analytics_event(
+            session,
+            event_type="friend_challenge_joined",
+            source=EVENT_SOURCE_BOT,
+            happened_at=now_utc,
+            user_id=user_id,
+            payload={
+                "challenge_id": str(challenge.id),
+                "creator_user_id": challenge.creator_user_id,
+                "mode_code": challenge.mode_code,
+                "total_rounds": challenge.total_rounds,
+                "expires_at": challenge.expires_at.isoformat(),
+                "series_id": str(challenge.series_id) if challenge.series_id is not None else None,
+                "series_game_number": challenge.series_game_number,
+                "series_best_of": challenge.series_best_of,
+            },
+        )
+        await emit_analytics_event(
+            session,
+            event_type="duel_accepted",
+            source=EVENT_SOURCE_BOT,
+            happened_at=now_utc,
+            user_id=user_id,
+            payload={
+                "challenge_id": str(challenge.id),
+                "challenge_type": challenge.challenge_type,
+                "format": challenge.total_rounds,
+            },
+        )
+        return FriendChallengeJoinResult(
+            snapshot=_build_friend_challenge_snapshot(challenge),
+            joined_now=True,
+        )
+    if challenge.opponent_user_id == user_id:
+        return FriendChallengeJoinResult(
+            snapshot=_build_friend_challenge_snapshot(challenge),
+            joined_now=False,
+        )
+    raise FriendChallengeFullError

@@ -6,12 +6,13 @@ from uuid import UUID
 
 import pytest
 
-from app.bot.handlers import start, start_friend_challenge_flow_messages
+from app.bot.handlers import start
 from app.bot.texts.de import TEXTS_DE
 from app.economy.offers.types import OfferSelection
 from app.game.sessions.errors import FriendChallengeExpiredError, FriendChallengeNotFoundError
 from app.game.sessions.types import (
     FriendChallengeJoinResult,
+    FriendChallengeRoundStartResult,
     FriendChallengeSnapshot,
     SessionQuestionView,
     StartSessionResult,
@@ -171,7 +172,7 @@ async def test_handle_start_friend_token_expired(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_handle_start_duel_payload_joins_and_shows_onboarding_screen(monkeypatch) -> None:
+async def test_handle_start_duel_payload_joins_and_shows_challenge_immediately(monkeypatch) -> None:
     monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
@@ -198,49 +199,8 @@ async def test_handle_start_duel_payload_joins_and_shows_onboarding_screen(monke
             joined_now=True,
         )
 
-    async def _fake_notify_creator(*args, **kwargs):
-        return None
-
-    async def _fake_resolve_label(*, challenge, user_id):
-        del challenge, user_id
-        return "Freund"
-
-    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(start.GameSessionService, "join_friend_challenge_by_id", _fake_join_by_id)
-    monkeypatch.setattr(start.start_flow, "_notify_creator_about_join", _fake_notify_creator)
-    monkeypatch.setattr(start.start_flow, "_resolve_opponent_label", _fake_resolve_label)
-
-    message = _StartMessage(
-        text="/start duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        from_user=SimpleNamespace(id=1, username="alice", first_name="Alice", language_code="de"),
-    )
-    await start.handle_start(message)
-
-    assert len(message.answers) == 1
-    response = message.answers[0]
-    assert response.text == TEXTS_DE["msg.friend.challenge.onboarding"].format(
-        challenger_name="Freund"
-    )
-    buttons = [button for row in response.kwargs["reply_markup"].inline_keyboard for button in row]
-    assert [button.text for button in buttons] == ["▶️ Spielen", "ℹ️ Was ist Quiz Arena?"]
-    assert [button.callback_data for button in buttons] == [
-        "friend:next:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        "friend:onboarding:info:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-    ]
-
-
-@pytest.mark.asyncio
-async def test_handle_start_duel_payload_sends_onboarding_photo_when_configured(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
-
-    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
-        assert start_payload == "duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-        return SimpleNamespace(user_id=9, free_energy=20, paid_energy=1, current_streak=1)
-
-    async def _fake_join_by_id(*args, **kwargs):
-        return FriendChallengeJoinResult(
+    async def _fake_start_round(*args, **kwargs):
+        return FriendChallengeRoundStartResult(
             snapshot=FriendChallengeSnapshot(
                 challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
                 invite_token="token",
@@ -256,65 +216,28 @@ async def test_handle_start_duel_payload_sends_onboarding_photo_when_configured(
                 opponent_score=0,
                 winner_user_id=None,
             ),
-            joined_now=False,
-        )
-
-    async def _fake_resolve_label(*, challenge, user_id):
-        del challenge, user_id
-        return "Freund"
-
-    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(start.GameSessionService, "join_friend_challenge_by_id", _fake_join_by_id)
-    monkeypatch.setattr(start.start_flow, "_resolve_opponent_label", _fake_resolve_label)
-    monkeypatch.setattr(
-        start_friend_challenge_flow_messages,
-        "get_settings",
-        lambda: SimpleNamespace(resolved_welcome_image_file_id="AgAC-duel-onboarding"),
-    )
-
-    message = _StartMessageWithPhotoGuard(
-        text="/start duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        from_user=SimpleNamespace(id=1, username="alice", first_name="Alice", language_code="de"),
-    )
-    await start.handle_start(message)
-
-    assert message.photo_calls == 1
-    assert len(message.answers) == 1
-    assert message.answers[0].kwargs.get("photo") == "AgAC-duel-onboarding"
-    assert message.answers[0].kwargs.get("caption") == TEXTS_DE[
-        "msg.friend.challenge.onboarding"
-    ].format(challenger_name="Freund")
-
-
-@pytest.mark.asyncio
-async def test_handle_start_duel_payload_hides_onboarding_for_non_playable_snapshot(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
-
-    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
-        assert start_payload == "duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-        return SimpleNamespace(user_id=9, free_energy=20, paid_energy=1, current_streak=1)
-
-    async def _fake_join_by_id(*args, **kwargs):
-        return FriendChallengeJoinResult(
-            snapshot=FriendChallengeSnapshot(
-                challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-                invite_token="token",
-                challenge_type="DIRECT",
-                mode_code="QUICK_MIX_A1A2",
-                access_type="FREE",
-                status="COMPLETED",
-                creator_user_id=1,
-                opponent_user_id=9,
-                current_round=5,
-                total_rounds=5,
-                creator_score=2,
-                opponent_score=3,
-                winner_user_id=9,
+            start_result=StartSessionResult(
+                session=SessionQuestionView(
+                    session_id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                    question_id="q-1",
+                    text="Frage?",
+                    options=("A", "B", "C", "D"),
+                    mode_code="QUICK_MIX_A1A2",
+                    source="FRIEND_CHALLENGE",
+                    category="Test",
+                    question_number=1,
+                    total_questions=5,
+                ),
+                energy_free=20,
+                energy_paid=1,
+                idempotent_replay=False,
             ),
-            joined_now=False,
+            waiting_for_opponent=False,
+            already_answered_current_round=False,
         )
+
+    async def _fake_notify_creator(*args, **kwargs):
+        return None
 
     async def _fake_resolve_label(*, challenge, user_id):
         del challenge, user_id
@@ -322,6 +245,8 @@ async def test_handle_start_duel_payload_hides_onboarding_for_non_playable_snaps
 
     monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(start.GameSessionService, "join_friend_challenge_by_id", _fake_join_by_id)
+    monkeypatch.setattr(start.GameSessionService, "start_friend_challenge_round", _fake_start_round)
+    monkeypatch.setattr(start.start_flow, "_notify_creator_about_join", _fake_notify_creator)
     monkeypatch.setattr(start.start_flow, "_resolve_opponent_label", _fake_resolve_label)
 
     message = _StartMessage(
@@ -330,22 +255,9 @@ async def test_handle_start_duel_payload_hides_onboarding_for_non_playable_snaps
     )
     await start.handle_start(message)
 
-    assert len(message.answers) == 1
-    response = message.answers[0]
-    assert response.text == TEXTS_DE["msg.friend.challenge.invalid"]
-    callbacks = [
-        button.callback_data
-        for row in response.kwargs["reply_markup"].inline_keyboard
-        for button in row
-        if button.callback_data
-    ]
-    assert callbacks == [
-        "daily_challenge",
-        "friend:challenge:create",
-        "play",
-        "mode:ARTIKEL_SPRINT",
-        "shop:open",
-    ]
+    assert len(message.answers) == 2
+    assert TEXTS_DE["msg.friend.challenge.joined"] in (message.answers[0].text or "")
+    assert message.answers[1].kwargs.get("parse_mode") == "HTML"
 
 
 @pytest.mark.asyncio

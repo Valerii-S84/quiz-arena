@@ -192,7 +192,7 @@ async def test_premium_downgrade_is_blocked_during_active_higher_tier() -> None:
             await PurchaseService.init_purchase(
                 session,
                 user_id=user_id,
-                product_code="PREMIUM_WEEK",
+                product_code="PREMIUM_STARTER",
                 idempotency_key="premium-downgrade-1",
                 now_utc=now_utc,
             )

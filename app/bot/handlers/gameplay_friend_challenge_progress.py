@@ -6,7 +6,6 @@ from app.bot.handlers import gameplay_callbacks
 from app.bot.handlers.gameplay_flows import (
     friend_challenge_flow,
     friend_next_flow,
-    friend_onboarding_flow,
     friend_series_flow,
     proof_card_flow,
 )
@@ -78,58 +77,6 @@ async def handle_friend_challenge_share_result(callback: CallbackQuery) -> None:
         build_friend_result_share_url=gameplay._build_friend_result_share_url,
         emit_analytics_event=gameplay.emit_analytics_event,
         event_source_bot=gameplay.EVENT_SOURCE_BOT,
-    )
-
-
-async def handle_friend_challenge_onboarding_show(callback: CallbackQuery) -> None:
-    gameplay = get_gameplay_module()
-    await friend_onboarding_flow.handle_friend_challenge_onboarding_show(
-        callback,
-        friend_onboarding_show_re=gameplay_callbacks.FRIEND_ONBOARDING_SHOW_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        session_local=gameplay.SessionLocal,
-        user_onboarding_service=gameplay.UserOnboardingService,
-        game_session_service=gameplay.GameSessionService,
-        resolve_opponent_label=gameplay._resolve_opponent_label,
-    )
-
-
-async def handle_friend_challenge_onboarding_info(callback: CallbackQuery) -> None:
-    gameplay = get_gameplay_module()
-    await friend_onboarding_flow.handle_friend_challenge_onboarding_info(
-        callback,
-        friend_onboarding_info_re=gameplay_callbacks.FRIEND_ONBOARDING_INFO_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        session_local=gameplay.SessionLocal,
-        user_onboarding_service=gameplay.UserOnboardingService,
-        game_session_service=gameplay.GameSessionService,
-    )
-
-
-async def handle_friend_challenge_finished_show(callback: CallbackQuery) -> None:
-    gameplay = get_gameplay_module()
-    await friend_onboarding_flow.handle_friend_challenge_finished_show(
-        callback,
-        friend_finished_show_re=gameplay_callbacks.FRIEND_FINISHED_SHOW_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        session_local=gameplay.SessionLocal,
-        user_onboarding_service=gameplay.UserOnboardingService,
-        game_session_service=gameplay.GameSessionService,
-        resolve_opponent_label=gameplay._resolve_opponent_label,
-        build_friend_score_text=gameplay._build_friend_score_text,
-        build_friend_finish_text=gameplay._build_friend_finish_text,
-    )
-
-
-async def handle_friend_challenge_finished_info(callback: CallbackQuery) -> None:
-    gameplay = get_gameplay_module()
-    await friend_onboarding_flow.handle_friend_challenge_finished_info(
-        callback,
-        friend_finished_info_re=gameplay_callbacks.FRIEND_FINISHED_INFO_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        session_local=gameplay.SessionLocal,
-        user_onboarding_service=gameplay.UserOnboardingService,
-        game_session_service=gameplay.GameSessionService,
     )
 
 

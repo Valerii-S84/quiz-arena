@@ -1,112 +1,45 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, cast
 
-from aiogram.types import CallbackQuery, Message
-from aiogram.types import User as TelegramUser
+from aiogram.types import CallbackQuery
 
-from app.bot.handlers.gameplay_flows import friend_answer_flow_runtime
 from app.bot.handlers.gameplay_flows.friend_answer_completion_flow import (
+    FriendCompletionCallbacks,
     handle_completed_friend_challenge,
 )
 from app.bot.handlers.gameplay_flows.friend_challenge_push_quota import reserve_duel_push_slot
+from app.bot.keyboards.friend_challenge import (
+    build_friend_challenge_back_keyboard,
+    build_friend_challenge_finished_keyboard,
+    build_friend_challenge_start_keyboard,
+)
+from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
+from app.game.sessions.errors import (
+    FriendChallengeAccessError,
+    FriendChallengeCompletedError,
+    FriendChallengeExpiredError,
+    FriendChallengeFullError,
+    FriendChallengeNotFoundError,
+)
 from app.game.sessions.types import AnswerSessionResult
 
 
-@dataclass(slots=True)
-class _FriendAnswerRequest:
-    message: Message
-    telegram_user: TelegramUser
-
-
-@dataclass(slots=True)
-class _FriendAnswerDeps:
-    session_local: Any
-    user_onboarding_service: Any
-    game_session_service: Any
-    resolve_opponent_label: Any
-    notify_opponent: Any
-    friend_opponent_user_id: Any
-    build_friend_score_text: Any
-    build_friend_ttl_text: Any
-    build_friend_finish_text: Any
-    build_public_badge_label: Any
-    build_friend_proof_card_text: Any
-    enqueue_friend_challenge_proof_cards: Any
-    build_series_progress_text: Any
-    send_friend_round_question: Any
-
-
-def _build_friend_answer_deps(
+async def _should_notify_creator_after_opponent_finished(
     *,
     session_local,
-    user_onboarding_service,
-    game_session_service,
-    resolve_opponent_label,
-    notify_opponent,
-    friend_opponent_user_id,
-    build_friend_score_text,
-    build_friend_ttl_text,
-    build_friend_finish_text,
-    build_public_badge_label,
-    build_friend_proof_card_text,
-    enqueue_friend_challenge_proof_cards,
-    build_series_progress_text,
-    send_friend_round_question,
-) -> _FriendAnswerDeps:
-    return _FriendAnswerDeps(
-        session_local=session_local,
-        user_onboarding_service=user_onboarding_service,
-        game_session_service=game_session_service,
-        resolve_opponent_label=resolve_opponent_label,
-        notify_opponent=notify_opponent,
-        friend_opponent_user_id=friend_opponent_user_id,
-        build_friend_score_text=build_friend_score_text,
-        build_friend_ttl_text=build_friend_ttl_text,
-        build_friend_finish_text=build_friend_finish_text,
-        build_public_badge_label=build_public_badge_label,
-        build_friend_proof_card_text=build_friend_proof_card_text,
-        enqueue_friend_challenge_proof_cards=enqueue_friend_challenge_proof_cards,
-        build_series_progress_text=build_series_progress_text,
-        send_friend_round_question=send_friend_round_question,
-    )
-
-
-async def _parse_friend_answer_request(
-    callback: CallbackQuery,
-) -> _FriendAnswerRequest | None:
-    if callback.from_user is None or callback.message is None:
-        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
-        return None
-
-    return _FriendAnswerRequest(
-        message=cast(Message, callback.message),
-        telegram_user=callback.from_user,
-    )
-
-
-async def _run_friend_answer_branch(
-    callback: CallbackQuery,
-    *,
-    request: _FriendAnswerRequest,
-    result: AnswerSessionResult,
-    now_utc: datetime,
-    deps: _FriendAnswerDeps,
-) -> None:
-    await friend_answer_flow_runtime.run_friend_answer_branch(
-        callback,
-        message=request.message,
-        telegram_user=request.telegram_user,
-        result=result,
-        now_utc=now_utc,
-        deps=deps,
-        friend_challenges_repo=FriendChallengesRepo,
-        reserve_duel_push_slot=reserve_duel_push_slot,
-        handle_completed_friend_challenge=handle_completed_friend_challenge,
+    challenge_id,
+    target_user_id: int,
+) -> bool:
+    async with session_local.begin() as session:
+        challenge_row = await FriendChallengesRepo.get_by_id(session, challenge_id)
+    return bool(
+        challenge_row is not None
+        and challenge_row.creator_user_id == target_user_id
+        and challenge_row.opponent_answered_round == challenge_row.total_rounds
+        and challenge_row.creator_answered_round == 0
     )
 
 
@@ -130,29 +63,149 @@ async def handle_friend_answer_branch(
     build_series_progress_text,
     send_friend_round_question,
 ) -> None:
-    request = await _parse_friend_answer_request(callback)
-    if request is None:
+    if callback.from_user is None or callback.message is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
 
-    await _run_friend_answer_branch(
-        callback,
-        request=request,
-        result=result,
-        now_utc=now_utc,
-        deps=_build_friend_answer_deps(
-            session_local=session_local,
-            user_onboarding_service=user_onboarding_service,
-            game_session_service=game_session_service,
-            resolve_opponent_label=resolve_opponent_label,
-            notify_opponent=notify_opponent,
-            friend_opponent_user_id=friend_opponent_user_id,
-            build_friend_score_text=build_friend_score_text,
-            build_friend_ttl_text=build_friend_ttl_text,
-            build_friend_finish_text=build_friend_finish_text,
-            build_public_badge_label=build_public_badge_label,
-            build_friend_proof_card_text=build_friend_proof_card_text,
-            enqueue_friend_challenge_proof_cards=enqueue_friend_challenge_proof_cards,
-            build_series_progress_text=build_series_progress_text,
-            send_friend_round_question=send_friend_round_question,
-        ),
+    async with session_local.begin() as session:
+        snapshot = await user_onboarding_service.ensure_home_snapshot(
+            session,
+            telegram_user=callback.from_user,
+        )
+
+    if result.friend_challenge is None:
+        await callback.message.answer(
+            TEXTS_DE["msg.friend.challenge.invalid"], reply_markup=build_home_keyboard()
+        )
+        await callback.answer()
+        return
+
+    challenge = result.friend_challenge
+    opponent_label = await resolve_opponent_label(
+        challenge=challenge,
+        user_id=snapshot.user_id,
     )
+    await callback.message.answer(
+        build_friend_score_text(
+            challenge=challenge,
+            user_id=snapshot.user_id,
+            opponent_label=opponent_label,
+        )
+    )
+    ttl_text = build_friend_ttl_text(challenge=challenge, now_utc=now_utc)
+    if ttl_text is not None:
+        await callback.message.answer(ttl_text)
+
+    opponent_user_id = friend_opponent_user_id(challenge=challenge, user_id=snapshot.user_id)
+    if result.friend_challenge_round_completed:
+        round_result_text = TEXTS_DE["msg.friend.challenge.round.result"].format(
+            round_no=(result.friend_challenge_answered_round or challenge.current_round)
+        )
+        await callback.message.answer(
+            round_result_text,
+        )
+
+    if (
+        not result.idempotent_replay
+        and opponent_user_id is not None
+        and opponent_user_id == challenge.creator_user_id
+        and await _should_notify_creator_after_opponent_finished(
+            session_local=session_local,
+            challenge_id=challenge.challenge_id,
+            target_user_id=opponent_user_id,
+        )
+    ):
+        push_reserved = await reserve_duel_push_slot(
+            session_local=session_local,
+            challenge_id=challenge.challenge_id,
+            target_user_id=opponent_user_id,
+            now_utc=now_utc,
+        )
+        if push_reserved:
+            await notify_opponent(
+                callback,
+                opponent_user_id=opponent_user_id,
+                text=TEXTS_DE["msg.friend.challenge.turn.reminder"],
+                reply_markup=build_friend_challenge_start_keyboard(
+                    challenge_id=str(challenge.challenge_id)
+                ),
+            )
+
+    if challenge.status in {"COMPLETED", "EXPIRED", "WALKOVER", "CANCELED"}:
+        await handle_completed_friend_challenge(
+            callback,
+            challenge=challenge,
+            snapshot_user_id=snapshot.user_id,
+            opponent_label=opponent_label,
+            opponent_user_id=opponent_user_id,
+            now_utc=now_utc,
+            idempotent_replay=result.idempotent_replay,
+            session_local=session_local,
+            game_session_service=game_session_service,
+            callbacks=FriendCompletionCallbacks(
+                resolve_opponent_label=resolve_opponent_label,
+                notify_opponent=notify_opponent,
+                build_friend_score_text=build_friend_score_text,
+                build_friend_finish_text=build_friend_finish_text,
+                build_public_badge_label=build_public_badge_label,
+                build_friend_proof_card_text=build_friend_proof_card_text,
+                enqueue_friend_challenge_proof_cards=enqueue_friend_challenge_proof_cards,
+                build_series_progress_text=build_series_progress_text,
+            ),
+        )
+        await callback.answer()
+        return
+
+    async with session_local.begin() as session:
+        snapshot = await user_onboarding_service.ensure_home_snapshot(
+            session,
+            telegram_user=callback.from_user,
+        )
+        try:
+            round_start = await game_session_service.start_friend_challenge_round(
+                session,
+                user_id=snapshot.user_id,
+                challenge_id=challenge.challenge_id,
+                idempotency_key=f"start:friend:auto:{challenge.challenge_id}:{callback.id}",
+                now_utc=now_utc,
+            )
+        except FriendChallengeExpiredError:
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.expired"],
+                reply_markup=build_friend_challenge_finished_keyboard(
+                    challenge_id=str(challenge.challenge_id)
+                ),
+            )
+            await callback.answer()
+            return
+        except (
+            FriendChallengeNotFoundError,
+            FriendChallengeAccessError,
+            FriendChallengeCompletedError,
+            FriendChallengeFullError,
+        ):
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.invalid"],
+                reply_markup=build_home_keyboard(),
+            )
+            await callback.answer()
+            return
+
+    if round_start.start_result is not None:
+        await send_friend_round_question(
+            callback,
+            snapshot_free_energy=snapshot.free_energy,
+            snapshot_paid_energy=snapshot.paid_energy,
+            round_start=round_start,
+        )
+    else:
+        waiting_text = TEXTS_DE["msg.friend.challenge.all_answered.waiting"].format(
+            total_rounds=challenge.total_rounds,
+            opponent_label=opponent_label,
+        )
+        await callback.message.answer(
+            waiting_text,
+            reply_markup=build_friend_challenge_back_keyboard(),
+        )
+
+    await callback.answer()

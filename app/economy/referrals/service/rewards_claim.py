@@ -10,7 +10,6 @@ from app.economy.referrals.constants import (
     REFERRAL_REWARDS_PER_MONTH_CAP,
     REWARD_CODE_PREMIUM_STARTER,
     REWARD_DELAY,
-    normalize_referral_reward_code,
 )
 
 from .models import ReferralClaimResult
@@ -26,7 +25,7 @@ async def claim_next_reward_choice(
     reward_code: str,
     now_utc: datetime,
 ) -> ReferralClaimResult | None:
-    normalized_reward_code = normalize_referral_reward_code(reward_code)
+    normalized_reward_code = reward_code.strip().upper()
     if normalized_reward_code != REWARD_CODE_PREMIUM_STARTER:
         raise ValueError(f"unsupported reward code: {reward_code}")
 

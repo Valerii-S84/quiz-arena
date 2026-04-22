@@ -7,7 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.friend_challenges import FriendChallenge
-from app.db.repo.friend_challenges_repo_core import _DUEL_LIVE_STATUSES
+
+from .friend_challenges_repo_core import _DUEL_LIVE_STATUSES
 
 
 class FriendChallengesRepoDeadlineMixin:

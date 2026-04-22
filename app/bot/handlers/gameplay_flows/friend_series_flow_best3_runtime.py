@@ -13,8 +13,29 @@ from app.game.sessions.errors import (
     FriendChallengePaymentRequiredError,
 )
 
-from .friend_series_flow_best3_render import notify_series_best3_opponent, send_series_best3_message
-from .friend_series_flow_common import handle_series_flow_error
+from .friend_series_flow_common import build_series_reply_markup, handle_series_flow_error
+
+
+def _build_series_start_text(
+    *,
+    series_duel: Any,
+    opponent_label: str,
+    build_friend_plan_text,
+    build_series_progress_text,
+) -> str:
+    return "\n".join(
+        [
+            TEXTS_DE["msg.friend.challenge.series.started"].format(opponent_label=opponent_label),
+            build_friend_plan_text(total_rounds=series_duel.total_rounds),
+            build_series_progress_text(
+                game_no=series_duel.series_game_number,
+                best_of=series_duel.series_best_of,
+                my_wins=0,
+                opponent_wins=0,
+                opponent_label=opponent_label,
+            ),
+        ]
+    )
 
 
 def _parse_series_best3_challenge_id(*, callback_data: str, pattern, parse_uuid_callback):
@@ -42,6 +63,53 @@ async def _start_series_best3_duel(
             best_of=3,
         )
     return series_duel, snapshot
+
+
+async def _send_series_start_message(
+    *,
+    message: Any,
+    series_duel: Any,
+    opponent_label: str,
+    build_friend_plan_text,
+    build_series_progress_text,
+) -> None:
+    await message.answer(
+        _build_series_start_text(
+            series_duel=series_duel,
+            opponent_label=opponent_label,
+            build_friend_plan_text=build_friend_plan_text,
+            build_series_progress_text=build_series_progress_text,
+        ),
+        reply_markup=build_series_reply_markup(challenge_id=str(series_duel.challenge_id)),
+    )
+
+
+async def _notify_series_start_opponent(
+    *,
+    callback: CallbackQuery,
+    series_duel: Any,
+    viewer_user_id: int,
+    resolve_opponent_label,
+    friend_opponent_user_id,
+    notify_opponent,
+    build_friend_plan_text,
+    build_series_progress_text,
+) -> None:
+    opponent_user_id = friend_opponent_user_id(challenge=series_duel, user_id=viewer_user_id)
+    if opponent_user_id is None:
+        return
+    opponent_label = await resolve_opponent_label(challenge=series_duel, user_id=opponent_user_id)
+    await notify_opponent(
+        callback,
+        opponent_user_id=opponent_user_id,
+        text=_build_series_start_text(
+            series_duel=series_duel,
+            opponent_label=opponent_label,
+            build_friend_plan_text=build_friend_plan_text,
+            build_series_progress_text=build_series_progress_text,
+        ),
+        reply_markup=build_series_reply_markup(challenge_id=str(series_duel.challenge_id)),
+    )
 
 
 async def _run_friend_challenge_series_best3(
@@ -80,14 +148,14 @@ async def _run_friend_challenge_series_best3(
         challenge=series_duel,
         user_id=snapshot.user_id,
     )
-    await send_series_best3_message(
+    await _send_series_start_message(
         message=message,
         series_duel=series_duel,
         opponent_label=opponent_label,
         build_friend_plan_text=deps["build_friend_plan_text"],
         build_series_progress_text=deps["build_series_progress_text"],
     )
-    await notify_series_best3_opponent(
+    await _notify_series_start_opponent(
         callback=callback,
         series_duel=series_duel,
         viewer_user_id=snapshot.user_id,
