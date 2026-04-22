@@ -37,11 +37,10 @@ def build_activity_days_subquery(*, from_utc: datetime, to_utc: datetime):
     ).subquery()
 
 
-def build_activity_day_hours_subquery(*, from_utc: datetime, to_utc: datetime):
+def build_activity_hours_subquery(*, from_utc: datetime, to_utc: datetime):
     return union_all(
         select(
             User.id.label("user_id"),
-            func.date(func.timezone("Europe/Berlin", User.created_at)).label("local_date_berlin"),
             cast(
                 func.extract("hour", func.timezone("Europe/Berlin", User.created_at)),
                 Integer,
@@ -49,7 +48,6 @@ def build_activity_day_hours_subquery(*, from_utc: datetime, to_utc: datetime):
         ).where(User.created_at >= from_utc, User.created_at < to_utc),
         select(
             AnalyticsEvent.user_id.label("user_id"),
-            AnalyticsEvent.local_date_berlin.label("local_date_berlin"),
             cast(
                 func.extract("hour", func.timezone("Europe/Berlin", AnalyticsEvent.happened_at)),
                 Integer,
@@ -61,7 +59,6 @@ def build_activity_day_hours_subquery(*, from_utc: datetime, to_utc: datetime):
         ),
         select(
             QuizSession.user_id.label("user_id"),
-            QuizSession.local_date_berlin.label("local_date_berlin"),
             cast(
                 func.extract("hour", func.timezone("Europe/Berlin", QuizSession.started_at)),
                 Integer,

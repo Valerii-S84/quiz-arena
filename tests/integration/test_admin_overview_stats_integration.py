@@ -179,62 +179,14 @@ async def test_overview_payload_uses_first_milestones_and_consistent_activity_mo
     assert payload["kpis"]["retention_d1"]["current"] == 100.0
     assert payload["kpis"]["dau"]["current"] == 2.0
     hourly_activity = {
-        int(item["hour"]): float(item["active_users"]) for item in payload["hourly_activity_series"]
+        int(item["hour"]): int(item["active_users"]) for item in payload["hourly_activity_series"]
     }
-    assert hourly_activity[10] == pytest.approx(0.57, abs=0.01)
-    assert hourly_activity[11] == pytest.approx(0.43, abs=0.01)
-    assert hourly_activity[12] == pytest.approx(0.14, abs=0.01)
+    assert hourly_activity[10] == 2
+    assert hourly_activity[11] == 2
+    assert hourly_activity[12] == 1
     assert payload["funnel"] == [
         {"step": "Start", "value": 2},
         {"step": "First Quiz", "value": 1},
         {"step": "Streak 3+", "value": 1},
         {"step": "Purchase", "value": 1},
     ]
-
-
-@pytest.mark.asyncio
-async def test_overview_hourly_activity_averages_users_per_day_instead_of_merging_whole_window() -> (
-    None
-):
-    now_utc = datetime(2026, 4, 10, 12, 0, tzinfo=UTC)
-    user_a = await _create_user(
-        seed="overview-hour-a",
-        created_at=datetime(2026, 4, 1, 9, 0, tzinfo=UTC),
-        last_seen_at=None,
-    )
-    user_b = await _create_user(
-        seed="overview-hour-b",
-        created_at=datetime(2026, 4, 1, 10, 0, tzinfo=UTC),
-        last_seen_at=None,
-    )
-
-    async with SessionLocal.begin() as session:
-        session.add_all(
-            [
-                _quiz_session(
-                    user_id=user_a,
-                    started_at=datetime(2026, 4, 9, 8, 0, tzinfo=UTC),
-                    completed_at=datetime(2026, 4, 9, 8, 2, tzinfo=UTC),
-                    local_day=date(2026, 4, 9),
-                    status="COMPLETED",
-                    suffix="hour-a",
-                ),
-                _quiz_session(
-                    user_id=user_b,
-                    started_at=datetime(2026, 4, 10, 8, 0, tzinfo=UTC),
-                    completed_at=datetime(2026, 4, 10, 8, 2, tzinfo=UTC),
-                    local_day=date(2026, 4, 10),
-                    status="COMPLETED",
-                    suffix="hour-b",
-                ),
-            ]
-        )
-
-    async with SessionLocal.begin() as session:
-        payload = as_any_dict(await build_overview_payload(session, now_utc=now_utc, days=2))
-
-    hourly_activity = {
-        int(item["hour"]): float(item["active_users"]) for item in payload["hourly_activity_series"]
-    }
-
-    assert hourly_activity[10] == pytest.approx(1.0, abs=0.01)
