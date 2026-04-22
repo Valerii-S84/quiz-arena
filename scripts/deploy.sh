@@ -39,7 +39,7 @@ rsync -az --delete \
   ./ "${REMOTE}:${REMOTE_DIR}/"
 
 ssh "$REMOTE" "cd ${REMOTE_DIR} && \
-  if [[ ! -f .env ]]; then cp .env.production.example .env; fi && \
+  if [[ ! -f .env ]]; then echo 'Remote .env is missing. Refusing to deploy with example env.' >&2; exit 1; fi && \
   bash scripts/check_compose_runtime_consistency.sh --expected-compose-file ${REMOTE_DIR}/docker-compose.prod.yml && \
   docker compose -f docker-compose.prod.yml up -d postgres redis && \
   docker compose -f docker-compose.prod.yml build api frontend worker beat && \
