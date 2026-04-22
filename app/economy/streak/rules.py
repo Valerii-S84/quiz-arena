@@ -7,6 +7,7 @@ from app.economy.streak.constants import (
     MONTHLY_PREMIUM_FREEZE_LIMIT,
     PREMIUM_SCOPE_3_DAYS,
     PREMIUM_SCOPE_SEASON,
+    PREMIUM_SCOPE_STARTER,
     PREMIUM_SCOPE_WEEK,
     PREMIUM_SCOPE_YEAR,
 )
@@ -28,6 +29,7 @@ def _premium_freeze_allowed(snapshot: StreakSnapshot, day: date, premium_scope: 
     if premium_scope in {
         None,
         PREMIUM_SCOPE_3_DAYS,
+        PREMIUM_SCOPE_STARTER,
         PREMIUM_SCOPE_WEEK,
     }:
         return False
