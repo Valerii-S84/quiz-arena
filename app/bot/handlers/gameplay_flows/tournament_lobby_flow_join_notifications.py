@@ -25,7 +25,9 @@ def _should_notify_creator(*, creator, callback_user_id: int, viewer_user_id: in
     )
 
 
-def _build_creator_join_text(*, callback: CallbackQuery, participant_count: int, max_participants: int) -> str:
+def _build_creator_join_text(
+    *, callback: CallbackQuery, participant_count: int, max_participants: int
+) -> str:
     return (
         f"✅ {(callback.from_user.first_name or 'Ein Spieler')} hat dein Turnier betreten!\n"
         f"Teilnehmer: {participant_count}/{max_participants}\n\n"

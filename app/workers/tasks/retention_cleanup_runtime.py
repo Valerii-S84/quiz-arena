@@ -11,13 +11,13 @@ import structlog
 from app.core.config import Settings
 from app.db.session import SessionLocal
 
-from .retention_cleanup_tables import CleanupTableSpec, build_cleanup_table_specs
 from .retention_cleanup_settings import (
     clamp_batch_size,
     clamp_max_batches,
     clamp_runtime_seconds,
     resolve_sleep_range_ms,
 )
+from .retention_cleanup_tables import CleanupTableSpec, build_cleanup_table_specs
 
 logger = structlog.get_logger(__name__)
 
@@ -41,6 +41,7 @@ def build_cleanup_config(settings: Settings) -> CleanupConfig:
         ),
     )
 
+
 async def cleanup_table_batched(
     *,
     spec: CleanupTableSpec,
@@ -56,16 +57,22 @@ async def cleanup_table_batched(
             runtime_guard_triggered = True
             break
         async with SessionLocal.begin() as session:
-            deleted_in_batch = await spec.delete_batch_fn(session, spec.cutoff_utc, config.batch_size)
+            deleted_in_batch = await spec.delete_batch_fn(
+                session, spec.cutoff_utc, config.batch_size
+            )
         batches_executed += 1
         rows_deleted += deleted_in_batch
         if deleted_in_batch < config.batch_size:
             break
         sleep_min_ms, sleep_max_ms = config.sleep_range_ms
         if sleep_max_ms > 0:
-            pause_ms = sleep_min_ms if sleep_min_ms == sleep_max_ms else randint(
-                sleep_min_ms,
-                sleep_max_ms,
+            pause_ms = (
+                sleep_min_ms
+                if sleep_min_ms == sleep_max_ms
+                else randint(
+                    sleep_min_ms,
+                    sleep_max_ms,
+                )
             )
             await asyncio.sleep(pause_ms / 1000)
 

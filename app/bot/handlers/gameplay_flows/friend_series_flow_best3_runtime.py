@@ -12,6 +12,7 @@ from app.game.sessions.errors import (
     FriendChallengeNotFoundError,
     FriendChallengePaymentRequiredError,
 )
+
 from .friend_series_flow_common import build_series_reply_markup, handle_series_flow_error
 
 
@@ -111,7 +112,9 @@ async def _notify_series_start_opponent(
     )
 
 
-async def _run_friend_challenge_series_best3(callback: CallbackQuery, *, deps: dict[str, Any]) -> None:
+async def _run_friend_challenge_series_best3(
+    callback: CallbackQuery, *, deps: dict[str, Any]
+) -> None:
     if callback.from_user is None or callback.message is None or callback.data is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return

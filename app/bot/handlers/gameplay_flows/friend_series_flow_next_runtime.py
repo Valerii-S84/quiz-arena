@@ -12,11 +12,9 @@ from app.game.sessions.errors import (
     FriendChallengeNotFoundError,
     FriendChallengePaymentRequiredError,
 )
+
 from .friend_series_flow_common import handle_series_flow_error
-from .friend_series_flow_next_render import (
-    notify_series_next_opponent,
-    send_series_next_message,
-)
+from .friend_series_flow_next_render import notify_series_next_opponent, send_series_next_message
 
 
 def _parse_series_next_challenge_id(*, callback_data: str, pattern, parse_uuid_callback):
@@ -79,7 +77,9 @@ async def _load_series_next_context(
         return None
 
 
-async def _run_friend_challenge_series_next(callback: CallbackQuery, *, deps: dict[str, Any]) -> None:
+async def _run_friend_challenge_series_next(
+    callback: CallbackQuery, *, deps: dict[str, Any]
+) -> None:
     if callback.from_user is None or callback.message is None or callback.data is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
@@ -105,7 +105,9 @@ async def _run_friend_challenge_series_next(callback: CallbackQuery, *, deps: di
         return
     next_duel, snapshot, score = context
     my_wins, opponent_wins, game_no, best_of = score
-    opponent_label = await deps["resolve_opponent_label"](challenge=next_duel, user_id=snapshot.user_id)
+    opponent_label = await deps["resolve_opponent_label"](
+        challenge=next_duel, user_id=snapshot.user_id
+    )
     await send_series_next_message(
         message=message,
         next_duel=next_duel,
