@@ -5,6 +5,8 @@ import os
 import sys
 import tempfile
 
+from sqlalchemy.engine import make_url
+
 from app.core.integration_db_safety import assert_safe_integration_db, assess_integration_db_safety
 
 TEST_DATABASE_URL = "postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test"
@@ -14,14 +16,27 @@ TEST_PROMO_ENCRYPTION_KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY"
 _BOOTSTRAPPED = False
 
 
+def _uses_async_database_driver(database_url: str) -> bool:
+    return make_url(database_url).drivername == "postgresql+asyncpg"
+
+
 def _resolve_test_database_url() -> str:
     explicit_test_database_url = os.environ.get("TEST_DATABASE_URL")
     if explicit_test_database_url:
         assert_safe_integration_db(explicit_test_database_url)
+        if not _uses_async_database_driver(explicit_test_database_url):
+            raise RuntimeError(
+                "TEST_DATABASE_URL must use an async PostgreSQL driver compatible with "
+                "create_async_engine."
+            )
         return explicit_test_database_url
 
     existing_database_url = os.environ.get("DATABASE_URL")
-    if existing_database_url and assess_integration_db_safety(existing_database_url).is_safe:
+    if (
+        existing_database_url
+        and assess_integration_db_safety(existing_database_url).is_safe
+        and _uses_async_database_driver(existing_database_url)
+    ):
         return existing_database_url
 
     return TEST_DATABASE_URL
