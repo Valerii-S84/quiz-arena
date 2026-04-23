@@ -217,11 +217,18 @@ def test_contact_partner_requires_idea(monkeypatch) -> None:
 
 def test_contact_honeypot_payload_is_silently_ignored(monkeypatch) -> None:
     session_stub = _SessionLocalStub()
+    call_count = {"count": 0}
+
+    async def _consume_contact_submission_slot(**kwargs) -> bool:
+        del kwargs
+        call_count["count"] += 1
+        return False
+
     monkeypatch.setattr(public_contact_routes, "SessionLocal", session_stub)
     monkeypatch.setattr(
         public_contact_routes,
         "consume_contact_submission_slot",
-        _allow_contact_submission_slot,
+        _consume_contact_submission_slot,
     )
     client = TestClient(app)
 
@@ -243,6 +250,7 @@ def test_contact_honeypot_payload_is_silently_ignored(monkeypatch) -> None:
 
     assert response.status_code == 202
     assert response.json() == {"ok": True}
+    assert call_count["count"] == 0
     assert not session_stub.added_rows
 
 

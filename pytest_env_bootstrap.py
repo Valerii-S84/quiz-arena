@@ -5,6 +5,8 @@ import os
 import sys
 import tempfile
 
+from app.core.integration_db_safety import assert_safe_integration_db, assess_integration_db_safety
+
 TEST_DATABASE_URL = "postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test"
 TEST_REDIS_URL = "redis://localhost:6379/15"
 TEST_PROMO_ENCRYPTION_KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY"
@@ -12,12 +14,27 @@ TEST_PROMO_ENCRYPTION_KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY"
 _BOOTSTRAPPED = False
 
 
+def _resolve_test_database_url() -> str:
+    explicit_test_database_url = os.environ.get("TEST_DATABASE_URL")
+    if explicit_test_database_url:
+        assert_safe_integration_db(explicit_test_database_url)
+        return explicit_test_database_url
+
+    existing_database_url = os.environ.get("DATABASE_URL")
+    if existing_database_url and assess_integration_db_safety(existing_database_url).is_safe:
+        return existing_database_url
+
+    return TEST_DATABASE_URL
+
+
 def bootstrap_pytest_env() -> None:
     global _BOOTSTRAPPED
     if _BOOTSTRAPPED:
         return
 
-    os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+    resolved_test_database_url = _resolve_test_database_url()
+    os.environ["TEST_DATABASE_URL"] = resolved_test_database_url
+    os.environ["DATABASE_URL"] = resolved_test_database_url
     os.environ.setdefault("TMPDIR", tempfile.gettempdir())
     os.environ.setdefault("REDIS_URL", TEST_REDIS_URL)
     os.environ.setdefault("CELERY_BROKER_URL", TEST_REDIS_URL)

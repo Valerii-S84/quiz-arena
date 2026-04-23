@@ -63,25 +63,23 @@ async def run_refund_promo_rollback_async(*, batch_size: int = 100) -> dict[str,
 
     for purchase_id in purchase_ids:
         try:
+            outcome: str | None = None
             async with SessionLocal.begin() as session:
                 purchase = await PurchasesRepo.get_by_id_for_update(session, purchase_id)
                 if purchase is None:
-                    summary["missing"] += 1
-                    continue
-                if purchase.status != "REFUNDED" or purchase.applied_promo_code_id is None:
-                    summary["skipped"] += 1
-                    continue
-
-                _, _, rollback_applied = await PromoRepo.revoke_redemption_for_refund(
-                    session,
-                    purchase_id=purchase.id,
-                    promo_code_id=purchase.applied_promo_code_id,
-                    now_utc=now_utc,
-                )
-                if rollback_applied:
-                    summary["rolled_back"] += 1
+                    outcome = "missing"
+                elif purchase.status != "REFUNDED" or purchase.applied_promo_code_id is None:
+                    outcome = "skipped"
                 else:
-                    summary["skipped"] += 1
+                    _, _, rollback_applied = await PromoRepo.revoke_redemption_for_refund(
+                        session,
+                        purchase_id=purchase.id,
+                        promo_code_id=purchase.applied_promo_code_id,
+                        now_utc=now_utc,
+                    )
+                    outcome = "rolled_back" if rollback_applied else "skipped"
+            if outcome is not None:
+                summary[outcome] += 1
         except Exception:
             summary["errors"] += 1
             logger.exception("promo_refund_rollback_error", purchase_id=str(purchase_id))

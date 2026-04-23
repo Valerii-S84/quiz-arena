@@ -34,7 +34,8 @@ async def consume_contact_submission_slot(
     key = _contact_rate_limit_key(bucket)
     try:
         count = await client.incr(key)
-        if count == 1:
+        ttl_seconds_remaining = await client.ttl(key)
+        if int(count) == 1 or int(ttl_seconds_remaining) < 0:
             await client.expire(key, ttl_seconds)
     except Exception as exc:
         raise _state_unavailable() from exc

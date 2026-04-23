@@ -166,12 +166,12 @@ run_step "Verify QuizBank reports freshness" "$PYTHON_BIN" scripts/quizbank_repo
 
 run_step "Validate TEST_DATABASE_URL safety" "$PYTHON_BIN" - <<'PY'
 import os
-from sqlalchemy.engine import make_url
+from app.core.integration_db_safety import assert_safe_integration_db, assess_integration_db_safety
 
-db_name = (make_url(os.environ["TEST_DATABASE_URL"]).database or "").strip()
-if "test" not in db_name.lower():
-    raise SystemExit(f"TEST_DATABASE_URL DB name must contain 'test', got: {db_name!r}")
-print(f"Using safe TEST_DATABASE_URL database: {db_name}")
+database_url = os.environ["TEST_DATABASE_URL"]
+assert_safe_integration_db(database_url)
+result = assess_integration_db_safety(database_url)
+print(f"Using safe TEST_DATABASE_URL database: {result.database_name} on host {result.host}")
 PY
 
 run_step "Architecture guards" architecture_guards
