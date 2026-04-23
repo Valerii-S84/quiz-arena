@@ -33,3 +33,18 @@ def test_bootstrap_pytest_env_uses_test_database_url_when_database_url_missing(
 
     assert os.environ["DATABASE_URL"] == custom_test_database_url
     assert os.environ["TEST_DATABASE_URL"] == custom_test_database_url
+
+
+def test_bootstrap_pytest_env_overrides_unsafe_database_url_with_default_test_url(
+    monkeypatch,
+) -> None:
+    unsafe_database_url = "postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena"
+
+    monkeypatch.setenv("DATABASE_URL", unsafe_database_url)
+    monkeypatch.delenv("TEST_DATABASE_URL", raising=False)
+    monkeypatch.setattr(pytest_env_bootstrap, "_BOOTSTRAPPED", False)
+
+    pytest_env_bootstrap.bootstrap_pytest_env()
+
+    assert os.environ["DATABASE_URL"] == pytest_env_bootstrap.TEST_DATABASE_URL
+    assert os.environ["TEST_DATABASE_URL"] == pytest_env_bootstrap.TEST_DATABASE_URL
