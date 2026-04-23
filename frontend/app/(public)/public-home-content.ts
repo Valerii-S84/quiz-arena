@@ -1,8 +1,3 @@
-export const TELEGRAM_BOT_URL =
-  process.env.NEXT_PUBLIC_TELEGRAM_BOT_URL || "https://t.me/Deine_Deutsch_Quiz_bot";
-export const TELEGRAM_CHANNEL_URL =
-  process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_URL || "https://t.me/doechkurse";
-export const TELEGRAM_BOT_START_PAYLOAD = "site_public_home";
 export const BOT_LOGO_PATH = "/logo/bot-logo.jpg";
 export const CHANNEL_LOGO_PATH = "/logo/channel-logo.jpg";
 export const WORKLOG_LOGO_PATH = "/products/worklog/logo.png";

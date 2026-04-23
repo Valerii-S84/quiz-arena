@@ -5,15 +5,15 @@ import { Inter } from "next/font/google";
 
 import { ContactWizardModal } from "./_components/contact-wizards";
 import {
-  TELEGRAM_BOT_START_PAYLOAD,
-  TELEGRAM_BOT_URL,
-} from "./public-home-content";
-import {
   requestAdminLogin,
   submitAdminLogin,
   usePublicStats,
 } from "./public-home-data";
 import { buildTrackedTelegramBotUrl } from "./public-home-helpers";
+import {
+  TELEGRAM_BOT_START_PAYLOAD,
+  getTelegramBotUrl,
+} from "@/lib/public-site-config";
 import { PublicHomeAdminLoginModal } from "./public-home-admin-login-modal";
 import {
   PublicHomeBotSection,
@@ -34,6 +34,7 @@ const inter = Inter({
 
 export default function PublicHomeClient() {
   const stats = usePublicStats();
+  const telegramBotUrl = getTelegramBotUrl();
   const [activeWizard, setActiveWizard] = useState<ActiveWizard>(null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [loginValue, setLoginValue] = useState("");
@@ -42,7 +43,7 @@ export default function PublicHomeClient() {
   const [loginFeedback, setLoginFeedback] = useState<string | null>(null);
 
   const trackedTelegramBotUrl = buildTrackedTelegramBotUrl(
-    TELEGRAM_BOT_URL,
+    telegramBotUrl,
     TELEGRAM_BOT_START_PAYLOAD,
   );
 

@@ -1,13 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { getTelegramChannelUrl } from "@/lib/public-site-config";
+
 import {
   BOT_LOGO_PATH,
   CHANNEL_LOGO_PATH,
   GLASS_CARD_CLASS,
   ORANGE_BUTTON_CLASS,
   STAR_POSITIONS,
-  TELEGRAM_CHANNEL_URL,
   WISSEN_ARTICLES,
   WORKLOG_DOWNLOAD_PATH,
   WORKLOG_LOGO_PATH,
@@ -84,6 +85,8 @@ export function PublicHomeHero() {
 }
 
 export function PublicHomeChannelSection() {
+  const telegramChannelUrl = getTelegramChannelUrl();
+
   return (
     <section className="mt-8">
       <div
@@ -117,7 +120,7 @@ export function PublicHomeChannelSection() {
           </div>
         </div>
         <a
-          href={TELEGRAM_CHANNEL_URL}
+          href={telegramChannelUrl}
           target="_blank"
           rel="noreferrer"
           className={ORANGE_BUTTON_CLASS}

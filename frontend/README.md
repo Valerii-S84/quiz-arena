@@ -8,11 +8,13 @@ npm ci
 npm run dev
 ```
 
-Set API URLs:
+Set frontend env values:
 
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:8000
 API_INTERNAL_URL=http://localhost:8000
+NEXT_PUBLIC_TELEGRAM_BOT_URL=https://t.me/Deine_Deutsch_Quiz_bot
+NEXT_PUBLIC_TELEGRAM_CHANNEL_URL=https://t.me/doechkurse
 ```
 
 - `NEXT_PUBLIC_API_URL` is the browser-facing API base.
@@ -21,6 +23,24 @@ API_INTERNAL_URL=http://localhost:8000
 - `API_INTERNAL_URL` is server-only and used by SSR/admin session checks.
 - If `NEXT_PUBLIC_API_URL` is relative, set `API_INTERNAL_URL` explicitly for SSR.
 - If `API_INTERNAL_URL` is unset, SSR falls back to an absolute `NEXT_PUBLIC_API_URL` or `http://localhost:8000`.
+- `NEXT_PUBLIC_TELEGRAM_BOT_URL` configures the public bot CTA target.
+- `NEXT_PUBLIC_TELEGRAM_CHANNEL_URL` configures the public Telegram channel CTA target.
+
+## Docker
+
+Pass the same env contract into the frontend image build/runtime:
+
+```bash
+docker build \
+  -f Dockerfile \
+  . \
+  --build-arg NEXT_PUBLIC_API_URL=http://localhost:8000 \
+  --build-arg API_INTERNAL_URL=http://localhost:8000 \
+  --build-arg NEXT_PUBLIC_TELEGRAM_BOT_URL=https://t.me/Deine_Deutsch_Quiz_bot \
+  --build-arg NEXT_PUBLIC_TELEGRAM_CHANNEL_URL=https://t.me/doechkurse
+```
+
+The Dockerfile accepts all four values in both the `builder` and `production` stages.
 
 ## Quality Gates
 
@@ -43,3 +63,4 @@ npm test
 - `robots.txt` disallows `/admin`.
 - Admin pages require backend cookie session (`/admin/auth/*`).
 - The frontend-consumed backend API contract is centralized in `lib/api-routes.ts`.
+- The frontend public-link env contract is centralized in `lib/public-site-config.ts`.
