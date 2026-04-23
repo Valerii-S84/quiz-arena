@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
+import { apiRoutes } from "@/lib/api-routes";
 
 import {
   createInitialStatsState,
@@ -19,7 +20,7 @@ import type {
 } from "./public-home-types";
 
 export async function requestPublicStats(): Promise<StatsPayload> {
-  const response = await api.get<StatsPayload>("/api/stats");
+  const response = await api.get<StatsPayload>(apiRoutes.public.stats);
   return response.data;
 }
 
@@ -59,7 +60,7 @@ export function usePublicStats() {
 }
 
 export async function requestAdminLogin(payload: AdminLoginRequest): Promise<LoginPayload> {
-  const response = await api.post<LoginPayload>("/admin/auth/login", payload);
+  const response = await api.post<LoginPayload>(apiRoutes.admin.auth.login, payload);
   return response.data;
 }
 

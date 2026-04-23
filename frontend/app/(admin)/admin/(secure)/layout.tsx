@@ -1,6 +1,9 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { getBrowserApiUrl, getServerApiUrl } from "@/lib/api-config";
+import { apiRoutes } from "@/lib/api-routes";
+
 const navItems = [
   { href: "/admin/dashboard", label: "Übersicht" },
   { href: "/admin/economy", label: "Umsatz" },
@@ -11,9 +14,8 @@ const navItems = [
 ];
 
 async function ensureSession() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const cookieHeader = cookies().toString();
-  const response = await fetch(`${apiUrl}/admin/auth/session`, {
+  const response = await fetch(getServerApiUrl(apiRoutes.admin.auth.session), {
     headers: {
       cookie: cookieHeader,
     },
@@ -40,7 +42,7 @@ export default async function SecureAdminLayout({ children }: { children: React.
             </a>
           ))}
         </nav>
-        <form action={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/admin/auth/logout`} method="post" className="mt-6">
+        <form action={getBrowserApiUrl(apiRoutes.admin.auth.logout)} method="post" className="mt-6">
           <button className="w-full rounded-lg border border-ember/20 px-3 py-2 text-left text-sm">
             Abmelden
           </button>

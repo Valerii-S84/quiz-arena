@@ -10,6 +10,7 @@ import {
   fetchPromoProducts,
   fetchPromoStats,
 } from "@/lib/api";
+import { apiRoutes } from "@/lib/api-routes";
 
 import {
   copyPromoCodes,
@@ -100,7 +101,10 @@ export function usePromoClientState() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post("/admin/promo", buildCreatePromoPayload(createForm));
+      const { data } = await api.post(
+        apiRoutes.admin.promo.list,
+        buildCreatePromoPayload(createForm),
+      );
       return data as PromoItem;
     },
     onSuccess: async (data) => {
@@ -117,7 +121,7 @@ export function usePromoClientState() {
   const bulkMutation = useMutation({
     mutationFn: async () => {
       const { data } = await api.post(
-        "/admin/promo/bulk-generate",
+        apiRoutes.admin.promo.bulkGenerate,
         buildBulkPromoPayload(bulkForm),
       );
       return data as BulkGenerateResponse;
@@ -135,7 +139,7 @@ export function usePromoClientState() {
   const updateMutation = useMutation({
     mutationFn: async () => {
       const { data } = await api.patch(
-        `/admin/promo/${editPromo?.id}`,
+        apiRoutes.admin.promo.detail(editPromo?.id as number),
         buildPatchPromoPayload(editForm),
       );
       return data as PromoItem;
@@ -156,7 +160,7 @@ export function usePromoClientState() {
 
   const toggleMutation = useMutation({
     mutationFn: async (promoId: number) => {
-      const { data } = await api.patch(`/admin/promo/${promoId}/toggle`);
+      const { data } = await api.patch(apiRoutes.admin.promo.toggle(promoId));
       return data as PromoItem;
     },
     onSuccess: async () => {
@@ -172,7 +176,7 @@ export function usePromoClientState() {
 
   const revokeMutation = useMutation({
     mutationFn: async ({ promoId, reason }: { promoId: number; reason: string | null }) => {
-      const { data } = await api.post(`/admin/promo/${promoId}/revoke`, { reason });
+      const { data } = await api.post(apiRoutes.admin.promo.revoke(promoId), { reason });
       return data as RevokeResponse;
     },
     onSuccess: async (data) => {
