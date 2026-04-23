@@ -1,5 +1,5 @@
 {
-  "name": "quiz-arena-ops-dashboard",
+  "name": "quiz-arena-frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .js,.mjs,.cjs,.jsx,.ts,.mts,.cts,.tsx",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "ci": "npm run lint && npm test && npm run typecheck && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

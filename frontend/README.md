@@ -5,6 +5,7 @@
 ```bash
 cd frontend
 npm ci
+cp .env.example .env.local
 npm run dev
 ```
 
@@ -46,11 +47,14 @@ The Dockerfile accepts all four values in both the `builder` and `production` st
 
 ```bash
 npm run lint
-npm run build
 npm test
+npm run typecheck
+npm run build
+npm run ci
 ```
 
 `npm run lint` uses the repo-supported ESLint CLI path.
+`npm run ci` is the frontend-local aggregate gate for a standalone repo or future frontend-only CI job.
 
 ## Routes
 
