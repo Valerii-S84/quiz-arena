@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 
 import { api } from "@/lib/api";
+import { apiRoutes } from "@/lib/api-routes";
 
 import {
   ChoiceCards,
@@ -177,7 +178,7 @@ export function StudentWizard({ onClose }: WizardProps) {
     setErrorMessage(null);
 
     try {
-      await api.post("/api/contact", {
+      await api.post(apiRoutes.public.contact, {
         type: "student",
         name: form.name.trim(),
         ageGroup: form.ageGroup,

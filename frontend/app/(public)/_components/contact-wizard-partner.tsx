@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 
 import { api } from "@/lib/api";
+import { apiRoutes } from "@/lib/api-routes";
 
 import {
   ChoiceCards,
@@ -140,7 +141,7 @@ export function PartnerWizard({ onClose }: WizardProps) {
     setErrorMessage(null);
 
     try {
-      await api.post("/api/contact", {
+      await api.post(apiRoutes.public.contact, {
         type: "partner",
         name: form.name.trim(),
         partnerType: form.partnerType,

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { api } from "@/lib/api";
+import { apiRoutes } from "@/lib/api-routes";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -30,7 +31,7 @@ export default function AdminLoginPage() {
   async function onSubmit(values: LoginForm) {
     setErrorMessage(null);
     try {
-      const response = await api.post<LoginResponse>("/admin/auth/login", values);
+      const response = await api.post<LoginResponse>(apiRoutes.admin.auth.login, values);
       if (response.data.requires_2fa) {
         setRequires2FA(true);
         return;
@@ -45,7 +46,7 @@ export default function AdminLoginPage() {
   async function verify2FA() {
     setErrorMessage(null);
     try {
-      await api.post("/admin/auth/2fa/verify", { code: totpCode });
+      await api.post(apiRoutes.admin.auth.verify2FA, { code: totpCode });
       window.location.href = "/admin/dashboard";
     } catch {
       setErrorMessage("Невірний 2FA код.");
