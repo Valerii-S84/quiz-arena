@@ -45,6 +45,15 @@ async def submit_contact(
     settings: Settings = Depends(get_settings),
 ) -> dict[str, bool]:
     bucket, client_ip = _contact_rate_limit_bucket(request, settings)
+    if is_honeypot_triggered(payload):
+        logger.warning(
+            "public_contact_rejected",
+            reason="honeypot_triggered",
+            client_ip=client_ip,
+            request_type=payload.request_type,
+        )
+        return {"ok": True}
+
     try:
         is_rate_limited = await consume_contact_submission_slot(
             settings=settings,
@@ -68,15 +77,6 @@ async def submit_contact(
             request_type=payload.request_type,
         )
         raise HTTPException(status_code=429, detail={"code": "E_RATE_LIMITED"})
-
-    if is_honeypot_triggered(payload):
-        logger.warning(
-            "public_contact_rejected",
-            reason="honeypot_triggered",
-            client_ip=client_ip,
-            request_type=payload.request_type,
-        )
-        return {"ok": True}
 
     validate_contact_payload(payload)
     normalized_payload = normalize_contact_payload(payload)

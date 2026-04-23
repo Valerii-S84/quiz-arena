@@ -17,7 +17,11 @@ def bootstrap_pytest_env() -> None:
     if _BOOTSTRAPPED:
         return
 
-    os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+    resolved_test_database_url = (
+        os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL") or TEST_DATABASE_URL
+    )
+    os.environ.setdefault("TEST_DATABASE_URL", resolved_test_database_url)
+    os.environ.setdefault("DATABASE_URL", resolved_test_database_url)
     os.environ.setdefault("TMPDIR", tempfile.gettempdir())
     os.environ.setdefault("REDIS_URL", TEST_REDIS_URL)
     os.environ.setdefault("CELERY_BROKER_URL", TEST_REDIS_URL)
