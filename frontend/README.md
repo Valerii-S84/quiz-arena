@@ -1,9 +1,12 @@
 # Quiz Arena Frontend (Public + Admin)
 
+This directory is the intended root of the future standalone frontend repo.
+Until the split happens, run the commands below from `frontend/`.
+After the split, run the same commands from the repo root.
+
 ## Run
 
 ```bash
-cd frontend
 npm ci
 cp .env.example .env.local
 npm run dev
@@ -30,6 +33,20 @@ NEXT_PUBLIC_TELEGRAM_CHANNEL_URL=https://t.me/doechkurse
 ## Docker
 
 Pass the same env contract into the frontend image build/runtime:
+
+From the current monorepo root:
+
+```bash
+docker build \
+  -f frontend/Dockerfile \
+  frontend \
+  --build-arg NEXT_PUBLIC_API_URL=http://localhost:8000 \
+  --build-arg API_INTERNAL_URL=http://localhost:8000 \
+  --build-arg NEXT_PUBLIC_TELEGRAM_BOT_URL=https://t.me/Deine_Deutsch_Quiz_bot \
+  --build-arg NEXT_PUBLIC_TELEGRAM_CHANNEL_URL=https://t.me/doechkurse
+```
+
+After the split, the same image can be built from the standalone repo root:
 
 ```bash
 docker build \
@@ -68,3 +85,5 @@ npm run ci
 - Admin pages require backend cookie session (`/admin/auth/*`).
 - The frontend-consumed backend API contract is centralized in `lib/api-routes.ts`.
 - The frontend public-link env contract is centralized in `lib/public-site-config.ts`.
+- The exact history-preserving repo split steps live in `SPLIT_RUNBOOK.md`.
+- In this local Windows/npm setup, run standalone validation from a mounted path such as `/mnt/c/...`; `npm` failed from WSL-only paths like `/tmp/...` because it resolved the current directory as an unsupported UNC path.
