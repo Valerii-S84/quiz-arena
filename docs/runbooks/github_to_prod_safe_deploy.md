@@ -8,6 +8,7 @@
 3. Ніколи не запускати прод-команди з `.env.production.example` (там placeholder-и).
 4. Міграції застосовувати тільки після валідного backup.
 5. Після деплою обов'язково перевіряти health + webhook + Celery + Redis черги.
+6. Frontend для prod більше не будується з цього monorepo; `docker-compose.prod.yml` очікує готовий `FRONTEND_IMAGE`.
 
 ## 1. GitHub flow (перед сервером)
 1. Створи гілку від `origin/main`.
@@ -83,8 +84,15 @@ ls -lh /opt/quiz-arena/backup_pre_deploy_*.sql | tail -1
 ```bash
 cd /opt/quiz-arena
 bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/quiz-arena/docker-compose.prod.yml
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d --build
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env pull frontend
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env build api worker beat
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d api frontend worker beat caddy
 ```
+
+Очікування перед цим кроком:
+- у `/opt/quiz-arena/.env` заданий `FRONTEND_IMAGE=<registry>/<owner>/quiz-arena-frontend:<tag>`;
+- цей image уже зібраний і запушений зі standalone frontend repo;
+- browser-facing API base baked у frontend image має лишатися same-host `/api`.
 
 ## 6. Міграції
 ```bash
@@ -168,7 +176,9 @@ cd /opt
 mv quiz-arena quiz-arena_bad_$(date +%Y%m%d_%H%M%S)
 mv quiz-arena_dirty_<TS> quiz-arena
 cd /opt/quiz-arena
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d --build
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env pull frontend
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env build api worker beat
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d api frontend worker beat caddy
 ```
 3. Якщо проблема в БД-схемі/даних, відновити dump.
 

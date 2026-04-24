@@ -1,8 +1,9 @@
 # Quiz Arena Frontend (Public + Admin)
 
-This directory is the intended root of the future standalone frontend repo.
-Until the split happens, run the commands below from `frontend/`.
-After the split, run the same commands from the repo root.
+This directory is the monorepo source subtree for the standalone frontend repo.
+Standalone repo: `https://github.com/Valerii-S84/quiz-arena-frontend`
+When working in this monorepo copy, run the commands below from `frontend/`.
+In the standalone repo, run the same commands from the repo root.
 
 ## Run
 
@@ -85,5 +86,6 @@ npm run ci
 - Admin pages require backend cookie session (`/admin/auth/*`).
 - The frontend-consumed backend API contract is centralized in `lib/api-routes.ts`.
 - The frontend public-link env contract is centralized in `lib/public-site-config.ts`.
-- The exact history-preserving repo split steps live in `SPLIT_RUNBOOK.md`.
+- The standalone Git remote is `git@github.com:Valerii-S84/quiz-arena-frontend.git`.
+- The exact history-preserving repo split and re-export steps live in `SPLIT_RUNBOOK.md`.
 - In this local Windows/npm setup, run standalone validation from a mounted path such as `/mnt/c/...`; `npm` failed from WSL-only paths like `/tmp/...` because it resolved the current directory as an unsupported UNC path.

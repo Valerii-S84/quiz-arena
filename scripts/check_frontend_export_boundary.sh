@@ -7,7 +7,7 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/check_frontend_export_boundary.sh [target-dir]
 
-Verifies that a frontend directory is self-contained as a future standalone
+Verifies that a frontend directory is self-contained as a standalone
 repo root and that exported docs do not accidentally depend on monorepo-only
 automation without saying so explicitly.
 USAGE

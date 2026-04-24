@@ -11,6 +11,11 @@ This file lives inside `frontend/` so it survives the extraction.
 Commands that reference monorepo-root `scripts/` are pre-export steps only.
 These scripts exist only in the source monorepo before extraction; they are not part of the exported frontend repo.
 
+## Current standalone repo
+
+- GitHub repo: `git@github.com:Valerii-S84/quiz-arena-frontend.git`
+- The initial history-preserving export from monorepo `main` has already been pushed there.
+
 ## Verified frontend boundary
 
 The current frontend directory already carries its own repo-local bootstrap and boundary files:
@@ -64,7 +69,7 @@ bash scripts/export_frontend_repo.sh \
   --strategy filter-repo \
   --include-working-tree \
   --output-dir .tmp/frontend-repo-export \
-  --remote-url <new-frontend-repo-url>
+  --remote-url git@github.com:Valerii-S84/quiz-arena-frontend.git
 ```
 
 ## Manual Extraction: `git filter-repo`
@@ -76,10 +81,17 @@ git clone --branch main git@github.com:Valerii-S84/quiz-arena.git quiz-arena-fro
 cd quiz-arena-frontend
 git filter-repo --path frontend/ --path-rename frontend/:
 git remote remove origin
-git remote add origin <new-frontend-repo-url>
+git remote add origin git@github.com:Valerii-S84/quiz-arena-frontend.git
 npm ci
 cp .env.example .env.local
 npm run ci
+git push -u origin main
+```
+
+If a writable GitHub key lives only under Windows `C:\Users\<user>\.ssh`, WSL may reject the private key because `/mnt/c/...` permissions look too open. On this machine, the first push worked via Windows OpenSSH:
+
+```bash
+GIT_SSH_COMMAND="/mnt/c/Windows/System32/OpenSSH/ssh.exe -i C:/Users/<user>/.ssh/<key_name> -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
 git push -u origin main
 ```
 
@@ -93,14 +105,14 @@ From the monorepo root:
 git checkout main
 git pull --ff-only
 git subtree split --prefix=frontend -b split/frontend-root
-git push <new-frontend-repo-url> split/frontend-root:main
+git push git@github.com:Valerii-S84/quiz-arena-frontend.git split/frontend-root:main
 git branch -D split/frontend-root
 ```
 
 Then validate from a fresh clone of the new frontend repo:
 
 ```bash
-git clone --branch main <new-frontend-repo-url> quiz-arena-frontend
+git clone --branch main git@github.com:Valerii-S84/quiz-arena-frontend.git quiz-arena-frontend
 cd quiz-arena-frontend
 npm ci
 cp .env.example .env.local

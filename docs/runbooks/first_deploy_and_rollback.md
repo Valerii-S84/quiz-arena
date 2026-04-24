@@ -32,7 +32,8 @@ scripts/deploy.sh <user@server_ip> /opt/quiz-arena
 
 What this does:
 - syncs repository files to `/opt/quiz-arena`,
-- builds runtime images,
+- pulls the prebuilt frontend image from `FRONTEND_IMAGE`,
+- builds backend runtime images,
 - runs migrations,
 - imports QuizBank,
 - runs post-deploy gate.
@@ -56,6 +57,7 @@ Mandatory to set:
 - `POSTGRES_PASSWORD`
 - `DATABASE_URL` password segment
 - `CADDY_EMAIL`
+- `FRONTEND_IMAGE`
 
 Important:
 - never use `.env.production.example` as runtime env,
@@ -65,7 +67,15 @@ Apply updated env:
 
 ```bash
 cd /opt/quiz-arena
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d --build
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env pull frontend
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env build api worker beat
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d api frontend worker beat caddy
+```
+
+`FRONTEND_IMAGE` must point to a ready image from the standalone frontend repo, for example:
+
+```bash
+FRONTEND_IMAGE=<registry>/<owner>/quiz-arena-frontend:<tag>
 ```
 
 ## 4) First-launch verification
@@ -122,7 +132,9 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env \
 cd /opt/quiz-arena
 git fetch origin
 git checkout <LAST_KNOWN_GOOD_SHA_OR_TAG>
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d --build
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env pull frontend
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env build api worker beat
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d api frontend worker beat caddy
 ```
 
 ### 7.2 Data rollback (migration/data issue)

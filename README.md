@@ -81,6 +81,7 @@ The mandatory `pytest` gate pins `DATABASE_URL` to the local PostgreSQL test DB
 - First deploy / rollback baseline: `docs/runbooks/first_deploy_and_rollback.md`
 - Deploy helper: `scripts/deploy.sh`
 - Runtime stack: `docker-compose.prod.yml`
+- Frontend runtime is sourced from the standalone repo image via `FRONTEND_IMAGE`; backend repo still owns compose / proxy orchestration.
 
 ## Documentation Map
 
