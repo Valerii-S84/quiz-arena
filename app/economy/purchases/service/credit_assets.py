@@ -72,25 +72,26 @@ async def credit_purchase_assets(
             promo_code.used_total += 1
             promo_code.updated_at = now_utc
 
-    await LedgerRepo.create(
-        session,
-        entry=LedgerEntry(
-            user_id=user_id,
-            purchase_id=purchase.id,
-            entry_type="PURCHASE_CREDIT",
-            asset="PURCHASE",
-            direction="CREDIT",
-            amount=purchase.stars_amount,
-            balance_after=None,
-            source="PURCHASE",
-            idempotency_key=f"credit:purchase:{purchase.id}",
-            metadata_={
-                "product_code": product.product_code,
-                "asset_breakdown": build_asset_breakdown(product),
-            },
-            created_at=now_utc,
-        ),
-    )
+    if purchase.stars_amount > 0:
+        await LedgerRepo.create(
+            session,
+            entry=LedgerEntry(
+                user_id=user_id,
+                purchase_id=purchase.id,
+                entry_type="PURCHASE_CREDIT",
+                asset="PURCHASE",
+                direction="CREDIT",
+                amount=purchase.stars_amount,
+                balance_after=None,
+                source="PURCHASE",
+                idempotency_key=f"credit:purchase:{purchase.id}",
+                metadata_={
+                    "product_code": product.product_code,
+                    "asset_breakdown": build_asset_breakdown(product),
+                },
+                created_at=now_utc,
+            ),
+        )
 
     purchase.status = "CREDITED"
     purchase.credited_at = now_utc

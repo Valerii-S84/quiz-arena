@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models.energy_state import EnergyState
 from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.economy.energy.constants import ENERGY_COST_PER_QUIZ, FREE_ENERGY_CAP, FREE_ENERGY_START
-from app.economy.energy.energy_consume import consume_quiz, credit_paid_energy
+from app.economy.energy.energy_consume import consume_quiz, credit_free_energy, credit_paid_energy
 from app.economy.energy.energy_daily_topup import apply_daily_topup_berlin
 from app.economy.energy.energy_models import (
     apply_snapshot_to_model,
@@ -65,6 +65,27 @@ class EnergyService:
         write_ledger_entry: bool = True,
     ) -> EnergyCreditResult:
         return await credit_paid_energy(
+            session,
+            user_id=user_id,
+            amount=amount,
+            idempotency_key=idempotency_key,
+            now_utc=now_utc,
+            source=source,
+            write_ledger_entry=write_ledger_entry,
+        )
+
+    @staticmethod
+    async def credit_free_energy(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        amount: int,
+        idempotency_key: str,
+        now_utc: datetime,
+        source: str = "SYSTEM",
+        write_ledger_entry: bool = True,
+    ) -> EnergyCreditResult:
+        return await credit_free_energy(
             session,
             user_id=user_id,
             amount=amount,

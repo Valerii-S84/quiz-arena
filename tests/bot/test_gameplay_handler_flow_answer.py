@@ -88,7 +88,10 @@ async def test_handle_answer_finishes_daily_challenge(monkeypatch) -> None:
     )
     await gameplay.handle_answer(callback)
 
-    assert any("🏆 Heute: 6/7 richtig" in (call.text or "") for call in callback.message.answers)
+    assert any(
+        TEXTS_DE["msg.daily.result.reward.energy3"] == (call.text or "")
+        for call in callback.message.answers
+    )
 
 
 @pytest.mark.asyncio
@@ -127,8 +130,7 @@ async def test_handle_answer_finishes_daily_challenge_hides_streak_when_zero(mon
     await gameplay.handle_answer(callback)
 
     result_messages = [call.text or "" for call in callback.message.answers]
-    assert any("🏆 Heute: 6/7 richtig" in text for text in result_messages)
-    assert all("🔥 Streak:" not in text for text in result_messages)
+    assert TEXTS_DE["msg.daily.result.reward.energy3"] in result_messages
 
 
 @pytest.mark.asyncio

@@ -35,16 +35,13 @@ def _resolve_push_kind(push_kind: str) -> str:
 
 
 def _build_push_text(*, push_kind: str, current_streak: int) -> str:
-    lines = [
-        (
-            TEXTS_DE["msg.daily.push.evening"]
-            if push_kind == DAILY_PUSH_KIND_EVENING_REMINDER
-            else TEXTS_DE["msg.daily.push.base"]
-        )
-    ]
-    if current_streak > 0:
-        lines.append(TEXTS_DE["msg.daily.push.streak"].format(streak=current_streak))
-    return "\n".join(lines)
+    if push_kind == DAILY_PUSH_KIND_EVENING_REMINDER:
+        lines = [TEXTS_DE["msg.daily.push.evening"]]
+        if current_streak > 0:
+            lines.append(TEXTS_DE["msg.daily.push.streak"].format(streak=current_streak))
+        return "\n".join(lines)
+
+    return TEXTS_DE["msg.daily.push.morning.reward"].format(streak_day=max(1, current_streak + 1))
 
 
 async def run_daily_question_set_precompute_async() -> dict[str, object]:

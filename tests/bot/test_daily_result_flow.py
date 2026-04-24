@@ -30,6 +30,19 @@ class _SessionLocal:
         return _SessionBegin(self._session)
 
 
+@pytest.mark.parametrize(
+    ("score", "expected_key"),
+    [
+        (7, "msg.daily.result.reward.ticket"),
+        (6, "msg.daily.result.reward.energy3"),
+        (5, "msg.daily.result.reward.energy2"),
+        (4, "msg.daily.result.reward.none"),
+    ],
+)
+def test_build_daily_result_text_uses_reward_thresholds(score: int, expected_key: str) -> None:
+    assert daily_result_flow._build_daily_result_text(score=score) == TEXTS_DE[expected_key]
+
+
 @pytest.mark.asyncio
 async def test_handle_daily_result_screen_rejects_invalid_callback_context() -> None:
     callback = DummyCallback(data="daily:result:x", from_user=None, message=DummyMessage())
@@ -104,7 +117,7 @@ async def test_handle_daily_result_screen_shows_used_when_summary_not_completed(
 
 
 @pytest.mark.asyncio
-async def test_handle_daily_result_screen_renders_completed_summary_with_streak() -> None:
+async def test_handle_daily_result_screen_renders_completed_summary_with_reward() -> None:
     session = object()
     calls: dict[str, object] = {}
     daily_run_id = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
@@ -120,8 +133,8 @@ async def test_handle_daily_result_screen_renders_completed_summary_with_streak(
         calls["daily_run_id"] = daily_run_id
         return SimpleNamespace(
             status="COMPLETED",
-            score=4,
-            total_questions=5,
+            score=6,
+            total_questions=7,
             daily_run_id=daily_run_id,
         )
 
@@ -140,11 +153,7 @@ async def test_handle_daily_result_screen_renders_completed_summary_with_streak(
 
     answer = callback.message.answers[0]
     assert calls == {"user_id": 7, "daily_run_id": daily_run_id}
-    assert answer.text == TEXTS_DE["msg.daily.result.summary.with_streak"].format(
-        score=4,
-        total=5,
-        streak=3,
-    )
+    assert answer.text == TEXTS_DE["msg.daily.result.reward.energy3"]
     callbacks = [
         button.callback_data
         for row in answer.kwargs["reply_markup"].inline_keyboard
@@ -167,8 +176,8 @@ async def test_handle_daily_result_screen_renders_completed_summary_without_stre
         del args, kwargs
         return SimpleNamespace(
             status="COMPLETED",
-            score=2,
-            total_questions=5,
+            score=4,
+            total_questions=7,
             daily_run_id=daily_run_id,
         )
 
@@ -185,10 +194,5 @@ async def test_handle_daily_result_screen_renders_completed_summary_without_stre
         game_session_service=SimpleNamespace(get_daily_run_summary=_fake_summary),
     )
 
-    assert callback.message.answers[0].text == TEXTS_DE[
-        "msg.daily.result.summary.no_streak"
-    ].format(
-        score=2,
-        total=5,
-    )
+    assert callback.message.answers[0].text == TEXTS_DE["msg.daily.result.reward.none"]
     assert callback.answer_calls == [{"text": None, "show_alert": False}]
