@@ -38,13 +38,13 @@ def build_shop_keyboard(*, channel_bonus_claimed: bool = False) -> InlineKeyboar
             ],
             [
                 InlineKeyboardButton(
-                    text="💎 Premium Season | 249⭐",
+                    text="💎 Premium Saison | 249⭐",
                     callback_data="buy:PREMIUM_SEASON",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="💎 Premium Year | 499⭐",
+                    text="💎 Premium Jahr | 499⭐",
                     callback_data="buy:PREMIUM_YEAR",
                 )
             ],
