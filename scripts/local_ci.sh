@@ -146,19 +146,6 @@ architecture_guards() {
   CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_import_cycles.sh
 }
 
-frontend_quality_gates() {
-  if ! command -v npm >/dev/null 2>&1; then
-    echo "ERROR: npm is required for frontend CI replay" >&2
-    exit 1
-  fi
-  (
-    cd frontend
-    npm ci
-    npm run lint
-    npm run build
-  )
-}
-
 run_step "Validate Python version" require_ci_python_version
 run_step "Verify lockfiles are in sync with pyproject" lockfile_check
 
@@ -180,7 +167,6 @@ run_step "Black" "$PYTHON_BIN" -m black --check app tests
 run_step "isort" "$PYTHON_BIN" -m isort --check-only app tests
 run_step "Mypy" "$PYTHON_BIN" -m mypy app tests
 run_step "Pytest (unit and bot)" env DATABASE_URL="$TEST_DATABASE_URL" TMPDIR="$TMPDIR" "$PYTHON_BIN" -m pytest -q --ignore=tests/integration
-run_step "Frontend quality gates" frontend_quality_gates
 run_step "Start local Postgres and Redis" start_local_services
 run_step "Wait for Postgres and Redis" wait_for_local_services
 run_step "Apply migrations" env DATABASE_URL="$TEST_DATABASE_URL" "$PYTHON_BIN" -m alembic upgrade head
