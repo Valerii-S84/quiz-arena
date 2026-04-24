@@ -176,10 +176,12 @@ cd /opt
 mv quiz-arena quiz-arena_bad_$(date +%Y%m%d_%H%M%S)
 mv quiz-arena_dirty_<TS> quiz-arena
 cd /opt/quiz-arena
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env pull frontend
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env pull --ignore-buildable frontend
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env build api worker beat
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d api frontend worker beat caddy
 ```
+
+`--ignore-buildable` keeps this rollback valid if the checked-out SHA predates the frontend image cutover and still defines `frontend` via `build:` instead of `image:`.
 3. Якщо проблема в БД-схемі/даних, відновити dump.
 
 ## 11. Антипатерни (заборонено)

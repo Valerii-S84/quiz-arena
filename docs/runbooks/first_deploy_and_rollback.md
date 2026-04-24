@@ -132,10 +132,12 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env \
 cd /opt/quiz-arena
 git fetch origin
 git checkout <LAST_KNOWN_GOOD_SHA_OR_TAG>
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env pull frontend
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env pull --ignore-buildable frontend
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env build api worker beat
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d api frontend worker beat caddy
 ```
+
+`--ignore-buildable` keeps rollback compatible with older SHAs that still use a build-only `frontend` service.
 
 ### 7.2 Data rollback (migration/data issue)
 
