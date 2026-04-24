@@ -21,7 +21,7 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env \
 ```
 
 Expected:
-- `api`, `worker`, `beat`, `postgres`, `redis`, `caddy` are `Up`.
+- `api`, `frontend`, `worker`, `beat`, `postgres`, `redis`, `caddy` are `Up`.
 - public health payload from `/health` is `status=ok`.
 - internal readiness payload from `/ready` is `status=ready` and `database/redis=status=ok`.
 

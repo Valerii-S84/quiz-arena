@@ -76,16 +76,12 @@ services:
       - "8000"
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: production
-      args:
-        NEXT_PUBLIC_API_URL: https://${DOMAIN}/api
+    image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required}
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_API_URL: https://${DOMAIN}/api
+      NEXT_PUBLIC_API_URL: /api
+      API_INTERNAL_URL: ${FRONTEND_API_INTERNAL_URL:-http://api:8000}
     depends_on:
       api:
         condition: service_healthy

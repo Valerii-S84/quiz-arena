@@ -42,14 +42,15 @@ ssh "$REMOTE" "cd ${REMOTE_DIR} && \
   if [[ ! -f .env ]]; then echo 'Remote .env is missing. Refusing to deploy with example env.' >&2; exit 1; fi && \
   bash scripts/check_compose_runtime_consistency.sh --expected-compose-file ${REMOTE_DIR}/docker-compose.prod.yml && \
   docker compose -f docker-compose.prod.yml up -d postgres redis && \
-  docker compose -f docker-compose.prod.yml build api frontend worker beat && \
+  docker compose -f docker-compose.prod.yml pull frontend && \
+  docker compose -f docker-compose.prod.yml build api worker beat && \
   docker compose -f docker-compose.prod.yml run --rm api alembic upgrade head && \
   docker compose -f docker-compose.prod.yml run --rm api sh -lc 'QUIZBANK_REPLACE_ALL_CONFIRM=PROD_REPLACE_ALL_OK QUIZBANK_REPLACE_ALL_CONFIRM_DB=\"\$POSTGRES_DB\" python -m scripts.quizbank_import_tool --replace-all' && \
   docker compose -f docker-compose.prod.yml run --rm api python -m scripts.quizbank_assert_non_empty && \
-  docker compose -f docker-compose.prod.yml up -d --build api frontend worker beat caddy && \
+  docker compose -f docker-compose.prod.yml up -d api frontend worker beat caddy && \
   docker compose -f docker-compose.prod.yml run --rm api python -m scripts.post_deploy_gate && \
   docker compose -f docker-compose.prod.yml ps && \
   bash scripts/check_compose_runtime_consistency.sh --expected-compose-file ${REMOTE_DIR}/docker-compose.prod.yml"
 
 echo "Deploy finished."
-echo "Remember to configure .env secrets on server: ${REMOTE}:${REMOTE_DIR}/.env"
+echo "Remember to configure .env secrets and FRONTEND_IMAGE on server: ${REMOTE}:${REMOTE_DIR}/.env"
