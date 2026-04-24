@@ -87,3 +87,7 @@ def consume_quiz_energy(
 
 def credit_paid_energy(snapshot: EnergySnapshot, *, amount: int) -> EnergySnapshot:
     return replace(snapshot, paid_energy=snapshot.paid_energy + amount)
+
+
+def credit_free_energy(snapshot: EnergySnapshot, *, amount: int) -> EnergySnapshot:
+    return replace(snapshot, free_energy=min(snapshot.free_cap, snapshot.free_energy + amount))

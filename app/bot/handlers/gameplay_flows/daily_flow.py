@@ -14,28 +14,33 @@ from app.game.sessions.errors import DailyChallengeAlreadyPlayedError
 from app.game.sessions.types import AnswerSessionResult, DailyRunSummary
 
 
-def _build_daily_result_text(*, score: int, total: int, streak: int) -> str:
-    if streak > 0:
-        return TEXTS_DE["msg.daily.result.summary.with_streak"].format(
-            score=score,
-            total=total,
-            streak=streak,
-        )
-    return TEXTS_DE["msg.daily.result.summary.no_streak"].format(score=score, total=total)
+def _build_daily_result_text(*, score: int) -> str:
+    if score >= 7:
+        return TEXTS_DE["msg.daily.result.reward.ticket"]
+    if score == 6:
+        return TEXTS_DE["msg.daily.result.reward.energy3"]
+    if score == 5:
+        return TEXTS_DE["msg.daily.result.reward.energy2"]
+    return TEXTS_DE["msg.daily.result.reward.none"]
+
+
+def _build_daily_ticket_progress_text(*, correct: int, total: int) -> str | None:
+    if correct >= 7:
+        return None
+    return TEXTS_DE["msg.daily.answer.reward_progress"].format(
+        correct=correct,
+        total=total,
+        left=max(0, 7 - correct),
+    )
 
 
 async def _send_daily_result_message(
     message: Message,
     *,
     summary: DailyRunSummary,
-    current_streak: int,
 ) -> None:
     await message.answer(
-        _build_daily_result_text(
-            score=summary.score,
-            total=summary.total_questions,
-            streak=current_streak,
-        ),
+        _build_daily_result_text(score=summary.score),
         reply_markup=build_daily_result_keyboard(daily_run_id=str(summary.daily_run_id)),
     )
 
@@ -76,7 +81,14 @@ async def handle_daily_answer_branch(
             current=current_question,
             total=total_questions,
         )
-    await message.answer(progress_text)
+    response_lines = [progress_text]
+    reward_progress_text = _build_daily_ticket_progress_text(
+        correct=result.daily_score or 0,
+        total=total_questions,
+    )
+    if reward_progress_text is not None:
+        response_lines.append(reward_progress_text)
+    await message.answer("\n".join(response_lines))
 
     if result.daily_completed:
         if result.daily_run_id is None:
@@ -84,11 +96,7 @@ async def handle_daily_answer_branch(
             await callback.answer()
             return
         await message.answer(
-            _build_daily_result_text(
-                score=result.daily_score or 0,
-                total=total_questions,
-                streak=result.current_streak,
-            ),
+            _build_daily_result_text(score=result.daily_score or 0),
             reply_markup=build_daily_result_keyboard(daily_run_id=str(result.daily_run_id)),
         )
         await callback.answer()
@@ -118,7 +126,6 @@ async def handle_daily_answer_branch(
                 await _send_daily_result_message(
                     message,
                     summary=summary,
-                    current_streak=snapshot.current_streak,
                 )
             else:
                 await message.answer(

@@ -11,14 +11,14 @@ from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import SessionNotFoundError
 
 
-def _build_daily_result_text(*, score: int, total: int, streak: int) -> str:
-    if streak > 0:
-        return TEXTS_DE["msg.daily.result.summary.with_streak"].format(
-            score=score,
-            total=total,
-            streak=streak,
-        )
-    return TEXTS_DE["msg.daily.result.summary.no_streak"].format(score=score, total=total)
+def _build_daily_result_text(*, score: int) -> str:
+    if score >= 7:
+        return TEXTS_DE["msg.daily.result.reward.ticket"]
+    if score == 6:
+        return TEXTS_DE["msg.daily.result.reward.energy3"]
+    if score == 5:
+        return TEXTS_DE["msg.daily.result.reward.energy2"]
+    return TEXTS_DE["msg.daily.result.reward.none"]
 
 
 async def handle_daily_result_screen(
@@ -62,11 +62,7 @@ async def handle_daily_result_screen(
         return
 
     await message.answer(
-        _build_daily_result_text(
-            score=summary.score,
-            total=summary.total_questions,
-            streak=snapshot.current_streak,
-        ),
+        _build_daily_result_text(score=summary.score),
         reply_markup=build_daily_result_keyboard(daily_run_id=str(summary.daily_run_id)),
     )
     await callback.answer()

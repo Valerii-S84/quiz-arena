@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import func, select
 
+from app.bot.texts.de import TEXTS_DE
 from app.db.models.daily_push_logs import DailyPushLog
 from app.db.models.daily_runs import DailyRun
 from app.db.repo.users_repo import UsersRepo
@@ -90,6 +91,7 @@ async def test_daily_push_worker_is_idempotent_for_same_day(monkeypatch) -> None
     assert int(first["sent_total"]) == 1
     assert int(second["sent_total"]) == 0
     assert len(bot.sent_messages) == 1
+    assert bot.sent_messages[0][1] == TEXTS_DE["msg.daily.push.morning.reward"].format(streak_day=1)
 
     async with SessionLocal.begin() as session:
         logged = await session.scalar(select(func.count(DailyPushLog.user_id)))
@@ -119,6 +121,7 @@ async def test_daily_push_worker_sends_evening_reminder_after_morning_push(monke
     assert int(second["sent_total"]) == 1
     assert second["push_kind"] == "EVENING_REMINDER"
     assert len(bot.sent_messages) == 2
+    assert bot.sent_messages[0][1] == TEXTS_DE["msg.daily.push.morning.reward"].format(streak_day=1)
     assert bot.sent_messages[1][1].startswith("⏰ Erinnerung:")
 
     async with SessionLocal.begin() as session:
