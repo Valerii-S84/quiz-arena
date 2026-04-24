@@ -68,9 +68,9 @@ For the full local equivalent of the GitHub CI pipeline, run:
 bash scripts/local_ci.sh
 ```
 
-`scripts/local_ci.sh` runs the full local CI sequence: backend lint/unit checks,
-frontend `npm ci && npm run lint && npm run build`, `docker compose up -d postgres redis`,
-service readiness, migrations, QuizBank import dry-run, and integration tests.
+`scripts/local_ci.sh` runs the backend local CI sequence: lint/unit checks,
+`docker compose up -d postgres redis`, service readiness, migrations, QuizBank
+import dry-run, and integration tests.
 
 The mandatory `pytest` gate pins `DATABASE_URL` to the local PostgreSQL test DB
 `quiz_arena_test`; integration stays available below as a separate targeted flow.
@@ -82,6 +82,7 @@ The mandatory `pytest` gate pins `DATABASE_URL` to the local PostgreSQL test DB
 - Deploy helper: `scripts/deploy.sh`
 - Runtime stack: `docker-compose.prod.yml`
 - Frontend runtime is sourced from the standalone repo image via `FRONTEND_IMAGE`; backend repo still owns compose / proxy orchestration.
+- Frontend source, CI, and image publishing now live in `https://github.com/Valerii-S84/quiz-arena-frontend`.
 
 ## Documentation Map
 

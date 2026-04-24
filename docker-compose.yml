@@ -43,21 +43,6 @@ services:
     ports:
       - "8000:8000"
 
-  frontend:
-    profiles: ["frontend"]
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: development
-    environment:
-      NODE_ENV: development
-      NEXT_PUBLIC_API_URL: http://api:8000
-    depends_on:
-      api:
-        condition: service_started
-    ports:
-      - "3000:3000"
-
 volumes:
   pg_data:
   redis_data:
