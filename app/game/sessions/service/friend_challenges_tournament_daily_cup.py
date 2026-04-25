@@ -15,11 +15,10 @@ from app.game.tournaments.constants import (
 )
 
 
-def _tighten_daily_cup_deadline(
+def _tighten_daily_cup_match_deadline(
     *,
     challenge: FriendChallenge,
     tournament_match: TournamentMatch,
-    tournament: Tournament,
     now_utc: datetime,
     grace_minutes: int,
 ) -> None:
@@ -31,8 +30,6 @@ def _tighten_daily_cup_deadline(
     tightened_deadline = min(tournament_match.deadline, response_deadline)
     if tightened_deadline < tournament_match.deadline:
         tournament_match.deadline = tightened_deadline
-    if tournament.round_deadline is None or tightened_deadline < tournament.round_deadline:
-        tournament.round_deadline = tightened_deadline
 
 
 async def handle_daily_cup_tournament_progress(
@@ -50,10 +47,9 @@ async def handle_daily_cup_tournament_progress(
     from app.workers.tasks.daily_cup_match_results import send_daily_cup_match_result_messages
     from app.workers.tasks.daily_cup_messaging import enqueue_daily_cup_round_messaging
 
-    _tighten_daily_cup_deadline(
+    _tighten_daily_cup_match_deadline(
         challenge=challenge,
         tournament_match=tournament_match,
-        tournament=tournament,
         now_utc=now_utc,
         grace_minutes=grace_minutes,
     )
