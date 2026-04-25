@@ -21,6 +21,35 @@ class DailyCupProofCardAttemptResult:
     sent: bool
     cached_reused: bool
     failed: bool
+    retry_needed: bool = False
+
+
+def _queue_retry_after_lock_skip(
+    *,
+    tournament_id: str,
+    user_id: int,
+    lock_retry_attempt: int,
+    retry_delay_seconds: int,
+    enqueue_retry_fn: Callable[..., bool] | None,
+    logger: Any,
+) -> None:
+    if enqueue_retry_fn is None:
+        return
+    queued = enqueue_retry_fn(
+        tournament_id=tournament_id,
+        user_id=user_id,
+        delay_seconds=retry_delay_seconds,
+        lock_retry_attempt=lock_retry_attempt + 1,
+    )
+    if not queued:
+        return
+    logger.info(
+        "daily_cup_proof_card_retry_queued",
+        tournament_id=tournament_id,
+        user_id=user_id,
+        retry_attempt=lock_retry_attempt + 1,
+        reason="participant_row_lock_skipped",
+    )
 
 
 async def _deliver_proof_card_for_user(
@@ -45,7 +74,14 @@ async def _deliver_proof_card_for_user(
                 user_id=user_id,
                 skip_locked=True,
             )
-            if participant_row is None or participant_row.proof_card_sent:
+            if participant_row is None:
+                return DailyCupProofCardAttemptResult(
+                    sent=False,
+                    cached_reused=False,
+                    failed=False,
+                    retry_needed=True,
+                )
+            if participant_row.proof_card_sent:
                 return DailyCupProofCardAttemptResult(
                     sent=False,
                     cached_reused=False,
@@ -112,6 +148,9 @@ async def deliver_daily_cup_proof_cards(
     session_factory: Any,
     participants_repo: Any,
     send_proof_card_fn: Callable[..., Any],
+    enqueue_retry_fn: Callable[..., bool] | None = None,
+    lock_retry_attempt: int = 0,
+    retry_delay_seconds: int = 2,
     render_card_png: Callable[..., bytes] = render_tournament_proof_card_png,
     logger: Any,
 ) -> DailyCupProofCardDeliveryResult:
@@ -138,6 +177,15 @@ async def deliver_daily_cup_proof_cards(
             render_card_png=render_card_png,
             logger=logger,
         )
+        if attempt.retry_needed:
+            _queue_retry_after_lock_skip(
+                tournament_id=tournament_id,
+                user_id=current_user_id,
+                lock_retry_attempt=lock_retry_attempt,
+                retry_delay_seconds=retry_delay_seconds,
+                enqueue_retry_fn=enqueue_retry_fn,
+                logger=logger,
+            )
         sent += int(attempt.sent)
         cached_reused += int(attempt.cached_reused)
         failed += int(attempt.failed)
