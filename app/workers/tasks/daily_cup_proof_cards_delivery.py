@@ -10,7 +10,9 @@ from aiogram.types import BufferedInputFile
 
 from app.bot.keyboards.daily_cup import build_daily_cup_share_keyboard, build_daily_cup_share_url
 from app.bot.texts.de import TEXTS_DE
+from app.core.analytics_events import EVENT_SOURCE_WORKER, emit_analytics_event
 from app.core.telegram_links import public_bot_link
+from app.db.repo.analytics_repo import AnalyticsRepo
 from app.db.repo.ledger_repo import LedgerRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.economy.energy.service import EnergyService
@@ -25,6 +27,7 @@ DAILY_CUP_REWARD_MIN_PARTICIPANTS = 13
 DAILY_CUP_PREMIUM_REWARD_DAYS = 3
 DAILY_CUP_TICKET_REWARD_TOTAL = 2
 DAILY_CUP_FREE_ENERGY_REWARD = 5
+DAILY_CUP_WINNER_REWARD_MESSAGE_SENT_EVENT_TYPE = "daily_cup_winner_reward_message_sent"
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +50,12 @@ class DailyCupWinnerRewardNotification:
     text: str
 
 
+@dataclass(frozen=True, slots=True)
+class DailyCupWinnerRewardGrantResult:
+    reward_ready: bool
+    granted_now: bool
+
+
 def _build_reward_key(
     *,
     prefix: str,
@@ -66,14 +75,14 @@ async def _grant_daily_cup_premium_reward(
     tournament_id: UUID,
     user_id: int,
     now_utc: datetime,
-) -> bool:
+) -> DailyCupWinnerRewardGrantResult:
     ledger_idempotency_key = _build_reward_key(
         prefix="dcpl",
         tournament_id=tournament_id,
         user_id=user_id,
     )
     if await LedgerRepo.get_by_idempotency_key(session, ledger_idempotency_key) is not None:
-        return False
+        return DailyCupWinnerRewardGrantResult(reward_ready=True, granted_now=False)
 
     await grant_premium_days(
         session,
@@ -95,7 +104,7 @@ async def _grant_daily_cup_premium_reward(
             "tournament_id": str(tournament_id),
         },
     )
-    return True
+    return DailyCupWinnerRewardGrantResult(reward_ready=True, granted_now=True)
 
 
 def _daily_cup_reward_message(*, rank: int) -> str:
@@ -144,7 +153,7 @@ async def _grant_daily_cup_ticket_reward(
     tournament_id: UUID,
     user_id: int,
     now_utc: datetime,
-) -> bool:
+) -> DailyCupWinnerRewardGrantResult:
     granted_any = False
     for ticket_no in range(1, DAILY_CUP_TICKET_REWARD_TOTAL + 1):
         result = await _credit_zero_cost_product(
@@ -160,7 +169,7 @@ async def _grant_daily_cup_ticket_reward(
             now_utc=now_utc,
         )
         granted_any = granted_any or not bool(result.idempotent_replay)
-    return granted_any
+    return DailyCupWinnerRewardGrantResult(reward_ready=True, granted_now=granted_any)
 
 
 async def _grant_daily_cup_energy_reward(
@@ -169,7 +178,7 @@ async def _grant_daily_cup_energy_reward(
     tournament_id: UUID,
     user_id: int,
     now_utc: datetime,
-) -> bool:
+) -> DailyCupWinnerRewardGrantResult:
     # Winner rewards must grant the public +5 even when free energy is already capped.
     result = await EnergyService.credit_paid_energy(
         session,
@@ -183,7 +192,10 @@ async def _grant_daily_cup_energy_reward(
         now_utc=now_utc,
         source="TOURNAMENT",
     )
-    return result.amount > 0 and not result.idempotent_replay
+    return DailyCupWinnerRewardGrantResult(
+        reward_ready=result.amount > 0,
+        granted_now=result.amount > 0 and not result.idempotent_replay,
+    )
 
 
 async def grant_daily_cup_winner_rewards(
@@ -198,12 +210,23 @@ async def grant_daily_cup_winner_rewards(
 
     participant_user_ids = {int(row.user_id) for row in context.participants}
     notifications: list[DailyCupWinnerRewardNotification] = []
+    winner_user_ids = [
+        int(user_id)
+        for user_id in context.standings_user_ids[:3]
+        if int(user_id) in participant_user_ids
+    ]
+    already_notified_user_ids = await AnalyticsRepo.list_user_ids_by_event_type_and_tournament(
+        session,
+        event_type=DAILY_CUP_WINNER_REWARD_MESSAGE_SENT_EVENT_TYPE,
+        tournament_id=str(context.parsed_tournament_id),
+        user_ids=winner_user_ids,
+    )
 
     for rank, current_user_id in enumerate(context.standings_user_ids[:3], start=1):
         if current_user_id not in participant_user_ids:
             continue
 
-        reward_granted = await _grant_reward_for_rank(
+        reward_result = await _grant_reward_for_rank(
             session=session,
             tournament_id=context.parsed_tournament_id,
             user_id=current_user_id,
@@ -211,7 +234,7 @@ async def grant_daily_cup_winner_rewards(
             now_utc=now_utc,
             logger=logger,
         )
-        if reward_granted:
+        if reward_result.reward_ready and current_user_id not in already_notified_user_ids:
             notifications.append(
                 DailyCupWinnerRewardNotification(
                     user_id=current_user_id,
@@ -230,7 +253,7 @@ async def _grant_reward_for_rank(
     rank: int,
     now_utc: datetime,
     logger: Any,
-) -> bool:
+) -> DailyCupWinnerRewardGrantResult:
     try:
         async with session.begin_nested():
             if rank == 1:
@@ -252,7 +275,7 @@ async def _grant_reward_for_rank(
                 tournament_id=tournament_id,
                 user_id=user_id,
                 now_utc=now_utc,
-            )
+                )
     except Exception as exc:
         logger.warning(
             "daily_cup_winner_reward_grant_failed",
@@ -261,14 +284,16 @@ async def _grant_reward_for_rank(
             rank=rank,
             error_type=type(exc).__name__,
         )
-        return False
+        return DailyCupWinnerRewardGrantResult(reward_ready=False, granted_now=False)
 
 
 async def send_daily_cup_winner_reward_messages(
     *,
+    session: Any,
     bot: Any,
     context: Any,
     notifications: list[DailyCupWinnerRewardNotification],
+    now_utc: datetime,
     logger: Any,
 ) -> None:
     for notification in notifications:
@@ -278,6 +303,14 @@ async def send_daily_cup_winner_reward_messages(
 
         try:
             await bot.send_message(chat_id=chat_id, text=notification.text)
+            await emit_analytics_event(
+                session,
+                event_type=DAILY_CUP_WINNER_REWARD_MESSAGE_SENT_EVENT_TYPE,
+                source=EVENT_SOURCE_WORKER,
+                happened_at=now_utc,
+                user_id=notification.user_id,
+                payload={"tournament_id": str(context.parsed_tournament_id)},
+            )
         except Exception as exc:
             logger.warning(
                 "daily_cup_winner_reward_message_failed",

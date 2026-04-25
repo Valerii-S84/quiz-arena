@@ -65,6 +65,7 @@ async def _load_proof_cards_context(
 
 async def _grant_winner_rewards_once(
     *,
+    bot: Any,
     context: Any,
     tournament_id: str,
     now_utc: datetime,
@@ -74,16 +75,25 @@ async def _grant_winner_rewards_once(
             tournament_row = await TournamentsRepo.get_by_id_for_update(
                 session,
                 context.parsed_tournament_id,
-                skip_locked=True,
             )
             if tournament_row is None:
                 return []
-            return await grant_daily_cup_winner_rewards(
+            reward_notifications = await grant_daily_cup_winner_rewards(
                 session=session,
                 context=context,
                 now_utc=now_utc,
                 logger=logger,
             )
+            if reward_notifications:
+                await send_daily_cup_winner_reward_messages(
+                    session=session,
+                    bot=bot,
+                    context=context,
+                    notifications=reward_notifications,
+                    now_utc=now_utc,
+                    logger=logger,
+                )
+            return reward_notifications
     except Exception as exc:
         logger.warning(
             "daily_cup_winner_rewards_failed",
@@ -133,18 +143,12 @@ async def run_daily_cup_proof_cards_async(
         )
 
         if user_id is None and context.participants_total >= DAILY_CUP_REWARD_MIN_PARTICIPANTS:
-            reward_notifications = await _grant_winner_rewards_once(
+            await _grant_winner_rewards_once(
+                bot=bot,
                 context=context,
                 tournament_id=tournament_id,
                 now_utc=now_utc,
             )
-            if reward_notifications:
-                await send_daily_cup_winner_reward_messages(
-                    bot=bot,
-                    context=context,
-                    notifications=reward_notifications,
-                    logger=logger,
-                )
     finally:
         await bot.session.close()
 

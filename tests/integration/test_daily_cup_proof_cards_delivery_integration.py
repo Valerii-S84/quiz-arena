@@ -349,6 +349,100 @@ async def test_daily_cup_proof_cards_grant_top_three_rewards_with_bye_seeded_res
 
 
 @pytest.mark.asyncio
+async def test_daily_cup_winner_message_rerun_retries_only_failed_notification_without_double_credit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now_utc = fixed_daily_cup_now()
+    await ensure_tournament_schema()
+
+    user_ids = await create_daily_cup_users(prefix="daily_cup_reward_retry", count=13)
+    tournament_id = await create_completed_daily_cup_with_bye_seeded_scores(
+        now_utc=now_utc,
+        user_ids=user_ids,
+    )
+    parsed_tournament_id = UUID(tournament_id)
+    reward_key_prefix = parsed_tournament_id.hex
+    await set_user_free_energy(user_id=user_ids[2], free_energy=18, now_utc=now_utc)
+
+    _FrozenDateTime.current = now_utc
+    monkeypatch.setattr(daily_cup_proof_cards, "datetime", _FrozenDateTime)
+    bot, _render_calls = install_recording_worker_bot(monkeypatch)
+
+    attempted_texts: list[str] = []
+    original_send_message = bot.send_message
+    failed_rank_three = {"done": False}
+
+    async def _flaky_send_message(**kwargs):
+        text = str(kwargs.get("text"))
+        attempted_texts.append(text)
+        if (
+            text == TEXTS_DE["msg.daily_cup.reward.rank_3"]
+            and failed_rank_three["done"] is False
+        ):
+            failed_rank_three["done"] = True
+            raise RuntimeError("telegram down")
+        return await original_send_message(**kwargs)
+
+    monkeypatch.setattr(bot, "send_message", _flaky_send_message)
+
+    first = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
+        tournament_id=tournament_id,
+        initial_delay_seconds=0,
+    )
+    second = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
+        tournament_id=tournament_id,
+        initial_delay_seconds=0,
+    )
+
+    assert first == {
+        "processed": 1,
+        "participants_total": 13,
+        "sent": 13,
+        "cached_reused": 0,
+        "failed": 0,
+    }
+    assert second == {
+        "processed": 1,
+        "participants_total": 13,
+        "sent": 0,
+        "cached_reused": 0,
+        "failed": 0,
+    }
+    assert attempted_texts == [
+        TEXTS_DE["msg.daily_cup.reward.rank_1"],
+        TEXTS_DE["msg.daily_cup.reward.rank_2"],
+        TEXTS_DE["msg.daily_cup.reward.rank_3"],
+        TEXTS_DE["msg.daily_cup.reward.rank_3"],
+    ]
+    assert [message["text"] for message in bot.send_messages] == [
+        TEXTS_DE["msg.daily_cup.reward.rank_1"],
+        TEXTS_DE["msg.daily_cup.reward.rank_2"],
+        TEXTS_DE["msg.daily_cup.reward.rank_3"],
+    ]
+    assert await _get_active_premium(user_id=user_ids[0]) is not None
+    async with SessionLocal.begin() as session:
+        ticket_count = await PurchasesRepo.count_credited_product(
+            session,
+            user_id=user_ids[1],
+            product_code="FRIEND_CHALLENGE_5",
+        )
+    assert ticket_count == 2
+    assert await _get_energy_balance(user_id=user_ids[2]) == (18, 5)
+    assert (
+        await _count_ledger_entries(
+            idempotency_key=f"dcpl:{reward_key_prefix}:{user_ids[0]}",
+        )
+        == 1
+    )
+    assert (
+        await _count_ledger_entries(
+            idempotency_key=f"dcen:{reward_key_prefix}:{user_ids[2]}",
+        )
+        == 1
+    )
+
+
+@pytest.mark.asyncio
 async def test_daily_cup_user_specific_proof_card_rerun_does_not_grant_winner_rewards(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -418,3 +418,54 @@ def test_daily_arena_proof_cards_enqueue_paths_and_wrapper(monkeypatch: pytest.M
     )
     wrapped = daily_cup_proof_cards.run_daily_cup_proof_cards(tournament_id="arena-proof-wrapper")
     assert wrapped == {"wrapped": "run_daily_cup_proof_cards_async"}
+
+
+@pytest.mark.asyncio
+async def test_daily_arena_proof_cards_winner_rewards_use_blocking_tournament_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tournament_id = daily_cup_proof_cards.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    context = SimpleNamespace(parsed_tournament_id=tournament_id)
+    bot = DummyBot()
+    captured: list[dict[str, object]] = []
+
+    async def _fake_get_by_id_for_update(session, parsed_tournament_id, **kwargs):
+        del session
+        captured.append(
+            {
+                "parsed_tournament_id": parsed_tournament_id,
+                "skip_locked": kwargs.get("skip_locked", False),
+            }
+        )
+        return SimpleNamespace(id=parsed_tournament_id)
+
+    monkeypatch.setattr(
+        daily_cup_proof_cards,
+        "SessionLocal",
+        session_local_with_sessions(SimpleNamespace()),
+    )
+    monkeypatch.setattr(
+        daily_cup_proof_cards.TournamentsRepo,
+        "get_by_id_for_update",
+        _fake_get_by_id_for_update,
+    )
+    monkeypatch.setattr(
+        daily_cup_proof_cards,
+        "grant_daily_cup_winner_rewards",
+        async_return([]),
+    )
+
+    result = await daily_cup_proof_cards._grant_winner_rewards_once(
+        bot=bot,
+        context=context,
+        tournament_id=str(tournament_id),
+        now_utc=datetime(2026, 3, 1, 18, 30, tzinfo=UTC),
+    )
+
+    assert result == []
+    assert captured == [
+        {
+            "parsed_tournament_id": tournament_id,
+            "skip_locked": False,
+        }
+    ]
