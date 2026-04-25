@@ -88,10 +88,11 @@ Ratified contract:
 
 ### 4.2 DAILY_ARENA Round Deadline
 
-Current runtime gap:
+Current runtime:
 
-* the round-deadline path currently allows a per-match action to tighten both
-  `tournament_match.deadline` and the shared `tournament.round_deadline`
+* per-match response handling may tighten `tournament_match.deadline`
+* the shared `tournament.round_deadline` remains round-scoped and is not
+  tightened by per-match duel progress
 
 Ratified contract:
 
