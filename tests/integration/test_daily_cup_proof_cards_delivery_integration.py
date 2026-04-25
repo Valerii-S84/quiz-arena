@@ -151,6 +151,71 @@ async def test_daily_cup_proof_cards_skip_repeat_enqueue_for_same_participant(
 
 
 @pytest.mark.asyncio
+async def test_daily_cup_proof_cards_queue_retry_when_participant_row_is_lock_skipped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now_utc = fixed_daily_cup_now()
+    await ensure_tournament_schema()
+
+    user_ids = await create_daily_cup_users(prefix="daily_cup_proof_locked", count=4)
+    tournament_id = await create_completed_daily_cup(now_utc=now_utc, user_ids=user_ids)
+    parsed_tournament_id = UUID(tournament_id)
+    queued: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        daily_cup_proof_cards,
+        "enqueue_daily_cup_proof_cards",
+        lambda **kwargs: queued.append(kwargs),
+    )
+    bot, _render_calls = install_recording_worker_bot(monkeypatch)
+
+    async with SessionLocal.begin() as lock_session:
+        locked_participant = await TournamentParticipantsRepo.get_for_tournament_user_for_update(
+            lock_session,
+            tournament_id=parsed_tournament_id,
+            user_id=user_ids[0],
+        )
+        assert locked_participant is not None
+
+        first = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
+            tournament_id=tournament_id,
+            user_id=user_ids[0],
+            initial_delay_seconds=0,
+        )
+
+    assert first == {
+        "processed": 1,
+        "participants_total": 4,
+        "sent": 0,
+        "cached_reused": 0,
+        "failed": 0,
+    }
+    assert queued == [
+        {
+            "tournament_id": tournament_id,
+            "user_id": user_ids[0],
+            "delay_seconds": 2,
+        }
+    ]
+    assert bot.send_photos == []
+
+    second = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
+        tournament_id=tournament_id,
+        user_id=user_ids[0],
+        initial_delay_seconds=0,
+    )
+
+    assert second == {
+        "processed": 1,
+        "participants_total": 4,
+        "sent": 1,
+        "cached_reused": 0,
+        "failed": 0,
+    }
+    assert len(bot.send_photos) == 1
+
+
+@pytest.mark.asyncio
 async def test_daily_cup_proof_cards_parallel_duplicate_run_does_not_send_duplicates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

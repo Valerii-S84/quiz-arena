@@ -117,6 +117,7 @@ async def run_daily_cup_proof_cards_async(
             session_factory=SessionLocal,
             participants_repo=TournamentParticipantsRepo,
             send_proof_card_fn=send_daily_cup_proof_card,
+            enqueue_retry_fn=enqueue_daily_cup_proof_cards,
             render_card_png=render_tournament_proof_card_png,
             logger=logger,
         )

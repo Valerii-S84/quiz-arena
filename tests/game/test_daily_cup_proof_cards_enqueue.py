@@ -133,3 +133,70 @@ async def test_daily_arena_proof_cards_winner_rewards_use_blocking_tournament_lo
             "skip_locked": False,
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_daily_arena_proof_cards_queue_retry_when_participant_row_lock_is_skipped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tournament_id = daily_cup_proof_cards.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    queued: list[dict[str, object]] = []
+    bot = DummyBot()
+    context = SimpleNamespace(
+        parsed_tournament_id=tournament_id,
+        participants=[SimpleNamespace(user_id=101)],
+        participants_total=1,
+        telegram_targets={101: 900101},
+        standings_user_ids=[101],
+        points_by_user={101: "7"},
+        user_labels={101: "Spieler"},
+        rounds_played=3,
+    )
+
+    monkeypatch.setattr(
+        daily_cup_proof_cards,
+        "_load_proof_cards_context",
+        async_return(context),
+    )
+    monkeypatch.setattr(daily_cup_proof_cards, "build_bot", lambda: bot)
+    monkeypatch.setattr(
+        daily_cup_proof_cards,
+        "enqueue_daily_cup_proof_cards",
+        lambda **kwargs: queued.append(kwargs),
+    )
+    monkeypatch.setattr(
+        daily_cup_proof_cards.TournamentParticipantsRepo,
+        "get_for_tournament_user_for_update",
+        async_return(None),
+    )
+    monkeypatch.setattr(
+        daily_cup_proof_cards,
+        "send_daily_cup_proof_card",
+        async_return((True, False, "should-not-send")),
+    )
+    monkeypatch.setattr(
+        daily_cup_proof_cards,
+        "SessionLocal",
+        session_local_with_sessions(SimpleNamespace()),
+    )
+
+    result = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
+        tournament_id=str(tournament_id),
+        initial_delay_seconds=0,
+    )
+
+    assert result == {
+        "processed": 1,
+        "participants_total": 1,
+        "sent": 0,
+        "cached_reused": 0,
+        "failed": 0,
+    }
+    assert queued == [
+        {
+            "tournament_id": str(tournament_id),
+            "user_id": 101,
+            "delay_seconds": 2,
+        }
+    ]
+    assert bot.session.closed is True
