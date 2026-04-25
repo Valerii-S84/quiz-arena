@@ -6,10 +6,10 @@ from zoneinfo import ZoneInfo
 from app.core.config import get_settings
 
 ROUND_SLOTS: tuple[tuple[int, int, int], ...] = (
+    (17, 0, 30),
+    (17, 30, 30),
     (18, 0, 30),
     (18, 30, 30),
-    (19, 0, 30),
-    (19, 30, 30),
 )
 
 

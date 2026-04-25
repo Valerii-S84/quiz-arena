@@ -321,7 +321,7 @@ async def test_push_skips_blocked_users(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_daily_cup_registration_accepts_hundredth_and_rejects_hundred_first() -> None:
-    now_utc = datetime(2026, 3, 1, 16, 30, tzinfo=UTC)
+    now_utc = datetime(2026, 3, 1, 15, 30, tzinfo=UTC)
     await _ensure_tournament_schema()
 
     user_ids = [await _create_user(f"daily_cup_cap_{idx}") for idx in range(101)]

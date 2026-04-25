@@ -175,3 +175,27 @@ async def test_invite_registration_button_payload_registers_user(monkeypatch) ->
             user_id=user_id,
         )
         assert participant is not None
+
+
+@pytest.mark.asyncio
+async def test_last_call_reminder_sends_main_registration_push_at_new_time(monkeypatch) -> None:
+    now_utc = datetime(2026, 3, 1, 15, 30, tzinfo=UTC)
+    await _ensure_tournament_schema()
+
+    user_id = await _create_user("daily_cup_last_call_push")
+    await _set_last_seen(user_id=user_id, seen_at=now_utc - timedelta(days=1))
+
+    bot = _RecordingBot()
+    monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
+    monkeypatch.setattr(daily_cup_async, "build_bot", lambda: bot)
+
+    result = as_any_dict(await daily_cup_async.send_daily_cup_last_call_reminder_async())
+
+    assert int(result["sent_total"]) == 1
+    assert len(bot.messages) == 1
+    message = bot.messages[0]
+    tournament_id = await _get_today_registration_tournament_id(now_utc=now_utc)
+    assert message["text"] == TEXTS_DE["msg.daily_cup.last_call_reminder"]
+    button = message["reply_markup"].inline_keyboard[0][0]
+    assert button.text == "✅ Ich bin dabei!"
+    assert button.callback_data == f"daily:cup:join:{tournament_id}"

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -8,7 +7,6 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
 from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
@@ -18,9 +16,15 @@ from app.game.tournaments.constants import (
     TOURNAMENT_STATUS_COMPLETED,
     TOURNAMENT_STATUS_REGISTRATION,
 )
-from app.workers.tasks.daily_cup_config import DAILY_CUP_TOURNAMENT_TYPE
+from app.workers.tasks.daily_cup_config import (
+    DAILY_CUP_CLOSE_HOUR,
+    DAILY_CUP_CLOSE_MINUTE,
+    DAILY_CUP_OPEN_HOUR,
+    DAILY_CUP_OPEN_MINUTE,
+    DAILY_CUP_TIMEZONE,
+    DAILY_CUP_TOURNAMENT_TYPE,
+)
 
-settings = get_settings()
 _ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3", "ROUND_4", "BRACKET_LIVE"})
 
 
@@ -53,8 +57,7 @@ def _parse_hhmm(value: str, *, default_hour: int, default_minute: int) -> tuple[
 
 
 def _local_daily_cup_anchor(*, now_utc: datetime, hour: int, minute: int) -> datetime:
-    timezone_name = settings.daily_cup_timezone.strip() or "Europe/Berlin"
-    tz = ZoneInfo(timezone_name)
+    tz = ZoneInfo(DAILY_CUP_TIMEZONE)
     local_now = now_utc.astimezone(tz)
     return datetime(
         local_now.year,
@@ -67,18 +70,18 @@ def _local_daily_cup_anchor(*, now_utc: datetime, hour: int, minute: int) -> dat
 
 
 def _invite_open_at_utc(*, now_utc: datetime) -> datetime:
-    invite_time_value = os.getenv("DAILY_CUP_INVITE_TIME", "16:00")
-    invite_hour, invite_minute = _parse_hhmm(invite_time_value, default_hour=16, default_minute=0)
     return _local_daily_cup_anchor(
-        now_utc=now_utc, hour=invite_hour, minute=invite_minute
+        now_utc=now_utc,
+        hour=DAILY_CUP_OPEN_HOUR,
+        minute=DAILY_CUP_OPEN_MINUTE,
     ).astimezone(timezone.utc)
 
 
 def _close_at_utc(*, now_utc: datetime) -> datetime:
-    close_time_value = os.getenv("DAILY_CUP_CLOSE_TIME", settings.daily_cup_registration_close)
-    close_hour, close_minute = _parse_hhmm(close_time_value, default_hour=18, default_minute=0)
     return _local_daily_cup_anchor(
-        now_utc=now_utc, hour=close_hour, minute=close_minute
+        now_utc=now_utc,
+        hour=DAILY_CUP_CLOSE_HOUR,
+        minute=DAILY_CUP_CLOSE_MINUTE,
     ).astimezone(timezone.utc)
 
 

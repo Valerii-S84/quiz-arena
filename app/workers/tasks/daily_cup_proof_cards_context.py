@@ -12,7 +12,6 @@ class DailyCupProofCardsContext:
     participants: list[Any]
     participants_total: int
     standings_user_ids: list[int]
-    participant_rows: dict[int, Any]
     points_by_user: dict[int, str]
     user_labels: dict[int, str]
     telegram_targets: dict[int, int | None]
@@ -73,7 +72,6 @@ async def load_daily_cup_proof_cards_context(
         participants=participants,
         participants_total=len(all_participants),
         standings_user_ids=[item.user_id for item in standings],
-        participant_rows={int(item.user_id): item for item in participants},
         points_by_user={
             int(item.user_id): format_points_fn(item.score) for item in all_participants
         },

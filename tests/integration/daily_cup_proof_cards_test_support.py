@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.db.models.entitlements import Entitlement
 from app.db.models.tournament_matches import TournamentMatch
 from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
@@ -16,6 +17,7 @@ from app.db.repo.tournament_round_scores_repo import (
 )
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
+from app.economy.energy.service import EnergyService
 from app.workers.tasks import daily_cup_proof_cards
 from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
 from tests.integration.friend_challenge_fixtures import _create_user
@@ -110,7 +112,7 @@ async def create_completed_daily_cup(*, now_utc: datetime, user_ids: list[int]) 
                 name="Daily Arena Cup",
                 status="COMPLETED",
                 format="QUICK_5",
-                max_participants=8,
+                max_participants=max(8, len(user_ids)),
                 current_round=3,
                 registration_deadline=now_utc - timedelta(hours=5),
                 round_deadline=None,
@@ -138,9 +140,8 @@ async def create_completed_daily_cup(*, now_utc: datetime, user_ids: list[int]) 
             tournament_id=tournament.id,
         )
         assert len(participants) == len(user_ids)
-        score_values = [Decimal("4"), Decimal("3"), Decimal("2"), Decimal("1")]
         for index, row in enumerate(participants):
-            row.score = score_values[index]
+            row.score = Decimal(len(user_ids) - index)
             row.tie_break = Decimal(index)
         return str(tournament.id)
 
@@ -230,3 +231,38 @@ async def create_completed_daily_cup_with_seeded_scores(
         )
 
         return str(tournament.id)
+
+
+async def set_user_free_energy(*, user_id: int, free_energy: int, now_utc: datetime) -> None:
+    async with SessionLocal.begin() as session:
+        state = await EnergyService.initialize_user_state(
+            session,
+            user_id=user_id,
+            now_utc=now_utc,
+        )
+        state.free_energy = free_energy
+
+
+async def set_user_active_premium(
+    *,
+    user_id: int,
+    scope: str,
+    now_utc: datetime,
+    ends_at: datetime,
+) -> None:
+    async with SessionLocal.begin() as session:
+        session.add(
+            Entitlement(
+                user_id=user_id,
+                entitlement_type="PREMIUM",
+                scope=scope,
+                status="ACTIVE",
+                starts_at=now_utc,
+                ends_at=ends_at,
+                source_purchase_id=None,
+                idempotency_key=f"test:premium:{user_id}:{scope}:{ends_at.timestamp()}",
+                metadata_={"source": "test"},
+                created_at=now_utc,
+                updated_at=now_utc,
+            )
+        )

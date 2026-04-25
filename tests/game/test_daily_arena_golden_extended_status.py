@@ -19,7 +19,7 @@ from tests.game.daily_arena_golden_support import async_return, patch_status_win
     ("raw_value", "defaults", "expected"),
     [
         ("bad", (16, 0), (16, 0)),
-        ("25:99", (18, 0), (18, 0)),
+        ("25:99", (17, 0), (17, 0)),
         ("09:45", (0, 0), (9, 45)),
     ],
     ids=["broken", "out_of_range", "valid"],
@@ -31,14 +31,16 @@ def test_daily_arena_status_time_helpers_keep_current_parsing_rules(
     expected: tuple[int, int],
 ) -> None:
     # GOLDEN: фіксує поточну поведінку, не змінювати без рев'ю
-    monkeypatch.setattr(daily_cup_user_status.settings, "daily_cup_timezone", "Europe/Berlin")
+    monkeypatch.setattr(daily_cup_user_status, "DAILY_CUP_TIMEZONE", "Europe/Berlin")
     monkeypatch.setattr(
         daily_cup_user_status,
         "DAILY_CUP_TOURNAMENT_TYPE",
         TOURNAMENT_TYPE_DAILY_ARENA,
     )
-    monkeypatch.setenv("DAILY_CUP_INVITE_TIME", "broken")
-    monkeypatch.setenv("DAILY_CUP_CLOSE_TIME", "25:99")
+    monkeypatch.setattr(daily_cup_user_status, "DAILY_CUP_OPEN_HOUR", 16)
+    monkeypatch.setattr(daily_cup_user_status, "DAILY_CUP_OPEN_MINUTE", 0)
+    monkeypatch.setattr(daily_cup_user_status, "DAILY_CUP_CLOSE_HOUR", 17)
+    monkeypatch.setattr(daily_cup_user_status, "DAILY_CUP_CLOSE_MINUTE", 0)
 
     assert (
         daily_cup_user_status._parse_hhmm(
@@ -57,7 +59,7 @@ def test_daily_arena_status_time_helpers_keep_current_parsing_rules(
         2026, 3, 1, 15, 0, tzinfo=UTC
     )
     assert daily_cup_user_status._close_at_utc(now_utc=now_utc) == datetime(
-        2026, 3, 1, 17, 0, tzinfo=UTC
+        2026, 3, 1, 16, 0, tzinfo=UTC
     )
 
 

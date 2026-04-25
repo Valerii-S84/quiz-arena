@@ -6,6 +6,7 @@ from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, ForeignKey, 
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.db.analytics_constants import DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES_SQL
 from app.db.models.base import Base
 
 
@@ -30,7 +31,7 @@ class AnalyticsEvent(Base):
                 "user_id IS NOT NULL "
                 "AND payload ? 'tournament_id' "
                 "AND event_type IN "
-                "('daily_cup_invite_registration_push_sent','daily_cup_last_call_reminder_sent')"
+                f"({DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES_SQL})"
             ),
         ),
     )

@@ -53,8 +53,17 @@ class MessagingSettingsMixin:
     tournament_max_participants: int = Field(default=8, alias="TOURNAMENT_MAX_PARTICIPANTS")
     tournament_min_participants: int = Field(default=2, alias="TOURNAMENT_MIN_PARTICIPANTS")
     tournament_rounds: int = Field(default=3, alias="TOURNAMENT_ROUNDS")
+    daily_cup_invite_time: str = Field(default="16:00", alias="DAILY_CUP_INVITE_TIME")
+    daily_cup_last_call_reminder_time: str = Field(
+        default="16:30",
+        alias="DAILY_CUP_LAST_CALL_REMINDER_TIME",
+    )
+    daily_cup_prestart_reminder_time: str = Field(
+        default="16:50",
+        alias="DAILY_CUP_PRESTART_REMINDER_TIME",
+    )
     daily_cup_registration_open: str = Field(default="16:00", alias="DAILY_CUP_REGISTRATION_OPEN")
-    daily_cup_registration_close: str = Field(default="18:00", alias="DAILY_CUP_REGISTRATION_CLOSE")
+    daily_cup_registration_close: str = Field(default="17:00", alias="DAILY_CUP_REGISTRATION_CLOSE")
     daily_cup_min_participants: int = Field(default=4, alias="DAILY_CUP_MIN_PARTICIPANTS")
     daily_cup_timezone: str = Field(default="Europe/Berlin", alias="DAILY_CUP_TIMEZONE")
     daily_challenge_precompute_hour_berlin: int = Field(

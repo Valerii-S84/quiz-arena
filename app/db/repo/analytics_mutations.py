@@ -8,14 +8,10 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.analytics_constants import DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES_SQL
 from app.db.models.analytics_daily import AnalyticsDaily
 from app.db.models.analytics_events import AnalyticsEvent
 from app.db.repo.analytics_models import AnalyticsDailyUpsert
-
-DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES = (
-    "daily_cup_invite_registration_push_sent",
-    "daily_cup_last_call_reminder_sent",
-)
 
 
 async def create_event(
@@ -71,7 +67,7 @@ async def create_daily_cup_push_event_once(
                 "user_id IS NOT NULL "
                 "AND payload ? 'tournament_id' "
                 "AND event_type IN "
-                "('daily_cup_invite_registration_push_sent','daily_cup_last_call_reminder_sent')"
+                f"({DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES_SQL})"
             ),
         )
         .returning(AnalyticsEvent.id)

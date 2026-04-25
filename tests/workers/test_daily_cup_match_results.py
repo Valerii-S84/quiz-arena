@@ -74,7 +74,7 @@ async def test_send_match_result_messages_sends_for_both_participants(monkeypatc
         user_a_points=4,
         user_b_points=3,
         rounds_total=3,
-        tournament_registration_deadline=datetime(2026, 3, 3, 17, 0, tzinfo=UTC),
+        tournament_registration_deadline=datetime(2026, 3, 3, 16, 0, tzinfo=UTC),
         next_round_start_time=datetime(2026, 3, 3, 18, 0, tzinfo=UTC),
     )
 
@@ -124,13 +124,13 @@ async def test_send_match_result_messages_uses_planned_slot_when_next_round_not_
         user_a_points=4,
         user_b_points=3,
         rounds_total=4,
-        tournament_registration_deadline=datetime(2026, 3, 3, 17, 0, tzinfo=UTC),
+        tournament_registration_deadline=datetime(2026, 3, 3, 16, 0, tzinfo=UTC),
         next_round_start_time=None,
     )
 
     by_chat = {int(item["chat_id"]): str(item["text"]) for item in bot.messages}
-    assert "Runde 4 startet voraussichtlich 19:30 (Berlin)" in by_chat[1011]
-    assert "Runde 4 startet voraussichtlich 19:30 (Berlin)" in by_chat[1022]
+    assert "Runde 4 startet voraussichtlich 18:30 (Berlin)" in by_chat[1011]
+    assert "Runde 4 startet voraussichtlich 18:30 (Berlin)" in by_chat[1022]
 
 
 @pytest.mark.asyncio

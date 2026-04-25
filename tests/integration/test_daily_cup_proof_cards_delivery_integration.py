@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+from datetime import datetime, timezone
 from uuid import UUID
 
 import pytest
+from sqlalchemy import select
 
+from app.bot.texts.de import TEXTS_DE
+from app.db.models.energy_state import EnergyState
+from app.db.models.entitlements import Entitlement
+from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.session import SessionLocal
 from app.workers.tasks import daily_cup_proof_cards
@@ -13,7 +20,37 @@ from tests.integration.daily_cup_proof_cards_test_support import (
     ensure_tournament_schema,
     fixed_daily_cup_now,
     install_recording_worker_bot,
+    set_user_free_energy,
 )
+
+UTC = timezone.utc
+
+
+class _FrozenDateTime(datetime):
+    current = datetime(2026, 4, 24, 10, 0, tzinfo=UTC)
+
+    @classmethod
+    def now(cls, tz=None):  # type: ignore[override]
+        if tz is None:
+            return cls.current.replace(tzinfo=None)
+        return cls.current.astimezone(tz)
+
+
+async def _get_free_energy(*, user_id: int) -> int | None:
+    async with SessionLocal.begin() as session:
+        state = await session.get(EnergyState, user_id)
+        return None if state is None else int(state.free_energy)
+
+
+async def _get_active_premium(*, user_id: int) -> Entitlement | None:
+    async with SessionLocal.begin() as session:
+        return await session.scalar(
+            select(Entitlement).where(
+                Entitlement.user_id == user_id,
+                Entitlement.entitlement_type == "PREMIUM",
+                Entitlement.status == "ACTIVE",
+            )
+        )
 
 
 @pytest.mark.asyncio
@@ -111,3 +148,84 @@ async def test_daily_cup_proof_cards_skip_repeat_enqueue_for_same_participant(
         "failed": 0,
     }
     assert len(bot.send_photos) == 1
+
+
+@pytest.mark.asyncio
+async def test_daily_cup_proof_cards_parallel_duplicate_run_does_not_send_duplicates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now_utc = fixed_daily_cup_now()
+    await ensure_tournament_schema()
+
+    user_ids = await create_daily_cup_users(prefix="daily_cup_proof_parallel", count=13)
+    tournament_id = await create_completed_daily_cup(now_utc=now_utc, user_ids=user_ids)
+    await set_user_free_energy(user_id=user_ids[2], free_energy=18, now_utc=now_utc)
+
+    _FrozenDateTime.current = now_utc
+    monkeypatch.setattr(daily_cup_proof_cards, "datetime", _FrozenDateTime)
+    bot, _render_calls = install_recording_worker_bot(monkeypatch)
+
+    original_send_photo = bot.send_photo
+
+    async def _slow_send_photo(**kwargs):
+        await asyncio.sleep(0.02)
+        return await original_send_photo(**kwargs)
+
+    monkeypatch.setattr(bot, "send_photo", _slow_send_photo)
+
+    first, second = await asyncio.gather(
+        daily_cup_proof_cards.run_daily_cup_proof_cards_async(
+            tournament_id=tournament_id,
+            initial_delay_seconds=0,
+        ),
+        daily_cup_proof_cards.run_daily_cup_proof_cards_async(
+            tournament_id=tournament_id,
+            initial_delay_seconds=0,
+        ),
+    )
+
+    assert first["sent"] + second["sent"] == 13
+    assert len(bot.send_photos) == 13
+    assert [message["text"] for message in bot.send_messages] == [
+        TEXTS_DE["msg.daily_cup.reward.rank_1"],
+        TEXTS_DE["msg.daily_cup.reward.rank_2"],
+        TEXTS_DE["msg.daily_cup.reward.rank_3"],
+    ]
+
+
+@pytest.mark.asyncio
+async def test_daily_cup_proof_cards_keep_proof_cards_but_skip_economy_rewards_below_threshold(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now_utc = fixed_daily_cup_now()
+    await ensure_tournament_schema()
+
+    user_ids = await create_daily_cup_users(prefix="daily_cup_rewards_12", count=12)
+    tournament_id = await create_completed_daily_cup(now_utc=now_utc, user_ids=user_ids)
+    await set_user_free_energy(user_id=user_ids[2], free_energy=10, now_utc=now_utc)
+
+    bot, _render_calls = install_recording_worker_bot(monkeypatch)
+
+    result = await daily_cup_proof_cards.run_daily_cup_proof_cards_async(
+        tournament_id=tournament_id,
+        initial_delay_seconds=0,
+    )
+
+    assert result == {
+        "processed": 1,
+        "participants_total": 12,
+        "sent": 12,
+        "cached_reused": 0,
+        "failed": 0,
+    }
+    assert len(bot.send_photos) == 12
+    assert bot.send_messages == []
+    assert await _get_active_premium(user_id=user_ids[0]) is None
+    async with SessionLocal.begin() as session:
+        ticket_count = await PurchasesRepo.count_credited_product(
+            session,
+            user_id=user_ids[1],
+            product_code="FRIEND_CHALLENGE_5",
+        )
+    assert ticket_count == 0
+    assert await _get_free_energy(user_id=user_ids[2]) == 10

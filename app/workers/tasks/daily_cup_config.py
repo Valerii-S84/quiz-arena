@@ -28,13 +28,11 @@ def _parse_hhmm(value: str, *, default_hour: int, default_minute: int) -> tuple[
 
 DAILY_CUP_TIMEZONE = settings.daily_cup_timezone.strip() or "Europe/Berlin"
 DAILY_CUP_TOURNAMENT_TYPE = TOURNAMENT_TYPE_DAILY_ARENA
-DAILY_CUP_INVITE_TIME = os.getenv("DAILY_CUP_INVITE_TIME", "16:00")
-DAILY_CUP_LAST_CALL_REMINDER_TIME = os.getenv("DAILY_CUP_LAST_CALL_REMINDER_TIME", "17:30")
-DAILY_CUP_PRESTART_REMINDER_TIME = os.getenv("DAILY_CUP_PRESTART_REMINDER_TIME", "17:45")
-DAILY_CUP_REGISTRATION_OPEN = os.getenv("DAILY_CUP_OPEN_TIME", settings.daily_cup_registration_open)
-DAILY_CUP_REGISTRATION_CLOSE = os.getenv(
-    "DAILY_CUP_CLOSE_TIME", settings.daily_cup_registration_close
-)
+DAILY_CUP_INVITE_TIME = settings.daily_cup_invite_time
+DAILY_CUP_LAST_CALL_REMINDER_TIME = settings.daily_cup_last_call_reminder_time
+DAILY_CUP_PRESTART_REMINDER_TIME = settings.daily_cup_prestart_reminder_time
+DAILY_CUP_REGISTRATION_OPEN = settings.daily_cup_registration_open
+DAILY_CUP_REGISTRATION_CLOSE = settings.daily_cup_registration_close
 DAILY_CUP_MIN_PARTICIPANTS = max(4, int(settings.daily_cup_min_participants))
 DAILY_CUP_PUSH_BATCH_SIZE = 200
 DAILY_CUP_ACTIVE_LOOKBACK_DAYS = 7
@@ -68,13 +66,13 @@ DAILY_CUP_INVITE_HOUR, DAILY_CUP_INVITE_MINUTE = _parse_hhmm(
 )
 DAILY_CUP_LAST_CALL_REMINDER_HOUR, DAILY_CUP_LAST_CALL_REMINDER_MINUTE = _parse_hhmm(
     DAILY_CUP_LAST_CALL_REMINDER_TIME,
-    default_hour=17,
+    default_hour=16,
     default_minute=30,
 )
 DAILY_CUP_PRESTART_REMINDER_HOUR, DAILY_CUP_PRESTART_REMINDER_MINUTE = _parse_hhmm(
     DAILY_CUP_PRESTART_REMINDER_TIME,
-    default_hour=17,
-    default_minute=45,
+    default_hour=16,
+    default_minute=50,
 )
 
 DAILY_CUP_OPEN_HOUR, DAILY_CUP_OPEN_MINUTE = _parse_hhmm(
@@ -84,7 +82,7 @@ DAILY_CUP_OPEN_HOUR, DAILY_CUP_OPEN_MINUTE = _parse_hhmm(
 )
 DAILY_CUP_CLOSE_HOUR, DAILY_CUP_CLOSE_MINUTE = _parse_hhmm(
     DAILY_CUP_REGISTRATION_CLOSE,
-    default_hour=18,
+    default_hour=17,
     default_minute=0,
 )
 

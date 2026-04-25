@@ -22,8 +22,17 @@ class TournamentsRepo:
         return await session.get(Tournament, tournament_id)
 
     @staticmethod
-    async def get_by_id_for_update(session: AsyncSession, tournament_id: UUID) -> Tournament | None:
-        stmt = select(Tournament).where(Tournament.id == tournament_id).with_for_update()
+    async def get_by_id_for_update(
+        session: AsyncSession,
+        tournament_id: UUID,
+        *,
+        skip_locked: bool = False,
+    ) -> Tournament | None:
+        stmt = (
+            select(Tournament)
+            .where(Tournament.id == tournament_id)
+            .with_for_update(skip_locked=skip_locked)
+        )
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 

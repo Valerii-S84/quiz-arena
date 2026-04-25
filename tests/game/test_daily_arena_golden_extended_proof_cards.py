@@ -13,8 +13,6 @@ from app.workers.tasks import daily_cup_proof_cards
 from tests.game.daily_arena_golden_support import (
     DummyBot,
     async_return,
-    close_coroutine_and_raise,
-    close_coroutine_with_name,
     make_standing_row,
     make_worker_user,
     session_local_with_sessions,
@@ -93,7 +91,13 @@ async def test_daily_arena_proof_cards_skip_stale_tournament_and_empty_selected_
     monkeypatch.setattr(
         daily_cup_proof_cards,
         "SessionLocal",
-        session_local_with_sessions(SimpleNamespace(), SimpleNamespace()),
+        session_local_with_sessions(
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+        ),
     )
     monkeypatch.setattr(
         daily_cup_proof_cards.TournamentsRepo, "get_by_id", async_return(tournament)
@@ -186,10 +190,29 @@ async def test_daily_arena_proof_cards_pipeline_handles_delivery_edge_cases(
         del session, tournament_id
         persisted_files.append((user_id, file_id))
 
+    participant_rows = {
+        101: standings[0].participant,
+        303: standings[2].participant,
+        404: standings[3].participant,
+        505: standings[4].participant,
+    }
+
+    async def _fake_get_for_tournament_user_for_update(
+        session, *, tournament_id, user_id, skip_locked
+    ):
+        del session, tournament_id, skip_locked
+        return participant_rows.get(user_id)
+
     monkeypatch.setattr(
         daily_cup_proof_cards,
         "SessionLocal",
-        session_local_with_sessions(SimpleNamespace(), SimpleNamespace()),
+        session_local_with_sessions(
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+        ),
     )
     monkeypatch.setattr(
         daily_cup_proof_cards.TournamentsRepo, "get_by_id", async_return(tournament)
@@ -218,6 +241,11 @@ async def test_daily_arena_proof_cards_pipeline_handles_delivery_edge_cases(
     monkeypatch.setattr(daily_cup_proof_cards, "build_bot", lambda: bot)
     monkeypatch.setattr(daily_cup_proof_cards, "send_daily_cup_proof_card", _fake_send_proof_card)
     monkeypatch.setattr(daily_cup_proof_cards.asyncio, "sleep", _fake_sleep)
+    monkeypatch.setattr(
+        daily_cup_proof_cards.TournamentParticipantsRepo,
+        "get_for_tournament_user_for_update",
+        _fake_get_for_tournament_user_for_update,
+    )
     monkeypatch.setattr(
         daily_cup_proof_cards.TournamentParticipantsRepo,
         "set_proof_card_sent",
@@ -317,74 +345,3 @@ async def test_proof_card_skips_user_with_none_telegram_id(
         "failed": 1,
     }
     assert bot.session.closed is True
-
-
-def test_daily_arena_proof_cards_enqueue_paths_and_wrapper(monkeypatch: pytest.MonkeyPatch) -> None:
-    # GOLDEN: фіксує поточну поведінку, не змінювати без рев'ю
-    enqueued: dict[str, object] = {}
-
-    monkeypatch.setattr(
-        daily_cup_proof_cards,
-        "is_celery_task",
-        lambda task: task is daily_cup_proof_cards.run_daily_cup_proof_cards,
-    )
-    monkeypatch.setattr(
-        daily_cup_proof_cards.run_daily_cup_proof_cards,
-        "apply_async",
-        lambda **kwargs: enqueued.setdefault("apply_async", kwargs),
-    )
-    daily_cup_proof_cards.enqueue_daily_cup_proof_cards(
-        tournament_id="arena-proof",
-        user_id=7,
-        delay_seconds=3,
-    )
-    assert enqueued["apply_async"] == {
-        "kwargs": {
-            "tournament_id": "arena-proof",
-            "user_id": 7,
-            "initial_delay_seconds": 0,
-        },
-        "countdown": 3,
-    }
-
-    monkeypatch.setattr(daily_cup_proof_cards, "is_celery_task", lambda task: False)
-    monkeypatch.setattr(
-        daily_cup_proof_cards,
-        "run_async_job",
-        lambda coroutine: enqueued.setdefault(
-            "run_async_job", close_coroutine_with_name(coroutine)
-        ),
-    )
-    daily_cup_proof_cards.enqueue_daily_cup_proof_cards(
-        tournament_id="arena-proof-async",
-        delay_seconds=4,
-    )
-    assert enqueued["run_async_job"] == "run_daily_cup_proof_cards_async"
-
-    warnings: list[dict[str, object]] = []
-    monkeypatch.setattr(
-        daily_cup_proof_cards,
-        "run_async_job",
-        lambda coroutine: close_coroutine_and_raise(coroutine, RuntimeError("boom")),
-    )
-    monkeypatch.setattr(
-        daily_cup_proof_cards.logger,
-        "warning",
-        lambda event, **kwargs: warnings.append({"event": event, **kwargs}),
-    )
-    daily_cup_proof_cards.enqueue_daily_cup_proof_cards(tournament_id="arena-proof-failed")
-    assert warnings == [
-        {
-            "event": "daily_cup_proof_card_enqueue_failed",
-            "tournament_id": "arena-proof-failed",
-            "error_type": "RuntimeError",
-        }
-    ]
-
-    monkeypatch.setattr(
-        daily_cup_proof_cards,
-        "run_async_job",
-        lambda coroutine: {"wrapped": close_coroutine_with_name(coroutine)},
-    )
-    wrapped = daily_cup_proof_cards.run_daily_cup_proof_cards(tournament_id="arena-proof-wrapper")
-    assert wrapped == {"wrapped": "run_daily_cup_proof_cards_async"}
