@@ -13,7 +13,6 @@ from app.game.tournaments.constants import (
     TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS,
     TOURNAMENT_MATCH_STATUS_PENDING,
     TOURNAMENT_MAX_ROUNDS,
-    TOURNAMENT_MIN_PARTICIPANTS,
     TOURNAMENT_STATUS_REGISTRATION,
     TOURNAMENT_STATUS_ROUND_1,
     TOURNAMENT_STATUS_ROUND_2,
@@ -57,12 +56,6 @@ async def close_expired_registration(
     tournament: Tournament,
 ) -> bool:
     if tournament.status != TOURNAMENT_STATUS_REGISTRATION:
-        return False
-    participants_total = await TournamentParticipantsRepo.count_for_tournament(
-        session,
-        tournament_id=tournament.id,
-    )
-    if participants_total >= TOURNAMENT_MIN_PARTICIPANTS:
         return False
     mark_tournament_canceled(tournament=tournament)
     return True

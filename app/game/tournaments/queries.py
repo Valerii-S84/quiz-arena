@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +23,12 @@ from app.game.tournaments.internal import build_tournament_snapshot
 from app.game.tournaments.types import TournamentLobbySnapshot, TournamentParticipantSnapshot
 
 _ROUND_STATUSES = frozenset({"ROUND_1", "ROUND_2", "ROUND_3", "ROUND_4", "BRACKET_LIVE"})
+
+
+def _resolve_now_utc(*, now_utc: datetime | None) -> datetime:
+    if now_utc is not None:
+        return now_utc
+    return datetime.now(timezone.utc)
 
 
 def _participant_snapshot(row: TournamentParticipant) -> TournamentParticipantSnapshot:
@@ -63,7 +70,9 @@ async def _build_lobby_snapshot(
     session: AsyncSession,
     tournament: Tournament,
     viewer_user_id: int,
+    now_utc: datetime | None = None,
 ) -> TournamentLobbySnapshot:
+    resolved_now_utc = _resolve_now_utc(now_utc=now_utc)
     if tournament.type in DAILY_CUP_TOURNAMENT_TYPES:
         standings = await calculate_daily_cup_standings(session, tournament_id=tournament.id)
         participants = [item.participant for item in standings]
@@ -76,11 +85,12 @@ async def _build_lobby_snapshot(
     participant_ids = {item.user_id for item in participant_snapshots}
     viewer_joined = viewer_user_id in participant_ids
     viewer_is_creator = tournament.created_by == viewer_user_id
-    can_start = (
-        viewer_is_creator
-        and tournament.status == TOURNAMENT_STATUS_REGISTRATION
-        and len(participant_snapshots) >= 2
+    registration_open = (
+        tournament.status == TOURNAMENT_STATUS_REGISTRATION
+        and tournament.registration_deadline > resolved_now_utc
     )
+    can_join = registration_open and not viewer_joined
+    can_start = viewer_is_creator and registration_open and len(participant_snapshots) >= 2
 
     viewer_match_challenge_id: UUID | None = None
     viewer_opponent_user_id: int | None = None
@@ -104,6 +114,7 @@ async def _build_lobby_snapshot(
         participants=participant_snapshots,
         viewer_joined=viewer_joined,
         viewer_is_creator=viewer_is_creator,
+        can_join=can_join,
         can_start=can_start,
         viewer_current_match_challenge_id=viewer_match_challenge_id,
         viewer_current_opponent_user_id=viewer_opponent_user_id,
@@ -115,6 +126,7 @@ async def get_private_tournament_lobby_by_id(
     *,
     tournament_id: UUID,
     viewer_user_id: int,
+    now_utc: datetime | None = None,
 ) -> TournamentLobbySnapshot:
     tournament = await TournamentsRepo.get_by_id(session, tournament_id)
     if tournament is None:
@@ -125,6 +137,7 @@ async def get_private_tournament_lobby_by_id(
         session=session,
         tournament=tournament,
         viewer_user_id=viewer_user_id,
+        now_utc=now_utc,
     )
 
 
@@ -133,6 +146,7 @@ async def get_private_tournament_lobby_by_invite_code(
     *,
     invite_code: str,
     viewer_user_id: int,
+    now_utc: datetime | None = None,
 ) -> TournamentLobbySnapshot:
     tournament = await TournamentsRepo.get_by_invite_code(session, invite_code)
     if tournament is None:
@@ -143,6 +157,7 @@ async def get_private_tournament_lobby_by_invite_code(
         session=session,
         tournament=tournament,
         viewer_user_id=viewer_user_id,
+        now_utc=now_utc,
     )
 
 
@@ -151,6 +166,7 @@ async def get_daily_cup_lobby_by_id(
     *,
     tournament_id: UUID,
     viewer_user_id: int,
+    now_utc: datetime | None = None,
 ) -> TournamentLobbySnapshot:
     tournament = await TournamentsRepo.get_by_id(session, tournament_id)
     if tournament is None:
@@ -161,4 +177,5 @@ async def get_daily_cup_lobby_by_id(
         session=session,
         tournament=tournament,
         viewer_user_id=viewer_user_id,
+        now_utc=now_utc,
     )

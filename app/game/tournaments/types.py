@@ -65,6 +65,7 @@ class TournamentLobbySnapshot:
     participants: tuple[TournamentParticipantSnapshot, ...]
     viewer_joined: bool
     viewer_is_creator: bool
+    can_join: bool
     can_start: bool
     viewer_current_match_challenge_id: UUID | None
     viewer_current_opponent_user_id: int | None

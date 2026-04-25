@@ -78,11 +78,13 @@ class TournamentServiceFacade:
         *,
         tournament_id: UUID,
         viewer_user_id: int,
+        now_utc: datetime | None = None,
     ) -> TournamentLobbySnapshot:
         return await get_private_tournament_lobby_by_id(
             session,
             tournament_id=tournament_id,
             viewer_user_id=viewer_user_id,
+            now_utc=now_utc,
         )
 
     @staticmethod
@@ -91,11 +93,13 @@ class TournamentServiceFacade:
         *,
         invite_code: str,
         viewer_user_id: int,
+        now_utc: datetime | None = None,
     ) -> TournamentLobbySnapshot:
         return await get_private_tournament_lobby_by_invite_code(
             session,
             invite_code=invite_code,
             viewer_user_id=viewer_user_id,
+            now_utc=now_utc,
         )
 
     @staticmethod
@@ -104,11 +108,13 @@ class TournamentServiceFacade:
         *,
         tournament_id: UUID,
         viewer_user_id: int,
+        now_utc: datetime | None = None,
     ) -> TournamentLobbySnapshot:
         return await get_daily_cup_lobby_by_id(
             session,
             tournament_id=tournament_id,
             viewer_user_id=viewer_user_id,
+            now_utc=now_utc,
         )
 
     @staticmethod
