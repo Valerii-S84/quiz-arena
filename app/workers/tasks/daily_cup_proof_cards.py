@@ -20,14 +20,16 @@ from app.workers.celery_app import celery_app
 from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
 from app.workers.tasks.daily_cup_proof_cards_context import load_daily_cup_proof_cards_context
 from app.workers.tasks.daily_cup_proof_cards_delivery import (
-    DAILY_CUP_REWARD_MIN_PARTICIPANTS,
     deliver_daily_cup_proof_cards,
-    grant_daily_cup_winner_rewards,
     send_daily_cup_proof_card,
-    send_daily_cup_winner_reward_messages,
 )
 from app.workers.tasks.daily_cup_proof_cards_text import format_points, format_user_label
 from app.workers.tasks.daily_cup_task_helpers import is_celery_task, is_today_daily_cup_tournament
+from app.workers.tasks.daily_cup_winner_rewards import (
+    DAILY_CUP_REWARD_MIN_PARTICIPANTS,
+    grant_daily_cup_winner_rewards,
+    send_daily_cup_winner_reward_messages,
+)
 from app.workers.tasks.tournaments_proof_card_render import render_tournament_proof_card_png
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_proof_cards")
