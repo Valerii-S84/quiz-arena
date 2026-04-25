@@ -66,6 +66,7 @@ async def test_handle_start_tournament_payload_shows_lobby_and_join_button(monke
                 SimpleNamespace(user_id=12, score=0),
             ),
             viewer_joined=False,
+            can_join=True,
             can_start=False,
             viewer_current_match_challenge_id=None,
         )

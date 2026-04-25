@@ -17,6 +17,7 @@ from app.game.tournaments.constants import (
 from app.game.tournaments.errors import (
     TournamentAccessError,
     TournamentAlreadyStartedError,
+    TournamentClosedError,
     TournamentInsufficientParticipantsError,
     TournamentNotFoundError,
 )
@@ -42,6 +43,8 @@ async def start_private_tournament(
         raise TournamentAccessError
     if tournament.status != TOURNAMENT_STATUS_REGISTRATION:
         raise TournamentAlreadyStartedError
+    if tournament.registration_deadline <= now_utc:
+        raise TournamentClosedError
 
     participants = await TournamentParticipantsRepo.list_for_tournament_for_update(
         session,

@@ -75,10 +75,12 @@ runtime diverges, the divergence is stated explicitly.
 Current runtime:
 
 * join is valid only while `status == REGISTRATION` and `now < registration_deadline`
-* manual start currently requires creator ownership, `status == REGISTRATION`,
-  and enough participants, but it does not check `registration_deadline`
-* a `PRIVATE` tournament may therefore remain startable after
-  `registration_deadline` until another lifecycle path changes its state
+* manual start is valid only while `status == REGISTRATION` and
+  `now < registration_deadline`
+* private lobby state exposes expired registrations as non-joinable and
+  non-startable
+* the registration-close worker cancels expired `PRIVATE` tournaments that are
+  still in `REGISTRATION`
 
 Ratified contract:
 

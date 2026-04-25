@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import cast
 
 import pytest
@@ -15,9 +15,12 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal, engine
+from app.game.tournaments.errors import TournamentClosedError
 from app.game.tournaments.lifecycle import check_and_advance_round
 from app.game.tournaments.service import (
     create_private_tournament,
+    get_private_tournament_lobby_by_id,
+    get_private_tournament_lobby_by_invite_code,
     join_private_tournament_by_code,
     start_private_tournament,
 )
@@ -253,3 +256,88 @@ async def test_round_advances_early_when_all_matches_completed_before_deadline()
         assert tournament_row is not None
         assert tournament_row.status == "ROUND_2"
         assert tournament_row.current_round == 2
+
+
+@pytest.mark.asyncio
+async def test_private_tournament_start_rejects_expired_registration_with_enough_players() -> None:
+    now_utc = datetime.now(UTC)
+    expired_now_utc = now_utc + timedelta(minutes=10)
+    await _ensure_tournament_schema()
+
+    creator_user_id = await _create_user("private_tournament_expired_start_creator")
+    opponent_user_id = await _create_user("private_tournament_expired_start_opponent")
+
+    async with SessionLocal.begin() as session:
+        tournament = await create_private_tournament(
+            session,
+            created_by=creator_user_id,
+            format_code="QUICK_5",
+            now_utc=now_utc,
+            registration_deadline=now_utc + timedelta(minutes=5),
+        )
+        await join_private_tournament_by_code(
+            session,
+            user_id=opponent_user_id,
+            invite_code=tournament.invite_code,
+            now_utc=now_utc,
+        )
+
+        with pytest.raises(TournamentClosedError):
+            await start_private_tournament(
+                session,
+                creator_user_id=creator_user_id,
+                tournament_id=tournament.tournament_id,
+                now_utc=expired_now_utc,
+            )
+
+        tournament_row = await TournamentsRepo.get_by_id_for_update(
+            session,
+            tournament_id=tournament.tournament_id,
+        )
+        assert tournament_row is not None
+        assert tournament_row.status == "REGISTRATION"
+
+
+@pytest.mark.asyncio
+async def test_private_tournament_lobby_marks_expired_registration_as_non_joinable_and_non_startable() -> (
+    None
+):
+    now_utc = datetime.now(UTC)
+    expired_now_utc = now_utc + timedelta(minutes=10)
+    await _ensure_tournament_schema()
+
+    creator_user_id = await _create_user("private_tournament_expired_lobby_creator")
+    opponent_user_id = await _create_user("private_tournament_expired_lobby_opponent")
+    outsider_user_id = await _create_user("private_tournament_expired_lobby_outsider")
+
+    async with SessionLocal.begin() as session:
+        tournament = await create_private_tournament(
+            session,
+            created_by=creator_user_id,
+            format_code="QUICK_5",
+            now_utc=now_utc,
+            registration_deadline=now_utc + timedelta(minutes=5),
+        )
+        await join_private_tournament_by_code(
+            session,
+            user_id=opponent_user_id,
+            invite_code=tournament.invite_code,
+            now_utc=now_utc,
+        )
+
+        creator_lobby = await get_private_tournament_lobby_by_id(
+            session,
+            tournament_id=tournament.tournament_id,
+            viewer_user_id=creator_user_id,
+            now_utc=expired_now_utc,
+        )
+        outsider_lobby = await get_private_tournament_lobby_by_invite_code(
+            session,
+            invite_code=tournament.invite_code,
+            viewer_user_id=outsider_user_id,
+            now_utc=expired_now_utc,
+        )
+
+        assert creator_lobby.can_start is False
+        assert creator_lobby.can_join is False
+        assert outsider_lobby.can_join is False

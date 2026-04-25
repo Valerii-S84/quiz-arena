@@ -77,17 +77,13 @@ async def handle_start_tournament_payload(
     keyboard = build_tournament_lobby_keyboard(
         invite_code=lobby.tournament.invite_code,
         tournament_id=str(lobby.tournament.tournament_id),
-        can_join=lobby.tournament.status == "REGISTRATION" and not lobby.viewer_joined,
+        can_join=lobby.can_join,
         can_start=lobby.can_start,
         play_challenge_id=play_challenge_id,
         show_share_result=lobby.tournament.status == "COMPLETED" and lobby.viewer_joined,
     )
     welcome_image_file_id = get_settings().resolved_welcome_image_file_id
-    should_show_join_photo = (
-        bool(welcome_image_file_id)
-        and lobby.tournament.status == "REGISTRATION"
-        and not lobby.viewer_joined
-    )
+    should_show_join_photo = bool(welcome_image_file_id) and lobby.can_join
     if should_show_join_photo:
         creator_label = labels.get(
             int(lobby.tournament.created_by) if lobby.tournament.created_by is not None else -1,

@@ -120,11 +120,7 @@ async def render_tournament_lobby(
     keyboard = build_tournament_lobby_keyboard(
         invite_code=(join_hint_invite_code or lobby.tournament.invite_code),
         tournament_id=str(lobby.tournament.tournament_id),
-        can_join=(
-            lobby.tournament.status == TOURNAMENT_STATUS_REGISTRATION
-            and not lobby.viewer_joined
-            and join_hint_invite_code is not None
-        ),
+        can_join=lobby.can_join and join_hint_invite_code is not None,
         can_start=lobby.can_start,
         play_challenge_id=play_challenge_id,
         show_share_result=lobby.tournament.status == "COMPLETED" and lobby.viewer_joined,
