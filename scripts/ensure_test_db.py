@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 
 import asyncpg  # type: ignore[import-untyped]
 from sqlalchemy.engine import make_url
-
-from app.core.config import get_settings
 
 IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -60,9 +59,17 @@ async def _ensure_database_exists(database_url: str) -> None:
         await conn.close()
 
 
+def _resolve_database_url() -> str:
+    database_url = (
+        os.environ.get("DATABASE_URL") or os.environ.get("TEST_DATABASE_URL") or ""
+    ).strip()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL or TEST_DATABASE_URL must be configured.")
+    return database_url
+
+
 def main() -> int:
-    settings = get_settings()
-    asyncio.run(_ensure_database_exists(settings.database_url))
+    asyncio.run(_ensure_database_exists(_resolve_database_url()))
     return 0
 
 
