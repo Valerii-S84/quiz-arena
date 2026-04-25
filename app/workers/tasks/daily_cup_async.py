@@ -12,7 +12,7 @@ from app.game.tournaments.constants import (
     TOURNAMENT_STATUS_REGISTRATION,
     TOURNAMENT_TYPE_DAILY_ARENA,
 )
-from app.workers.tasks.daily_cup_config import TOURNAMENT_MIN_PARTICIPANTS
+from app.workers.tasks.daily_cup_config import DAILY_CUP_MIN_PARTICIPANTS
 from app.workers.tasks.daily_cup_core import (
     emit_daily_cup_events,
     ensure_daily_cup_registration_tournament,
@@ -100,7 +100,7 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
             tournament_id=tournament.id,
         )
         participants_total = len(participants)
-        if participants_total < TOURNAMENT_MIN_PARTICIPANTS:
+        if participants_total < DAILY_CUP_MIN_PARTICIPANTS:
             tournament.status = TOURNAMENT_STATUS_CANCELED
             tournament.round_deadline = None
             users = await UsersRepo.list_by_ids(

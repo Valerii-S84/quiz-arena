@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID, uuid4
@@ -8,6 +9,7 @@ import pytest
 from aiogram.exceptions import TelegramForbiddenError
 from aiogram.methods import SendMessage
 
+from app.core import config as config_module
 from app.db.models.tournaments import Tournament
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
@@ -100,70 +102,89 @@ async def _join_users(*, tournament_id: UUID, user_ids: list[int], now_utc: date
             )
 
 
-@pytest.mark.asyncio
-async def test_daily_cup_canceled_if_less_than_4(monkeypatch) -> None:
-    now_utc = datetime(2026, 3, 1, 11, 0, tzinfo=UTC)
-    await _ensure_tournament_schema()
+def _reload_daily_cup_runtime_modules():
+    config_module.get_settings.cache_clear()
+    config_module.settings = config_module.get_settings()
+    import app.workers.tasks.daily_cup_config as daily_cup_config_module
 
-    user_ids = [
-        await _create_user("daily_cup_cancel_1"),
-        await _create_user("daily_cup_cancel_2"),
-        await _create_user("daily_cup_cancel_3"),
-    ]
-    tournament_id = await _create_daily_cup_registration_tournament(now_utc=now_utc)
-    await _join_users(tournament_id=tournament_id, user_ids=user_ids, now_utc=now_utc)
-
-    bot = _RecordingBot()
-    monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
-    monkeypatch.setattr(daily_cup_async, "build_bot", lambda: bot)
-
-    result = as_any_dict(await daily_cup_async.close_daily_cup_registration_and_start_async())
-    assert int(result["canceled"]) == 1
-    assert int(result["started"]) == 0
-    assert int(result["participants_total"]) == 3
-
-    async with SessionLocal.begin() as session:
-        tournament = await TournamentsRepo.get_by_id(session, tournament_id)
-        assert tournament is not None
-        assert tournament.status == "CANCELED"
-
-    assert len(bot.messages) == 3
+    importlib.reload(daily_cup_config_module)
+    return importlib.reload(daily_cup_async)
 
 
 @pytest.mark.asyncio
-async def test_daily_cup_starts_with_4_plus(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    ("env_min_participants", "participants_total", "expected_min_participants", "expected_started"),
+    [
+        (None, 4, 4, 1),
+        ("5", 4, 5, 0),
+    ],
+    ids=["default_env", "override_env"],
+)
+async def test_daily_cup_close_registration_uses_configured_min_participants(
+    monkeypatch,
+    env_min_participants: str | None,
+    participants_total: int,
+    expected_min_participants: int,
+    expected_started: int,
+) -> None:
     now_utc = datetime(2026, 3, 1, 11, 0, tzinfo=UTC)
     await _ensure_tournament_schema()
-    await _seed_friend_challenge_questions(now_utc=now_utc)
+    daily_cup_async_module = daily_cup_async
 
-    user_ids = [await _create_user(f"daily_cup_start_{idx}") for idx in range(4)]
-    tournament_id = await _create_daily_cup_registration_tournament(now_utc=now_utc)
-    await _join_users(tournament_id=tournament_id, user_ids=user_ids, now_utc=now_utc)
+    try:
+        with monkeypatch.context() as env_patch:
+            if env_min_participants is None:
+                env_patch.delenv("DAILY_CUP_MIN_PARTICIPANTS", raising=False)
+            else:
+                env_patch.setenv("DAILY_CUP_MIN_PARTICIPANTS", env_min_participants)
+            daily_cup_async_module = _reload_daily_cup_runtime_modules()
 
-    enqueued: list[str] = []
-    monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
-    monkeypatch.setattr(
-        daily_cup_async,
-        "enqueue_daily_cup_round_messaging",
-        lambda *, tournament_id: enqueued.append(tournament_id),
-    )
+            if expected_started:
+                await _seed_friend_challenge_questions(now_utc=now_utc)
 
-    result = as_any_dict(await daily_cup_async.close_daily_cup_registration_and_start_async())
-    assert int(result["started"]) == 1
-    assert int(result["canceled"]) == 0
-    assert enqueued == [str(tournament_id)]
+            user_ids = [
+                await _create_user(f"daily_cup_min_participants_{expected_min_participants}_{idx}")
+                for idx in range(participants_total)
+            ]
+            tournament_id = await _create_daily_cup_registration_tournament(now_utc=now_utc)
+            await _join_users(tournament_id=tournament_id, user_ids=user_ids, now_utc=now_utc)
 
-    async with SessionLocal.begin() as session:
-        tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
-        assert tournament is not None
-        assert tournament.status == "ROUND_1"
-        assert tournament.current_round == 1
-        matches = await TournamentMatchesRepo.list_by_tournament_round(
-            session,
-            tournament_id=tournament_id,
-            round_no=1,
-        )
-        assert len(matches) == 2
+            bot = _RecordingBot()
+            enqueued: list[str] = []
+            monkeypatch.setattr(daily_cup_async_module, "_now_utc", lambda: now_utc)
+            monkeypatch.setattr(daily_cup_async_module, "build_bot", lambda: bot)
+            monkeypatch.setattr(
+                daily_cup_async_module,
+                "enqueue_daily_cup_round_messaging",
+                lambda *, tournament_id: enqueued.append(tournament_id),
+            )
+
+            assert daily_cup_async_module.DAILY_CUP_MIN_PARTICIPANTS == expected_min_participants
+
+            result = as_any_dict(
+                await daily_cup_async_module.close_daily_cup_registration_and_start_async()
+            )
+            assert int(result["participants_total"]) == participants_total
+            assert int(result["started"]) == expected_started
+            assert int(result["canceled"]) == int(not expected_started)
+
+            async with SessionLocal.begin() as session:
+                tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
+                assert tournament is not None
+                assert tournament.status == ("ROUND_1" if expected_started else "CANCELED")
+                if expected_started:
+                    assert tournament.current_round == 1
+                    matches = await TournamentMatchesRepo.list_by_tournament_round(
+                        session,
+                        tournament_id=tournament_id,
+                        round_no=1,
+                    )
+                    assert len(matches) == 2
+
+            assert enqueued == ([str(tournament_id)] if expected_started else [])
+            assert len(bot.messages) == (0 if expected_started else participants_total)
+    finally:
+        _reload_daily_cup_runtime_modules()
 
 
 @pytest.mark.asyncio
