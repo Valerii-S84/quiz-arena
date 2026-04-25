@@ -19,6 +19,11 @@ Dieses Dokument definiert:
 
 Dieses Dokument ist verbindlich für jede Implementierung.
 
+Für die aktuell aktiven Runtime-Typen `PRIVATE` und `DAILY_ARENA` gelten die
+spezifischeren Verträge in
+`PRODUCT/TOURNAMENT_CONTRACTS_PRIVATE_DAILY_ARENA.md`. Bei Abweichungen gewinnt
+das spezifischere Dokument.
+
 ---
 
 ## 2. Grundprinzipien
