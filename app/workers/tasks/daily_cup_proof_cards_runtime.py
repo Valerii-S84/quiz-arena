@@ -1,23 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Set as AbstractSet
 from datetime import datetime
 from typing import Any
 from uuid import UUID
-
-from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
-from app.db.repo.tournaments_repo import TournamentsRepo
-from app.db.repo.users_repo import UsersRepo
-from app.db.session import SessionLocal
-from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES, TOURNAMENT_STATUS_COMPLETED
-from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
-from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
-from app.workers.tasks.daily_cup_proof_cards_context import load_daily_cup_proof_cards_context
-from app.workers.tasks.daily_cup_proof_cards_text import format_points, format_user_label
-from app.workers.tasks.daily_cup_task_helpers import is_today_daily_cup_tournament
-from app.workers.tasks.daily_cup_winner_rewards import (
-    grant_daily_cup_winner_rewards,
-    send_daily_cup_winner_reward_messages,
-)
 
 
 def empty_daily_cup_proof_cards_result() -> dict[str, int]:
@@ -30,24 +16,36 @@ async def load_daily_cup_proof_cards_runtime_context(
     user_id: int | None,
     now_utc: datetime,
     logger: Any,
+    session_factory: Any,
+    load_context_fn: Any,
+    tournaments_repo: Any,
+    users_repo: Any,
+    matches_repo: Any,
+    calculate_standings_fn: Any,
+    format_points_fn: Any,
+    format_user_label_fn: Any,
+    is_today_daily_cup_tournament_fn: Any,
+    daily_cup_tournament_types: AbstractSet[str],
+    tournament_completed_status: str,
+    timezone_name: str,
 ) -> Any:
-    async with SessionLocal.begin() as session:
-        return await load_daily_cup_proof_cards_context(
+    async with session_factory.begin() as session:
+        return await load_context_fn(
             session=session,
             parsed_tournament_id=parsed_tournament_id,
             user_id=user_id,
             now_utc=now_utc,
-            tournaments_repo=TournamentsRepo,
-            users_repo=UsersRepo,
-            matches_repo=TournamentMatchesRepo,
-            calculate_standings_fn=calculate_daily_cup_standings,
-            format_points_fn=format_points,
-            format_user_label_fn=format_user_label,
-            is_today_daily_cup_tournament_fn=is_today_daily_cup_tournament,
+            tournaments_repo=tournaments_repo,
+            users_repo=users_repo,
+            matches_repo=matches_repo,
+            calculate_standings_fn=calculate_standings_fn,
+            format_points_fn=format_points_fn,
+            format_user_label_fn=format_user_label_fn,
+            is_today_daily_cup_tournament_fn=is_today_daily_cup_tournament_fn,
             logger=logger,
-            daily_cup_tournament_types=DAILY_CUP_TOURNAMENT_TYPES,
-            tournament_completed_status=TOURNAMENT_STATUS_COMPLETED,
-            timezone_name=DAILY_CUP_TIMEZONE,
+            daily_cup_tournament_types=daily_cup_tournament_types,
+            tournament_completed_status=tournament_completed_status,
+            timezone_name=timezone_name,
         )
 
 
@@ -58,23 +56,27 @@ async def grant_daily_cup_winner_rewards_once(
     tournament_id: str,
     now_utc: datetime,
     logger: Any,
+    session_factory: Any,
+    tournaments_repo: Any,
+    grant_winner_rewards_fn: Any,
+    send_reward_messages_fn: Any,
 ) -> list[Any]:
     try:
-        async with SessionLocal.begin() as session:
-            tournament_row = await TournamentsRepo.get_by_id_for_update(
+        async with session_factory.begin() as session:
+            tournament_row = await tournaments_repo.get_by_id_for_update(
                 session,
                 context.parsed_tournament_id,
             )
             if tournament_row is None:
                 return []
-            notifications = await grant_daily_cup_winner_rewards(
+            notifications = await grant_winner_rewards_fn(
                 session=session,
                 context=context,
                 now_utc=now_utc,
                 logger=logger,
             )
             if notifications:
-                await send_daily_cup_winner_reward_messages(
+                await send_reward_messages_fn(
                     session=session,
                     bot=bot,
                     context=context,
