@@ -195,6 +195,7 @@ async def test_daily_cup_proof_cards_queue_retry_when_participant_row_is_lock_sk
             "tournament_id": tournament_id,
             "user_id": user_ids[0],
             "delay_seconds": 2,
+            "lock_retry_attempt": 1,
         }
     ]
     assert bot.send_photos == []

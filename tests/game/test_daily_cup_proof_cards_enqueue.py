@@ -210,6 +210,7 @@ async def test_daily_arena_proof_cards_queue_retry_when_participant_row_lock_is_
             "tournament_id": str(tournament_id),
             "user_id": 101,
             "delay_seconds": 2,
+            "lock_retry_attempt": 1,
         }
     ]
     assert infos == [
@@ -217,6 +218,7 @@ async def test_daily_arena_proof_cards_queue_retry_when_participant_row_lock_is_
             "event": "daily_cup_proof_card_retry_queued",
             "tournament_id": str(tournament_id),
             "user_id": 101,
+            "retry_attempt": 1,
             "reason": "participant_row_lock_skipped",
         }
     ]
@@ -282,3 +284,44 @@ async def test_daily_arena_proof_cards_do_not_log_retry_queued_when_enqueue_fail
     }
     assert infos == []
     assert bot.session.closed is True
+
+
+def test_daily_arena_proof_cards_do_not_enqueue_past_lock_retry_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    enqueued: dict[str, object] = {}
+    warnings: list[dict[str, object]] = []
+
+    monkeypatch.setattr(
+        daily_cup_proof_cards,
+        "is_celery_task",
+        lambda task: task is daily_cup_proof_cards.run_daily_cup_proof_cards,
+    )
+    monkeypatch.setattr(
+        daily_cup_proof_cards.run_daily_cup_proof_cards,
+        "apply_async",
+        lambda **kwargs: enqueued.setdefault("apply_async", kwargs),
+    )
+    monkeypatch.setattr(
+        daily_cup_proof_cards.logger,
+        "warning",
+        lambda event, **kwargs: warnings.append({"event": event, **kwargs}),
+    )
+
+    result = daily_cup_proof_cards.enqueue_daily_cup_proof_cards(
+        tournament_id="arena-proof-retry-limit",
+        user_id=7,
+        delay_seconds=2,
+        lock_retry_attempt=4,
+    )
+
+    assert result is False
+    assert enqueued == {}
+    assert warnings == [
+        {
+            "event": "daily_cup_proof_card_retry_exhausted",
+            "tournament_id": "arena-proof-retry-limit",
+            "user_id": 7,
+            "retry_attempt": 4,
+        }
+    ]

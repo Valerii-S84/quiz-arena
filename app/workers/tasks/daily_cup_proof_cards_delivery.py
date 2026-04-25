@@ -28,6 +28,7 @@ def _queue_retry_after_lock_skip(
     *,
     tournament_id: str,
     user_id: int,
+    lock_retry_attempt: int,
     retry_delay_seconds: int,
     enqueue_retry_fn: Callable[..., bool] | None,
     logger: Any,
@@ -38,6 +39,7 @@ def _queue_retry_after_lock_skip(
         tournament_id=tournament_id,
         user_id=user_id,
         delay_seconds=retry_delay_seconds,
+        lock_retry_attempt=lock_retry_attempt + 1,
     )
     if not queued:
         return
@@ -45,6 +47,7 @@ def _queue_retry_after_lock_skip(
         "daily_cup_proof_card_retry_queued",
         tournament_id=tournament_id,
         user_id=user_id,
+        retry_attempt=lock_retry_attempt + 1,
         reason="participant_row_lock_skipped",
     )
 
@@ -146,6 +149,7 @@ async def deliver_daily_cup_proof_cards(
     participants_repo: Any,
     send_proof_card_fn: Callable[..., Any],
     enqueue_retry_fn: Callable[..., bool] | None = None,
+    lock_retry_attempt: int = 0,
     retry_delay_seconds: int = 2,
     render_card_png: Callable[..., bytes] = render_tournament_proof_card_png,
     logger: Any,
@@ -177,6 +181,7 @@ async def deliver_daily_cup_proof_cards(
             _queue_retry_after_lock_skip(
                 tournament_id=tournament_id,
                 user_id=current_user_id,
+                lock_retry_attempt=lock_retry_attempt,
                 retry_delay_seconds=retry_delay_seconds,
                 enqueue_retry_fn=enqueue_retry_fn,
                 logger=logger,

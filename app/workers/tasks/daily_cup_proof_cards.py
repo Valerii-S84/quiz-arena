@@ -87,6 +87,7 @@ async def run_daily_cup_proof_cards_async(
     tournament_id: str,
     user_id: int | None = None,
     initial_delay_seconds: int = 2,
+    lock_retry_attempt: int = 0,
 ) -> dict[str, int]:
     try:
         parsed_tournament_id = UUID(tournament_id)
@@ -118,6 +119,7 @@ async def run_daily_cup_proof_cards_async(
             participants_repo=TournamentParticipantsRepo,
             send_proof_card_fn=send_daily_cup_proof_card,
             enqueue_retry_fn=enqueue_daily_cup_proof_cards,
+            lock_retry_attempt=lock_retry_attempt,
             render_card_png=render_tournament_proof_card_png,
             logger=logger,
         )
@@ -146,11 +148,13 @@ def enqueue_daily_cup_proof_cards(
     tournament_id: str,
     user_id: int | None = None,
     delay_seconds: int = 2,
+    lock_retry_attempt: int = 0,
 ) -> bool:
     return enqueue_daily_cup_proof_cards_job(
         tournament_id=tournament_id,
         user_id=user_id,
         delay_seconds=delay_seconds,
+        lock_retry_attempt=lock_retry_attempt,
         celery_task=run_daily_cup_proof_cards,
         async_fn=run_daily_cup_proof_cards_async,
         is_celery_task_fn=is_celery_task,
@@ -165,11 +169,13 @@ def run_daily_cup_proof_cards(
     tournament_id: str,
     user_id: int | None = None,
     initial_delay_seconds: int = 2,
+    lock_retry_attempt: int = 0,
 ) -> dict[str, int]:
     return run_async_job(
         run_daily_cup_proof_cards_async(
             tournament_id=tournament_id,
             user_id=user_id,
             initial_delay_seconds=initial_delay_seconds,
+            lock_retry_attempt=lock_retry_attempt,
         )
     )
