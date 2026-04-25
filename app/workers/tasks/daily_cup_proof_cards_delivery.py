@@ -29,16 +29,18 @@ def _queue_retry_after_lock_skip(
     tournament_id: str,
     user_id: int,
     retry_delay_seconds: int,
-    enqueue_retry_fn: Callable[..., None] | None,
+    enqueue_retry_fn: Callable[..., bool] | None,
     logger: Any,
 ) -> None:
     if enqueue_retry_fn is None:
         return
-    enqueue_retry_fn(
+    queued = enqueue_retry_fn(
         tournament_id=tournament_id,
         user_id=user_id,
         delay_seconds=retry_delay_seconds,
     )
+    if not queued:
+        return
     logger.info(
         "daily_cup_proof_card_retry_queued",
         tournament_id=tournament_id,
@@ -143,7 +145,7 @@ async def deliver_daily_cup_proof_cards(
     session_factory: Any,
     participants_repo: Any,
     send_proof_card_fn: Callable[..., Any],
-    enqueue_retry_fn: Callable[..., None] | None = None,
+    enqueue_retry_fn: Callable[..., bool] | None = None,
     retry_delay_seconds: int = 2,
     render_card_png: Callable[..., bytes] = render_tournament_proof_card_png,
     logger: Any,

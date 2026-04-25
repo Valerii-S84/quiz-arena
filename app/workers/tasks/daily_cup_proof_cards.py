@@ -146,8 +146,8 @@ def enqueue_daily_cup_proof_cards(
     tournament_id: str,
     user_id: int | None = None,
     delay_seconds: int = 2,
-) -> None:
-    enqueue_daily_cup_proof_cards_job(
+) -> bool:
+    return enqueue_daily_cup_proof_cards_job(
         tournament_id=tournament_id,
         user_id=user_id,
         delay_seconds=delay_seconds,

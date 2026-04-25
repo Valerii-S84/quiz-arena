@@ -13,7 +13,7 @@ def enqueue_daily_cup_proof_cards_job(
     is_celery_task_fn: Any,
     run_async_job_fn: Any,
     logger: Any,
-) -> None:
+) -> bool:
     try:
         if is_celery_task_fn(celery_task):
             celery_task.apply_async(
@@ -24,7 +24,7 @@ def enqueue_daily_cup_proof_cards_job(
                 },
                 countdown=max(0, int(delay_seconds)),
             )
-            return
+            return True
         run_async_job_fn(
             async_fn(
                 tournament_id=tournament_id,
@@ -32,9 +32,11 @@ def enqueue_daily_cup_proof_cards_job(
                 initial_delay_seconds=max(0, int(delay_seconds)),
             )
         )
+        return True
     except Exception as exc:
         logger.warning(
             "daily_cup_proof_card_enqueue_failed",
             tournament_id=tournament_id,
             error_type=type(exc).__name__,
         )
+        return False
