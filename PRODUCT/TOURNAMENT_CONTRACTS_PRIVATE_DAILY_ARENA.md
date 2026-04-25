@@ -64,43 +64,57 @@ rules:
 * draw = `1` point
 * rewards are unlocked only from `13` participants
 
-## 4. Ratified Runtime Contracts
+## 4. Ratified Contracts and Current Runtime Gaps
 
-### 4.1 Registration Deadline Is a Hard Lifecycle Boundary for PRIVATE
+Section 4 distinguishes between the current runtime behavior that exists today
+and the ratified contract that future fixes must converge to. Where the current
+runtime diverges, the divergence is stated explicitly.
 
-For `PRIVATE`, `registration_deadline` is the hard end of the registration
-window.
+### 4.1 PRIVATE Registration Deadline
 
-This means:
+Current runtime:
 
 * join is valid only while `status == REGISTRATION` and `now < registration_deadline`
-* manual start is valid only while `status == REGISTRATION` and `now < registration_deadline`
-* once `registration_deadline` passes, the tournament must not remain as an
-  actionable open registration forever
+* manual start currently requires creator ownership, `status == REGISTRATION`,
+  and enough participants, but it does not check `registration_deadline`
+* a `PRIVATE` tournament may therefore remain startable after
+  `registration_deadline` until another lifecycle path changes its state
+
+Ratified contract:
+
+* `registration_deadline` is the hard end of the registration window
 * after the deadline, the tournament must be non-joinable and non-startable
+* the contract does not allow a post-deadline manual start
 
-This contract does not allow a post-deadline manual start.
+### 4.2 DAILY_ARENA Round Deadline
 
-### 4.2 DAILY_ARENA Round Deadline Is Round-Scoped, Not Match-Scoped
+Current runtime gap:
 
-`tournament.round_deadline` is the shared deadline for the active tournament
-round and must be identical for every participant in that round.
+* the round-deadline path currently allows a per-match action to tighten both
+  `tournament_match.deadline` and the shared `tournament.round_deadline`
 
-This means:
+Ratified contract:
 
+* `tournament.round_deadline` is the shared deadline for the active tournament
+  round and must be identical for every participant in that round
 * round messages, lobby views, reminders, and worker transitions must all use
   the same round-level deadline
 * per-match adjustments may change `tournament_match.deadline`
 * per-match adjustments must never mutate the shared
   `tournament.round_deadline`
 
-### 4.3 DAILY_ARENA Minimum Participants Has One Runtime Source of Truth
+### 4.3 DAILY_ARENA Minimum Participants
 
-The runtime source of truth for the daily minimum is
-`settings.daily_cup_min_participants`, exposed through
-`DAILY_CUP_MIN_PARTICIPANTS`.
+Current runtime:
 
-This means:
+* `settings.daily_cup_min_participants` is exposed through
+  `DAILY_CUP_MIN_PARTICIPANTS`
+* the registration close cancel/start branch still uses the hardcoded
+  `TOURNAMENT_MIN_PARTICIPANTS = 4`
+* the runtime therefore does not yet have one minimum-participants source of
+  truth
+
+Ratified contract:
 
 * registration close
 * cancel/start branching
@@ -109,13 +123,18 @@ This means:
 must all resolve from the same configured value, not from duplicated hardcoded
 constants.
 
-### 4.4 Tournament Ranking Must Stay Deterministic
+### 4.4 Tournament Ranking
 
-Tournament ranking must always be deterministic. No final order may depend on
-database return order.
+Current runtime:
 
-The active contracts are:
+* `DAILY_ARENA` standings are deterministic and already end with `user_id asc`
+* `PRIVATE` standings currently sort by `score desc`, `tie_break desc`,
+  `joined_at asc` and do not yet apply a final `user_id asc` fallback
 
+Ratified contract:
+
+* tournament ranking must always be deterministic
+* no final order may depend on database return order
 * `PRIVATE`: `score desc`, `tie_break desc`, `joined_at asc`, `user_id asc`
 * `DAILY_ARENA`: `wins desc`, `correct_answers desc`, `total_time_ms asc`,
   `joined_at asc`, `user_id asc`
@@ -123,35 +142,51 @@ The active contracts are:
 The final `user_id asc` fallback is required to keep the ordering stable under
 full equality.
 
-### 4.5 Daily Cup Share Semantics Are Two-Step and Truthful
+### 4.5 Daily Cup Share Semantics
 
-The daily share flow has two distinct user contracts:
+Current runtime gap:
+
+* the repeat-share handler path looks for a `button.url` share action, while
+  the active keyboard uses `switch_inline_query`
+* the `msg.daily_cup.share.thanks` branch is therefore unreachable in the
+  current implementation
+
+Ratified contract:
 
 * first share tap on a completed result creates the share UI and enqueues the
   user proof card
 * repeat share tap from a message that already contains the share action must
   answer with `msg.daily_cup.share.thanks`
+* the repeat path is an acknowledgement path, not a proof-card requeue path
 
-The repeat path is an acknowledgement path, not a proof-card requeue path.
+### 4.6 Proof Card Eligibility Acknowledgements
 
-### 4.6 Positive Proof Card Acks Must Match Real Delivery Eligibility
+Current runtime gap:
 
-User-visible proof-card acknowledgements must be truthful.
+* stale completed messages for old daily cups may still answer
+  `msg.daily_cup.proof_card.queued` even when the worker will intentionally
+  skip delivery for that tournament
 
-This means:
+Ratified contract:
 
+* user-visible proof-card acknowledgements must be truthful
 * `msg.daily_cup.proof_card.queued` is allowed only if a proof-card job is
   actually eligible to run
 * stale completed messages for old daily cups must not acknowledge a proof card
   as queued if the worker will intentionally skip that tournament
 
-### 4.7 Proof Card Delivery Is Idempotent Per Participant
+### 4.7 Proof Card Delivery Idempotence
 
-Proof-card delivery is an idempotent participant-level operation for both active
-tournament types.
+Current runtime:
 
-This means:
+* `DAILY_ARENA` uses `proof_card_sent` as an explicit delivery guard
+* `PRIVATE` caches `proof_card_file_id` for resend reuse but does not yet have
+  a separate participant-level sent guard
 
+Ratified contract:
+
+* proof-card delivery is an idempotent participant-level operation for both
+  active tournament types
 * automatic completion follow-ups must send at most one canonical proof-card
   delivery per participant
 * repeated user-triggered requests may resend the already prepared card
@@ -159,24 +194,30 @@ This means:
 * repeated requests must not create duplicate side effects such as duplicate
   rewards or duplicate canonical-delivery state transitions
 
-For `DAILY_ARENA`, `proof_card_sent` is the delivery guard.
-For `PRIVATE`, the same participant-level idempotence contract applies.
+### 4.8 Share URL Semantics
 
-### 4.8 Share URL Semantics Must Stay Consistent
+Current runtime:
 
-Tournament share links use the same public Telegram share contract:
+* interactive tournament share builders use the public Telegram share contract
+  with `https://t.me/share/url`, `url=...`, and `text=...` when share text is
+  part of the UX contract
+* the private worker-generated standings share button currently emits a
+  different URL pattern that omits the `text=...` part
 
-* `https://t.me/share/url`
+Ratified contract:
+
+* tournament share links use the same public Telegram share contract
+  `https://t.me/share/url`
 * `url=...`
 * `text=...` when share text is part of the UX contract
-
-Worker-generated tournament share buttons must follow the same URL pattern as
-the interactive tournament builders.
+* worker-generated tournament share buttons must follow the same URL pattern as
+  the interactive tournament builders
 
 ## 5. Delivery Rules for Future Fixes
 
-Any code change for `PRIVATE` or `DAILY_ARENA` must preserve all contracts in
-section 4 unless this document is explicitly updated in the same change.
+Any code change for `PRIVATE` or `DAILY_ARENA` must preserve the ratified
+contracts in section 4 unless this document is explicitly updated in the same
+change.
 
 Any test added for the audited defects from `2026-04-25` must map directly to
-one or more contracts in section 4.
+one or more ratified contracts in section 4.
