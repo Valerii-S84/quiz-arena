@@ -38,6 +38,8 @@ def _bootstrap_test_migration_env() -> str:
     if not database_url:
         return ""
 
+    os.environ.setdefault("DATABASE_URL", database_url)
+
     database_name = (make_url(database_url).database or "").strip().lower()
     if "test" not in database_name:
         return database_url
