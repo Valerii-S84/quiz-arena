@@ -85,6 +85,25 @@ class TournamentParticipantsRepoQueriesMixin:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_for_tournament_user_for_update(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+        user_id: int,
+        skip_locked: bool = False,
+    ) -> TournamentParticipant | None:
+        stmt = (
+            select(TournamentParticipant)
+            .where(
+                TournamentParticipant.tournament_id == tournament_id,
+                TournamentParticipant.user_id == user_id,
+            )
+            .with_for_update(skip_locked=skip_locked)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def list_for_tournament_for_update(
         session: AsyncSession,
         *,

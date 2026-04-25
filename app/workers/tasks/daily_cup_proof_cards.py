@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -19,11 +20,11 @@ from app.workers.celery_app import celery_app
 from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
 from app.workers.tasks.daily_cup_proof_cards_context import load_daily_cup_proof_cards_context
 from app.workers.tasks.daily_cup_proof_cards_delivery import (
+    DAILY_CUP_REWARD_MIN_PARTICIPANTS,
     deliver_daily_cup_proof_cards,
+    grant_daily_cup_winner_rewards,
     send_daily_cup_proof_card,
-)
-from app.workers.tasks.daily_cup_proof_cards_persistence import (
-    persist_daily_cup_proof_card_delivery,
+    send_daily_cup_winner_reward_messages,
 )
 from app.workers.tasks.daily_cup_proof_cards_text import format_points, format_user_label
 from app.workers.tasks.daily_cup_task_helpers import is_celery_task, is_today_daily_cup_tournament
@@ -36,20 +37,14 @@ def _empty_result() -> dict[str, int]:
     return {"processed": 0, "participants_total": 0, "sent": 0, "cached_reused": 0, "failed": 0}
 
 
-async def run_daily_cup_proof_cards_async(
+async def _load_proof_cards_context(
     *,
-    tournament_id: str,
-    user_id: int | None = None,
-    initial_delay_seconds: int = 2,
-) -> dict[str, int]:
-    try:
-        parsed_tournament_id = UUID(tournament_id)
-    except ValueError:
-        return _empty_result()
-
-    now_utc = datetime.now(timezone.utc)
+    parsed_tournament_id: UUID,
+    user_id: int | None,
+    now_utc: datetime,
+) -> Any:
     async with SessionLocal.begin() as session:
-        context = await load_daily_cup_proof_cards_context(
+        return await load_daily_cup_proof_cards_context(
             session=session,
             parsed_tournament_id=parsed_tournament_id,
             user_id=user_id,
@@ -66,6 +61,55 @@ async def run_daily_cup_proof_cards_async(
             tournament_completed_status=TOURNAMENT_STATUS_COMPLETED,
             timezone_name=DAILY_CUP_TIMEZONE,
         )
+
+
+async def _grant_winner_rewards_once(
+    *,
+    context: Any,
+    tournament_id: str,
+    now_utc: datetime,
+) -> list[Any]:
+    try:
+        async with SessionLocal.begin() as session:
+            tournament_row = await TournamentsRepo.get_by_id_for_update(
+                session,
+                context.parsed_tournament_id,
+                skip_locked=True,
+            )
+            if tournament_row is None:
+                return []
+            return await grant_daily_cup_winner_rewards(
+                session=session,
+                context=context,
+                now_utc=now_utc,
+                logger=logger,
+            )
+    except Exception as exc:
+        logger.warning(
+            "daily_cup_winner_rewards_failed",
+            tournament_id=tournament_id,
+            error_type=type(exc).__name__,
+        )
+        return []
+
+
+async def run_daily_cup_proof_cards_async(
+    *,
+    tournament_id: str,
+    user_id: int | None = None,
+    initial_delay_seconds: int = 2,
+) -> dict[str, int]:
+    try:
+        parsed_tournament_id = UUID(tournament_id)
+    except ValueError:
+        return _empty_result()
+
+    now_utc = datetime.now(timezone.utc)
+    context = await _load_proof_cards_context(
+        parsed_tournament_id=parsed_tournament_id,
+        user_id=user_id,
+        now_utc=now_utc,
+    )
     if context is None:
         return _empty_result()
     if not context.participants:
@@ -81,22 +125,28 @@ async def run_daily_cup_proof_cards_async(
             bot=bot,
             tournament_id=tournament_id,
             now_utc=now_utc,
+            session_factory=SessionLocal,
+            participants_repo=TournamentParticipantsRepo,
             send_proof_card_fn=send_daily_cup_proof_card,
             render_card_png=render_tournament_proof_card_png,
             logger=logger,
         )
+
+        if user_id is None and context.participants_total >= DAILY_CUP_REWARD_MIN_PARTICIPANTS:
+            reward_notifications = await _grant_winner_rewards_once(
+                context=context,
+                tournament_id=tournament_id,
+                now_utc=now_utc,
+            )
+            if reward_notifications:
+                await send_daily_cup_winner_reward_messages(
+                    bot=bot,
+                    context=context,
+                    notifications=reward_notifications,
+                    logger=logger,
+                )
     finally:
         await bot.session.close()
-
-    if delivery.new_file_ids or delivery.sent_user_ids:
-        async with SessionLocal.begin() as session:
-            await persist_daily_cup_proof_card_delivery(
-                session=session,
-                parsed_tournament_id=context.parsed_tournament_id,
-                participants_repo=TournamentParticipantsRepo,
-                sent_user_ids=delivery.sent_user_ids,
-                new_file_ids=delivery.new_file_ids,
-            )
 
     return {
         "processed": 1,

@@ -93,7 +93,13 @@ async def test_daily_arena_proof_cards_skip_stale_tournament_and_empty_selected_
     monkeypatch.setattr(
         daily_cup_proof_cards,
         "SessionLocal",
-        session_local_with_sessions(SimpleNamespace(), SimpleNamespace()),
+        session_local_with_sessions(
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+        ),
     )
     monkeypatch.setattr(
         daily_cup_proof_cards.TournamentsRepo, "get_by_id", async_return(tournament)
@@ -186,10 +192,29 @@ async def test_daily_arena_proof_cards_pipeline_handles_delivery_edge_cases(
         del session, tournament_id
         persisted_files.append((user_id, file_id))
 
+    participant_rows = {
+        101: standings[0].participant,
+        303: standings[2].participant,
+        404: standings[3].participant,
+        505: standings[4].participant,
+    }
+
+    async def _fake_get_for_tournament_user_for_update(
+        session, *, tournament_id, user_id, skip_locked
+    ):
+        del session, tournament_id, skip_locked
+        return participant_rows.get(user_id)
+
     monkeypatch.setattr(
         daily_cup_proof_cards,
         "SessionLocal",
-        session_local_with_sessions(SimpleNamespace(), SimpleNamespace()),
+        session_local_with_sessions(
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+            SimpleNamespace(),
+        ),
     )
     monkeypatch.setattr(
         daily_cup_proof_cards.TournamentsRepo, "get_by_id", async_return(tournament)
@@ -218,6 +243,11 @@ async def test_daily_arena_proof_cards_pipeline_handles_delivery_edge_cases(
     monkeypatch.setattr(daily_cup_proof_cards, "build_bot", lambda: bot)
     monkeypatch.setattr(daily_cup_proof_cards, "send_daily_cup_proof_card", _fake_send_proof_card)
     monkeypatch.setattr(daily_cup_proof_cards.asyncio, "sleep", _fake_sleep)
+    monkeypatch.setattr(
+        daily_cup_proof_cards.TournamentParticipantsRepo,
+        "get_for_tournament_user_for_update",
+        _fake_get_for_tournament_user_for_update,
+    )
     monkeypatch.setattr(
         daily_cup_proof_cards.TournamentParticipantsRepo,
         "set_proof_card_sent",

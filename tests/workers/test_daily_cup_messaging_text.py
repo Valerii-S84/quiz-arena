@@ -52,7 +52,7 @@ def test_build_round_text_uses_arena_bot_label_for_self_match() -> None:
 def test_build_next_round_start_text_uses_actual_db_start_time() -> None:
     text = build_next_round_start_text(
         round_no=3,
-        tournament_start=datetime(2026, 3, 3, 17, 0, tzinfo=UTC),
+        tournament_start=datetime(2026, 3, 3, 16, 0, tzinfo=UTC),
         round_start_time=datetime(2026, 3, 3, 18, 0, tzinfo=UTC),
     )
 
@@ -62,7 +62,7 @@ def test_build_next_round_start_text_uses_actual_db_start_time() -> None:
 def test_build_next_round_start_text_uses_delayed_db_start_time() -> None:
     text = build_next_round_start_text(
         round_no=3,
-        tournament_start=datetime(2026, 3, 3, 17, 0, tzinfo=UTC),
+        tournament_start=datetime(2026, 3, 3, 16, 0, tzinfo=UTC),
         round_start_time=datetime(2026, 3, 3, 18, 17, tzinfo=UTC),
     )
 
@@ -72,11 +72,11 @@ def test_build_next_round_start_text_uses_delayed_db_start_time() -> None:
 def test_build_next_round_start_text_falls_back_to_planned_slot() -> None:
     text = build_next_round_start_text(
         round_no=4,
-        tournament_start=datetime(2026, 3, 3, 17, 0, tzinfo=UTC),
+        tournament_start=datetime(2026, 3, 3, 16, 0, tzinfo=UTC),
         round_start_time=None,
     )
 
-    assert text == "voraussichtlich 19:30"
+    assert text == "voraussichtlich 18:30"
 
 
 def test_build_completed_text_includes_top_3_and_personal_result() -> None:

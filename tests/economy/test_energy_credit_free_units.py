@@ -161,6 +161,56 @@ async def test_credit_free_energy_replay_is_idempotent_and_does_not_duplicate_cr
     assert state.free_energy == 12
 
 
+@pytest.mark.asyncio
+async def test_credit_paid_energy_grants_full_reward_without_free_cap_clamp(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = _Session()
+    state = _energy_state(free_energy=18, free_cap=20)
+    created_entries: list[LedgerEntry] = []
+
+    monkeypatch.setattr(energy_consume, "get_or_create_state_for_update", _async_return(state))
+    monkeypatch.setattr(
+        energy_consume.EntitlementsRepo,
+        "has_active_premium",
+        _async_return(False),
+    )
+    monkeypatch.setattr(
+        energy_consume.LedgerRepo,
+        "get_by_idempotency_key",
+        _async_return(None),
+    )
+
+    async def _fake_create(_session, *, entry):
+        created_entries.append(entry)
+        return entry
+
+    monkeypatch.setattr(energy_consume.LedgerRepo, "create", _fake_create)
+
+    result = await energy_consume.credit_paid_energy(
+        session,
+        user_id=11,
+        amount=5,
+        idempotency_key="daily:cup:reward:energy:test",
+        now_utc=NOW_UTC,
+        source="TOURNAMENT",
+    )
+
+    assert result.amount == 5
+    assert result.idempotent_replay is False
+    assert result.free_energy == 18
+    assert result.paid_energy == 5
+    assert result.state == EnergyBucketState.AVAILABLE
+    assert state.free_energy == 18
+    assert state.paid_energy == 5
+    assert len(created_entries) == 1
+    entry = cast(LedgerEntry, created_entries[0])
+    assert entry.amount == 5
+    assert entry.balance_after == 5
+    assert entry.asset == "PAID_ENERGY"
+    assert entry.source == "TOURNAMENT"
+
+
 def _async_return(value):
     async def _inner(*_args, **_kwargs):
         return value

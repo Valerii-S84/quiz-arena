@@ -44,7 +44,7 @@ async def test_render_daily_cup_lobby_registration_shows_registered_waiting_hint
     response = callback.message.answers[0]
     text = response.text or ""
     assert "Du bist im heutigen Cup registriert." in text
-    assert "Start um 18:00." in text
+    assert "Start um 17:00" in text
 
 
 @pytest.mark.asyncio
