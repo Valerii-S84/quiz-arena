@@ -109,6 +109,14 @@ async def _get_free_energy(*, user_id: int) -> int | None:
         return None if state is None else int(state.free_energy)
 
 
+async def _get_energy_balance(*, user_id: int) -> tuple[int, int] | None:
+    async with SessionLocal.begin() as session:
+        state = await session.get(EnergyState, user_id)
+        if state is None:
+            return None
+        return int(state.free_energy), int(state.paid_energy)
+
+
 async def _round_question_ids(*, tournament_id, round_no: int) -> tuple[tuple[str, ...], ...]:
     async with SessionLocal.begin() as session:
         matches = await TournamentMatchesRepo.list_by_tournament_round(
@@ -524,7 +532,9 @@ async def test_daily_cup_e2e_with_21_participants_covers_round_four_and_top_thre
 
     assert await _get_active_premium_scope(user_id=top_three_user_ids[0]) == "PREMIUM_3_DAYS"
     assert await _count_duel_tickets(user_id=top_three_user_ids[1]) == 2
-    assert await _get_free_energy(user_id=top_three_user_ids[2]) == 20
+    third_place_energy = await _get_energy_balance(user_id=top_three_user_ids[2])
+    assert third_place_energy == (18, 5)
+    assert sum(third_place_energy) == 23
     assert await _get_active_premium_scope(user_id=fourth_place_user_id) is None
     assert await _count_duel_tickets(user_id=fourth_place_user_id) == 0
     assert await _get_free_energy(user_id=fourth_place_user_id) == 7
