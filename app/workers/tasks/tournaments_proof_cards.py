@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
@@ -17,7 +18,9 @@ from app.workers.tasks.tournaments_proof_card_render import render_tournament_pr
 from app.workers.tasks.tournaments_proof_cards_delivery import (
     deliver_proof_cards,
     load_proof_card_context,
-    persist_proof_card_file_ids,
+)
+from app.workers.tasks.tournaments_proof_cards_enqueue import (
+    enqueue_private_tournament_proof_cards_job,
 )
 
 logger = structlog.get_logger("app.workers.tasks.tournaments_proof_cards")
@@ -75,11 +78,16 @@ async def run_private_tournament_proof_cards_async(
     *,
     tournament_id: str,
     user_id: int | None = None,
+    initial_delay_seconds: int = 0,
+    explicit_resend: bool = False,
+    lock_retry_attempt: int = 0,
 ) -> dict[str, int]:
     try:
         parsed_tournament_id = UUID(tournament_id)
     except ValueError:
         return _build_proof_card_result(processed=0, participants_total=0)
+
+    resolved_explicit_resend = bool(explicit_resend and user_id is not None)
 
     async with SessionLocal.begin() as session:
         context = await load_proof_card_context(
@@ -97,25 +105,25 @@ async def run_private_tournament_proof_cards_async(
             return _build_proof_card_result(processed=0, participants_total=0)
         if not context.participants:
             return _build_proof_card_result(processed=1, participants_total=0)
+
+    if initial_delay_seconds > 0:
+        await asyncio.sleep(max(0, int(initial_delay_seconds)))
+
     now_utc = datetime.now(timezone.utc)
     delivery_result = await deliver_proof_cards(
         context=context,
         tournament_id=tournament_id,
         now_utc=now_utc,
+        session_factory=SessionLocal,
+        participants_repo=TournamentParticipantsRepo,
         build_bot_fn=build_bot,
         build_caption_fn=_build_caption,
         render_card_fn=render_tournament_proof_card_png,
+        explicit_resend=resolved_explicit_resend,
+        enqueue_retry_fn=enqueue_private_tournament_proof_cards,
+        lock_retry_attempt=lock_retry_attempt,
         logger=logger,
     )
-
-    if delivery_result.new_file_ids:
-        async with SessionLocal.begin() as session:
-            await persist_proof_card_file_ids(
-                session=session,
-                parsed_tournament_id=parsed_tournament_id,
-                participants_repo=TournamentParticipantsRepo,
-                new_file_ids=delivery_result.new_file_ids,
-            )
 
     return _build_proof_card_result(
         processed=1,
@@ -130,26 +138,22 @@ def enqueue_private_tournament_proof_cards(
     *,
     tournament_id: str,
     user_id: int | None = None,
-) -> None:
-    try:
-        if _is_celery_task(run_private_tournament_proof_cards):
-            run_private_tournament_proof_cards.delay(
-                tournament_id=tournament_id,
-                user_id=user_id,
-            )
-        else:
-            run_async_job(
-                run_private_tournament_proof_cards_async(
-                    tournament_id=tournament_id,
-                    user_id=user_id,
-                )
-            )
-    except Exception as exc:
-        logger.warning(
-            "private_tournament_proof_card_enqueue_failed",
-            tournament_id=tournament_id,
-            error_type=type(exc).__name__,
-        )
+    explicit_resend: bool = False,
+    delay_seconds: int = 0,
+    lock_retry_attempt: int = 0,
+) -> bool:
+    return enqueue_private_tournament_proof_cards_job(
+        tournament_id=tournament_id,
+        user_id=user_id,
+        explicit_resend=explicit_resend,
+        delay_seconds=delay_seconds,
+        lock_retry_attempt=lock_retry_attempt,
+        celery_task=run_private_tournament_proof_cards,
+        async_fn=run_private_tournament_proof_cards_async,
+        is_celery_task_fn=_is_celery_task,
+        run_async_job_fn=run_async_job,
+        logger=logger,
+    )
 
 
 @celery_app.task(
@@ -159,10 +163,16 @@ def run_private_tournament_proof_cards(
     *,
     tournament_id: str,
     user_id: int | None = None,
+    initial_delay_seconds: int = 0,
+    explicit_resend: bool = False,
+    lock_retry_attempt: int = 0,
 ) -> dict[str, int]:
     return run_async_job(
         run_private_tournament_proof_cards_async(
             tournament_id=tournament_id,
             user_id=user_id,
+            initial_delay_seconds=initial_delay_seconds,
+            explicit_resend=explicit_resend,
+            lock_retry_attempt=lock_retry_attempt,
         )
     )

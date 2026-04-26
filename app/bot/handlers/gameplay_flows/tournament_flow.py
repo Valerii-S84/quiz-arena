@@ -128,6 +128,7 @@ async def handle_tournament_share_result(
     enqueue_private_tournament_proof_cards(
         tournament_id=str(tournament_id),
         user_id=snapshot.user_id,
+        explicit_resend=True,
     )
     share_url = await build_tournament_share_result_url(
         callback,

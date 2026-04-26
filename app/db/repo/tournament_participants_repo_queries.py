@@ -65,6 +65,7 @@ class TournamentParticipantsRepoQueriesMixin:
                 TournamentParticipant.score.desc(),
                 TournamentParticipant.tie_break.desc(),
                 TournamentParticipant.joined_at.asc(),
+                TournamentParticipant.user_id.asc(),
             )
         )
         result = await session.execute(stmt)

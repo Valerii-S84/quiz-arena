@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 
@@ -20,14 +21,14 @@ from tests.type_helpers import as_any_dict
 UTC = timezone.utc
 
 
-@pytest.mark.asyncio
-async def test_proof_cards_use_cached_file_id_on_second_run(monkeypatch) -> None:
-    now_utc = datetime.now(UTC)
-    await _ensure_tournament_schema()
-
-    creator_user_id = await _create_user("private_tournament_proof_creator")
-    user_2 = await _create_user("private_tournament_proof_user_2")
-    user_3 = await _create_user("private_tournament_proof_user_3")
+async def _create_completed_private_tournament(
+    *,
+    now_utc: datetime,
+    seed_prefix: str,
+) -> tuple[str, int]:
+    creator_user_id = await _create_user(f"{seed_prefix}_creator")
+    user_2 = await _create_user(f"{seed_prefix}_user_2")
+    user_3 = await _create_user(f"{seed_prefix}_user_3")
 
     async with SessionLocal.begin() as session:
         tournament = await create_private_tournament(
@@ -64,7 +65,17 @@ async def test_proof_cards_use_cached_file_id_on_second_run(monkeypatch) -> None
         assert tournament_row is not None
         tournament_row.status = "COMPLETED"
         tournament_row.current_round = 3
-        tournament_id = str(tournament.tournament_id)
+        return str(tournament.tournament_id), creator_user_id
+
+
+@pytest.mark.asyncio
+async def test_duplicate_auto_runs_do_not_resend_private_proof_cards(monkeypatch) -> None:
+    now_utc = datetime.now(UTC)
+    await _ensure_tournament_schema()
+    tournament_id, _ = await _create_completed_private_tournament(
+        now_utc=now_utc,
+        seed_prefix="private_tournament_proof_auto",
+    )
 
     bot = _DummyWorkerBot()
     monkeypatch.setattr(tournaments_proof_cards, "build_bot", lambda: bot)
@@ -82,6 +93,13 @@ async def test_proof_cards_use_cached_file_id_on_second_run(monkeypatch) -> None
         "🏆 Turnier abgeschlossen\nPlatz #2\nPunkte: 2",
         "🏆 Turnier abgeschlossen\nPlatz #3\nPunkte: 1",
     ]
+    async with SessionLocal.begin() as session:
+        participants = await TournamentParticipantsRepo.list_for_tournament(
+            session,
+            tournament_id=UUID(tournament_id),
+        )
+        assert all(item.proof_card_sent is True for item in participants)
+        assert all(item.proof_card_file_id is not None for item in participants)
 
     first_batch = len(bot.send_photos)
     second = as_any_dict(
@@ -89,8 +107,40 @@ async def test_proof_cards_use_cached_file_id_on_second_run(monkeypatch) -> None
             tournament_id=tournament_id
         )
     )
-    assert int(second["sent"]) == 3
-    assert int(second["cached_reused"]) == 3
-    second_batch = bot.send_photos[first_batch:]
-    assert len(second_batch) == 3
-    assert all(isinstance(item["photo"], str) for item in second_batch)
+    assert int(second["sent"]) == 0
+    assert int(second["cached_reused"]) == 0
+    assert bot.send_photos[first_batch:] == []
+
+
+@pytest.mark.asyncio
+async def test_explicit_resend_uses_cached_private_proof_card_file_id(monkeypatch) -> None:
+    now_utc = datetime.now(UTC)
+    await _ensure_tournament_schema()
+    tournament_id, creator_user_id = await _create_completed_private_tournament(
+        now_utc=now_utc,
+        seed_prefix="private_tournament_proof_resend",
+    )
+
+    bot = _DummyWorkerBot()
+    monkeypatch.setattr(tournaments_proof_cards, "build_bot", lambda: bot)
+
+    first = as_any_dict(
+        await tournaments_proof_cards.run_private_tournament_proof_cards_async(
+            tournament_id=tournament_id
+        )
+    )
+    assert int(first["sent"]) == 3
+    first_batch = len(bot.send_photos)
+
+    resend = as_any_dict(
+        await tournaments_proof_cards.run_private_tournament_proof_cards_async(
+            tournament_id=tournament_id,
+            user_id=creator_user_id,
+            explicit_resend=True,
+        )
+    )
+    assert int(resend["sent"]) == 1
+    assert int(resend["cached_reused"]) == 1
+    resend_batch = bot.send_photos[first_batch:]
+    assert len(resend_batch) == 1
+    assert isinstance(resend_batch[0]["photo"], str)

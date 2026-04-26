@@ -191,6 +191,45 @@ async def test_private_tournament_start_with_odd_participants_creates_walkover_b
 
 
 @pytest.mark.asyncio
+async def test_private_tournament_standings_use_user_id_as_final_tie_break() -> None:
+    now_utc = datetime.now(UTC)
+    await _ensure_tournament_schema()
+
+    lowest_user_id = await _create_user("private_tournament_full_tie_low")
+    creator_user_id = await _create_user("private_tournament_full_tie_creator")
+    highest_user_id = await _create_user("private_tournament_full_tie_high")
+
+    async with SessionLocal.begin() as session:
+        tournament = await create_private_tournament(
+            session,
+            created_by=creator_user_id,
+            format_code="QUICK_5",
+            now_utc=now_utc,
+        )
+        await join_private_tournament_by_code(
+            session,
+            user_id=lowest_user_id,
+            invite_code=tournament.invite_code,
+            now_utc=now_utc,
+        )
+        await join_private_tournament_by_code(
+            session,
+            user_id=highest_user_id,
+            invite_code=tournament.invite_code,
+            now_utc=now_utc,
+        )
+
+        participants = await TournamentParticipantsRepo.list_for_tournament(
+            session,
+            tournament_id=tournament.tournament_id,
+        )
+
+    assert [int(item.user_id) for item in participants] == sorted(
+        [lowest_user_id, creator_user_id, highest_user_id]
+    )
+
+
+@pytest.mark.asyncio
 async def test_round_advances_early_when_all_matches_completed_before_deadline() -> None:
     now_utc = datetime.now(UTC)
     await _ensure_tournament_schema()
