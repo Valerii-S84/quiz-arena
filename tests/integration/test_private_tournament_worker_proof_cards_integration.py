@@ -136,6 +136,7 @@ async def test_explicit_resend_uses_cached_private_proof_card_file_id(monkeypatc
         await tournaments_proof_cards.run_private_tournament_proof_cards_async(
             tournament_id=tournament_id,
             user_id=creator_user_id,
+            explicit_resend=True,
         )
     )
     assert int(resend["sent"]) == 1

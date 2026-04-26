@@ -91,13 +91,18 @@ async def test_handle_tournament_share_result_sends_share_keyboard_and_emits_eve
         return "https://t.me/share/url?url=x&text=y"
 
     emitted: list[str] = []
-    enqueued: list[tuple[str, int | None]] = []
+    enqueued: list[tuple[str, int | None, bool]] = []
 
     async def _fake_emit(*args, **kwargs):
         emitted.append(str(kwargs.get("event_type")))
 
-    def _fake_enqueue(*, tournament_id: str, user_id: int | None = None) -> None:
-        enqueued.append((tournament_id, user_id))
+    def _fake_enqueue(
+        *,
+        tournament_id: str,
+        user_id: int | None = None,
+        explicit_resend: bool = False,
+    ) -> None:
+        enqueued.append((tournament_id, user_id, explicit_resend))
 
     monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
     monkeypatch.setattr(
@@ -129,7 +134,7 @@ async def test_handle_tournament_share_result_sends_share_keyboard_and_emits_eve
     urls = [button.url for row in response.kwargs["reply_markup"].inline_keyboard for button in row]
     assert any(url and "https://t.me/share/url" in url for url in urls)
     assert emitted == ["private_tournament_result_shared"]
-    assert enqueued == [("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", 17)]
+    assert enqueued == [("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", 17, True)]
 
 
 @pytest.mark.asyncio

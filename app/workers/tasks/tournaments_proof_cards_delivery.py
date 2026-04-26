@@ -36,6 +36,37 @@ class TournamentProofCardAttemptResult:
     sent: bool
     cached_reused: bool
     failed: bool
+    retry_needed: bool = False
+
+
+def _queue_retry_after_lock_skip(
+    *,
+    tournament_id: str,
+    user_id: int,
+    lock_retry_attempt: int,
+    retry_delay_seconds: int,
+    enqueue_retry_fn: Callable[..., bool] | None,
+    logger: Any,
+) -> bool:
+    if enqueue_retry_fn is None:
+        return False
+    queued = enqueue_retry_fn(
+        tournament_id=tournament_id,
+        user_id=user_id,
+        explicit_resend=False,
+        delay_seconds=retry_delay_seconds,
+        lock_retry_attempt=lock_retry_attempt + 1,
+    )
+    if not queued:
+        return False
+    logger.info(
+        "private_tournament_proof_card_retry_queued",
+        tournament_id=tournament_id,
+        user_id=user_id,
+        retry_attempt=lock_retry_attempt + 1,
+        reason="participant_row_lock_skipped",
+    )
+    return True
 
 
 async def load_proof_card_context(
@@ -98,6 +129,9 @@ async def deliver_proof_cards(
     build_caption_fn: Callable[..., str],
     render_card_fn: Callable[..., bytes],
     explicit_resend: bool,
+    enqueue_retry_fn: Callable[..., bool] | None = None,
+    lock_retry_attempt: int = 0,
+    retry_delay_seconds: int = 2,
     logger: Any,
 ) -> TournamentProofCardDeliveryResult:
     async def _deliver_for_user(
@@ -115,7 +149,8 @@ async def deliver_proof_cards(
                     return TournamentProofCardAttemptResult(
                         sent=False,
                         cached_reused=False,
-                        failed=False,
+                        failed=explicit_resend,
+                        retry_needed=not explicit_resend,
                     )
 
                 already_sent = bool(participant_row.proof_card_sent)
@@ -197,6 +232,17 @@ async def deliver_proof_cards(
                 failed += 1
                 continue
             attempt = await _deliver_for_user(current_user_id=current_user_id, chat_id=chat_id)
+            if attempt.retry_needed:
+                queued = _queue_retry_after_lock_skip(
+                    tournament_id=tournament_id,
+                    user_id=current_user_id,
+                    lock_retry_attempt=lock_retry_attempt,
+                    retry_delay_seconds=retry_delay_seconds,
+                    enqueue_retry_fn=enqueue_retry_fn,
+                    logger=logger,
+                )
+                failed += int(not queued)
+                continue
             sent += int(attempt.sent)
             cached_reused += int(attempt.cached_reused)
             failed += int(attempt.failed)
