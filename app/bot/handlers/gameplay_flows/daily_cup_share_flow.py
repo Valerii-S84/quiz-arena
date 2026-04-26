@@ -2,24 +2,39 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from aiogram.types import CallbackQuery
 
 from app.bot.handlers.gameplay_flows.tournament_views import format_points
 from app.bot.keyboards.daily_cup import build_daily_cup_share_keyboard, build_daily_cup_share_url
+from app.bot.keyboards.proof_card_share import build_daily_cup_inline_share_query
 from app.bot.texts.de import TEXTS_DE
+from app.core.config import get_settings
 from app.core.telegram_links import public_bot_link
 
+_DAILY_CUP_TIMEZONE = ZoneInfo(get_settings().daily_cup_timezone.strip() or "Europe/Berlin")
 
-def _message_has_share_url_button(message) -> bool:
+
+def _message_has_share_action_button(message, *, tournament_id: UUID) -> bool:
     markup = getattr(message, "reply_markup", None)
     if markup is None:
         return False
+    expected_inline_query = build_daily_cup_inline_share_query(tournament_id=str(tournament_id))
     for row in markup.inline_keyboard:
         for button in row:
+            if button.switch_inline_query == expected_inline_query:
+                return True
             if button.url and "https://t.me/share/url" in button.url:
                 return True
     return False
+
+
+def _is_today_daily_cup_tournament(*, registration_deadline: datetime, now_utc: datetime) -> bool:
+    return (
+        registration_deadline.astimezone(_DAILY_CUP_TIMEZONE).date()
+        == now_utc.astimezone(_DAILY_CUP_TIMEZONE).date()
+    )
 
 
 async def handle_daily_cup_share_result(
@@ -48,6 +63,9 @@ async def handle_daily_cup_share_result(
         )
         if not lobby.viewer_joined or lobby.tournament.status != "COMPLETED":
             await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+            return
+        if _message_has_share_action_button(callback.message, tournament_id=tournament_id):
+            await callback.answer(TEXTS_DE["msg.daily_cup.share.thanks"], show_alert=False)
             return
         participant_ids = [item.user_id for item in lobby.participants]
         place = participant_ids.index(snapshot.user_id) + 1
@@ -81,9 +99,6 @@ async def handle_daily_cup_share_result(
             points=points,
         ),
     )
-    if _message_has_share_url_button(callback.message):
-        await callback.answer(TEXTS_DE["msg.daily_cup.share.thanks"], show_alert=False)
-        return
     await callback.message.answer(
         TEXTS_DE["msg.daily_cup.share.ready"],
         reply_markup=build_daily_cup_share_keyboard(
@@ -119,6 +134,12 @@ async def handle_daily_cup_request_proof_card(
             viewer_user_id=snapshot.user_id,
         )
         if not lobby.viewer_joined or lobby.tournament.status != "COMPLETED":
+            await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+            return
+        if not _is_today_daily_cup_tournament(
+            registration_deadline=lobby.tournament.registration_deadline,
+            now_utc=now_utc,
+        ):
             await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
             return
         await emit_analytics_event(

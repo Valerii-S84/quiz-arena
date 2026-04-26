@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import urllib.parse
 from uuid import UUID
 
 import structlog
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.application import build_bot
-from app.bot.keyboards.tournament import build_tournament_lobby_keyboard
+from app.bot.keyboards.tournament import build_tournament_lobby_keyboard, build_tournament_share_url
 from app.core.telegram_links import public_bot_start_link
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
@@ -43,11 +42,9 @@ def _build_standings_share_url(
     invite_code: str,
     tournament_name: str | None,
 ) -> str:
-    share_text = urllib.parse.quote(
-        f"🏆 Ich spiele im {tournament_name or 'Deutsch-Turnier'}! "
-        f"Komm dazu → {public_bot_start_link(start_param=f'tournament_{invite_code}')}"
-    )
-    return f"https://t.me/share/url?url={share_text}"
+    invite_link = public_bot_start_link(start_param=f"tournament_{invite_code}")
+    share_text = f"🏆 Ich spiele im {tournament_name or 'Deutsch-Turnier'}! " "Komm dazu →"
+    return build_tournament_share_url(base_link=invite_link, share_text=share_text)
 
 
 def _with_standings_share_button(
