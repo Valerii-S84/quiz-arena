@@ -17,7 +17,6 @@ from app.workers.tasks.tournaments_proof_card_render import render_tournament_pr
 from app.workers.tasks.tournaments_proof_cards_delivery import (
     deliver_proof_cards,
     load_proof_card_context,
-    persist_proof_card_file_ids,
 )
 
 logger = structlog.get_logger("app.workers.tasks.tournaments_proof_cards")
@@ -102,20 +101,14 @@ async def run_private_tournament_proof_cards_async(
         context=context,
         tournament_id=tournament_id,
         now_utc=now_utc,
+        session_factory=SessionLocal,
+        participants_repo=TournamentParticipantsRepo,
         build_bot_fn=build_bot,
         build_caption_fn=_build_caption,
         render_card_fn=render_tournament_proof_card_png,
+        explicit_resend=user_id is not None,
         logger=logger,
     )
-
-    if delivery_result.new_file_ids:
-        async with SessionLocal.begin() as session:
-            await persist_proof_card_file_ids(
-                session=session,
-                parsed_tournament_id=parsed_tournament_id,
-                participants_repo=TournamentParticipantsRepo,
-                new_file_ids=delivery_result.new_file_ids,
-            )
 
     return _build_proof_card_result(
         processed=1,
