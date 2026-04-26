@@ -48,9 +48,11 @@ def test_daily_cup_share_keyboard_uses_inline_share_query() -> None:
         tournament_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
+    callbacks = [button.callback_data for button in buttons if button.callback_data]
     inline_queries = [
         button.switch_inline_query for button in buttons if button.switch_inline_query
     ]
+    assert "daily:cup:share:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
     assert inline_queries == ["proof:daily:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
 
 
@@ -60,9 +62,11 @@ def test_daily_cup_share_keyboard_ignores_text_share_url() -> None:
         share_url="https://t.me/share/url?url=https%3A%2F%2Ft.me%2FDeine_Deutsch_Quiz_bot&text=x",
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
+    callbacks = [button.callback_data for button in buttons if button.callback_data]
     inline_queries = [
         button.switch_inline_query for button in buttons if button.switch_inline_query
     ]
+    assert "daily:cup:share:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
     assert inline_queries == ["proof:daily:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
 
 

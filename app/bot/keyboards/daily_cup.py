@@ -88,10 +88,16 @@ def build_daily_cup_share_keyboard(
     rows = [
         [
             InlineKeyboardButton(
+                text="📤 Ergebnis teilen",
+                callback_data=f"daily:cup:share:{tournament_id}",
+            )
+        ],
+        [
+            InlineKeyboardButton(
                 text="📤 KARTE TEILEN",
                 switch_inline_query=build_daily_cup_inline_share_query(tournament_id=tournament_id),
             )
-        ]
+        ],
     ]
     rows.append(
         [
