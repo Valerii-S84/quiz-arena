@@ -9,6 +9,7 @@ import pytest
 
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
+from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.lifecycle import check_and_advance_round
@@ -24,7 +25,6 @@ from tests.integration.test_daily_cup_worker_integration import (
     _join_users,
 )
 from tests.type_helpers import as_any_dict
-from app.db.repo.tournaments_repo import TournamentsRepo
 
 UTC = timezone.utc
 
@@ -96,6 +96,7 @@ async def _advance_to_round(
                         session,
                         tournament_id=tournament_id,
                     )
+                assert tournament is not None
                 assert int(tournament.current_round) == round_no + 1
             else:
                 assert int(transition["round_started"]) == 1

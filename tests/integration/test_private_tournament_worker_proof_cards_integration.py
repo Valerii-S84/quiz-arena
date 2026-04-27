@@ -125,9 +125,9 @@ async def test_duplicate_auto_runs_do_not_resend_private_proof_cards(monkeypatch
     assert all(not isinstance(item["photo"], str) for item in bot.send_photos)
     assert sorted(str(item.get("caption")) for item in bot.send_photos[:3]) == sorted(
         [
-        "🏆 Turnier abgeschlossen\nPlatz #1\nPunkte: 3",
-        "🏆 Turnier abgeschlossen\nPlatz #2\nPunkte: 2",
-        "🏆 Turnier abgeschlossen\nPlatz #3\nPunkte: 1",
+            "🏆 Turnier abgeschlossen\nPlatz #1\nPunkte: 3",
+            "🏆 Turnier abgeschlossen\nPlatz #2\nPunkte: 2",
+            "🏆 Turnier abgeschlossen\nPlatz #3\nPunkte: 1",
         ]
     )
     async with SessionLocal.begin() as session:

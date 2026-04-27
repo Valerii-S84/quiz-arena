@@ -27,8 +27,8 @@ from tests.integration.test_daily_cup_worker_integration import (
     _create_daily_cup_registration_tournament,
     _join_users,
 )
-from tests.integration.tournament_deadlock_test_support import run_with_deadlock_retry
 from tests.integration.test_private_tournament_service_integration import _ensure_tournament_schema
+from tests.integration.tournament_deadlock_test_support import run_with_deadlock_retry
 from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
