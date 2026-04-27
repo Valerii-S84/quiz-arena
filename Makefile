@@ -67,6 +67,9 @@ test-integration:
 	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m alembic upgrade head
 	DATABASE_URL=$(TEST_DATABASE_URL) TMPDIR=/tmp .venv/bin/pytest -q -s tests/integration
 
+test-tournaments:
+	bash scripts/tournament_regression.sh
+
 migrate:
 	$(PYTHON) -m alembic upgrade head
 

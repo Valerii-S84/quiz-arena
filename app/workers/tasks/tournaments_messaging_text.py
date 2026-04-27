@@ -85,6 +85,7 @@ def build_round_text(
     tournament_name: str | None,
     tournament_format: str,
     round_no: int,
+    rounds_total: int = 3,
     deadline_text: str,
     opponent_label: str | None,
     standings_lines: list[str],
@@ -93,7 +94,7 @@ def build_round_text(
     lines = [
         header,
         "",
-        f"⚔️ Runde {round_no}/3 gestartet",
+        f"⚔️ Runde {round_no}/{rounds_total} gestartet",
         f"Format: {format_tournament_format(tournament_format)}",
         f"Deadline: {deadline_text} (Berlin)",
     ]

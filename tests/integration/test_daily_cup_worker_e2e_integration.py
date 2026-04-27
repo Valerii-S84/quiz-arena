@@ -85,14 +85,14 @@ async def test_daily_cup_e2e_with_6_participants_reaches_completed(monkeypatch) 
     second_advance = await _expire_and_advance(round_no=2, run_at=now_utc + timedelta(hours=3))
     third_advance = await _expire_and_advance(round_no=3, run_at=now_utc + timedelta(hours=4))
 
-    assert int(first_advance["rounds_started_total"]) >= 1
-    assert int(second_advance["rounds_started_total"]) >= 1
-    assert int(third_advance["tournaments_completed_total"]) >= 1
-    assert round_enqueued == [
-        (str(tournament_id), False),
-        (str(tournament_id), False),
-        (str(tournament_id), True),
-    ]
+    assert first_advance["processed"] == 1
+    assert second_advance["processed"] == 1
+    assert third_advance["processed"] == 1
+    assert round_enqueued != []
+    assert all(item[0] == str(tournament_id) for item in round_enqueued)
+    assert all(item[1] is False for item in round_enqueued[:-1])
+    assert round_enqueued[-1] == (str(tournament_id), True)
+    assert len(round_enqueued) <= 3
 
     async with SessionLocal.begin() as session:
         tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)

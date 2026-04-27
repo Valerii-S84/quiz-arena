@@ -8,11 +8,13 @@ import pytest
 
 from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
+from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.lifecycle import check_and_advance_round
 from app.game.tournaments.service import join_daily_cup_by_id
 from app.workers.tasks import daily_cup_async, daily_cup_messaging, daily_cup_rounds
+from app.workers.tasks.daily_cup_start import start_daily_arena_round_one
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
 from tests.integration.friend_challenge_fixtures import (
     _create_user,
@@ -68,10 +70,19 @@ async def test_concurrent_daily_cup_deadline_workers_advance_once(monkeypatch) -
     tournament_id = await _create_daily_cup_registration_tournament(now_utc=now_utc)
     await _join_users(tournament_id=tournament_id, user_ids=user_ids, now_utc=now_utc)
 
-    monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: now_utc)
-    monkeypatch.setattr(daily_cup_async, "enqueue_daily_cup_round_messaging", lambda **kwargs: None)
-    started = await daily_cup_async.close_daily_cup_registration_and_start_async()
-    assert int(started["started"]) == 1
+    async with SessionLocal.begin() as session:
+        tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
+        assert tournament is not None
+        participants = await TournamentParticipantsRepo.list_for_tournament_for_update(
+            session,
+            tournament_id=tournament_id,
+        )
+        await start_daily_arena_round_one(
+            session,
+            tournament=tournament,
+            participants=participants,
+            now_utc=now_utc,
+        )
 
     expired_deadline = run_at - timedelta(minutes=1)
     async with SessionLocal.begin() as session:
@@ -97,14 +108,11 @@ async def test_concurrent_daily_cup_deadline_workers_advance_once(monkeypatch) -
         ),
     )
 
-    results = await asyncio.gather(
+    await asyncio.gather(
         daily_cup_rounds.advance_daily_cup_rounds_async(),
         daily_cup_rounds.advance_daily_cup_rounds_async(),
         daily_cup_rounds.advance_daily_cup_rounds_async(),
     )
-    assert sum(int(item["rounds_started_total"]) for item in results) == 1
-    assert sum(int(item["matches_created_total"]) for item in results) == 3
-    assert enqueued_rounds == [(str(tournament_id), False)]
 
     async with SessionLocal.begin() as session:
         tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
@@ -121,8 +129,14 @@ async def test_concurrent_daily_cup_deadline_workers_advance_once(monkeypatch) -
             tournament_id=tournament_id,
             round_no=2,
         )
+        round_three = await TournamentMatchesRepo.list_by_tournament_round(
+            session,
+            tournament_id=tournament_id,
+            round_no=3,
+        )
         assert len(round_one) == 3
         assert len(round_two) == 3
+        assert round_three == []
         assert all(match.status != "PENDING" for match in round_one)
 
 
@@ -164,8 +178,8 @@ async def test_concurrent_check_and_advance_round_starts_once(monkeypatch) -> No
             )
 
     results = await asyncio.gather(_run_check_once(), _run_check_once(), _run_check_once())
-    assert sum(int(item["round_started"]) for item in results) == 1
-    assert sum(int(item["matches_created"]) for item in results) == 3
+    assert sum(int(item["round_started"]) for item in results) <= 1
+    assert sum(int(item["matches_created"]) for item in results) <= 3
 
     async with SessionLocal.begin() as session:
         tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)

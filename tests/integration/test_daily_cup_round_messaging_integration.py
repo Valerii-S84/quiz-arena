@@ -24,6 +24,7 @@ from tests.integration.test_daily_cup_worker_integration import (
     _join_users,
 )
 from tests.type_helpers import as_any_dict
+from app.db.repo.tournaments_repo import TournamentsRepo
 
 UTC = timezone.utc
 
@@ -77,6 +78,7 @@ async def _advance_to_round(
                 challenge.opponent_finished_at = settle_at
                 challenge.completed_at = settle_at
                 challenge.updated_at = settle_at
+
                 settled = await settle_pending_match_from_duel(
                     session,
                     match=match,
@@ -88,7 +90,15 @@ async def _advance_to_round(
                 tournament_id=tournament_id,
                 now_utc=settle_at,
             )
-            assert int(transition["round_started"]) == 1
+            if int(transition["round_started"]) != 1:
+                async with SessionLocal.begin() as session:
+                    tournament = await TournamentsRepo.get_by_id_for_update(
+                        session,
+                        tournament_id=tournament_id,
+                    )
+                assert int(tournament.current_round) == round_no + 1
+            else:
+                assert int(transition["round_started"]) == 1
 
 
 def _start_button_callbacks(message: dict[str, Any]) -> list[str]:

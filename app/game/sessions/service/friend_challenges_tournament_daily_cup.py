@@ -26,7 +26,8 @@ def _tighten_daily_cup_match_deadline(
         return
     if tournament_match.status != TOURNAMENT_MATCH_STATUS_PENDING:
         return
-    response_deadline = now_utc + timedelta(minutes=grace_minutes)
+    normalized_now = now_utc.replace(microsecond=0)
+    response_deadline = normalized_now + timedelta(minutes=grace_minutes)
     tightened_deadline = min(tournament_match.deadline, response_deadline)
     if tightened_deadline < tournament_match.deadline:
         tournament_match.deadline = tightened_deadline

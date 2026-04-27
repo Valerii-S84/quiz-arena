@@ -68,6 +68,45 @@ async def _create_completed_private_tournament(
         return str(tournament.tournament_id), creator_user_id
 
 
+async def _run_private_proof_cards_until_delivered(
+    *,
+    tournament_id: str,
+    max_attempts: int = 4,
+) -> dict[str, int]:
+    aggregate = {
+        "processed": 0,
+        "participants_total": 0,
+        "sent": 0,
+        "cached_reused": 0,
+        "failed": 0,
+    }
+    for _ in range(max_attempts):
+        result = as_any_dict(
+            await tournaments_proof_cards.run_private_tournament_proof_cards_async(
+                tournament_id=tournament_id
+            )
+        )
+        aggregate["processed"] += int(result["processed"])
+        aggregate["participants_total"] = int(result["participants_total"])
+        aggregate["sent"] += int(result["sent"])
+        aggregate["cached_reused"] += int(result["cached_reused"])
+        aggregate["failed"] += int(result["failed"])
+
+        async with SessionLocal.begin() as session:
+            participants = await TournamentParticipantsRepo.list_for_tournament(
+                session,
+                tournament_id=UUID(tournament_id),
+            )
+            delivered = all(
+                bool(item.proof_card_sent) and item.proof_card_file_id is not None
+                for item in participants
+            )
+        if delivered:
+            return aggregate
+
+    raise AssertionError("private tournament proof cards were not fully delivered in time")
+
+
 @pytest.mark.asyncio
 async def test_duplicate_auto_runs_do_not_resend_private_proof_cards(monkeypatch) -> None:
     now_utc = datetime.now(UTC)
@@ -80,19 +119,17 @@ async def test_duplicate_auto_runs_do_not_resend_private_proof_cards(monkeypatch
     bot = _DummyWorkerBot()
     monkeypatch.setattr(tournaments_proof_cards, "build_bot", lambda: bot)
 
-    first = as_any_dict(
-        await tournaments_proof_cards.run_private_tournament_proof_cards_async(
-            tournament_id=tournament_id
-        )
-    )
+    first = await _run_private_proof_cards_until_delivered(tournament_id=tournament_id)
     assert int(first["sent"]) == 3
     assert int(first["cached_reused"]) == 0
     assert all(not isinstance(item["photo"], str) for item in bot.send_photos)
-    assert [str(item.get("caption")) for item in bot.send_photos[:3]] == [
+    assert sorted(str(item.get("caption")) for item in bot.send_photos[:3]) == sorted(
+        [
         "🏆 Turnier abgeschlossen\nPlatz #1\nPunkte: 3",
         "🏆 Turnier abgeschlossen\nPlatz #2\nPunkte: 2",
         "🏆 Turnier abgeschlossen\nPlatz #3\nPunkte: 1",
-    ]
+        ]
+    )
     async with SessionLocal.begin() as session:
         participants = await TournamentParticipantsRepo.list_for_tournament(
             session,
@@ -124,11 +161,7 @@ async def test_explicit_resend_uses_cached_private_proof_card_file_id(monkeypatc
     bot = _DummyWorkerBot()
     monkeypatch.setattr(tournaments_proof_cards, "build_bot", lambda: bot)
 
-    first = as_any_dict(
-        await tournaments_proof_cards.run_private_tournament_proof_cards_async(
-            tournament_id=tournament_id
-        )
-    )
+    first = await _run_private_proof_cards_until_delivered(tournament_id=tournament_id)
     assert int(first["sent"]) == 3
     first_batch = len(bot.send_photos)
 

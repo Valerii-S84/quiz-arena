@@ -13,9 +13,13 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
+from app.game.tournaments.lifecycle import check_and_advance_round
 from app.game.tournaments.service import join_daily_cup_by_id
 from app.workers.tasks import daily_cup_async, daily_cup_messaging, daily_cup_rounds
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
+from tests.integration.daily_cup_worker_e2e_test_support import (
+    settle_round_with_lowest_user_wins,
+)
 from tests.integration.friend_challenge_fixtures import (
     _create_user,
     _seed_friend_challenge_questions,
@@ -121,28 +125,25 @@ async def _assert_round_question_levels(
             assert resolved_levels == expected_levels
 
 
-async def _expire_round_and_advance(
+async def _settle_round_and_advance(
     *,
     tournament_id: UUID,
     round_no: int,
     run_at: datetime,
     monkeypatch,
 ) -> None:
-    expired_deadline = run_at - timedelta(minutes=1)
+    await settle_round_with_lowest_user_wins(
+        tournament_id=tournament_id,
+        round_no=round_no,
+        settled_at=run_at,
+    )
+    monkeypatch.setattr(daily_cup_rounds, "_now_utc", lambda: run_at)
     async with SessionLocal.begin() as session:
-        tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
-        assert tournament is not None
-        tournament.round_deadline = expired_deadline
-        matches = await TournamentMatchesRepo.list_by_tournament_round(
+        await check_and_advance_round(
             session,
             tournament_id=tournament_id,
-            round_no=round_no,
+            now_utc=run_at,
         )
-        assert len(matches) == 3
-        for match in matches:
-            match.deadline = expired_deadline
-    monkeypatch.setattr(daily_cup_rounds, "_now_utc", lambda: run_at)
-    await daily_cup_rounds.advance_daily_cup_rounds_async()
 
 
 @pytest.mark.asyncio
@@ -175,7 +176,7 @@ async def test_daily_cup_round_2_and_3_question_level_mix(monkeypatch) -> None:
         expected_levels=("A1", "A1", "A1", "A1", "A1", "A1", "A1"),
     )
 
-    await _expire_round_and_advance(
+    await _settle_round_and_advance(
         tournament_id=tournament_id,
         round_no=1,
         run_at=now_utc + timedelta(hours=2),
@@ -187,7 +188,7 @@ async def test_daily_cup_round_2_and_3_question_level_mix(monkeypatch) -> None:
         expected_levels=("A2", "A2", "A2", "A2", "A2", "A2", "A2"),
     )
 
-    await _expire_round_and_advance(
+    await _settle_round_and_advance(
         tournament_id=tournament_id,
         round_no=2,
         run_at=now_utc + timedelta(hours=3),

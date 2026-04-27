@@ -13,6 +13,7 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.settlement import settle_pending_match_from_duel
+from tests.integration.tournament_deadlock_test_support import run_with_deadlock_retry
 
 UTC = timezone.utc
 
@@ -119,52 +120,81 @@ async def settle_round_with_lowest_user_wins(
     round_no: int,
     settled_at: datetime,
 ) -> None:
-    expired_deadline = settled_at - timedelta(minutes=1)
-    async with SessionLocal.begin() as session:
-        tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
-        assert tournament is not None
-        tournament.round_deadline = expired_deadline
-        matches = await TournamentMatchesRepo.list_by_tournament_round(
-            session,
-            tournament_id=tournament_id,
-            round_no=round_no,
-        )
-        assert matches
-        for match in matches:
-            match.deadline = expired_deadline
-            assert match.friend_challenge_id is not None
-            challenge = await FriendChallengesRepo.get_by_id_for_update(
+    async def _settle_once() -> None:
+        expired_deadline = settled_at - timedelta(minutes=1)
+        async with SessionLocal.begin() as session:
+            tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
+            assert tournament is not None
+            tournament.round_deadline = expired_deadline
+            matches = await TournamentMatchesRepo.list_by_tournament_round_for_update(
                 session,
-                match.friend_challenge_id,
+                tournament_id=tournament_id,
+                round_no=round_no,
             )
-            assert challenge is not None
+            assert matches
+            for match in matches:
+                match.deadline = expired_deadline
+                assert match.friend_challenge_id is not None
+                challenge = await FriendChallengesRepo.get_by_id_for_update(
+                    session,
+                    match.friend_challenge_id,
+                )
+                assert challenge is not None
 
-            if match.user_b is None:
-                winner_user_id = int(match.user_a)
+                if match.user_b is None:
+                    winner_user_id = int(match.user_a)
+                    challenge.status = "COMPLETED"
+                    challenge.winner_user_id = winner_user_id
+                    challenge.creator_score = 7
+                    challenge.opponent_score = 0
+                    challenge.creator_finished_at = settled_at
+                    challenge.opponent_finished_at = settled_at
+                    challenge.completed_at = settled_at
+                    challenge.updated_at = settled_at
+                    settled = await settle_pending_match_from_duel(
+                        session, match=match, now_utc=settled_at
+                    )
+                    assert settled or match.status != "PENDING"
+                    continue
+
+                winner_user_id = min(int(match.user_a), int(match.user_b))
                 challenge.status = "COMPLETED"
                 challenge.winner_user_id = winner_user_id
-                challenge.creator_score = 7
-                challenge.opponent_score = 0
+                if int(challenge.creator_user_id) == winner_user_id:
+                    challenge.creator_score = 7
+                    challenge.opponent_score = 4
+                else:
+                    challenge.creator_score = 4
+                    challenge.opponent_score = 7
                 challenge.creator_finished_at = settled_at
                 challenge.opponent_finished_at = settled_at
                 challenge.completed_at = settled_at
                 challenge.updated_at = settled_at
-                assert await settle_pending_match_from_duel(
+                settled = await settle_pending_match_from_duel(
                     session, match=match, now_utc=settled_at
                 )
-                continue
+                assert settled or match.status != "PENDING"
+            await session.flush()
+            remaining_pending = [
+                match
+                for match in await TournamentMatchesRepo.list_by_tournament_round_for_update(
+                    session,
+                    tournament_id=tournament_id,
+                    round_no=round_no,
+                )
+                if match.status == "PENDING"
+            ]
+            for match in remaining_pending:
+                settled = await settle_pending_match_from_duel(
+                    session, match=match, now_utc=settled_at
+                )
+                assert settled or match.status != "PENDING"
+            await session.flush()
+            final_matches = await TournamentMatchesRepo.list_by_tournament_round_for_update(
+                session,
+                tournament_id=tournament_id,
+                round_no=round_no,
+            )
+            assert all(match.status != "PENDING" for match in final_matches)
 
-            winner_user_id = min(int(match.user_a), int(match.user_b))
-            challenge.status = "COMPLETED"
-            challenge.winner_user_id = winner_user_id
-            if int(challenge.creator_user_id) == winner_user_id:
-                challenge.creator_score = 7
-                challenge.opponent_score = 4
-            else:
-                challenge.creator_score = 4
-                challenge.opponent_score = 7
-            challenge.creator_finished_at = settled_at
-            challenge.opponent_finished_at = settled_at
-            challenge.completed_at = settled_at
-            challenge.updated_at = settled_at
-            assert await settle_pending_match_from_duel(session, match=match, now_utc=settled_at)
+    await run_with_deadlock_retry(_settle_once)

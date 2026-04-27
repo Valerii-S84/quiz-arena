@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
 from app.core.integration_db_safety import assert_safe_integration_db
 from app.db.session import engine
@@ -68,6 +70,19 @@ async def _existing_truncate_sql() -> str | None:
     return f"TRUNCATE TABLE {', '.join(existing_tables)} RESTART IDENTITY CASCADE"
 
 
+async def _truncate_with_retry(truncate_sql: str) -> None:
+    for attempt in range(1, 4):
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text(truncate_sql))
+            return
+        except DBAPIError as exc:
+            if "deadlock detected" not in str(exc).lower() or attempt == 3:
+                raise
+            await engine.dispose()
+            await asyncio.sleep(0.2 * attempt)
+
+
 @pytest.fixture(autouse=True)
 async def cleanup_db() -> AsyncGenerator[None, None]:
     # Dispose pooled connections between tests to avoid cross-event-loop asyncpg reuse.
@@ -81,8 +96,7 @@ async def cleanup_db() -> AsyncGenerator[None, None]:
 
     truncate_sql = await _existing_truncate_sql()
     if truncate_sql is not None:
-        async with engine.begin() as conn:
-            await conn.execute(text(truncate_sql))
+        await _truncate_with_retry(truncate_sql)
 
     yield
 

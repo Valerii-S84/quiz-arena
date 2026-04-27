@@ -26,6 +26,7 @@ from tests.integration.friend_challenge_fixtures import (
     _create_user,
     _seed_friend_challenge_questions,
 )
+from tests.integration.tournament_deadlock_test_support import run_with_deadlock_retry
 from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
@@ -84,15 +85,19 @@ async def _ensure_tournament_schema() -> None:
     participants_table = cast(Table, TournamentParticipant.__table__)
     tournaments_table = cast(Table, Tournament.__table__)
 
-    async with engine.begin() as conn:
-        await conn.run_sync(round_scores_table.drop, checkfirst=True)
-        await conn.run_sync(matches_table.drop, checkfirst=True)
-        await conn.run_sync(participants_table.drop, checkfirst=True)
-        await conn.run_sync(tournaments_table.drop, checkfirst=True)
-        await conn.run_sync(tournaments_table.create, checkfirst=True)
-        await conn.run_sync(participants_table.create, checkfirst=True)
-        await conn.run_sync(matches_table.create, checkfirst=True)
-        await conn.run_sync(round_scores_table.create, checkfirst=True)
+    async def _reset_schema() -> None:
+        async with engine.begin() as conn:
+            await conn.run_sync(round_scores_table.drop, checkfirst=True)
+            await conn.run_sync(matches_table.drop, checkfirst=True)
+            await conn.run_sync(participants_table.drop, checkfirst=True)
+            await conn.run_sync(tournaments_table.drop, checkfirst=True)
+            await conn.run_sync(tournaments_table.create, checkfirst=True)
+            await conn.run_sync(participants_table.create, checkfirst=True)
+            await conn.run_sync(matches_table.create, checkfirst=True)
+            await conn.run_sync(round_scores_table.create, checkfirst=True)
+
+    await engine.dispose()
+    await run_with_deadlock_retry(_reset_schema)
 
 
 @pytest.mark.asyncio

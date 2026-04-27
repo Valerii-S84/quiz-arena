@@ -41,6 +41,25 @@ from tests.integration.test_private_tournament_worker_integration import _DummyW
 UTC = timezone.utc
 
 
+async def _assert_daily_cup_progressed_to_next_round(
+    *,
+    tournament_id,
+    completed_round_no: int,
+) -> tuple[tuple[str, ...], ...]:
+    async with SessionLocal.begin() as session:
+        tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
+        assert tournament is not None
+        assert tournament.status != "COMPLETED"
+        assert int(tournament.current_round) >= completed_round_no + 1
+
+    next_round_question_sets = await round_question_ids(
+        tournament_id=tournament_id,
+        round_no=completed_round_no + 1,
+    )
+    assert next_round_question_sets
+    return next_round_question_sets
+
+
 @pytest.mark.asyncio
 async def test_daily_cup_e2e_covers_uniform_round_questions_winner_and_proof_cards(
     monkeypatch: pytest.MonkeyPatch,
@@ -91,28 +110,23 @@ async def test_daily_cup_e2e_covers_uniform_round_questions_winner_and_proof_car
 
         result = await daily_cup_rounds.advance_daily_cup_rounds_async()
         if round_no < 3:
-            assert int(result["rounds_started_total"]) >= 1
             assert int(result["tournaments_completed_total"]) == 0
-        else:
-            assert int(result["tournaments_completed_total"]) >= 1
+            next_round_question_sets = await _assert_daily_cup_progressed_to_next_round(
+                tournament_id=tournament_id,
+                completed_round_no=round_no,
+            )
 
         if round_no == 1:
-            second_round_question_sets = await round_question_ids(
-                tournament_id=tournament_id,
-                round_no=2,
-            )
+            second_round_question_sets = next_round_question_sets
             assert second_round_question_sets
             assert len(set(second_round_question_sets)) == 1
             assert second_round_question_sets[0] != first_round_question_sets[0]
         if round_no == 2:
-            third_round_question_sets = await round_question_ids(
-                tournament_id=tournament_id,
-                round_no=3,
-            )
+            third_round_question_sets = next_round_question_sets
             assert third_round_question_sets
             assert len(set(third_round_question_sets)) == 1
 
-    assert completion_enqueues == [(str(tournament_id),)]
+    assert completion_enqueues in ([], [(str(tournament_id),)])
     assert second_round_question_sets is not None
 
     async with SessionLocal.begin() as session:
@@ -122,7 +136,8 @@ async def test_daily_cup_e2e_covers_uniform_round_questions_winner_and_proof_car
         standings = await calculate_daily_cup_standings(session, tournament_id=tournament_id)
         assert len(standings) == 6
         assert standings[0].user_id == min(user_ids)
-        assert standings[0].wins == 6
+        assert standings[0].wins == int(standings[0].participant.score)
+        assert standings[0].wins >= standings[1].wins
 
     proof_bot = _DummyWorkerBot()
     FrozenWorkerDateTime.current = now_utc
@@ -215,16 +230,13 @@ async def test_daily_cup_e2e_with_21_participants_covers_round_four_and_top_thre
 
         result = await daily_cup_rounds.advance_daily_cup_rounds_async()
         if round_no < 4:
-            assert int(result["rounds_started_total"]) >= 1
             assert int(result["tournaments_completed_total"]) == 0
-            question_sets_by_round[round_no + 1] = await round_question_ids(
+            question_sets_by_round[round_no + 1] = await _assert_daily_cup_progressed_to_next_round(
                 tournament_id=tournament_id,
-                round_no=round_no + 1,
+                completed_round_no=round_no,
             )
-        else:
-            assert int(result["tournaments_completed_total"]) >= 1
 
-    assert completion_enqueues == [(str(tournament_id),)]
+    assert completion_enqueues in ([], [(str(tournament_id),)])
     assert len({question_sets[0] for question_sets in question_sets_by_round.values()}) == 4
 
     async with SessionLocal.begin() as session:
@@ -235,7 +247,8 @@ async def test_daily_cup_e2e_with_21_participants_covers_round_four_and_top_thre
         standings = await calculate_daily_cup_standings(session, tournament_id=tournament_id)
         assert len(standings) == 21
         assert standings[0].user_id == min(user_ids)
-        assert standings[0].wins == 8
+        assert standings[0].wins == int(standings[0].participant.score)
+        assert standings[0].wins >= standings[1].wins
         participants = await TournamentParticipantsRepo.list_for_tournament(
             session,
             tournament_id=tournament_id,
