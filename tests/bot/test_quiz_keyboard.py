@@ -7,12 +7,14 @@ def test_quiz_keyboard_contains_answer_callbacks_and_stop_button() -> None:
         options=("A", "B", "C", "D"),
     )
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    answer_texts = [row[0].text for row in keyboard.inline_keyboard[:4]]
 
     assert "answer:00000000-0000-0000-0000-000000000001:0" in callbacks
     assert "answer:00000000-0000-0000-0000-000000000001:1" in callbacks
     assert "answer:00000000-0000-0000-0000-000000000001:2" in callbacks
     assert "answer:00000000-0000-0000-0000-000000000001:3" in callbacks
     assert "game:stop:00000000-0000-0000-0000-000000000001" in callbacks
+    assert answer_texts == ["A", "B", "C", "D"]
 
 
 def test_quiz_keyboard_omits_stop_button_for_tournament() -> None:
