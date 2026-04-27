@@ -179,7 +179,7 @@ async def test_credit_mutates_wallet_only_by_expected_breakdown_delta() -> None:
                 user_id=user_id,
                 free_energy=7,
                 paid_energy=2,
-                free_cap=20,
+                free_cap=10,
                 regen_interval_sec=1800,
                 last_regen_at=now_utc,
                 last_daily_topup_local_date=berlin_local_date(now_utc),

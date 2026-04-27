@@ -32,7 +32,7 @@ async def test_handle_start_home_menu_shows_premium_flag(monkeypatch) -> None:
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
         return SimpleNamespace(
             user_id=8,
-            free_energy=12,
+            free_energy=8,
             paid_energy=3,
             current_streak=4,
             best_streak=9,
@@ -57,4 +57,4 @@ async def test_handle_start_home_menu_shows_premium_flag(monkeypatch) -> None:
     )
     await start.handle_start(message)
 
-    assert "⚡ 12/20 | 💎 Premium aktiv" in (message.answers[0].text or "")
+    assert "⚡ 8/10 | 💎 Premium aktiv" in (message.answers[0].text or "")

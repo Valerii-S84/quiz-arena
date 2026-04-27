@@ -107,7 +107,9 @@ async def advance_due_daily_cup_rounds(
                     },
                 }
             )
-        if completed_count > 0 or (tournament.status == tournament_completed_status and not was_completed):
+        if completed_count > 0 or (
+            tournament.status == tournament_completed_status and not was_completed
+        ):
             outcome.completed_ids.append(str(tournament.id))
         if settled_count == 0 or not pending_match_ids:
             continue

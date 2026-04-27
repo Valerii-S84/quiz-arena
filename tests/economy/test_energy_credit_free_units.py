@@ -38,7 +38,7 @@ async def test_credit_free_energy_caps_to_current_free_cap_and_logs_actual_credi
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _Session()
-    state = _energy_state(free_energy=10, free_cap=12)
+    state = _energy_state(free_energy=8, free_cap=10)
     created_entries: list[LedgerEntry] = []
 
     monkeypatch.setattr(energy_consume, "get_or_create_state_for_update", _async_return(state))
@@ -70,14 +70,14 @@ async def test_credit_free_energy_caps_to_current_free_cap_and_logs_actual_credi
 
     assert result.amount == 2
     assert result.idempotent_replay is False
-    assert result.free_energy == 12
+    assert result.free_energy == 10
     assert result.paid_energy == 0
     assert result.state == EnergyBucketState.AVAILABLE
-    assert state.free_energy == 12
+    assert state.free_energy == 10
     assert len(created_entries) == 1
     entry = cast(LedgerEntry, created_entries[0])
     assert entry.amount == 2
-    assert entry.balance_after == 12
+    assert entry.balance_after == 10
     assert entry.asset == "FREE_ENERGY"
 
 
@@ -86,7 +86,7 @@ async def test_credit_free_energy_adds_nothing_when_already_at_cap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _Session()
-    state = _energy_state(free_energy=12, free_cap=12)
+    state = _energy_state(free_energy=10, free_cap=10)
 
     monkeypatch.setattr(energy_consume, "get_or_create_state_for_update", _async_return(state))
     monkeypatch.setattr(
@@ -116,9 +116,9 @@ async def test_credit_free_energy_adds_nothing_when_already_at_cap(
 
     assert result.amount == 0
     assert result.idempotent_replay is False
-    assert result.free_energy == 12
+    assert result.free_energy == 10
     assert result.state == EnergyBucketState.AVAILABLE
-    assert state.free_energy == 12
+    assert state.free_energy == 10
 
 
 @pytest.mark.asyncio
@@ -126,7 +126,7 @@ async def test_credit_free_energy_replay_is_idempotent_and_does_not_duplicate_cr
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _Session()
-    state = _energy_state(free_energy=12, free_cap=12)
+    state = _energy_state(free_energy=10, free_cap=10)
     existing_entry = SimpleNamespace(amount=2)
 
     monkeypatch.setattr(energy_consume, "get_or_create_state_for_update", _async_return(state))
@@ -157,8 +157,8 @@ async def test_credit_free_energy_replay_is_idempotent_and_does_not_duplicate_cr
 
     assert result.amount == 2
     assert result.idempotent_replay is True
-    assert result.free_energy == 12
-    assert state.free_energy == 12
+    assert result.free_energy == 10
+    assert state.free_energy == 10
 
 
 @pytest.mark.asyncio
@@ -166,7 +166,7 @@ async def test_credit_paid_energy_grants_full_reward_without_free_cap_clamp(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = _Session()
-    state = _energy_state(free_energy=18, free_cap=20)
+    state = _energy_state(free_energy=8, free_cap=10)
     created_entries: list[LedgerEntry] = []
 
     monkeypatch.setattr(energy_consume, "get_or_create_state_for_update", _async_return(state))
@@ -198,10 +198,10 @@ async def test_credit_paid_energy_grants_full_reward_without_free_cap_clamp(
 
     assert result.amount == 5
     assert result.idempotent_replay is False
-    assert result.free_energy == 18
+    assert result.free_energy == 8
     assert result.paid_energy == 5
     assert result.state == EnergyBucketState.AVAILABLE
-    assert state.free_energy == 18
+    assert state.free_energy == 8
     assert state.paid_energy == 5
     assert len(created_entries) == 1
     entry = cast(LedgerEntry, created_entries[0])

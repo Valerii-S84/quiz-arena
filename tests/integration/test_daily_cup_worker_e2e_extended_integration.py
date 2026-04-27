@@ -257,7 +257,7 @@ async def test_daily_cup_e2e_with_21_participants_covers_round_four_and_top_thre
 
     top_three_user_ids = [item.user_id for item in standings[:3]]
     fourth_place_user_id = standings[3].user_id
-    await set_user_free_energy(user_id=top_three_user_ids[2], free_energy=18, now_utc=now_utc)
+    await set_user_free_energy(user_id=top_three_user_ids[2], free_energy=8, now_utc=now_utc)
     await set_user_free_energy(user_id=fourth_place_user_id, free_energy=7, now_utc=now_utc)
 
     proof_bot = _DummyWorkerBot()
@@ -287,8 +287,8 @@ async def test_daily_cup_e2e_with_21_participants_covers_round_four_and_top_thre
     assert await get_active_premium_scope(user_id=top_three_user_ids[0]) == "PREMIUM_3_DAYS"
     assert await count_duel_tickets(user_id=top_three_user_ids[1]) == 2
     third_place_energy = await get_energy_balance(user_id=top_three_user_ids[2])
-    assert third_place_energy == (18, 5)
-    assert sum(third_place_energy) == 23
+    assert third_place_energy == (8, 5)
+    assert sum(third_place_energy) == 13
     assert await get_active_premium_scope(user_id=fourth_place_user_id) is None
     assert await count_duel_tickets(user_id=fourth_place_user_id) == 0
     assert await get_free_energy(user_id=fourth_place_user_id) == 7

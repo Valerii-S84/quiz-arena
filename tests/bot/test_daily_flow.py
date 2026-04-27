@@ -79,7 +79,7 @@ async def test_handle_daily_answer_branch_adds_ticket_progress_and_next_question
     async def _fake_snapshot(_session, *, telegram_user):
         assert _session is session
         assert telegram_user.id == 21
-        return SimpleNamespace(user_id=7, free_energy=20, paid_energy=0)
+        return SimpleNamespace(user_id=7, free_energy=10, paid_energy=0)
 
     async def _fake_start_session(_session, **kwargs):
         assert _session is session

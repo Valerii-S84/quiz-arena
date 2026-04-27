@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
+from app.economy.energy.constants import FREE_ENERGY_CAP
 from app.economy.energy.rules import (
     apply_daily_topup,
     apply_regen,
@@ -27,7 +28,7 @@ def snapshot(
     return EnergySnapshot(
         free_energy=free_energy,
         paid_energy=paid_energy,
-        free_cap=20,
+        free_cap=FREE_ENERGY_CAP,
         regen_interval_sec=1800,
         last_regen_at=last_regen_at or datetime(2026, 2, 17, 12, 0, tzinfo=UTC),
         last_daily_topup_local_date=last_daily_topup_local_date,
@@ -116,7 +117,7 @@ def test_transition_to_available_on_daily_topup() -> None:
     state_after, applied = apply_daily_topup(state_before, local_date_berlin=date(2026, 2, 17))
 
     assert applied is True
-    assert state_after.free_energy == 20
+    assert state_after.free_energy == FREE_ENERGY_CAP
     assert classify_energy_state(state_after, premium_active=False) == EnergyBucketState.AVAILABLE
 
 

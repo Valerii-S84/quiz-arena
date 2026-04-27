@@ -36,7 +36,7 @@ async def test_handle_answer_handles_missing_session(monkeypatch) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
-        return SimpleNamespace(user_id=1, free_energy=20, paid_energy=0, current_streak=0)
+        return SimpleNamespace(user_id=1, free_energy=10, paid_energy=0, current_streak=0)
 
     async def _fake_submit_answer(*args, **kwargs):
         raise SessionNotFoundError()
@@ -324,7 +324,7 @@ async def test_handle_answer_friend_challenge_completion_sends_proof_card_with_s
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
-        return SimpleNamespace(user_id=10, free_energy=20, paid_energy=0, current_streak=0)
+        return SimpleNamespace(user_id=10, free_energy=10, paid_energy=0, current_streak=0)
 
     async def _fake_submit_answer(*args, **kwargs):
         return AnswerSessionResult(

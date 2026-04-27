@@ -254,6 +254,30 @@ jobs:
     runs-on: ubuntu-latest
     needs: integration
 
+    services:
+      postgres:
+        image: postgres:16.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: quiz_arena_test_tournaments
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d quiz_arena_test_tournaments"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
     env:
       APP_ENV: test
       LOG_LEVEL: INFO
@@ -265,11 +289,11 @@ jobs:
       INTERNAL_API_TOKEN: ci-internal-token
       PROMO_SECRET_PEPPER: ci-test-promo-pepper
       PROMO_ENCRYPTION_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY
-      TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/quiz_arena_test
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/quiz_arena_test
-      REDIS_URL: redis://127.0.0.1:6379/0
-      CELERY_BROKER_URL: redis://127.0.0.1:6379/1
-      CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/2
+      TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/quiz_arena_test_tournaments
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/quiz_arena_test_tournaments
+      REDIS_URL: redis://127.0.0.1:6379/10
+      CELERY_BROKER_URL: redis://127.0.0.1:6379/11
+      CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/12
       TMPDIR: /tmp
       SKIP_LOCAL_SERVICES: "1"
       PYTHON_BIN: python

@@ -71,7 +71,7 @@ async def _run_friend_answer_branch(
 
     async def _fake_home_snapshot(session, *, telegram_user):
         del session, telegram_user
-        return SimpleNamespace(user_id=actor_user_id, free_energy=20, paid_energy=0)
+        return SimpleNamespace(user_id=actor_user_id, free_energy=10, paid_energy=0)
 
     async def _fake_resolve_label(**kwargs):
         del kwargs

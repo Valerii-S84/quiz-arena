@@ -44,7 +44,7 @@ async def test_claim_bonus_grants_energy_only_once_when_subscribed(monkeypatch) 
         nonlocal fill_calls
         del session, user_id, now_utc
         fill_calls += 1
-        return SimpleNamespace(free_energy=20, paid_energy=0)
+        return SimpleNamespace(free_energy=10, paid_energy=0)
 
     monkeypatch.setattr(
         channel_bonus,
@@ -179,7 +179,7 @@ async def test_claim_bonus_uses_dedicated_checker_bot_token(monkeypatch) -> None
 
     async def _fake_fill_to_free_cap(session, *, user_id: int, now_utc):
         del session, user_id, now_utc
-        return SimpleNamespace(free_energy=20, paid_energy=0)
+        return SimpleNamespace(free_energy=10, paid_energy=0)
 
     monkeypatch.setattr(
         channel_bonus,
