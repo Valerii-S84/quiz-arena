@@ -228,7 +228,7 @@ async def test_daily_cup_round_advance_on_deadline(monkeypatch) -> None:
         lambda *, tournament_id: enqueued_proofs.append(tournament_id),
     )
 
-    result = as_any_dict(await daily_cup_rounds.advance_daily_cup_rounds_async())
+    await daily_cup_rounds.advance_daily_cup_rounds_async()
     assert enqueued_proofs == []
 
     async with SessionLocal.begin() as session:
