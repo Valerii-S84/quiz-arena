@@ -49,9 +49,9 @@ async def _create_user_with_home_state(
         session.add(
             EnergyState(
                 user_id=user.id,
-                free_energy=20,
+                free_energy=10,
                 paid_energy=0,
-                free_cap=20,
+                free_cap=10,
                 regen_interval_sec=1800,
                 last_regen_at=now_utc,
                 last_daily_topup_local_date=_berlin_date(now_utc),

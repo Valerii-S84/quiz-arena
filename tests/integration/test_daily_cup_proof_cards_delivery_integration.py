@@ -225,7 +225,7 @@ async def test_daily_cup_proof_cards_parallel_duplicate_run_does_not_send_duplic
 
     user_ids = await create_daily_cup_users(prefix="daily_cup_proof_parallel", count=13)
     tournament_id = await create_completed_daily_cup(now_utc=now_utc, user_ids=user_ids)
-    await set_user_free_energy(user_id=user_ids[2], free_energy=18, now_utc=now_utc)
+    await set_user_free_energy(user_id=user_ids[2], free_energy=8, now_utc=now_utc)
 
     _FrozenDateTime.current = now_utc
     monkeypatch.setattr(daily_cup_proof_cards, "datetime", _FrozenDateTime)

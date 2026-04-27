@@ -19,7 +19,7 @@ async def test_handle_friend_challenge_next_expired_shows_expired_message(
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
-        return SimpleNamespace(user_id=17, free_energy=20, paid_energy=0, current_streak=0)
+        return SimpleNamespace(user_id=17, free_energy=10, paid_energy=0, current_streak=0)
 
     async def _fake_start_round(*args, **kwargs):
         raise FriendChallengeExpiredError()
@@ -47,7 +47,7 @@ async def test_handle_friend_challenge_share_result_sends_inline_share_and_emits
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
-        return SimpleNamespace(user_id=10, free_energy=20, paid_energy=0, current_streak=0)
+        return SimpleNamespace(user_id=10, free_energy=10, paid_energy=0, current_streak=0)
 
     async def _fake_get_snapshot(*args, **kwargs):
         return FriendChallengeSnapshot(

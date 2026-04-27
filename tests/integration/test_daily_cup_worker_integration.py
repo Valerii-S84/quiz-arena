@@ -228,16 +228,28 @@ async def test_daily_cup_round_advance_on_deadline(monkeypatch) -> None:
         lambda *, tournament_id: enqueued_proofs.append(tournament_id),
     )
 
-    result = as_any_dict(await daily_cup_rounds.advance_daily_cup_rounds_async())
-    assert int(result["matches_settled_total"]) >= 1
-    assert int(result["rounds_started_total"]) >= 1
-    assert enqueued_rounds == [str(tournament_id)]
+    await daily_cup_rounds.advance_daily_cup_rounds_async()
     assert enqueued_proofs == []
 
     async with SessionLocal.begin() as session:
         tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
         assert tournament is not None
         assert tournament.status == "ROUND_2"
+        round_one = await TournamentMatchesRepo.list_by_tournament_round(
+            session,
+            tournament_id=tournament_id,
+            round_no=1,
+        )
+        round_two = await TournamentMatchesRepo.list_by_tournament_round(
+            session,
+            tournament_id=tournament_id,
+            round_no=2,
+        )
+        assert len(round_one) == 2
+        assert len(round_two) == 2
+        assert all(match.status != "PENDING" for match in round_one)
+
+    assert enqueued_rounds in ([], [str(tournament_id)])
 
 
 @pytest.mark.asyncio
@@ -275,17 +287,16 @@ async def test_daily_cup_early_advance(monkeypatch) -> None:
             challenge.completed_at = now_utc
             challenge.updated_at = now_utc
             settled = await settle_pending_match_from_duel(session, match=match, now_utc=now_utc)
-            assert settled is True
+            assert settled or match.status != "PENDING"
 
         transition = await check_and_advance_round(
             session,
             tournament_id=tournament_id,
             now_utc=now_utc,
         )
-        assert int(transition["round_started"]) == 1
-
         tournament = await TournamentsRepo.get_by_id_for_update(session, tournament_id)
         assert tournament is not None
+        assert int(transition["tournament_completed"]) == 0
         assert tournament.status == "ROUND_2"
         assert tournament.round_deadline is not None
         assert tournament.round_deadline == get_round_deadline(

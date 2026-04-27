@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import exists, or_, select
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.tournament_matches import TournamentMatch
@@ -126,18 +126,51 @@ class TournamentsRepo:
                     TournamentMatch.deadline <= now_utc,
                 )
             )
-            due_condition = or_(due_condition, due_pending_match_exists)
-        stmt = (
-            select(Tournament)
-            .where(
-                Tournament.status.in_(("ROUND_1", "ROUND_2", "ROUND_3", "ROUND_4", "BRACKET_LIVE")),
-                Tournament.round_deadline.is_not(None),
-                due_condition,
+            due_settled_match_exists = exists(
+                select(TournamentMatch.id).where(
+                    TournamentMatch.tournament_id == Tournament.id,
+                    TournamentMatch.round_no == Tournament.current_round,
+                    TournamentMatch.deadline <= now_utc,
+                )
             )
-            .order_by(Tournament.round_deadline.asc())
-            .limit(resolved_limit)
-            .with_for_update(skip_locked=True)
-        )
+            active_pending_match_exists = exists(
+                select(TournamentMatch.id).where(
+                    TournamentMatch.tournament_id == Tournament.id,
+                    TournamentMatch.round_no == Tournament.current_round,
+                    TournamentMatch.status == "PENDING",
+                )
+            )
+            due_condition = or_(
+                due_condition,
+                due_pending_match_exists,
+                and_(due_settled_match_exists, ~active_pending_match_exists),
+            )
+            stmt = (
+                select(Tournament)
+                .where(
+                    Tournament.status.in_(
+                        ("ROUND_1", "ROUND_2", "ROUND_3", "ROUND_4", "BRACKET_LIVE")
+                    ),
+                    due_condition,
+                )
+                .order_by(Tournament.round_deadline.asc())
+                .limit(resolved_limit)
+                .with_for_update(skip_locked=True)
+            )
+        else:
+            stmt = (
+                select(Tournament)
+                .where(
+                    Tournament.status.in_(
+                        ("ROUND_1", "ROUND_2", "ROUND_3", "ROUND_4", "BRACKET_LIVE")
+                    ),
+                    Tournament.round_deadline.is_not(None),
+                    due_condition,
+                )
+                .order_by(Tournament.round_deadline.asc())
+                .limit(resolved_limit)
+                .with_for_update(skip_locked=True)
+            )
         if tournament_type is not None:
             stmt = stmt.where(Tournament.type == tournament_type)
         result = await session.execute(stmt)

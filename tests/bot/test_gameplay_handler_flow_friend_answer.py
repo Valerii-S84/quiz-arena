@@ -49,7 +49,7 @@ async def test_friend_answer_branch_notifies_creator_once_when_opponent_finishes
 ) -> None:
     async def _fake_home_snapshot(session, *, telegram_user):
         del session, telegram_user
-        return SimpleNamespace(user_id=20, free_energy=20, paid_energy=0)
+        return SimpleNamespace(user_id=20, free_energy=10, paid_energy=0)
 
     async def _fake_get_by_id(session, challenge_id):
         del session, challenge_id
@@ -136,7 +136,7 @@ async def test_friend_answer_branch_skips_push_when_creator_already_started(
 ) -> None:
     async def _fake_home_snapshot(session, *, telegram_user):
         del session, telegram_user
-        return SimpleNamespace(user_id=20, free_energy=20, paid_energy=0)
+        return SimpleNamespace(user_id=20, free_energy=10, paid_energy=0)
 
     async def _fake_get_by_id(session, challenge_id):
         del session, challenge_id
@@ -205,7 +205,7 @@ async def test_friend_answer_branch_skips_repo_lookup_when_creator_answers(
 ) -> None:
     async def _fake_home_snapshot(session, *, telegram_user):
         del session, telegram_user
-        return SimpleNamespace(user_id=10, free_energy=20, paid_energy=0)
+        return SimpleNamespace(user_id=10, free_energy=10, paid_energy=0)
 
     async def _fake_resolve_label(**kwargs):
         del kwargs

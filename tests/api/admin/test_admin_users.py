@@ -318,7 +318,10 @@ async def test_apply_bonus_handles_supported_bonus_types(
     assert session.flushed is True
     assert any(type(item).__name__ == "UserEvent" for item in session.added)
     if bonus_type == "energy":
-        assert any(isinstance(item, EnergyState) for item in session.added)
+        energy_states = [item for item in session.added if isinstance(item, EnergyState)]
+        assert len(energy_states) == 1
+        assert energy_states[0].free_energy == 10
+        assert energy_states[0].free_cap == 10
     elif bonus_type == "streak_token":
         assert any(isinstance(item, StreakState) for item in session.added)
     else:

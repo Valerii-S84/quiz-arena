@@ -5,6 +5,7 @@ from datetime import datetime
 
 from app.bot.handlers.question_theme_label import sanitize_question_theme_label
 from app.bot.texts.de import TEXTS_DE
+from app.economy.energy.constants import FREE_ENERGY_CAP
 from app.game.friend_challenges.constants import is_duel_active_status
 from app.game.modes.presentation import display_mode_label
 from app.game.modes.rules import is_zero_cost_source
@@ -43,7 +44,7 @@ def _build_home_text(
 ) -> str:
     del paid_energy
     stats_line = f"Serie: {current_streak} | Beste: {best_streak} | 🏆 Rekord: {global_best_streak}"
-    energy_line = f"⚡ {free_energy}/20"
+    energy_line = f"⚡ {free_energy}/{FREE_ENERGY_CAP}"
     if premium_active:
         energy_line = f"{energy_line} | 💎 Premium aktiv"
 

@@ -16,6 +16,7 @@ from app.db.models.streak_state import StreakState
 from app.db.models.user_events import UserEvent
 from app.db.models.users import User
 from app.db.session import SessionLocal
+from app.economy.energy.constants import FREE_ENERGY_CAP
 
 router = APIRouter(prefix="/admin/users", tags=["admin-users"])
 
@@ -173,7 +174,8 @@ async def reset_user_state(
 
         energy = await session.get(EnergyState, user_id)
         if energy is not None:
-            energy.free_energy = min(energy.free_cap, 20)
+            energy.free_cap = FREE_ENERGY_CAP
+            energy.free_energy = FREE_ENERGY_CAP
             energy.paid_energy = 0
             energy.updated_at = now_utc
 

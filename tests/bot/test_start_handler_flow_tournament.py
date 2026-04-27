@@ -47,7 +47,7 @@ async def test_handle_start_tournament_payload_shows_lobby_and_join_button(monke
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
         del session, telegram_user
         assert start_payload == "tournament_abcdefabcdef"
-        return SimpleNamespace(user_id=9, free_energy=20, paid_energy=1, current_streak=1)
+        return SimpleNamespace(user_id=9, free_energy=10, paid_energy=1, current_streak=1)
 
     async def _fake_lobby_by_code(*args, **kwargs):
         del args, kwargs
@@ -111,7 +111,7 @@ async def test_handle_start_tournament_payload_for_started_tournament_shows_clos
 
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
         del session, telegram_user, start_payload
-        return SimpleNamespace(user_id=9, free_energy=20, paid_energy=1, current_streak=1)
+        return SimpleNamespace(user_id=9, free_energy=10, paid_energy=1, current_streak=1)
 
     async def _fake_lobby_by_code(*args, **kwargs):
         del args, kwargs

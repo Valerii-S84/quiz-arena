@@ -62,6 +62,7 @@ async def advance_due_daily_cup_rounds(
         tournament_type=tournament_type_daily_arena,
     )
     for tournament in due_rounds:
+        was_completed = tournament.status == tournament_completed_status
         round_before = max(1, int(tournament.current_round))
         participants_total = await participants_repo.count_for_tournament(
             session,
@@ -106,7 +107,9 @@ async def advance_due_daily_cup_rounds(
                     },
                 }
             )
-        if completed_count > 0 or tournament.status == tournament_completed_status:
+        if completed_count > 0 or (
+            tournament.status == tournament_completed_status and not was_completed
+        ):
             outcome.completed_ids.append(str(tournament.id))
         if settled_count == 0 or not pending_match_ids:
             continue

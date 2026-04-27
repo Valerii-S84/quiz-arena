@@ -214,7 +214,8 @@ def test_admin_users_state_routes_cover_mutations_and_not_found(
     assert reset.status_code == 200
     assert streak.current_streak == 0
     assert streak.today_status == "NO_ACTIVITY"
-    assert energy.free_energy == 20
+    assert energy.free_cap == 10
+    assert energy.free_energy == 10
     assert energy.paid_energy == 0
     assert any(type(item).__name__ == "UserEvent" for item in reset_session.added)
     assert missing.status_code == 404

@@ -21,7 +21,7 @@ class EnergyState(Base):
     __tablename__ = "energy_state"
     __table_args__ = (
         CheckConstraint(
-            "free_energy >= 0 AND free_energy <= 20",
+            "free_energy >= 0 AND free_energy <= 10",
             name="ck_energy_state_free_energy_range",
         ),
         CheckConstraint("paid_energy >= 0", name="ck_energy_state_paid_energy_non_negative"),
@@ -32,7 +32,7 @@ class EnergyState(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), primary_key=True)
     free_energy: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     paid_energy: Mapped[int] = mapped_column(Integer, nullable=False)
-    free_cap: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=20)
+    free_cap: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=10)
     regen_interval_sec: Mapped[int] = mapped_column(Integer, nullable=False, default=1800)
     last_regen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_daily_topup_local_date: Mapped[date] = mapped_column(Date, nullable=False)

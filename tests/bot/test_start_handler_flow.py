@@ -124,7 +124,7 @@ async def test_handle_start_friend_token_invalid(monkeypatch) -> None:
     monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
-        return SimpleNamespace(user_id=7, free_energy=20, paid_energy=0, current_streak=1)
+        return SimpleNamespace(user_id=7, free_energy=10, paid_energy=0, current_streak=1)
 
     async def _fake_join_friend_challenge(*args, **kwargs):
         raise FriendChallengeNotFoundError()
@@ -150,7 +150,7 @@ async def test_handle_start_friend_token_expired(monkeypatch) -> None:
     monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
-        return SimpleNamespace(user_id=9, free_energy=20, paid_energy=0, current_streak=1)
+        return SimpleNamespace(user_id=9, free_energy=10, paid_energy=0, current_streak=1)
 
     async def _fake_join_friend_challenge(*args, **kwargs):
         raise FriendChallengeExpiredError()
@@ -177,7 +177,7 @@ async def test_handle_start_duel_payload_joins_and_shows_challenge_immediately(m
 
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
         assert start_payload == "duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-        return SimpleNamespace(user_id=9, free_energy=20, paid_energy=1, current_streak=1)
+        return SimpleNamespace(user_id=9, free_energy=10, paid_energy=1, current_streak=1)
 
     async def _fake_join_by_id(*args, **kwargs):
         return FriendChallengeJoinResult(
@@ -267,7 +267,7 @@ async def test_handle_start_sends_home_and_offer_when_available(monkeypatch) -> 
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
         return SimpleNamespace(
             user_id=8,
-            free_energy=12,
+            free_energy=8,
             paid_energy=3,
             current_streak=4,
             best_streak=9,
@@ -305,7 +305,7 @@ async def test_handle_start_home_menu_does_not_send_photo(monkeypatch) -> None:
     monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
-        return SimpleNamespace(user_id=8, free_energy=12, paid_energy=3, current_streak=4)
+        return SimpleNamespace(user_id=8, free_energy=8, paid_energy=3, current_streak=4)
 
     async def _fake_offer(*args, **kwargs):
         return None
@@ -334,7 +334,7 @@ async def test_handle_start_home_menu_shows_zero_streak_without_crashing(monkeyp
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
         return SimpleNamespace(
             user_id=8,
-            free_energy=12,
+            free_energy=8,
             paid_energy=3,
             current_streak=0,
             best_streak=0,
@@ -360,7 +360,7 @@ async def test_handle_start_home_menu_shows_zero_streak_without_crashing(monkeyp
 
     home_text = message.answers[0].text or ""
     assert "Serie: 0 | Beste: 0 | 🏆 Rekord: 7" in home_text
-    assert "⚡ 12/20" in home_text
+    assert "⚡ 8/10" in home_text
 
 
 @pytest.mark.asyncio
@@ -368,7 +368,7 @@ async def test_handle_start_home_menu_sends_photo_when_file_id_configured(monkey
     monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
-        return SimpleNamespace(user_id=8, free_energy=12, paid_energy=3, current_streak=4)
+        return SimpleNamespace(user_id=8, free_energy=8, paid_energy=3, current_streak=4)
 
     async def _fake_offer(*args, **kwargs):
         return None

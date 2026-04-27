@@ -24,7 +24,7 @@ async def test_premium_consume_does_not_mutate_wallet_or_create_ledger() -> None
                 user_id=user_id,
                 free_energy=1,
                 paid_energy=3,
-                free_cap=20,
+                free_cap=10,
                 regen_interval_sec=1800,
                 last_regen_at=now_utc - timedelta(hours=6),
                 last_daily_topup_local_date=date(2026, 2, 17),

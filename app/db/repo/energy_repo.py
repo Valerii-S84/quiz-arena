@@ -26,12 +26,14 @@ class EnergyRepo:
         user_id: int,
         now_utc: datetime,
         local_date_berlin: date,
+        free_energy_start: int,
+        free_energy_cap: int,
     ) -> EnergyState:
         state = EnergyState(
             user_id=user_id,
-            free_energy=20,
+            free_energy=free_energy_start,
             paid_energy=0,
-            free_cap=20,
+            free_cap=free_energy_cap,
             regen_interval_sec=1800,
             last_regen_at=now_utc,
             last_daily_topup_local_date=local_date_berlin,

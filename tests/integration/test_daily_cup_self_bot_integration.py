@@ -28,6 +28,7 @@ from tests.integration.test_daily_cup_worker_integration import (
     _join_users,
 )
 from tests.integration.test_private_tournament_service_integration import _ensure_tournament_schema
+from tests.integration.tournament_deadlock_test_support import run_with_deadlock_retry
 from tests.type_helpers import as_any_dict
 
 UTC = timezone.utc
@@ -63,46 +64,49 @@ async def _complete_self_bot_match(
     now_utc: datetime,
     creator_score: int,
 ) -> tuple[FriendChallenge, TournamentMatch, TournamentParticipant]:
-    async with SessionLocal.begin() as session:
-        matches = await TournamentMatchesRepo.list_by_tournament_round(
-            session,
-            tournament_id=tournament_id,
-            round_no=1,
-        )
-        self_bot_match = next(match for match in matches if match.user_b is None)
-        assert self_bot_match.friend_challenge_id is not None
+    async def _complete_once() -> tuple[FriendChallenge, TournamentMatch, TournamentParticipant]:
+        async with SessionLocal.begin() as session:
+            matches = await TournamentMatchesRepo.list_by_tournament_round(
+                session,
+                tournament_id=tournament_id,
+                round_no=1,
+            )
+            self_bot_match = next(match for match in matches if match.user_b is None)
+            assert self_bot_match.friend_challenge_id is not None
 
-        challenge = await FriendChallengesRepo.get_by_id_for_update(
-            session, self_bot_match.friend_challenge_id
-        )
-        assert challenge is not None
-        challenge.creator_score = creator_score
-        challenge.creator_answered_round = challenge.total_rounds
-        challenge.creator_finished_at = now_utc + timedelta(minutes=5)
-        challenge.status = "CREATOR_DONE"
-        challenge.updated_at = now_utc + timedelta(minutes=5)
+            challenge = await FriendChallengesRepo.get_by_id_for_update(
+                session, self_bot_match.friend_challenge_id
+            )
+            assert challenge is not None
+            challenge.creator_score = creator_score
+            challenge.creator_answered_round = challenge.total_rounds
+            challenge.creator_finished_at = now_utc + timedelta(minutes=5)
+            challenge.status = "CREATOR_DONE"
+            challenge.updated_at = now_utc + timedelta(minutes=5)
 
-        await handle_tournament_duel_progress(
-            session,
-            challenge=challenge,
-            user_id=int(self_bot_match.user_a),
-            now_utc=now_utc + timedelta(minutes=5),
-        )
+            await handle_tournament_duel_progress(
+                session,
+                challenge=challenge,
+                user_id=int(self_bot_match.user_a),
+                now_utc=now_utc + timedelta(minutes=5),
+            )
 
-        refreshed_match = await TournamentMatchesRepo.get_by_id_for_update(
-            session,
-            self_bot_match.id,
-        )
-        assert refreshed_match is not None
+            refreshed_match = await TournamentMatchesRepo.get_by_id_for_update(
+                session,
+                self_bot_match.id,
+            )
+            assert refreshed_match is not None
 
-        participants = await TournamentParticipantsRepo.list_for_tournament(
-            session,
-            tournament_id=tournament_id,
-        )
-        self_bot_participant = next(
-            item for item in participants if item.user_id == refreshed_match.user_a
-        )
-        return challenge, refreshed_match, self_bot_participant
+            participants = await TournamentParticipantsRepo.list_for_tournament(
+                session,
+                tournament_id=tournament_id,
+            )
+            self_bot_participant = next(
+                item for item in participants if item.user_id == refreshed_match.user_a
+            )
+            return challenge, refreshed_match, self_bot_participant
+
+    return await run_with_deadlock_retry(_complete_once)
 
 
 @pytest.mark.asyncio
@@ -162,11 +166,16 @@ async def test_daily_cup_round_question_uses_daily_arena_cup_header(monkeypatch)
         )
         self_bot_match = next(match for match in matches if match.user_b is None)
         assert self_bot_match.friend_challenge_id is not None
+        challenge_id = self_bot_match.friend_challenge_id
+        user_id = int(self_bot_match.user_a)
+        idempotency_key = f"start:daily-cup:test:{self_bot_match.id}"
+
+    async with SessionLocal.begin() as session:
         round_start = await GameSessionService.start_friend_challenge_round(
             session,
-            user_id=int(self_bot_match.user_a),
-            challenge_id=self_bot_match.friend_challenge_id,
-            idempotency_key=f"start:daily-cup:test:{self_bot_match.id}",
+            user_id=user_id,
+            challenge_id=challenge_id,
+            idempotency_key=idempotency_key,
             now_utc=now_utc,
         )
 

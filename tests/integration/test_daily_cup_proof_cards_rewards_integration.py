@@ -91,7 +91,7 @@ async def test_daily_cup_proof_cards_grant_top_three_rewards_with_bye_seeded_res
     )
     parsed_tournament_id = UUID(tournament_id)
     reward_key_prefix = parsed_tournament_id.hex
-    await set_user_free_energy(user_id=user_ids[2], free_energy=18, now_utc=now_utc)
+    await set_user_free_energy(user_id=user_ids[2], free_energy=8, now_utc=now_utc)
     await set_user_free_energy(user_id=user_ids[3], free_energy=7, now_utc=now_utc)
 
     _FrozenDateTime.current = now_utc
@@ -159,8 +159,8 @@ async def test_daily_cup_proof_cards_grant_top_three_rewards_with_bye_seeded_res
     assert no_reward_ticket_count == 0
     assert await _get_active_premium(user_id=user_ids[3]) is None
     third_place_energy = await _get_energy_balance(user_id=user_ids[2])
-    assert third_place_energy == (18, 5)
-    assert sum(third_place_energy) == 23
+    assert third_place_energy == (8, 5)
+    assert sum(third_place_energy) == 13
     assert await _get_free_energy(user_id=user_ids[3]) == 7
     assert (
         await _count_ledger_entries(
@@ -184,7 +184,7 @@ async def test_daily_cup_winner_message_rerun_retries_only_failed_notification_w
     )
     parsed_tournament_id = UUID(tournament_id)
     reward_key_prefix = parsed_tournament_id.hex
-    await set_user_free_energy(user_id=user_ids[2], free_energy=18, now_utc=now_utc)
+    await set_user_free_energy(user_id=user_ids[2], free_energy=8, now_utc=now_utc)
 
     _FrozenDateTime.current = now_utc
     monkeypatch.setattr(daily_cup_proof_cards, "datetime", _FrozenDateTime)
@@ -246,7 +246,7 @@ async def test_daily_cup_winner_message_rerun_retries_only_failed_notification_w
             product_code="FRIEND_CHALLENGE_5",
         )
     assert ticket_count == 2
-    assert await _get_energy_balance(user_id=user_ids[2]) == (18, 5)
+    assert await _get_energy_balance(user_id=user_ids[2]) == (8, 5)
     assert (
         await _count_ledger_entries(
             idempotency_key=f"dcpl:{reward_key_prefix}:{user_ids[0]}",
@@ -318,7 +318,7 @@ async def test_daily_cup_first_place_reward_extends_existing_active_premium(
         now_utc=now_utc - timedelta(days=1),
         ends_at=now_utc + timedelta(days=5),
     )
-    await set_user_free_energy(user_id=user_ids[2], free_energy=18, now_utc=now_utc)
+    await set_user_free_energy(user_id=user_ids[2], free_energy=8, now_utc=now_utc)
 
     _FrozenDateTime.current = now_utc
     monkeypatch.setattr(daily_cup_proof_cards, "datetime", _FrozenDateTime)

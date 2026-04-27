@@ -169,7 +169,7 @@ async def test_reopening_daily_result_screen_does_not_duplicate_energy_reward(
 ) -> None:
     started_at = datetime(2026, 4, 24, 9, 0, tzinfo=UTC)
     user_id, telegram_user_id = await _create_user("daily-result-reopen-energy")
-    await _set_free_energy(user_id=user_id, free_energy=10, now_utc=started_at)
+    await _set_free_energy(user_id=user_id, free_energy=7, now_utc=started_at)
     completed = await _complete_daily(user_id=user_id, score=6, started_at=started_at)
     daily_run_id = completed.daily_run_id
     assert daily_run_id is not None
@@ -179,7 +179,7 @@ async def test_reopening_daily_result_screen_does_not_duplicate_energy_reward(
     async with SessionLocal.begin() as session:
         state = await session.get(EnergyState, user_id)
         assert state is not None
-        assert state.free_energy == 13
+        assert state.free_energy == 10
         reward_entry = await session.scalar(
             select(LedgerEntry).where(LedgerEntry.idempotency_key == reward_idempotency_key)
         )
@@ -213,7 +213,7 @@ async def test_reopening_daily_result_screen_does_not_duplicate_energy_reward(
     async with SessionLocal.begin() as session:
         state = await session.get(EnergyState, user_id)
         assert state is not None
-        assert state.free_energy == 13
+        assert state.free_energy == 10
         reward_entries_count = int(
             await session.scalar(
                 select(func.count(LedgerEntry.id)).where(

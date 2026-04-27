@@ -48,7 +48,7 @@ async def _create_user_with_state(
                 user_id=user.id,
                 free_energy=free_energy,
                 paid_energy=paid_energy,
-                free_cap=20,
+                free_cap=10,
                 regen_interval_sec=1800,
                 last_regen_at=now_utc,
                 last_daily_topup_local_date=_berlin_date(now_utc),

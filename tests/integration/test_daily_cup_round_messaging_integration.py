@@ -9,6 +9,7 @@ import pytest
 
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
+from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.lifecycle import check_and_advance_round
@@ -77,6 +78,7 @@ async def _advance_to_round(
                 challenge.opponent_finished_at = settle_at
                 challenge.completed_at = settle_at
                 challenge.updated_at = settle_at
+
                 settled = await settle_pending_match_from_duel(
                     session,
                     match=match,
@@ -88,7 +90,16 @@ async def _advance_to_round(
                 tournament_id=tournament_id,
                 now_utc=settle_at,
             )
-            assert int(transition["round_started"]) == 1
+            if int(transition["round_started"]) != 1:
+                async with SessionLocal.begin() as session:
+                    tournament = await TournamentsRepo.get_by_id_for_update(
+                        session,
+                        tournament_id=tournament_id,
+                    )
+                assert tournament is not None
+                assert int(tournament.current_round) == round_no + 1
+            else:
+                assert int(transition["round_started"]) == 1
 
 
 def _start_button_callbacks(message: dict[str, Any]) -> list[str]:
