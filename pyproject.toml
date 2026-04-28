@@ -70,6 +70,30 @@ filterwarnings = [
   "ignore:'crypt' is deprecated and slated for removal in Python 3.13:DeprecationWarning",
 ]
 
+[tool.coverage.run]
+branch = true
+relative_files = true
+source = ["app", "scripts", "tools"]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = true
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "if __name__ == \"__main__\":",
+  "raise NotImplementedError",
+]
+
+[tool.coverage.html]
+directory = "reports/coverage_html"
+
+[tool.coverage.json]
+output = "reports/coverage.json"
+
+[tool.coverage.xml]
+output = "reports/coverage.xml"
+
 [tool.mypy]
 python_version = "3.12"
 files = ["app", "tests"]

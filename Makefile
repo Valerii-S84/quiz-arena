@@ -62,6 +62,11 @@ test:
 	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m alembic upgrade head
 	DATABASE_URL=$(TEST_DATABASE_URL) TMPDIR=/tmp .venv/bin/pytest -q
 
+coverage:
+	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m scripts.ensure_test_db
+	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m alembic upgrade head
+	DATABASE_URL=$(TEST_DATABASE_URL) TMPDIR=/tmp .venv/bin/pytest -q --cov=app --cov=scripts --cov=tools --cov-report=term-missing:skip-covered --cov-report=html --cov-report=json --cov-report=xml
+
 test-integration:
 	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m scripts.ensure_test_db
 	DATABASE_URL=$(TEST_DATABASE_URL) $(PYTHON) -m alembic upgrade head
