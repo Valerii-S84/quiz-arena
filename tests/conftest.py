@@ -1,3 +1,5 @@
 from pytest_env_bootstrap import bootstrap_pytest_env
+from tests.threadless_testclient import install_threadless_testclient
 
 bootstrap_pytest_env()
+install_threadless_testclient()
