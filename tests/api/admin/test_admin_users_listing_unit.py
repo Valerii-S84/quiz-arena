@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
+from sqlalchemy.dialects import postgresql
 
 from app.api.routes.admin.pagination import build_pagination
 from app.api.routes.admin.users_listing import _build_search_filters, list_users_page
@@ -21,10 +23,38 @@ class _Session(AsyncSessionStub):
         return self.results.pop(0)
 
 
-def test_build_search_filters_ignores_blank_and_adds_numeric_matches() -> None:
+def _compile_sql(statement: Any) -> str:
+    return str(
+        statement.compile(
+            dialect=postgresql.dialect(),
+            compile_kwargs={"literal_binds": True},
+        )
+    )
+
+
+def _search_filter_sql(search: str) -> str:
+    [condition] = _build_search_filters(search)
+    return _compile_sql(condition)
+
+
+def test_build_search_filters_ignores_blank_and_matches_names() -> None:
     assert _build_search_filters("  ") == []
-    assert len(_build_search_filters("anna")) == 1
-    assert len(_build_search_filters("900101")) == 1
+
+    sql = _search_filter_sql("anna")
+
+    assert "users.username ILIKE '%%anna%%'" in sql
+    assert "users.first_name ILIKE '%%anna%%'" in sql
+    assert "users.id =" not in sql
+    assert "users.telegram_user_id =" not in sql
+
+
+def test_build_search_filters_adds_numeric_id_matches() -> None:
+    sql = _search_filter_sql("900101")
+
+    assert "users.username ILIKE '%%900101%%'" in sql
+    assert "users.first_name ILIKE '%%900101%%'" in sql
+    assert "users.id = 900101" in sql
+    assert "users.telegram_user_id = 900101" in sql
 
 
 def test_build_pagination_clamps_empty_and_out_of_range_inputs() -> None:
