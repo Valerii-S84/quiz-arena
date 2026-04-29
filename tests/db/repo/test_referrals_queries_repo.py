@@ -161,6 +161,16 @@ async def test_review_and_notification_queries_apply_optional_filters() -> None:
     assert "ORDER BY referrals.fraud_score DESC" in review_sql
     assert "LIMIT 20" in review_sql
 
+    unfiltered_review_session = RecordingSession(_ScalarsResult([referral]))
+    assert await ReferralsRepo.list_for_review_since(
+        unfiltered_review_session,
+        since_utc=since_utc,
+        limit=10,
+    ) == [referral]
+    unfiltered_sql = compile_statement(unfiltered_review_session.statement)
+    assert "referrals.created_at >=" in unfiltered_sql
+    assert "referrals.status =" not in unfiltered_sql
+
     notification_session = RecordingSession(_ScalarsResult(["7", "8"]))
     rows = await ReferralsRepo.list_referrer_ids_with_reward_notifications(
         notification_session,
