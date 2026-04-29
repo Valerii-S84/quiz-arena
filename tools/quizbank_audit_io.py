@@ -55,10 +55,14 @@ def read_csv_table(path: Path) -> TableData:
                 reader = csv.DictReader(handle)
                 if reader.fieldnames is None:
                     return TableData([], [], "csv", [f"{path.name}: missing header"])
-                columns = [name.strip() if name else "" for name in reader.fieldnames]
+                raw_columns = reader.fieldnames
+                columns = [name.strip() if name else "" for name in raw_columns]
                 rows: list[dict[str, Any]] = []
                 for index, row in enumerate(reader, start=2):
-                    row_data = {col: row.get(col) for col in columns}
+                    row_data = {
+                        column: row.get(raw_column) if raw_column is not None else None
+                        for raw_column, column in zip(raw_columns, columns)
+                    }
                     row_data["_row"] = index
                     rows.append(row_data)
                 return TableData(columns, rows, "csv", warnings)
