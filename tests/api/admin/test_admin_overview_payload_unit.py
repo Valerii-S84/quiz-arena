@@ -62,7 +62,6 @@ async def test_build_alerts_returns_only_triggered_alerts(monkeypatch: pytest.Mo
         quiz_to_purchase_now=79.9,
         quiz_to_purchase_prev=100.0,
     )
-
     assert [alert["type"] for alert in alerts] == [
         "webhook_errors",
         "conversion_drop",
@@ -80,8 +79,10 @@ async def test_load_conversion_snapshot_uses_windowed_counters(
 
     async def _counter(name: str, value: int, session, *, from_utc, to_utc):
         assert session is session_stub
-        assert from_utc in {windows.current_start, windows.previous_start}
-        assert to_utc in {windows.current_end, windows.previous_end}
+        assert (from_utc, to_utc) in {
+            (windows.current_start, windows.current_end),
+            (windows.previous_start, windows.previous_end),
+        }
         calls.append(name)
         return value
 
