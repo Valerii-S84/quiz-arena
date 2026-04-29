@@ -6,7 +6,7 @@ from typing import Any
 from quizbank_audit_analysis import audit_table, make_action_plan
 from quizbank_audit_io import TableData
 
-BASE_ROW = {
+BASE_ROW: dict[str, Any] = {
     "quiz_id": "q1",
     "question": "Was ist richtig?",
     "option_1": "A",
