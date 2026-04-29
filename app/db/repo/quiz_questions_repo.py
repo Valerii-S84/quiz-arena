@@ -20,6 +20,14 @@ class QuizQuestionPoolChange:
     updated_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class QuizQuestionPoolCandidate:
+    question_id: str
+    level: str
+    source_file: str
+    category: str
+
+
 class QuizQuestionsRepo:
     @staticmethod
     async def get_by_id(session: AsyncSession, question_id: str) -> QuizQuestion | None:
@@ -69,6 +77,77 @@ class QuizQuestionsRepo:
             stmt = stmt.where(QuizQuestion.question_id.not_in(tuple(exclude_question_ids)))
         result = await session.execute(stmt)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def list_question_candidates_for_mode(
+        session: AsyncSession,
+        *,
+        mode_code: str,
+        exclude_question_ids: Sequence[str] | None = None,
+        preferred_levels: Sequence[str] | None = None,
+    ) -> list[QuizQuestionPoolCandidate]:
+        stmt = (
+            select(
+                QuizQuestion.question_id,
+                QuizQuestion.level,
+                QuizQuestion.source_file,
+                QuizQuestion.category,
+            )
+            .where(
+                QuizQuestion.mode_code == mode_code,
+                QuizQuestion.status == "ACTIVE",
+            )
+            .order_by(QuizQuestion.question_id.asc())
+        )
+        if preferred_levels:
+            stmt = stmt.where(QuizQuestion.level.in_(tuple(preferred_levels)))
+        if exclude_question_ids:
+            stmt = stmt.where(QuizQuestion.question_id.not_in(tuple(exclude_question_ids)))
+        result = await session.execute(stmt)
+        return [
+            QuizQuestionPoolCandidate(
+                question_id=question_id,
+                level=level,
+                source_file=source_file,
+                category=category,
+            )
+            for question_id, level, source_file, category in result.all()
+        ]
+
+    @staticmethod
+    async def list_question_candidates_all_active(
+        session: AsyncSession,
+        *,
+        exclude_question_ids: Sequence[str] | None = None,
+        preferred_levels: Sequence[str] | None = None,
+        require_quick_mix_eligible: bool = False,
+    ) -> list[QuizQuestionPoolCandidate]:
+        stmt = (
+            select(
+                QuizQuestion.question_id,
+                QuizQuestion.level,
+                QuizQuestion.source_file,
+                QuizQuestion.category,
+            )
+            .where(QuizQuestion.status == "ACTIVE")
+            .order_by(QuizQuestion.question_id.asc())
+        )
+        if require_quick_mix_eligible:
+            stmt = stmt.where(QuizQuestion.quick_mix_eligible.is_(True))
+        if preferred_levels:
+            stmt = stmt.where(QuizQuestion.level.in_(tuple(preferred_levels)))
+        if exclude_question_ids:
+            stmt = stmt.where(QuizQuestion.question_id.not_in(tuple(exclude_question_ids)))
+        result = await session.execute(stmt)
+        return [
+            QuizQuestionPoolCandidate(
+                question_id=question_id,
+                level=level,
+                source_file=source_file,
+                category=category,
+            )
+            for question_id, level, source_file, category in result.all()
+        ]
 
     @staticmethod
     async def list_by_ids(

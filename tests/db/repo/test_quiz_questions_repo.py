@@ -3,7 +3,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from app.db.models.quiz_questions import QuizQuestion
-from app.db.repo.quiz_questions_repo import QuizQuestionPoolChange, QuizQuestionsRepo
+from app.db.repo.quiz_questions_repo import (
+    QuizQuestionPoolCandidate,
+    QuizQuestionPoolChange,
+    QuizQuestionsRepo,
+)
 from tests.db.repo._helpers import RecordingSession, compile_statement
 from tests.type_helpers import RowsResult as _RowsResult
 from tests.type_helpers import ScalarsResult as _ScalarsResult
@@ -80,3 +84,44 @@ async def test_quiz_question_queries_filter_optional_pools_and_map_changes() -> 
             updated_at=change_time,
         )
     ]
+
+
+async def test_quiz_question_candidate_queries_return_metadata_and_quick_mix_semantics() -> None:
+    rows = [("q1", "A1", "bank.csv", "Grammatik")]
+    expected = [
+        QuizQuestionPoolCandidate(
+            question_id="q1",
+            level="A1",
+            source_file="bank.csv",
+            category="Grammatik",
+        )
+    ]
+
+    mode_session = RecordingSession(_RowsResult(rows))
+    assert (
+        await QuizQuestionsRepo.list_question_candidates_for_mode(
+            mode_session,
+            mode_code="DAILY_CUP",
+            exclude_question_ids=["q0"],
+            preferred_levels=["A1"],
+        )
+        == expected
+    )
+    mode_sql = compile_statement(mode_session.statement)
+    assert "quiz_questions.mode_code = 'DAILY_CUP'" in mode_sql
+    assert "quiz_questions.source_file" in mode_sql
+    assert "quiz_questions.category" in mode_sql
+
+    all_session = RecordingSession(_RowsResult(rows))
+    assert (
+        await QuizQuestionsRepo.list_question_candidates_all_active(
+            all_session,
+            exclude_question_ids=["q0"],
+            preferred_levels=["A1"],
+            require_quick_mix_eligible=True,
+        )
+        == expected
+    )
+    all_sql = compile_statement(all_session.statement)
+    assert "quiz_questions.quick_mix_eligible IS true" in all_sql
+    assert "quiz_questions.mode_code =" not in all_sql

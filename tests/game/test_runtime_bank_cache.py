@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.game.questions.runtime_bank import clear_question_pool_cache, select_question_for_mode
-from tests.game.runtime_bank_fixtures import _fake_record
+from tests.game.runtime_bank_fixtures import _fake_record, _install_question_record_repo
 from tests.type_helpers import AsyncSessionStub
 
 
@@ -45,9 +45,6 @@ async def test_select_question_for_mode_reuses_cached_pool_between_calls(
         list_calls += 1
         return ["q_cache_1", "q_cache_2", "q_cache_3"]
 
-    async def fake_get_by_id(session, question_id):  # noqa: ANN001
-        return _fake_record(question_id, mode_code="ARTIKEL_SPRINT")
-
     monkeypatch.setattr(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
         fake_list_question_ids_all_active,
@@ -56,9 +53,9 @@ async def test_select_question_for_mode_reuses_cached_pool_between_calls(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_for_mode",
         fake_list_question_ids_for_mode,
     )
-    monkeypatch.setattr(
-        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
-        fake_get_by_id,
+    _install_question_record_repo(
+        monkeypatch,
+        lambda question_id: _fake_record(question_id, mode_code="ARTIKEL_SPRINT"),
     )
 
     first = await select_question_for_mode(
@@ -109,7 +106,7 @@ async def test_select_question_for_mode_refreshes_stale_cache_if_selected_id_mis
             return ["q_stale"]
         return ["q_fresh"]
 
-    async def fake_get_by_id(session, question_id):  # noqa: ANN001
+    def record_for(question_id: str):
         if question_id == "q_stale":
             return None
         return _fake_record(question_id, mode_code="ARTIKEL_SPRINT")
@@ -122,10 +119,7 @@ async def test_select_question_for_mode_refreshes_stale_cache_if_selected_id_mis
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_for_mode",
         fake_list_question_ids_for_mode,
     )
-    monkeypatch.setattr(
-        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
-        fake_get_by_id,
-    )
+    _install_question_record_repo(monkeypatch, record_for)
 
     selected = await select_question_for_mode(
         _Session(),
@@ -197,9 +191,6 @@ async def test_select_question_for_mode_refresh_uses_incremental_changes(
             ),
         ]
 
-    async def fake_get_by_id(session, question_id):  # noqa: ANN001
-        return _fake_record(question_id, mode_code="ARTIKEL_SPRINT")
-
     monkeypatch.setattr(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
         fake_list_question_ids_all_active,
@@ -212,9 +203,9 @@ async def test_select_question_for_mode_refresh_uses_incremental_changes(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_pool_changes_since",
         fake_list_question_pool_changes_since,
     )
-    monkeypatch.setattr(
-        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
-        fake_get_by_id,
+    _install_question_record_repo(
+        monkeypatch,
+        lambda question_id: _fake_record(question_id, mode_code="ARTIKEL_SPRINT"),
     )
     monkeypatch.setattr(
         "app.game.questions.runtime_bank_pool.get_settings",

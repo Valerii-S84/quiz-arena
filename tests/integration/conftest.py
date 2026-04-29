@@ -9,6 +9,7 @@ from sqlalchemy.exc import DBAPIError
 
 from app.core.integration_db_safety import assert_safe_integration_db
 from app.db.session import engine
+from app.game.questions.runtime_bank import clear_question_pool_cache
 
 TRUNCATE_TABLES = (
     "daily_metrics",
@@ -87,6 +88,7 @@ async def _truncate_with_retry(truncate_sql: str) -> None:
 async def cleanup_db() -> AsyncGenerator[None, None]:
     # Dispose pooled connections between tests to avoid cross-event-loop asyncpg reuse.
     await engine.dispose()
+    clear_question_pool_cache()
 
     try:
         async with engine.connect() as conn:
@@ -100,4 +102,5 @@ async def cleanup_db() -> AsyncGenerator[None, None]:
 
     yield
 
+    clear_question_pool_cache()
     await engine.dispose()
