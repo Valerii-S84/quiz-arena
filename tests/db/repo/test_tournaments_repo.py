@@ -115,6 +115,24 @@ async def test_list_due_registration_close_filters_type_and_clamps_limit() -> No
     assert "FOR UPDATE SKIP LOCKED" in sql
 
 
+async def test_list_due_registration_close_can_run_without_type_filter() -> None:
+    now_utc = datetime(2026, 3, 14, 13, 0, tzinfo=UTC)
+    tournament = _tournament(registration_deadline=now_utc - timedelta(minutes=1))
+    session = RecordingSession(_ScalarsResult([tournament]))
+
+    rows = await TournamentsRepo.list_due_registration_close_for_update(
+        session,
+        now_utc=now_utc,
+        limit=3,
+    )
+
+    assert rows == [tournament]
+    sql = compile_statement(session.statement)
+    assert "tournaments.status = 'REGISTRATION'" in sql
+    assert "tournaments.type =" not in sql
+    assert "LIMIT 3" in sql
+
+
 async def test_daily_arena_round_deadline_query_accepts_match_deadline_fallbacks() -> None:
     now_utc = datetime(2026, 3, 14, 14, 0, tzinfo=UTC)
     tournament = _tournament(status="ROUND_1", current_round=1, round_deadline=None)

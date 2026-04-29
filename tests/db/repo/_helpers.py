@@ -59,6 +59,14 @@ class RecordingSession(AsyncSessionStub):
         self.flushed = True
 
 
+class IterableScalarsResult:
+    def __init__(self, rows: Iterable[object]) -> None:
+        self._rows = list(rows)
+
+    def scalars(self) -> Iterable[object]:
+        return iter(self._rows)
+
+
 def compile_statement(statement: Any) -> str:
     return str(
         statement.compile(
