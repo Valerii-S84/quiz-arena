@@ -126,6 +126,24 @@ async def test_list_joined_at_by_type_filters_status_and_clamps_limit() -> None:
     assert "LIMIT 1000" in sql
 
 
+async def test_list_joined_at_by_type_can_omit_status_filter() -> None:
+    joined_at = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
+    session = RecordingSession(_ScalarsResult([joined_at]))
+
+    rows = await Repo.list_joined_at_for_user_by_tournament_type(
+        session,
+        user_id=10,
+        tournament_type="DAILY_ARENA",
+        limit=0,
+    )
+
+    assert rows == [joined_at]
+    sql = compile_statement(session.statement)
+    assert "tournaments.type = 'DAILY_ARENA'" in sql
+    assert "tournaments.status =" not in sql
+    assert "LIMIT 1" in sql
+
+
 async def test_score_updates_return_affected_row_count_and_set_expected_values() -> None:
     tournament_id = uuid4()
 
