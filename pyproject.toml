@@ -74,6 +74,14 @@ filterwarnings = [
 branch = true
 relative_files = true
 source = ["app", "scripts", "tools"]
+omit = [
+  "scripts/benchmark_question_selection_hotpath.py",
+  "scripts/pg_lock_waits_snapshot.py",
+  "scripts/post_deploy_gate.py",
+  "scripts/run_bot_polling.py",
+  "scripts/simulate_phase2_manual_check.py",
+  "scripts/simulate_phase3_daily_cup_manual_check.py",
+]
 
 [tool.coverage.report]
 precision = 2
