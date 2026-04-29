@@ -7,13 +7,14 @@ def _fake_record(
     question_id: str,
     *,
     mode_code: str = "QUICK_MIX_A1A2",
+    source_file: str = "bank.csv",
     level: str = "A1",
     category: str = "General",
 ) -> SimpleNamespace:
     return SimpleNamespace(
         question_id=question_id,
         mode_code=mode_code,
-        source_file="bank.csv",
+        source_file=source_file,
         level=level,
         category=category,
         question_text=f"Frage {question_id}?",

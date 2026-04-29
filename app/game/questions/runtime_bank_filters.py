@@ -63,3 +63,42 @@ def select_least_used_by_category(
     ]
     least_used_candidates.sort(key=lambda record: record.question_id)
     return least_used_candidates[stable_index(selection_seed, len(least_used_candidates))]
+
+
+def _pick_record_by_seed(
+    records: Sequence[QuizQuestionRecord],
+    *,
+    selection_seed: str,
+) -> QuizQuestionRecord | None:
+    if not records:
+        return None
+    ordered = sorted(records, key=lambda record: record.question_id)
+    return ordered[stable_index(selection_seed, len(ordered))]
+
+
+def select_diverse_record(
+    *,
+    candidate_records: Sequence[QuizQuestionRecord],
+    previous_records: Sequence[QuizQuestionRecord],
+    selection_seed: str,
+) -> QuizQuestionRecord | None:
+    if not candidate_records:
+        return None
+
+    used_source_files = {record.source_file for record in previous_records}
+    selected = _pick_record_by_seed(
+        [record for record in candidate_records if record.source_file not in used_source_files],
+        selection_seed=selection_seed,
+    )
+    if selected is not None:
+        return selected
+
+    used_categories = {record.category for record in previous_records}
+    selected = _pick_record_by_seed(
+        [record for record in candidate_records if record.category not in used_categories],
+        selection_seed=selection_seed,
+    )
+    if selected is not None:
+        return selected
+
+    return _pick_record_by_seed(candidate_records, selection_seed=selection_seed)

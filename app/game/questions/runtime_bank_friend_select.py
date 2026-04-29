@@ -6,10 +6,7 @@ from typing import Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.game.questions.catalog import DAILY_CHALLENGE_SOURCE_MODE
-from app.game.questions.runtime_bank_filters import (
-    filter_active_records,
-    select_least_used_by_category,
-)
+from app.game.questions.runtime_bank_filters import filter_active_records, select_diverse_record
 from app.game.questions.runtime_bank_mode_select import (
     _list_candidate_ids_for_mode,
     select_question_for_mode,
@@ -70,7 +67,7 @@ async def select_friend_challenge_question(
                 session,
                 question_ids=list(previous_round_question_ids),
             )
-            selected = select_least_used_by_category(
+            selected = select_diverse_record(
                 candidate_records=candidate_records,
                 previous_records=previous_records,
                 selection_seed=selection_seed,
