@@ -5,7 +5,7 @@ from datetime import date
 import pytest
 
 from app.game.questions.runtime_bank import clear_question_pool_cache, select_question_for_mode
-from tests.game.runtime_bank_fixtures import _fake_record
+from tests.game.runtime_bank_fixtures import _fake_record, _install_question_record_repo
 from tests.type_helpers import AsyncSessionStub
 
 
@@ -42,9 +42,6 @@ async def test_select_question_for_mode_uses_db_pool_before_fallback(
             return ["db_q1"]
         return ["db_q1"]
 
-    async def fake_get_by_id(session, question_id):  # noqa: ANN001
-        return _fake_record(question_id)
-
     monkeypatch.setattr(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
         fake_list_question_ids_all_active,
@@ -53,10 +50,7 @@ async def test_select_question_for_mode_uses_db_pool_before_fallback(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_for_mode",
         fake_list_question_ids_for_mode,
     )
-    monkeypatch.setattr(
-        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
-        fake_get_by_id,
-    )
+    _install_question_record_repo(monkeypatch, _fake_record)
 
     selected = await select_question_for_mode(
         _Session(),  # session is unused by monkeypatched repo methods
@@ -96,9 +90,6 @@ async def test_select_question_for_mode_daily_uses_quick_mix_source_mode(
     ):
         return []
 
-    async def fake_get_by_id(session, question_id):  # noqa: ANN001
-        return _fake_record(question_id)
-
     monkeypatch.setattr(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
         fake_list_question_ids_all_active,
@@ -107,10 +98,7 @@ async def test_select_question_for_mode_daily_uses_quick_mix_source_mode(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_for_mode",
         fake_list_question_ids_for_mode,
     )
-    monkeypatch.setattr(
-        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
-        fake_get_by_id,
-    )
+    _install_question_record_repo(monkeypatch, _fake_record)
 
     first = await select_question_for_mode(
         _Session(),
@@ -161,9 +149,6 @@ async def test_select_question_for_quick_mix_uses_only_eligible_active_pool(
         called_for_mode += 1
         return ["mode_q_1"]
 
-    async def fake_get_by_id(session, question_id):  # noqa: ANN001
-        return _fake_record(question_id)
-
     monkeypatch.setattr(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
         fake_list_question_ids_all_active,
@@ -172,10 +157,7 @@ async def test_select_question_for_quick_mix_uses_only_eligible_active_pool(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_for_mode",
         fake_list_question_ids_for_mode,
     )
-    monkeypatch.setattr(
-        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
-        fake_get_by_id,
-    )
+    _install_question_record_repo(monkeypatch, _fake_record)
 
     selected = await select_question_for_mode(
         _Session(),
@@ -216,7 +198,7 @@ async def test_select_question_for_mode_prefers_requested_level(
             return ["q_b1"]
         return ["q_default"]
 
-    async def fake_get_by_id(session, question_id):  # noqa: ANN001
+    def record_for(question_id: str):
         level = "B1" if question_id == "q_b1" else "A1"
         record = _fake_record(question_id, mode_code="ARTIKEL_SPRINT")
         record.level = level
@@ -230,10 +212,7 @@ async def test_select_question_for_mode_prefers_requested_level(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_for_mode",
         fake_list_question_ids_for_mode,
     )
-    monkeypatch.setattr(
-        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
-        fake_get_by_id,
-    )
+    _install_question_record_repo(monkeypatch, record_for)
 
     selected = await select_question_for_mode(
         _Session(),
@@ -276,9 +255,6 @@ async def test_select_question_for_mode_relaxes_only_within_allowed_levels(
             return ["q_default"]
         return []
 
-    async def fake_get_by_id(session, question_id):  # noqa: ANN001
-        return _fake_record(question_id, mode_code="ARTIKEL_SPRINT")
-
     monkeypatch.setattr(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
         fake_list_question_ids_all_active,
@@ -287,9 +263,9 @@ async def test_select_question_for_mode_relaxes_only_within_allowed_levels(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_for_mode",
         fake_list_question_ids_for_mode,
     )
-    monkeypatch.setattr(
-        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
-        fake_get_by_id,
+    _install_question_record_repo(
+        monkeypatch,
+        lambda question_id: _fake_record(question_id, mode_code="ARTIKEL_SPRINT"),
     )
 
     selected = await select_question_for_mode(
@@ -331,9 +307,6 @@ async def test_select_question_for_quick_mix_excludes_recent_ids_after_filtering
     ):
         return ["unexpected"]
 
-    async def fake_get_by_id(session, question_id):  # noqa: ANN001
-        return _fake_record(question_id)
-
     monkeypatch.setattr(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
         fake_list_question_ids_all_active,
@@ -342,10 +315,7 @@ async def test_select_question_for_quick_mix_excludes_recent_ids_after_filtering
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_for_mode",
         fake_list_question_ids_for_mode,
     )
-    monkeypatch.setattr(
-        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
-        fake_get_by_id,
-    )
+    _install_question_record_repo(monkeypatch, _fake_record)
 
     selected = await select_question_for_mode(
         _Session(),

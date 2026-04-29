@@ -5,7 +5,7 @@ from datetime import date
 import pytest
 
 from app.game.questions.runtime_bank import clear_question_pool_cache, select_question_for_mode
-from tests.game.runtime_bank_fixtures import _fake_record
+from tests.game.runtime_bank_fixtures import _fake_record, _install_question_record_repo
 from tests.type_helpers import AsyncSessionStub
 
 
@@ -56,9 +56,6 @@ async def test_non_quick_mix_mode_prefers_unused_source_file_after_recent_attemp
         assert mode_code == "ARTIKEL_SPRINT"
         return ["same_source_fresh", "new_source_fresh"]
 
-    async def fake_get_by_id(session, question_id):  # noqa: ANN001
-        return records.get(question_id)
-
     monkeypatch.setattr(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
         fail_list_question_ids_all_active,
@@ -67,10 +64,7 @@ async def test_non_quick_mix_mode_prefers_unused_source_file_after_recent_attemp
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_for_mode",
         fake_list_question_ids_for_mode,
     )
-    monkeypatch.setattr(
-        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
-        fake_get_by_id,
-    )
+    _install_question_record_repo(monkeypatch, records)
 
     selected = await select_question_for_mode(
         _Session(),
@@ -102,17 +96,11 @@ async def test_quick_mix_allows_duplicate_only_when_unique_candidates_are_exhaus
         assert require_quick_mix_eligible is True
         return ["recent_a", "recent_b"]
 
-    async def fake_get_by_id(session, question_id):  # noqa: ANN001
-        return records.get(question_id)
-
     monkeypatch.setattr(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
         fake_list_question_ids_all_active,
     )
-    monkeypatch.setattr(
-        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
-        fake_get_by_id,
-    )
+    _install_question_record_repo(monkeypatch, records)
 
     selected = await select_question_for_mode(
         _Session(),

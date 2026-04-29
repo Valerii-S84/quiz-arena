@@ -5,7 +5,7 @@ from datetime import date
 import pytest
 
 from app.game.questions.runtime_bank import clear_question_pool_cache, select_question_for_mode
-from tests.game.runtime_bank_fixtures import _fake_record
+from tests.game.runtime_bank_fixtures import _fake_record, _install_question_record_repo
 from tests.type_helpers import AsyncSessionStub
 
 
@@ -50,17 +50,11 @@ async def test_quick_mix_prefers_unused_source_file_after_recent_attempt(
         assert require_quick_mix_eligible is True
         return ["same_source_fresh", "new_source_fresh"]
 
-    async def fake_get_by_id(session, question_id):  # noqa: ANN001
-        return records.get(question_id)
-
     monkeypatch.setattr(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
         fake_list_question_ids_all_active,
     )
-    monkeypatch.setattr(
-        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
-        fake_get_by_id,
-    )
+    _install_question_record_repo(monkeypatch, records)
 
     selected = await select_question_for_mode(
         _Session(),
@@ -105,17 +99,11 @@ async def test_quick_mix_falls_back_to_unused_category_when_source_repeats(
         assert require_quick_mix_eligible is True
         return ["fresh_heavy", "fresh_light"]
 
-    async def fake_get_by_id(session, question_id):  # noqa: ANN001
-        return records.get(question_id)
-
     monkeypatch.setattr(
         "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
         fake_list_question_ids_all_active,
     )
-    monkeypatch.setattr(
-        "app.game.questions.runtime_bank.QuizQuestionsRepo.get_by_id",
-        fake_get_by_id,
-    )
+    _install_question_record_repo(monkeypatch, records)
 
     selected = await select_question_for_mode(
         _Session(),

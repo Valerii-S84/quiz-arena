@@ -62,17 +62,12 @@ async def _list_active_records_by_id(
     session: AsyncSession,
     question_ids: Sequence[str],
 ) -> list[QuizQuestionRecord]:
-    records: list[QuizQuestionRecord] = []
-    seen_ids: set[str] = set()
-    repo = _repo()
-    for question_id in question_ids:
-        if question_id in seen_ids:
-            continue
-        seen_ids.add(question_id)
-        record = await repo.get_by_id(session, question_id)
-        if record is not None and record.status == "ACTIVE":
-            records.append(record)
-    return records
+    unique_ids = tuple(dict.fromkeys(question_ids))
+    if not unique_ids:
+        return []
+
+    records = await _repo().list_by_ids(session, question_ids=unique_ids)
+    return filter_active_records(records, ids=unique_ids)
 
 
 async def _pick_diverse_from_pool(
@@ -93,10 +88,7 @@ async def _pick_diverse_from_pool(
         eligible_ids = list(candidate_ids)
         fallback_to_duplicate = True
 
-    candidate_records = filter_active_records(
-        await _list_active_records_by_id(session, eligible_ids),
-        ids=eligible_ids,
-    )
+    candidate_records = await _list_active_records_by_id(session, eligible_ids)
     if not candidate_records:
         return None
 
