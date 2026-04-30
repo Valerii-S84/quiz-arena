@@ -45,14 +45,6 @@ async def start_session(
     arena_round: int | None = None,
     duel_limit_checked: bool = False,
 ) -> StartSessionResult:
-    DuelLimitService.assert_start_gate(source, duel_limit_checked=duel_limit_checked)
-    if source == "FRIEND_CHALLENGE" and (
-        friend_challenge_id is None or friend_challenge_round is None
-    ):
-        raise FriendChallengeAccessError
-    if source == "ARENA_DUEL" and (arena_attempt_id is None or arena_round is None):
-        raise FriendChallengeAccessError
-
     existing = await QuizSessionsRepo.get_by_idempotency_key(session, idempotency_key)
     local_date = berlin_local_date(now_utc)
     if existing is not None:
@@ -61,6 +53,14 @@ async def start_session(
             existing=existing,
             idempotent_replay=True,
         )
+
+    DuelLimitService.assert_start_gate(source, duel_limit_checked=duel_limit_checked)
+    if source == "FRIEND_CHALLENGE" and (
+        friend_challenge_id is None or friend_challenge_round is None
+    ):
+        raise FriendChallengeAccessError
+    if source == "ARENA_DUEL" and (arena_attempt_id is None or arena_round is None):
+        raise FriendChallengeAccessError
 
     if source == "DAILY_CHALLENGE":
         return await start_daily_session(

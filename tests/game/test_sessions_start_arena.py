@@ -19,10 +19,77 @@ class _Session(AsyncSessionStub):
 
 
 @pytest.mark.asyncio
+async def test_arena_duel_idempotent_replay_does_not_require_duel_limit_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing = QuizSession(
+        id=uuid4(),
+        user_id=11,
+        mode_code="QUICK_MIX_A1A2",
+        source="ARENA_DUEL",
+        status="STARTED",
+        energy_cost_total=0,
+        question_id="arena-q-2",
+        arena_attempt_id=uuid4(),
+        arena_round=2,
+        started_at=NOW_UTC,
+        local_date_berlin=NOW_UTC.date(),
+        idempotency_key="arena:replay",
+    )
+
+    async def _fake_get_existing(*_args, **_kwargs):
+        return existing
+
+    async def _fake_get_question_by_id(*_args, **_kwargs):
+        return SimpleNamespace(
+            question_id="arena-q-2",
+            text="Question?",
+            options=("A", "B", "C", "D"),
+            category="Arena",
+        )
+
+    async def _unexpected_energy_consume(*_args, **_kwargs):
+        pytest.fail("idempotent ARENA_DUEL replay must not consume energy")
+
+    monkeypatch.setattr(
+        sessions_start.QuizSessionsRepo,
+        "get_by_idempotency_key",
+        _fake_get_existing,
+    )
+    monkeypatch.setattr(sessions_start.EnergyService, "consume_quiz", _unexpected_energy_consume)
+
+    from app.game.sessions import service as service_module
+
+    monkeypatch.setattr(service_module, "get_question_by_id", _fake_get_question_by_id)
+
+    result = await sessions_start.start_session(
+        _Session(),
+        user_id=11,
+        mode_code="QUICK_MIX_A1A2",
+        source="ARENA_DUEL",
+        idempotency_key="arena:replay",
+        now_utc=NOW_UTC,
+    )
+
+    assert result.idempotent_replay is True
+    assert result.session.session_id == existing.id
+    assert result.session.question_number == 2
+    assert result.session.total_questions == 7
+
+
+@pytest.mark.asyncio
 async def test_arena_duel_start_requires_duel_limit_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _fake_get_existing(*_args, **_kwargs):
+        return None
+
     async def _unexpected_energy_consume(*_args, **_kwargs):
         pytest.fail("ARENA_DUEL must fail on missing duel gate before energy")
 
+    monkeypatch.setattr(
+        sessions_start.QuizSessionsRepo,
+        "get_by_idempotency_key",
+        _fake_get_existing,
+    )
     monkeypatch.setattr(sessions_start.EnergyService, "consume_quiz", _unexpected_energy_consume)
 
     with pytest.raises(DuelLimitRequiredError):
