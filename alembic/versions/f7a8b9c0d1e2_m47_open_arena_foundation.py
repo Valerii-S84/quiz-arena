@@ -132,14 +132,14 @@ def upgrade() -> None:
     op.create_check_constraint(
         "ck_quiz_sessions_arena_source_link",
         "quiz_sessions",
-        "(source != 'ARENA_DUEL') OR arena_attempt_id IS NOT NULL",
+        "((source = 'ARENA_DUEL' AND arena_attempt_id IS NOT NULL "
+        "AND arena_round IS NOT NULL) OR (source != 'ARENA_DUEL' "
+        "AND arena_attempt_id IS NULL AND arena_round IS NULL))",
     )
     op.create_check_constraint(
         "ck_quiz_sessions_arena_round_consistency",
         "quiz_sessions",
-        "(arena_attempt_id IS NULL AND arena_round IS NULL) "
-        "OR (arena_attempt_id IS NOT NULL AND arena_round IS NOT NULL "
-        "AND arena_round >= 1 AND arena_round <= 7)",
+        "(arena_round IS NULL) OR (arena_round >= 1 AND arena_round <= 7)",
     )
     op.create_index(
         "idx_sessions_arena_attempt",

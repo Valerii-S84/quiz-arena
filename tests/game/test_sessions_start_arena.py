@@ -267,6 +267,17 @@ async def test_arena_duel_start_is_zero_energy_after_duel_limit_gate(
         created_sessions.append(kwargs["quiz_session"])
         return kwargs["quiz_session"]
 
+    async def _fake_get_arena_attempt(*_args, **_kwargs):
+        return SimpleNamespace(
+            id=arena_attempt_id,
+            user_id=11,
+            role="CHALLENGER",
+            score=None,
+            time_ms=None,
+            result=None,
+            completed_at=None,
+        )
+
     monkeypatch.setattr(
         sessions_start.QuizSessionsRepo,
         "get_by_idempotency_key",
@@ -274,6 +285,11 @@ async def test_arena_duel_start_is_zero_energy_after_duel_limit_gate(
     )
     monkeypatch.setattr(sessions_start.EnergyService, "consume_quiz", _unexpected_energy_consume)
     monkeypatch.setattr(sessions_start.QuizSessionsRepo, "create", _fake_create)
+    monkeypatch.setattr(
+        sessions_start.ArenaAttemptsRepo,
+        "get_by_id_for_update",
+        _fake_get_arena_attempt,
+    )
 
     from app.game.sessions import service as service_module
 

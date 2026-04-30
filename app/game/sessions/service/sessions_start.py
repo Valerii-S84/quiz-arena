@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.quiz_sessions import QuizSession
+from app.db.repo.arena_attempts_repo import ArenaAttemptsRepo
 from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.economy.energy.service import EnergyService
@@ -25,6 +26,8 @@ from .levels import _is_persistent_adaptive_mode
 from .progression import resolve_start_progression_state, select_level_weighted
 from .question_loading import _build_start_result_from_existing_session
 from .sessions_start_daily import start_daily_session
+
+_ARENA_START_ROLES = frozenset({"CREATOR_BASELINE", "CHALLENGER"})
 
 
 async def start_session(
@@ -69,8 +72,19 @@ async def start_session(
         friend_challenge_id is None or friend_challenge_round is None
     ):
         raise FriendChallengeAccessError
-    if source == "ARENA_DUEL" and (arena_attempt_id is None or arena_round is None):
-        raise FriendChallengeAccessError
+    if source == "ARENA_DUEL":
+        if (
+            arena_attempt_id is None
+            or arena_round is None
+            or arena_round < 1
+            or arena_round > DUEL_QUESTION_COUNT
+        ):
+            raise FriendChallengeAccessError
+        await _ensure_arena_attempt_can_start(
+            session,
+            arena_attempt_id=arena_attempt_id,
+            user_id=user_id,
+        )
 
     if source == "DAILY_CHALLENGE":
         return await start_daily_session(
@@ -264,3 +278,22 @@ def _ensure_existing_session_matches_start_request(
             or existing.arena_round != arena_round
         ):
             raise FriendChallengeAccessError
+
+
+async def _ensure_arena_attempt_can_start(
+    session: AsyncSession,
+    *,
+    arena_attempt_id: UUID,
+    user_id: int,
+) -> None:
+    attempt = await ArenaAttemptsRepo.get_by_id_for_update(session, arena_attempt_id)
+    if (
+        attempt is None
+        or attempt.user_id != user_id
+        or attempt.role not in _ARENA_START_ROLES
+        or attempt.score is not None
+        or attempt.time_ms is not None
+        or attempt.result is not None
+        or attempt.completed_at is not None
+    ):
+        raise FriendChallengeAccessError

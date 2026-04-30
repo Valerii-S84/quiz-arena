@@ -42,13 +42,13 @@ class QuizSession(Base):
             name="ck_quiz_sessions_friend_round_consistency",
         ),
         CheckConstraint(
-            "(source != 'ARENA_DUEL') OR arena_attempt_id IS NOT NULL",
+            "((source = 'ARENA_DUEL' AND arena_attempt_id IS NOT NULL "
+            "AND arena_round IS NOT NULL) OR (source != 'ARENA_DUEL' "
+            "AND arena_attempt_id IS NULL AND arena_round IS NULL))",
             name="ck_quiz_sessions_arena_source_link",
         ),
         CheckConstraint(
-            "(arena_attempt_id IS NULL AND arena_round IS NULL) "
-            "OR (arena_attempt_id IS NOT NULL AND arena_round IS NOT NULL "
-            "AND arena_round >= 1 AND arena_round <= 7)",
+            "(arena_round IS NULL) OR (arena_round >= 1 AND arena_round <= 7)",
             name="ck_quiz_sessions_arena_round_consistency",
         ),
         Index("idx_sessions_user_started", "user_id", "started_at"),
