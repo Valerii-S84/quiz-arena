@@ -2,6 +2,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.keyboards import friend_challenge_share
 from app.core.config import get_settings
+from app.game.duels.constants import DUEL_PAYWALL_PRODUCT_CODES
 
 build_friend_challenge_share_url = friend_challenge_share.build_friend_challenge_share_url
 build_friend_challenge_share_keyboard = friend_challenge_share.build_friend_challenge_share_keyboard
@@ -122,15 +123,22 @@ def build_friend_challenge_finished_keyboard(
 
 
 def build_friend_challenge_limit_keyboard() -> InlineKeyboardMarkup:
+    ticket_product_code, premium_week_product_code = DUEL_PAYWALL_PRODUCT_CODES
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="🎟 1 DUELL  |  5⭐", callback_data="buy:FRIEND_CHALLENGE_5"
+                    text="🎟 Duell-Ticket – 5⭐",
+                    callback_data=f"buy:{ticket_product_code}",
                 )
             ],
-            [InlineKeyboardButton(text="💎 PREMIUM WOCHE", callback_data="buy:PREMIUM_WEEK")],
-            [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
+            [
+                InlineKeyboardButton(
+                    text="👑 Premium-Woche – 29⭐",
+                    callback_data=f"buy:{premium_week_product_code}",
+                )
+            ],
+            [InlineKeyboardButton(text="↩️ Später", callback_data="home:open")],
         ]
     )
 

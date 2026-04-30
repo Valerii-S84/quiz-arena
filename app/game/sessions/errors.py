@@ -48,3 +48,7 @@ class FriendChallengePaymentRequiredError(GameSessionError):
 
 class FriendChallengeLimitExceededError(GameSessionError):
     pass
+
+
+class DuelLimitRequiredError(GameSessionError):
+    pass

@@ -98,12 +98,17 @@ def upgrade() -> None:
         ["arena_duel_id", "user_id"],
         unique=True,
     )
+    op.create_unique_constraint(
+        "uq_arena_attempts_duel_id_id",
+        "arena_attempts",
+        ["arena_duel_id", "id"],
+    )
     op.create_foreign_key(
         "fk_arena_duels_baseline_attempt_id_arena_attempts",
         "arena_duels",
         "arena_attempts",
-        ["baseline_attempt_id"],
-        ["id"],
+        ["id", "baseline_attempt_id"],
+        ["arena_duel_id", "id"],
     )
 
     op.add_column(
@@ -127,14 +132,14 @@ def upgrade() -> None:
     op.create_check_constraint(
         "ck_quiz_sessions_arena_source_link",
         "quiz_sessions",
-        "(source != 'ARENA_DUEL') OR arena_attempt_id IS NOT NULL",
+        "((source = 'ARENA_DUEL' AND arena_attempt_id IS NOT NULL "
+        "AND arena_round IS NOT NULL) OR (source != 'ARENA_DUEL' "
+        "AND arena_attempt_id IS NULL AND arena_round IS NULL))",
     )
     op.create_check_constraint(
         "ck_quiz_sessions_arena_round_consistency",
         "quiz_sessions",
-        "(arena_attempt_id IS NULL AND arena_round IS NULL) "
-        "OR (arena_attempt_id IS NOT NULL AND arena_round IS NOT NULL "
-        "AND arena_round >= 1 AND arena_round <= 7)",
+        "(arena_round IS NULL) OR (arena_round >= 1 AND arena_round <= 7)",
     )
     op.create_index(
         "idx_sessions_arena_attempt",
@@ -156,6 +161,13 @@ def downgrade() -> None:
     op.drop_constraint("ck_quiz_sessions_arena_round_consistency", "quiz_sessions", type_="check")
     op.drop_constraint("ck_quiz_sessions_arena_source_link", "quiz_sessions", type_="check")
     op.drop_constraint("ck_quiz_sessions_source", "quiz_sessions", type_="check")
+    op.execute(
+        sa.text(
+            "DELETE FROM quiz_attempts "
+            "WHERE session_id IN (SELECT id FROM quiz_sessions WHERE source = 'ARENA_DUEL')"
+        )
+    )
+    op.execute(sa.text("DELETE FROM quiz_sessions WHERE source = 'ARENA_DUEL'"))
     op.create_check_constraint(
         "ck_quiz_sessions_source",
         "quiz_sessions",
@@ -169,6 +181,11 @@ def downgrade() -> None:
         "fk_arena_duels_baseline_attempt_id_arena_attempts",
         "arena_duels",
         type_="foreignkey",
+    )
+    op.drop_constraint(
+        "uq_arena_attempts_duel_id_id",
+        "arena_attempts",
+        type_="unique",
     )
     op.drop_index("uq_arena_attempts_duel_user", table_name="arena_attempts")
     op.drop_index("idx_arena_attempts_user", table_name="arena_attempts")

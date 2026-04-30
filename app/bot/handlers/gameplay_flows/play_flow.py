@@ -8,6 +8,7 @@ from app.bot.handlers.gameplay_flows.energy_zero_flow import handle_energy_insuf
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.keyboards.quiz import build_quiz_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.game.duels.constants import DUEL_QUESTION_COUNT
 from app.game.sessions.errors import DailyChallengeAlreadyPlayedError, EnergyInsufficientError
 from app.game.sessions.types import AnswerSessionResult, FriendChallengeRoundStartResult
 
@@ -129,15 +130,30 @@ async def continue_regular_mode_after_answer(
             session, telegram_user=callback.from_user
         )
         try:
-            next_result = await game_session_service.start_session(
-                session,
-                user_id=snapshot.user_id,
-                mode_code=result.mode_code,
-                source=result.source,
-                idempotency_key=f"start:auto:{result.mode_code}:{callback.id}",
-                now_utc=now_utc,
-                preferred_question_level=result.next_preferred_level,
-            )
+            start_kwargs = {
+                "user_id": snapshot.user_id,
+                "mode_code": result.mode_code,
+                "source": result.source,
+                "idempotency_key": f"start:auto:{result.mode_code}:{callback.id}",
+                "now_utc": now_utc,
+                "preferred_question_level": result.next_preferred_level,
+            }
+            if result.source == "ARENA_DUEL":
+                if result.arena_attempt_id is None or result.arena_answered_round is None:
+                    await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+                    return
+                next_arena_round = result.arena_answered_round + 1
+                if next_arena_round > DUEL_QUESTION_COUNT:
+                    await callback.answer()
+                    return
+                start_kwargs.update(
+                    {
+                        "arena_attempt_id": result.arena_attempt_id,
+                        "arena_round": next_arena_round,
+                        "duel_limit_checked": True,
+                    }
+                )
+            next_result = await game_session_service.start_session(session, **start_kwargs)
         except EnergyInsufficientError:
             await handle_energy_insufficient(
                 callback,

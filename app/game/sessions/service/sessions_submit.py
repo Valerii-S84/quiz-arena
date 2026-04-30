@@ -109,6 +109,8 @@ async def submit_answer(
             daily_total_questions=daily_state.total_questions,
             daily_score=daily_state.score,
             daily_completed=daily_state.completed,
+            arena_attempt_id=quiz_session.arena_attempt_id,
+            arena_answered_round=quiz_session.arena_round,
         )
 
     friend_snapshot, friend_round_completed, friend_waiting_for_opponent = (
@@ -153,4 +155,6 @@ async def submit_answer(
         friend_challenge_answered_round=quiz_session.friend_challenge_round,
         friend_challenge_round_completed=friend_round_completed,
         friend_challenge_waiting_for_opponent=friend_waiting_for_opponent,
+        arena_attempt_id=quiz_session.arena_attempt_id,
+        arena_answered_round=quiz_session.arena_round,
     )

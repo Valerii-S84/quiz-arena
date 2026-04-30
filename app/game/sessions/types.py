@@ -98,3 +98,5 @@ class AnswerSessionResult:
     daily_total_questions: int | None = None
     daily_score: int | None = None
     daily_completed: bool = False
+    arena_attempt_id: UUID | None = None
+    arena_answered_round: int | None = None
