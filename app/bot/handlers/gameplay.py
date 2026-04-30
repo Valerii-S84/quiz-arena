@@ -11,6 +11,7 @@ from app.bot.handlers import (
     gameplay_analytics,
     gameplay_callbacks,
     gameplay_daily_cup,
+    gameplay_duels,
     gameplay_friend_challenge,
     gameplay_helpers,
     gameplay_proof_cards,
@@ -50,6 +51,7 @@ emit_analytics_event = gameplay_analytics.emit_analytics_event
 
 ANSWER_RE, DAILY_RESULT_RE = gameplay_callbacks.ANSWER_RE, gameplay_callbacks.DAILY_RESULT_RE
 gameplay_friend_challenge.register(router)
+gameplay_duels.register(router)
 gameplay_tournaments.register(router)
 gameplay_daily_cup.register(router)
 _format_user_label = gameplay_views._format_user_label
