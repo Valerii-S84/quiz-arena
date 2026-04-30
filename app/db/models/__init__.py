@@ -2,6 +2,7 @@ from app.db.models.admin_audit_log import AdminAuditLog
 from app.db.models.admins import Admin
 from app.db.models.analytics_daily import AnalyticsDaily
 from app.db.models.analytics_events import AnalyticsEvent
+from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
 from app.db.models.contact_requests import ContactRequest
 from app.db.models.daily_metrics import DailyMetrics
 from app.db.models.daily_push_logs import DailyPushLog
@@ -39,6 +40,8 @@ __all__ = [
     "Admin",
     "AnalyticsDaily",
     "AnalyticsEvent",
+    "ArenaAttempt",
+    "ArenaDuel",
     "ContactRequest",
     "DailyPushLog",
     "DailyQuestionSet",
