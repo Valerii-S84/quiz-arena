@@ -133,7 +133,8 @@ def upgrade() -> None:
         "ck_quiz_sessions_arena_round_consistency",
         "quiz_sessions",
         "(arena_attempt_id IS NULL AND arena_round IS NULL) "
-        "OR (arena_attempt_id IS NOT NULL AND arena_round >= 1 AND arena_round <= 7)",
+        "OR (arena_attempt_id IS NOT NULL AND arena_round IS NOT NULL "
+        "AND arena_round >= 1 AND arena_round <= 7)",
     )
     op.create_index(
         "idx_sessions_arena_attempt",

@@ -47,7 +47,8 @@ class QuizSession(Base):
         ),
         CheckConstraint(
             "(arena_attempt_id IS NULL AND arena_round IS NULL) "
-            "OR (arena_attempt_id IS NOT NULL AND arena_round >= 1 AND arena_round <= 7)",
+            "OR (arena_attempt_id IS NOT NULL AND arena_round IS NOT NULL "
+            "AND arena_round >= 1 AND arena_round <= 7)",
             name="ck_quiz_sessions_arena_round_consistency",
         ),
         Index("idx_sessions_user_started", "user_id", "started_at"),
