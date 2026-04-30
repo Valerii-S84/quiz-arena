@@ -14,7 +14,7 @@ def test_home_keyboard_has_all_buttons_in_canonical_order() -> None:
     ]
     assert [button.callback_data for button in buttons] == [
         "daily_challenge",
-        "friend:challenge:create",
+        "duels:menu",
         "play",
         "mode:ARTIKEL_SPRINT",
         "shop:open",

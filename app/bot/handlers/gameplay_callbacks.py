@@ -7,7 +7,7 @@ ANSWER_RE = re.compile(r"^answer:([0-9a-f\-]{36}):([0-3])$")
 STOP_RE = re.compile(r"^game:stop:([0-9a-f\-]{36})$")
 FRIEND_NEXT_RE = re.compile(r"^(?:friend:next|friend:challenge:round:start):([0-9a-f\-]{36})$")
 FRIEND_CREATE_TYPE_RE = re.compile(r"^friend:challenge:type:(direct|open|tournament)$")
-FRIEND_CREATE_FORMAT_RE = re.compile(r"^friend:challenge:format:(direct|open):(5|12)$")
+FRIEND_CREATE_FORMAT_RE = re.compile(r"^friend:challenge:format:(direct|open):(5|7|12)$")
 FRIEND_CREATE_LEGACY_RE = re.compile(r"^friend:challenge:create:(5|12)$")
 FRIEND_REMATCH_RE = re.compile(r"^friend:rematch:([0-9a-f\-]{36})$")
 FRIEND_SHARE_RESULT_RE = re.compile(r"^friend:share:result:([0-9a-f\-]{36})$")
@@ -29,6 +29,9 @@ DAILY_CUP_VIEW_RE = re.compile(r"^daily:cup:view:([0-9a-f\-]{36})$")
 DAILY_CUP_SHARE_RE = re.compile(r"^daily:cup:share:([0-9a-f\-]{36})$")
 DAILY_CUP_PROOF_RE = re.compile(r"^daily:cup:proof:([0-9a-f\-]{36})$")
 DAILY_RESULT_RE = re.compile(r"^daily:result:([0-9a-f\-]{36})$")
+ARENA_ACCEPT_RE = re.compile(r"^arena:accept:([0-9a-f\-]{36})$")
+ARENA_START_ATTEMPT_RE = re.compile(r"^arena:start_attempt:([0-9a-f\-]{36})$")
+ARENA_PUBLISH_FRIEND_RE = re.compile(r"^arena:publish_friend:([0-9a-f\-]{36})$")
 
 
 def parse_answer_callback(callback_data: str) -> tuple[UUID, int] | None:
