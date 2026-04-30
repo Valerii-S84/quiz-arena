@@ -98,12 +98,17 @@ def upgrade() -> None:
         ["arena_duel_id", "user_id"],
         unique=True,
     )
+    op.create_unique_constraint(
+        "uq_arena_attempts_duel_id_id",
+        "arena_attempts",
+        ["arena_duel_id", "id"],
+    )
     op.create_foreign_key(
         "fk_arena_duels_baseline_attempt_id_arena_attempts",
         "arena_duels",
         "arena_attempts",
-        ["baseline_attempt_id"],
-        ["id"],
+        ["id", "baseline_attempt_id"],
+        ["arena_duel_id", "id"],
     )
 
     op.add_column(
@@ -169,6 +174,11 @@ def downgrade() -> None:
         "fk_arena_duels_baseline_attempt_id_arena_attempts",
         "arena_duels",
         type_="foreignkey",
+    )
+    op.drop_constraint(
+        "uq_arena_attempts_duel_id_id",
+        "arena_attempts",
+        type_="unique",
     )
     op.drop_index("uq_arena_attempts_duel_user", table_name="arena_attempts")
     op.drop_index("idx_arena_attempts_user", table_name="arena_attempts")

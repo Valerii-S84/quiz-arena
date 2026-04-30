@@ -94,4 +94,12 @@ async def build_replay_answer_result(
         daily_total_questions=(daily_state.total_questions if daily_state is not None else None),
         daily_score=(daily_state.score if daily_state is not None else None),
         daily_completed=(daily_state.completed if daily_state is not None else False),
+        arena_attempt_id=(
+            getattr(replay_session, "arena_attempt_id", None)
+            if replay_session is not None
+            else None
+        ),
+        arena_answered_round=(
+            getattr(replay_session, "arena_round", None) if replay_session is not None else None
+        ),
     )

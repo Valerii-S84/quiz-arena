@@ -3,7 +3,17 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Index, Integer, String
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -22,6 +32,12 @@ class ArenaDuel(Base):
             "jsonb_typeof(question_ids) = 'array' AND jsonb_array_length(question_ids) = 7",
             name="ck_arena_duels_question_ids_7",
         ),
+        ForeignKeyConstraint(
+            ["id", "baseline_attempt_id"],
+            ["arena_attempts.arena_duel_id", "arena_attempts.id"],
+            name="fk_arena_duels_baseline_attempt_id_arena_attempts",
+            use_alter=True,
+        ),
         Index("idx_arena_duels_creator_created", "creator_user_id", "created_at"),
         Index("idx_arena_duels_status_expires_created", "status", "expires_at", "created_at"),
         Index("idx_arena_duels_source_friend", "source_friend_challenge_id"),
@@ -31,11 +47,6 @@ class ArenaDuel(Base):
     creator_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
     baseline_attempt_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey(
-            "arena_attempts.id",
-            name="fk_arena_duels_baseline_attempt_id_arena_attempts",
-            use_alter=True,
-        ),
         nullable=True,
     )
     question_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
@@ -66,6 +77,7 @@ class ArenaAttempt(Base):
             "time_ms IS NULL OR time_ms >= 0",
             name="ck_arena_attempts_time_ms_non_negative",
         ),
+        UniqueConstraint("arena_duel_id", "id", name="uq_arena_attempts_duel_id_id"),
         Index("idx_arena_attempts_duel", "arena_duel_id"),
         Index("idx_arena_attempts_user", "user_id"),
         Index("uq_arena_attempts_duel_user", "arena_duel_id", "user_id", unique=True),
