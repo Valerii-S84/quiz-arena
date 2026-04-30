@@ -3,10 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.core.config import get_settings
+from app.game.duels.constants import (
+    DUEL_FREE_LIMITS_PER_DAY,
+    DUEL_LIMIT_ACTION_FRIEND_CREATE,
+    DUEL_TICKET_PRODUCT_CODE,
+)
 
 FRIEND_CHALLENGE_TOTAL_ROUNDS = 12
-FRIEND_CHALLENGE_FREE_CREATES = 2
-FRIEND_CHALLENGE_TICKET_PRODUCT_CODE = "FRIEND_CHALLENGE_5"
+FRIEND_CHALLENGE_FREE_CREATES = DUEL_FREE_LIMITS_PER_DAY[DUEL_LIMIT_ACTION_FRIEND_CREATE]
+FRIEND_CHALLENGE_TICKET_PRODUCT_CODE = DUEL_TICKET_PRODUCT_CODE
 DUEL_PENDING_TTL_SECONDS = max(60, int(get_settings().duel_pending_ttl_hours) * 3600)
 DUEL_ACCEPTED_TTL_SECONDS = max(60, int(get_settings().duel_accepted_ttl_hours) * 3600)
 DUEL_MAX_ACTIVE_PER_USER = max(1, int(get_settings().duel_max_active_per_user))

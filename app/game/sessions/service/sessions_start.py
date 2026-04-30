@@ -10,6 +10,8 @@ from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.economy.energy.service import EnergyService
 from app.economy.streak.time import berlin_local_date
+from app.game.duels.constants import DUEL_QUESTION_COUNT
+from app.game.duels.limits import DuelLimitService
 from app.game.modes.rules import is_zero_cost_source
 from app.game.questions.types import QuizQuestion
 from app.game.sessions.errors import (
@@ -39,10 +41,16 @@ async def start_session(
     friend_challenge_id: UUID | None = None,
     friend_challenge_round: int | None = None,
     friend_challenge_total_rounds: int | None = None,
+    arena_attempt_id: UUID | None = None,
+    arena_round: int | None = None,
+    duel_limit_checked: bool = False,
 ) -> StartSessionResult:
+    DuelLimitService.assert_start_gate(source, duel_limit_checked=duel_limit_checked)
     if source == "FRIEND_CHALLENGE" and (
         friend_challenge_id is None or friend_challenge_round is None
     ):
+        raise FriendChallengeAccessError
+    if source == "ARENA_DUEL" and (arena_attempt_id is None or arena_round is None):
         raise FriendChallengeAccessError
 
     existing = await QuizSessionsRepo.get_by_idempotency_key(session, idempotency_key)
@@ -149,6 +157,8 @@ async def start_session(
             question_id=question.question_id,
             friend_challenge_id=friend_challenge_id,
             friend_challenge_round=friend_challenge_round,
+            arena_attempt_id=arena_attempt_id,
+            arena_round=arena_round,
             started_at=now_utc,
             local_date_berlin=local_date,
             idempotency_key=idempotency_key,
@@ -164,8 +174,15 @@ async def start_session(
             mode_code=mode_code,
             source=source,
             category=question.category,
-            question_number=(friend_challenge_round if source == "FRIEND_CHALLENGE" else 1),
-            total_questions=(friend_challenge_total_rounds if source == "FRIEND_CHALLENGE" else 1),
+            question_number=_session_question_number(
+                source=source,
+                friend_challenge_round=friend_challenge_round,
+                arena_round=arena_round,
+            ),
+            total_questions=_session_total_questions(
+                source=source,
+                friend_challenge_total_rounds=friend_challenge_total_rounds,
+            ),
         ),
         energy_free=energy_free,
         energy_paid=energy_paid,
@@ -178,3 +195,28 @@ async def get_session_user_id(session: AsyncSession, session_id: UUID) -> int:
     if quiz_session is None:
         raise SessionNotFoundError
     return quiz_session.user_id
+
+
+def _session_question_number(
+    *,
+    source: str,
+    friend_challenge_round: int | None,
+    arena_round: int | None,
+) -> int:
+    if source == "FRIEND_CHALLENGE":
+        return friend_challenge_round or 1
+    if source == "ARENA_DUEL":
+        return arena_round or 1
+    return 1
+
+
+def _session_total_questions(
+    *,
+    source: str,
+    friend_challenge_total_rounds: int | None,
+) -> int:
+    if source == "FRIEND_CHALLENGE":
+        return friend_challenge_total_rounds or 1
+    if source == "ARENA_DUEL":
+        return DUEL_QUESTION_COUNT
+    return 1

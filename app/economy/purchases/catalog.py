@@ -43,8 +43,8 @@ PRODUCTS: dict[str, ProductSpec] = {
     "FRIEND_CHALLENGE_5": ProductSpec(
         product_code="FRIEND_CHALLENGE_5",
         product_type="MICRO",
-        title="Duell Ticket",
-        description="Ein zusaetzliches Freundes-Duell.",
+        title="Duell-Ticket",
+        description="Ein zusaetzliches Duell.",
         stars_amount=5,
         energy_credit=0,
         friend_challenge_tickets=1,

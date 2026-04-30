@@ -7,6 +7,7 @@ from app.db.repo.daily_runs_repo import DailyRunsRepo
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
 from app.db.repo.quiz_questions_repo import QuizQuestionsRepo
+from app.game.duels.constants import DUEL_QUESTION_COUNT
 from app.game.questions.types import QuizQuestion
 from app.game.sessions.types import SessionQuestionView, StartSessionResult
 
@@ -77,6 +78,9 @@ async def _build_start_result_from_existing_session(
             challenge = await FriendChallengesRepo.get_by_id(session, existing.friend_challenge_id)
             if challenge is not None:
                 total_questions = challenge.total_rounds
+    elif existing.source == "ARENA_DUEL":
+        question_number = existing.arena_round
+        total_questions = DUEL_QUESTION_COUNT
     elif existing.source == "DAILY_CHALLENGE" and existing.daily_run_id is not None:
         run = await DailyRunsRepo.get_by_id(session, existing.daily_run_id)
         total_questions = DAILY_CHALLENGE_TOTAL_QUESTIONS

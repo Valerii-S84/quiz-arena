@@ -15,6 +15,8 @@ def test_purchase_catalog_contains_core_micro_products() -> None:
         "STREAK_SAVER_20",
         "FRIEND_CHALLENGE_5",
     }.issubset(PRODUCTS)
+    assert PRODUCTS["FRIEND_CHALLENGE_5"].title == "Duell-Ticket"
+    assert PRODUCTS["FRIEND_CHALLENGE_5"].description == "Ein zusaetzliches Duell."
 
 
 def test_purchase_catalog_contains_core_premium_products() -> None:
