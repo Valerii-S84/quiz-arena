@@ -50,6 +50,7 @@ async def start_session(
 ) -> StartSessionResult:
     existing = await QuizSessionsRepo.get_by_idempotency_key(session, idempotency_key)
     local_date = berlin_local_date(now_utc)
+    resolved_forced_question_id = forced_question_id
     if existing is not None:
         _ensure_existing_session_matches_start_request(
             existing,
@@ -80,10 +81,13 @@ async def start_session(
             or arena_round > DUEL_QUESTION_COUNT
         ):
             raise FriendChallengeAccessError
-        await _ensure_arena_attempt_can_start(
+        resolved_forced_question_id = await _ensure_arena_attempt_can_start(
             session,
             arena_attempt_id=arena_attempt_id,
             user_id=user_id,
+            mode_code=mode_code,
+            arena_round=arena_round,
+            forced_question_id=forced_question_id,
         )
 
     if source == "DAILY_CHALLENGE":
@@ -112,15 +116,17 @@ async def start_session(
         energy_cost_total = 1
 
     question: QuizQuestion | None = None
-    if forced_question_id is not None:
+    if resolved_forced_question_id is not None:
         from app.game.sessions import service as service_module
 
         question = await service_module.get_question_by_id(
             session,
             mode_code,
-            question_id=forced_question_id,
+            question_id=resolved_forced_question_id,
             local_date_berlin=local_date,
         )
+    if source == "ARENA_DUEL" and question is None:
+        raise FriendChallengeAccessError
 
     if question is None:
         effective_preferred_level = preferred_question_level
@@ -285,11 +291,17 @@ async def _ensure_arena_attempt_can_start(
     *,
     arena_attempt_id: UUID,
     user_id: int,
-) -> None:
-    attempt = await ArenaAttemptsRepo.get_by_id_for_update(session, arena_attempt_id)
+    mode_code: str,
+    arena_round: int,
+    forced_question_id: str | None,
+) -> str:
+    context = await ArenaAttemptsRepo.get_start_context_for_update(session, arena_attempt_id)
+    if context is None:
+        raise FriendChallengeAccessError
+
+    attempt = context.attempt
     if (
-        attempt is None
-        or attempt.user_id != user_id
+        attempt.user_id != user_id
         or attempt.role not in _ARENA_START_ROLES
         or attempt.score is not None
         or attempt.time_ms is not None
@@ -297,3 +309,23 @@ async def _ensure_arena_attempt_can_start(
         or attempt.completed_at is not None
     ):
         raise FriendChallengeAccessError
+
+    duel = context.duel
+    expected_question_id = _arena_duel_question_id(duel.question_ids, arena_round)
+    if duel.mode_code != mode_code or expected_question_id is None:
+        raise FriendChallengeAccessError
+    if forced_question_id is not None and forced_question_id != expected_question_id:
+        raise FriendChallengeAccessError
+    return expected_question_id
+
+
+def _arena_duel_question_id(question_ids: object, arena_round: int) -> str | None:
+    if not isinstance(question_ids, list):
+        return None
+    try:
+        question_id = question_ids[arena_round - 1]
+    except IndexError:
+        return None
+    if not isinstance(question_id, str) or not question_id:
+        return None
+    return question_id

@@ -247,6 +247,7 @@ async def test_arena_duel_start_is_zero_energy_after_duel_limit_gate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     created_sessions: list[QuizSession] = []
+    loaded_question_ids: list[str] = []
     arena_attempt_id = uuid4()
 
     async def _fake_get_existing(*_args, **_kwargs):
@@ -255,7 +256,8 @@ async def test_arena_duel_start_is_zero_energy_after_duel_limit_gate(
     async def _unexpected_energy_consume(*_args, **_kwargs):
         pytest.fail("ARENA_DUEL sessions must not consume quiz energy")
 
-    async def _fake_get_question_by_id(*_args, **_kwargs):
+    async def _fake_get_question_by_id(*_args, **kwargs):
+        loaded_question_ids.append(kwargs["question_id"])
         return SimpleNamespace(
             question_id="arena-q-3",
             text="Question?",
@@ -267,15 +269,21 @@ async def test_arena_duel_start_is_zero_energy_after_duel_limit_gate(
         created_sessions.append(kwargs["quiz_session"])
         return kwargs["quiz_session"]
 
-    async def _fake_get_arena_attempt(*_args, **_kwargs):
+    async def _fake_get_start_context(*_args, **_kwargs):
         return SimpleNamespace(
-            id=arena_attempt_id,
-            user_id=11,
-            role="CHALLENGER",
-            score=None,
-            time_ms=None,
-            result=None,
-            completed_at=None,
+            attempt=SimpleNamespace(
+                id=arena_attempt_id,
+                user_id=11,
+                role="CHALLENGER",
+                score=None,
+                time_ms=None,
+                result=None,
+                completed_at=None,
+            ),
+            duel=SimpleNamespace(
+                mode_code="QUICK_MIX_A1A2",
+                question_ids=[f"arena-q-{number}" for number in range(1, 8)],
+            ),
         )
 
     monkeypatch.setattr(
@@ -287,8 +295,8 @@ async def test_arena_duel_start_is_zero_energy_after_duel_limit_gate(
     monkeypatch.setattr(sessions_start.QuizSessionsRepo, "create", _fake_create)
     monkeypatch.setattr(
         sessions_start.ArenaAttemptsRepo,
-        "get_by_id_for_update",
-        _fake_get_arena_attempt,
+        "get_start_context_for_update",
+        _fake_get_start_context,
     )
 
     from app.game.sessions import service as service_module
@@ -304,11 +312,11 @@ async def test_arena_duel_start_is_zero_energy_after_duel_limit_gate(
         now_utc=NOW_UTC,
         arena_attempt_id=arena_attempt_id,
         arena_round=3,
-        forced_question_id="arena-q-3",
         duel_limit_checked=True,
     )
 
     created = created_sessions[0]
+    assert loaded_question_ids == ["arena-q-3"]
     assert created.source == "ARENA_DUEL"
     assert created.energy_cost_total == 0
     assert created.arena_attempt_id == arena_attempt_id

@@ -161,6 +161,13 @@ def downgrade() -> None:
     op.drop_constraint("ck_quiz_sessions_arena_round_consistency", "quiz_sessions", type_="check")
     op.drop_constraint("ck_quiz_sessions_arena_source_link", "quiz_sessions", type_="check")
     op.drop_constraint("ck_quiz_sessions_source", "quiz_sessions", type_="check")
+    op.execute(
+        sa.text(
+            "DELETE FROM quiz_attempts "
+            "WHERE session_id IN (SELECT id FROM quiz_sessions WHERE source = 'ARENA_DUEL')"
+        )
+    )
+    op.execute(sa.text("DELETE FROM quiz_sessions WHERE source = 'ARENA_DUEL'"))
     op.create_check_constraint(
         "ck_quiz_sessions_source",
         "quiz_sessions",
