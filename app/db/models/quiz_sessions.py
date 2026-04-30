@@ -24,7 +24,7 @@ class QuizSession(Base):
     __tablename__ = "quiz_sessions"
     __table_args__ = (
         CheckConstraint(
-            "source IN ('MENU','DAILY_CHALLENGE','FRIEND_CHALLENGE','TOURNAMENT')",
+            "source IN ('MENU','DAILY_CHALLENGE','FRIEND_CHALLENGE','TOURNAMENT','ARENA_DUEL')",
             name="ck_quiz_sessions_source",
         ),
         CheckConstraint(
@@ -41,10 +41,20 @@ class QuizSession(Base):
             "OR (friend_challenge_id IS NOT NULL AND friend_challenge_round >= 1)",
             name="ck_quiz_sessions_friend_round_consistency",
         ),
+        CheckConstraint(
+            "(source != 'ARENA_DUEL') OR arena_attempt_id IS NOT NULL",
+            name="ck_quiz_sessions_arena_source_link",
+        ),
+        CheckConstraint(
+            "(arena_attempt_id IS NULL AND arena_round IS NULL) "
+            "OR (arena_attempt_id IS NOT NULL AND arena_round >= 1 AND arena_round <= 7)",
+            name="ck_quiz_sessions_arena_round_consistency",
+        ),
         Index("idx_sessions_user_started", "user_id", "started_at"),
         Index("idx_sessions_mode", "mode_code"),
         Index("idx_sessions_local_date", "local_date_berlin"),
         Index("idx_sessions_daily_run", "daily_run_id"),
+        Index("idx_sessions_arena_attempt", "arena_attempt_id", "arena_round"),
         Index(
             "idx_sessions_friend_challenge",
             "friend_challenge_id",
@@ -66,6 +76,13 @@ class QuizSession(Base):
             unique=True,
             postgresql_where=text("friend_challenge_id IS NOT NULL"),
         ),
+        Index(
+            "uq_sessions_arena_attempt_round",
+            "arena_attempt_id",
+            "arena_round",
+            unique=True,
+            postgresql_where=text("arena_attempt_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)
@@ -86,6 +103,12 @@ class QuizSession(Base):
         nullable=True,
     )
     friend_challenge_round: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    arena_attempt_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("arena_attempts.id"),
+        nullable=True,
+    )
+    arena_round: Mapped[int | None] = mapped_column(Integer, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     local_date_berlin: Mapped[date] = mapped_column(Date, nullable=False)
