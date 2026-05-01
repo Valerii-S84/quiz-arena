@@ -30,6 +30,13 @@ class ArenaBaselineStartResult:
 
 
 @dataclass(frozen=True, slots=True)
+class ArenaChallengerStartResult:
+    duel: ArenaDuelSnapshot
+    challenger_attempt_id: UUID
+    start_result: StartSessionResult
+
+
+@dataclass(frozen=True, slots=True)
 class ArenaActiveDuelSnapshot:
     duel_id: UUID
     creator_user_id: int
