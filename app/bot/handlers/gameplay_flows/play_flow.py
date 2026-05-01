@@ -145,7 +145,7 @@ async def continue_regular_mode_after_answer(
                     return
                 next_arena_round = result.arena_answered_round + 1
                 if next_arena_round > DUEL_QUESTION_COUNT:
-                    await game_session_service.complete_arena_creator_baseline(
+                    await game_session_service.complete_arena_creator_baseline_if_applicable(
                         session,
                         attempt_id=result.arena_attempt_id,
                         user_id=snapshot.user_id,

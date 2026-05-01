@@ -53,7 +53,7 @@ async def _continue_arena(
     result: AnswerSessionResult,
     start_session,
     text: str = "unused",
-    complete_arena_creator_baseline=None,
+    complete_arena_creator_baseline_if_applicable=None,
 ):
     async def _default_complete_baseline(*_args, **_kwargs):
         pytest.fail("Arena baseline finalization was not expected")
@@ -67,8 +67,8 @@ async def _continue_arena(
         user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_ensure_home_snapshot),
         game_session_service=SimpleNamespace(
             start_session=start_session,
-            complete_arena_creator_baseline=(
-                complete_arena_creator_baseline or _default_complete_baseline
+            complete_arena_creator_baseline_if_applicable=(
+                complete_arena_creator_baseline_if_applicable or _default_complete_baseline
             ),
         ),
         offer_service=SimpleNamespace(),
@@ -199,7 +199,37 @@ async def test_continue_after_final_arena_baseline_round_publishes_duel() -> Non
     callback = await _continue_arena(
         _arena_result(arena_attempt_id, 7),
         _unexpected_start_session,
-        complete_arena_creator_baseline=_complete_baseline,
+        complete_arena_creator_baseline_if_applicable=_complete_baseline,
+    )
+
+    assert completed == [
+        {
+            "attempt_id": arena_attempt_id,
+            "user_id": 101,
+            "now_utc": NOW_UTC,
+        }
+    ]
+    assert callback.message.answers == []
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
+
+
+@pytest.mark.asyncio
+async def test_continue_after_final_arena_challenger_round_does_not_publish_baseline() -> None:
+    arena_attempt_id = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
+    completed: list[dict[str, object]] = []
+
+    async def _unexpected_start_session(*_args, **_kwargs):
+        pytest.fail("final ARENA_DUEL round must not start another session")
+
+    async def _complete_if_applicable(*args, **kwargs):
+        del args
+        completed.append(kwargs)
+        return None
+
+    callback = await _continue_arena(
+        _arena_result(arena_attempt_id, 7),
+        _unexpected_start_session,
+        complete_arena_creator_baseline_if_applicable=_complete_if_applicable,
     )
 
     assert completed == [

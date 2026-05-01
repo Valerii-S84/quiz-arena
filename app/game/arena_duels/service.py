@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
-from app.db.repo.arena_duels_repo import ArenaActiveDuelRow, ArenaDuelsRepo
+from app.db.repo.arena_duels_repo import ArenaActiveDuelRow, ArenaAttemptDuelContext, ArenaDuelsRepo
 from app.game.arena_duels.constants import (
     ARENA_ATTEMPT_RESULT_BASELINE,
     ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
@@ -112,6 +112,45 @@ async def complete_arena_creator_baseline(
     if context is None:
         raise ArenaDuelNotFoundError
 
+    return await _complete_arena_creator_baseline_context(
+        session,
+        context=context,
+        user_id=user_id,
+        now_utc=now_utc,
+    )
+
+
+async def complete_arena_creator_baseline_if_applicable(
+    session: AsyncSession,
+    *,
+    attempt_id: UUID,
+    user_id: int,
+    now_utc: datetime,
+) -> ArenaDuelSnapshot | None:
+    context = await ArenaDuelsRepo.get_attempt_duel_for_update(session, attempt_id=attempt_id)
+    if context is None:
+        raise ArenaDuelNotFoundError
+
+    attempt = context.attempt
+    if attempt.user_id != user_id:
+        raise ArenaDuelAccessError
+    if attempt.role != ARENA_ATTEMPT_ROLE_CREATOR_BASELINE:
+        return None
+    return await _complete_arena_creator_baseline_context(
+        session,
+        context=context,
+        user_id=user_id,
+        now_utc=now_utc,
+    )
+
+
+async def _complete_arena_creator_baseline_context(
+    session: AsyncSession,
+    *,
+    context: ArenaAttemptDuelContext,
+    user_id: int,
+    now_utc: datetime,
+) -> ArenaDuelSnapshot:
     attempt = context.attempt
     duel = context.duel
     _ensure_creator_baseline_access(attempt=attempt, duel=duel, user_id=user_id)

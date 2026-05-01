@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -283,6 +283,8 @@ async def test_arena_duel_start_is_zero_energy_after_duel_limit_gate(
             duel=SimpleNamespace(
                 mode_code="QUICK_MIX_A1A2",
                 question_ids=[f"arena-q-{number}" for number in range(1, 8)],
+                status="ACTIVE",
+                expires_at=NOW_UTC + timedelta(hours=1),
             ),
         )
 

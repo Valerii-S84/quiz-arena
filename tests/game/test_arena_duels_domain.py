@@ -16,6 +16,7 @@ from app.db.repo.arena_duels_repo import (
 from app.game.arena_duels import service as arena_service
 from app.game.arena_duels.constants import (
     ARENA_ATTEMPT_RESULT_BASELINE,
+    ARENA_ATTEMPT_ROLE_CHALLENGER,
     ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
     ARENA_DUEL_STATUS_ACTIVE,
     ARENA_DUEL_STATUS_DRAFT,
@@ -73,6 +74,20 @@ def _baseline_attempt(*, duel_id: UUID) -> ArenaAttempt:
         arena_duel_id=duel_id,
         user_id=11,
         role=ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+        score=None,
+        time_ms=None,
+        result=None,
+        completed_at=None,
+        created_at=NOW_UTC,
+    )
+
+
+def _challenger_attempt(*, duel_id: UUID) -> ArenaAttempt:
+    return ArenaAttempt(
+        id=uuid4(),
+        arena_duel_id=duel_id,
+        user_id=22,
+        role=ARENA_ATTEMPT_ROLE_CHALLENGER,
         score=None,
         time_ms=None,
         result=None,
@@ -192,6 +207,36 @@ async def test_complete_arena_creator_baseline_publishes_active_for_24_hours(
     assert duel.expires_at == NOW_UTC + timedelta(hours=24)
     assert result.baseline_score == 6
     assert result.baseline_time_ms == 48_000
+
+
+@pytest.mark.asyncio
+async def test_complete_arena_creator_baseline_if_applicable_ignores_challengers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    duel = _duel(status=ARENA_DUEL_STATUS_ACTIVE)
+    attempt = _challenger_attempt(duel_id=duel.id)
+
+    async def _fake_get_context(*_args, **_kwargs):
+        return ArenaAttemptDuelContext(attempt=attempt, duel=duel)
+
+    async def _unexpected_summary(*_args, **_kwargs):
+        pytest.fail("challenger final round must not publish creator baseline")
+
+    monkeypatch.setattr(
+        arena_service.ArenaDuelsRepo, "get_attempt_duel_for_update", _fake_get_context
+    )
+    monkeypatch.setattr(
+        arena_service.ArenaDuelsRepo, "summarize_completed_attempt", _unexpected_summary
+    )
+
+    result = await arena_service.complete_arena_creator_baseline_if_applicable(
+        AsyncSessionStub(),
+        attempt_id=attempt.id,
+        user_id=22,
+        now_utc=NOW_UTC,
+    )
+
+    assert result is None
 
 
 @pytest.mark.asyncio
