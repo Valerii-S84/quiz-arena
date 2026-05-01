@@ -68,6 +68,20 @@ from .sessions_start import get_session_user_id, start_session
 from .sessions_submit import submit_answer
 
 
+async def complete_arena_creator_baseline(*args, **kwargs):
+    from app.game.arena_duels.service import complete_arena_creator_baseline as _complete
+
+    return await _complete(*args, **kwargs)
+
+
+async def complete_arena_creator_baseline_if_applicable(*args, **kwargs):
+    from app.game.arena_duels.service import (
+        complete_arena_creator_baseline_if_applicable as _complete,
+    )
+
+    return await _complete(*args, **kwargs)
+
+
 class GameSessionService:
     _friend_challenge_expires_at = staticmethod(_friend_challenge_expires_at)
     _expire_friend_challenge_if_due = staticmethod(_expire_friend_challenge_if_due)
@@ -107,6 +121,10 @@ class GameSessionService:
     get_friend_challenge_snapshot_for_user = staticmethod(get_friend_challenge_snapshot_for_user)
     list_friend_challenges_for_user = staticmethod(list_friend_challenges_for_user)
     get_friend_series_score_for_user = staticmethod(get_friend_series_score_for_user)
+    complete_arena_creator_baseline = staticmethod(complete_arena_creator_baseline)
+    complete_arena_creator_baseline_if_applicable = staticmethod(
+        complete_arena_creator_baseline_if_applicable
+    )
     start_session = staticmethod(start_session)
     submit_answer = staticmethod(submit_answer)
     abandon_session = staticmethod(abandon_session)

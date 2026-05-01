@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -25,7 +25,12 @@ def _arena_question_ids() -> list[str]:
     return [f"arena-q-{number}" for number in range(1, 8)]
 
 
-def _arena_start_context(*, attempt: object | None = None) -> SimpleNamespace:
+def _arena_start_context(
+    *,
+    attempt: object | None = None,
+    status: str = "ACTIVE",
+    expires_at: datetime | None = None,
+) -> SimpleNamespace:
     return SimpleNamespace(
         attempt=attempt
         or SimpleNamespace(
@@ -39,6 +44,8 @@ def _arena_start_context(*, attempt: object | None = None) -> SimpleNamespace:
         duel=SimpleNamespace(
             mode_code="QUICK_MIX_A1A2",
             question_ids=_arena_question_ids(),
+            status=status,
+            expires_at=expires_at or NOW_UTC + timedelta(hours=1),
         ),
     )
 
@@ -192,6 +199,68 @@ async def test_arena_start_rejects_duel_mode_or_question_mismatch(
             arena_attempt_id=uuid4(),
             arena_round=1,
             forced_question_id=forced_question_id,
+            duel_limit_checked=True,
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("attempt_role", "duel_status", "expires_at"),
+    [
+        ("CHALLENGER", "DRAFT", NOW_UTC + timedelta(hours=1)),
+        ("CHALLENGER", "EXPIRED", NOW_UTC + timedelta(hours=1)),
+        ("CHALLENGER", "CANCELLED", NOW_UTC + timedelta(hours=1)),
+        ("CHALLENGER", "ACTIVE", NOW_UTC),
+        ("CREATOR_BASELINE", "ACTIVE", NOW_UTC + timedelta(hours=1)),
+        ("CREATOR_BASELINE", "DRAFT", NOW_UTC),
+    ],
+)
+async def test_arena_start_rejects_duel_state_or_expiry_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+    attempt_role: str,
+    duel_status: str,
+    expires_at: datetime,
+) -> None:
+    async def _fake_get_start_context(*_args, **_kwargs):
+        return _arena_start_context(
+            attempt=SimpleNamespace(
+                user_id=11,
+                role=attempt_role,
+                score=None,
+                time_ms=None,
+                result=None,
+                completed_at=None,
+            ),
+            status=duel_status,
+            expires_at=expires_at,
+        )
+
+    async def _unexpected_create(*_args, **_kwargs):
+        pytest.fail("inactive or expired ARENA_DUEL must not create a quiz session")
+
+    monkeypatch.setattr(
+        sessions_start.QuizSessionsRepo,
+        "get_by_idempotency_key",
+        _no_existing_session,
+    )
+    monkeypatch.setattr(
+        sessions_start.ArenaAttemptsRepo,
+        "get_start_context_for_update",
+        _fake_get_start_context,
+    )
+    monkeypatch.setattr(sessions_start.QuizSessionsRepo, "create", _unexpected_create)
+
+    with pytest.raises(FriendChallengeAccessError):
+        await sessions_start.start_session(
+            AsyncSessionStub(),
+            user_id=11,
+            mode_code="QUICK_MIX_A1A2",
+            source="ARENA_DUEL",
+            idempotency_key="arena:bad-duel-state",
+            now_utc=NOW_UTC,
+            arena_attempt_id=uuid4(),
+            arena_round=1,
+            forced_question_id="arena-q-1",
             duel_limit_checked=True,
         )
 

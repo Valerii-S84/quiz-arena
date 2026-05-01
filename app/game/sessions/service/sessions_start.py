@@ -11,6 +11,12 @@ from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.economy.energy.service import EnergyService
 from app.economy.streak.time import berlin_local_date
+from app.game.arena_duels.constants import (
+    ARENA_ATTEMPT_ROLE_CHALLENGER,
+    ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+    ARENA_DUEL_STATUS_ACTIVE,
+    ARENA_DUEL_STATUS_DRAFT,
+)
 from app.game.duels.constants import DUEL_QUESTION_COUNT
 from app.game.duels.limits import DuelLimitService
 from app.game.modes.rules import is_zero_cost_source
@@ -27,7 +33,12 @@ from .progression import resolve_start_progression_state, select_level_weighted
 from .question_loading import _build_start_result_from_existing_session
 from .sessions_start_daily import start_daily_session
 
-_ARENA_START_ROLES = frozenset({"CREATOR_BASELINE", "CHALLENGER"})
+_ARENA_START_ROLES = frozenset(
+    {
+        ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+        ARENA_ATTEMPT_ROLE_CHALLENGER,
+    }
+)
 
 
 async def start_session(
@@ -88,6 +99,7 @@ async def start_session(
             mode_code=mode_code,
             arena_round=arena_round,
             forced_question_id=forced_question_id,
+            now_utc=now_utc,
         )
 
     if source == "DAILY_CHALLENGE":
@@ -294,6 +306,7 @@ async def _ensure_arena_attempt_can_start(
     mode_code: str,
     arena_round: int,
     forced_question_id: str | None,
+    now_utc: datetime,
 ) -> str:
     context = await ArenaAttemptsRepo.get_start_context_for_update(session, arena_attempt_id)
     if context is None:
@@ -311,12 +324,37 @@ async def _ensure_arena_attempt_can_start(
         raise FriendChallengeAccessError
 
     duel = context.duel
+    _ensure_arena_duel_allows_attempt_start(
+        duel=duel,
+        attempt_role=attempt.role,
+        now_utc=now_utc,
+    )
     expected_question_id = _arena_duel_question_id(duel.question_ids, arena_round)
     if duel.mode_code != mode_code or expected_question_id is None:
         raise FriendChallengeAccessError
     if forced_question_id is not None and forced_question_id != expected_question_id:
         raise FriendChallengeAccessError
     return expected_question_id
+
+
+def _ensure_arena_duel_allows_attempt_start(
+    *,
+    duel: object,
+    attempt_role: str,
+    now_utc: datetime,
+) -> None:
+    expires_at = getattr(duel, "expires_at", None)
+    if not isinstance(expires_at, datetime) or expires_at <= now_utc:
+        raise FriendChallengeAccessError
+
+    status = getattr(duel, "status", None)
+    if attempt_role == ARENA_ATTEMPT_ROLE_CREATOR_BASELINE:
+        if status != ARENA_DUEL_STATUS_DRAFT:
+            raise FriendChallengeAccessError
+        return
+    if attempt_role == ARENA_ATTEMPT_ROLE_CHALLENGER and status == ARENA_DUEL_STATUS_ACTIVE:
+        return
+    raise FriendChallengeAccessError
 
 
 def _arena_duel_question_id(question_ids: object, arena_round: int) -> str | None:
