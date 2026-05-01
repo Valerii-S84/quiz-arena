@@ -102,6 +102,7 @@ class ArenaDuelsRepo:
         stmt = select(func.count(ArenaDuel.id)).where(
             ArenaDuel.creator_user_id == creator_user_id,
             ArenaDuel.access_type == access_type,
+            ArenaDuel.source_friend_challenge_id.is_(None),
         )
         if since is not None:
             stmt = stmt.where(ArenaDuel.created_at >= since)
