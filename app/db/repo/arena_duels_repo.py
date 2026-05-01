@@ -36,6 +36,12 @@ class ArenaActiveDuelRow:
     baseline_attempt: ArenaAttempt
 
 
+@dataclass(frozen=True, slots=True)
+class ArenaDuelAcceptContext:
+    duel: ArenaDuel
+    existing_attempt: ArenaAttempt | None
+
+
 class ArenaDuelsRepo:
     @staticmethod
     async def create_duel(session: AsyncSession, *, duel: ArenaDuel) -> ArenaDuel:
@@ -67,6 +73,33 @@ class ArenaDuelsRepo:
             return None
         attempt, duel = row.t
         return ArenaAttemptDuelContext(attempt=attempt, duel=duel)
+
+    @staticmethod
+    async def get_accept_context_for_update(
+        session: AsyncSession,
+        *,
+        duel_id: UUID,
+        user_id: int,
+    ) -> ArenaDuelAcceptContext | None:
+        duel_stmt = select(ArenaDuel).where(ArenaDuel.id == duel_id).with_for_update()
+        duel_result = await session.execute(duel_stmt)
+        duel = duel_result.scalar_one_or_none()
+        if duel is None:
+            return None
+
+        attempt_stmt = (
+            select(ArenaAttempt)
+            .where(
+                ArenaAttempt.arena_duel_id == duel_id,
+                ArenaAttempt.user_id == user_id,
+            )
+            .with_for_update()
+        )
+        attempt_result = await session.execute(attempt_stmt)
+        return ArenaDuelAcceptContext(
+            duel=duel,
+            existing_attempt=attempt_result.scalar_one_or_none(),
+        )
 
     @staticmethod
     async def summarize_completed_attempt(
