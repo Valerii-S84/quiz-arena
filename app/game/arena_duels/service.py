@@ -31,6 +31,7 @@ from app.game.arena_duels.scoring import ArenaScoreLine, decide_arena_scoring_ou
 from app.game.arena_duels.types import (
     ArenaActiveDuelSnapshot,
     ArenaAttemptCompletionResult,
+    ArenaAttemptResultLine,
     ArenaBaselineStartResult,
     ArenaBeatenNotification,
     ArenaDuelSnapshot,
@@ -173,7 +174,10 @@ async def complete_arena_attempt_if_applicable(
             user_id=user_id,
             now_utc=now_utc,
         )
-        return ArenaAttemptCompletionResult(duel=snapshot)
+        return ArenaAttemptCompletionResult(
+            duel=snapshot,
+            completed_attempt=_build_attempt_result_line(attempt),
+        )
     if attempt.role == ARENA_ATTEMPT_ROLE_CHALLENGER:
         return await _complete_arena_challenger_context(
             session,
@@ -228,8 +232,10 @@ async def _complete_arena_challenger_context(
     duel = context.duel
     _ensure_challenger_completion_access(attempt=attempt, duel=duel)
     if attempt.completed_at is not None:
+        # The original comparison opponent is not persisted. Suppress replay
+        # rendering instead of pairing the stored result with a changed leaderboard.
         return ArenaAttemptCompletionResult(
-            duel=_build_duel_snapshot(duel=duel, baseline_attempt=None)
+            duel=_build_duel_snapshot(duel=duel, baseline_attempt=None),
         )
 
     summary = await ArenaDuelsRepo.summarize_completed_attempt(session, attempt_id=attempt.id)
@@ -261,6 +267,19 @@ async def _complete_arena_challenger_context(
     return ArenaAttemptCompletionResult(
         duel=_build_duel_snapshot(duel=duel, baseline_attempt=None),
         beaten_notification=notification,
+        completed_attempt=_build_attempt_result_line(attempt),
+        opponent_attempt=_build_attempt_result_line(previous_best),
+    )
+
+
+def _build_attempt_result_line(attempt: ArenaAttempt) -> ArenaAttemptResultLine:
+    if attempt.score is None or attempt.time_ms is None:
+        raise ArenaDuelAccessError
+    return ArenaAttemptResultLine(
+        user_id=attempt.user_id,
+        score=attempt.score,
+        time_ms=attempt.time_ms,
+        result=attempt.result,
     )
 
 
@@ -277,7 +296,10 @@ async def list_active_arena_duels(
     )
     snapshots: list[ArenaActiveDuelSnapshot] = []
     for row in rows:
-        snapshot = _build_active_duel_snapshot(row)
+        current_best_attempt = await _get_current_best_attempt(session, duel_id=row.duel.id)
+        if current_best_attempt is None:
+            continue
+        snapshot = _build_active_duel_snapshot(row, current_best_attempt=current_best_attempt)
         if snapshot is not None:
             snapshots.append(snapshot)
     return tuple(snapshots)
@@ -326,6 +348,20 @@ async def _get_previous_best_attempt(
     )
     if not completed_attempts:
         raise ArenaDuelAccessError
+    return completed_attempts[0]
+
+
+async def _get_current_best_attempt(
+    session: AsyncSession,
+    *,
+    duel_id: UUID,
+) -> ArenaAttempt | None:
+    completed_attempts = await ArenaDuelsRepo.list_completed_attempts_for_duel(
+        session,
+        duel_id=duel_id,
+    )
+    if not completed_attempts:
+        return None
     return completed_attempts[0]
 
 
@@ -398,18 +434,21 @@ def _build_duel_snapshot(
     )
 
 
-def _build_active_duel_snapshot(row: ArenaActiveDuelRow) -> ArenaActiveDuelSnapshot | None:
-    score = row.baseline_attempt.score
-    time_ms = row.baseline_attempt.time_ms
-    baseline_attempt_id = row.duel.baseline_attempt_id
-    if score is None or time_ms is None or baseline_attempt_id is None:
+def _build_active_duel_snapshot(
+    row: ArenaActiveDuelRow,
+    *,
+    current_best_attempt: ArenaAttempt,
+) -> ArenaActiveDuelSnapshot | None:
+    score = current_best_attempt.score
+    time_ms = current_best_attempt.time_ms
+    if score is None or time_ms is None:
         return None
     return ArenaActiveDuelSnapshot(
         duel_id=row.duel.id,
-        creator_user_id=row.duel.creator_user_id,
+        creator_user_id=current_best_attempt.user_id,
         mode_code=row.duel.mode_code,
         question_ids=_validate_question_ids(row.duel.question_ids),
-        baseline_attempt_id=baseline_attempt_id,
+        baseline_attempt_id=current_best_attempt.id,
         score=score,
         time_ms=time_ms,
         expires_at=row.duel.expires_at,

@@ -306,9 +306,65 @@ async def test_complete_arena_challenger_without_new_best_sends_no_notification(
 
     assert result is not None
     assert result.beaten_notification is None
+    assert result.completed_attempt is not None
+    assert result.opponent_attempt is not None
+    assert result.completed_attempt.score == 5
+    assert result.completed_attempt.time_ms == 44_000
+    assert result.opponent_attempt.score == 6
+    assert result.opponent_attempt.time_ms == 48_000
     assert attempt.score == 5
     assert attempt.time_ms == 44_000
     assert attempt.result == ARENA_ATTEMPT_RESULT_LOSS
+
+
+@pytest.mark.asyncio
+async def test_complete_arena_challenger_repeat_suppresses_result_rendering(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    duel = _duel(status=ARENA_DUEL_STATUS_ACTIVE)
+    baseline = _completed_attempt(
+        duel_id=duel.id,
+        user_id=11,
+        score=6,
+        time_ms=48_000,
+        role=ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+    )
+    attempt = _completed_attempt(duel_id=duel.id, user_id=22, score=7, time_ms=52_000)
+    attempt.result = ARENA_ATTEMPT_RESULT_WIN
+    duel.baseline_attempt_id = baseline.id
+
+    async def _fake_get_context(*_args, **_kwargs):
+        return ArenaAttemptDuelContext(attempt=attempt, duel=duel)
+
+    async def _unexpected_summary(*_args, **_kwargs):
+        pytest.fail("idempotent challenger completion must not resummarize rounds")
+
+    async def _unexpected_completed_attempts(*_args, **_kwargs):
+        pytest.fail("idempotent challenger completion must not derive opponent from leaderboard")
+
+    monkeypatch.setattr(
+        arena_service.ArenaDuelsRepo, "get_attempt_duel_for_update", _fake_get_context
+    )
+    monkeypatch.setattr(
+        arena_service.ArenaDuelsRepo, "summarize_completed_attempt", _unexpected_summary
+    )
+    monkeypatch.setattr(
+        arena_service.ArenaDuelsRepo,
+        "list_completed_attempts_for_duel",
+        _unexpected_completed_attempts,
+    )
+
+    result = await arena_service.complete_arena_attempt_if_applicable(
+        AsyncSessionStub(),
+        attempt_id=attempt.id,
+        user_id=22,
+        now_utc=NOW_UTC,
+    )
+
+    assert result is not None
+    assert result.completed_attempt is None
+    assert result.opponent_attempt is None
+    assert result.beaten_notification is None
 
 
 @pytest.mark.asyncio
@@ -410,7 +466,15 @@ async def test_list_active_arena_duels_maps_complete_baselines(
     async def _fake_rows(*_args, **_kwargs):
         return [ArenaActiveDuelRow(duel=duel, baseline_attempt=attempt)]
 
+    async def _fake_completed_attempts(*_args, **_kwargs):
+        return [attempt]
+
     monkeypatch.setattr(arena_service.ArenaDuelsRepo, "list_active_with_baseline", _fake_rows)
+    monkeypatch.setattr(
+        arena_service.ArenaDuelsRepo,
+        "list_completed_attempts_for_duel",
+        _fake_completed_attempts,
+    )
 
     result = await arena_service.list_active_arena_duels(AsyncSessionStub(), now_utc=NOW_UTC)
 
@@ -420,6 +484,46 @@ async def test_list_active_arena_duels_maps_complete_baselines(
     assert result[0].score == 7
     assert result[0].time_ms == 55_000
     assert result[0].question_ids == tuple(_question_ids())
+
+
+@pytest.mark.asyncio
+async def test_list_active_arena_duels_maps_current_best_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    duel = _duel(status=ARENA_DUEL_STATUS_ACTIVE)
+    baseline = _baseline_attempt(duel_id=duel.id)
+    duel.baseline_attempt_id = baseline.id
+    baseline.score = 6
+    baseline.time_ms = 48_000
+    baseline.completed_at = NOW_UTC
+    current_best = _completed_attempt(
+        duel_id=duel.id,
+        user_id=33,
+        score=7,
+        time_ms=52_000,
+    )
+
+    async def _fake_rows(*_args, **_kwargs):
+        return [ArenaActiveDuelRow(duel=duel, baseline_attempt=baseline)]
+
+    async def _fake_completed_attempts(*_args, **_kwargs):
+        return [current_best, baseline]
+
+    monkeypatch.setattr(arena_service.ArenaDuelsRepo, "list_active_with_baseline", _fake_rows)
+    monkeypatch.setattr(
+        arena_service.ArenaDuelsRepo,
+        "list_completed_attempts_for_duel",
+        _fake_completed_attempts,
+    )
+
+    result = await arena_service.list_active_arena_duels(AsyncSessionStub(), now_utc=NOW_UTC)
+
+    assert len(result) == 1
+    assert result[0].duel_id == duel.id
+    assert result[0].creator_user_id == 33
+    assert result[0].baseline_attempt_id == current_best.id
+    assert result[0].score == 7
+    assert result[0].time_ms == 52_000
 
 
 @pytest.mark.asyncio

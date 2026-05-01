@@ -15,6 +15,8 @@ from tests.game.arena_duels_accept_support import (
     MODE_CODE,
     NOW_UTC,
     active_duel,
+    baseline_attempt,
+    challenger_attempt,
     question_ids,
     start_result,
 )
@@ -113,6 +115,48 @@ async def test_accept_arena_duel_rejects_missing_duel(monkeypatch: pytest.Monkey
             now_utc=NOW_UTC,
             duel_limit_checked=True,
         )
+
+
+@pytest.mark.asyncio
+async def test_get_arena_duel_accept_preview_returns_current_best_score(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    duel = active_duel()
+    baseline = baseline_attempt(duel_id=duel.id, attempt_id=duel.baseline_attempt_id)
+    baseline.score = 6
+    baseline.time_ms = 48_000
+    current_best = challenger_attempt(duel_id=duel.id, user_id=33)
+    current_best.score = 7
+    current_best.time_ms = 52_000
+    current_best.completed_at = NOW_UTC
+
+    async def _get_context(*_args, **_kwargs):
+        return ArenaDuelAcceptContext(duel=duel, existing_attempt=None)
+
+    async def _list_completed_attempts(*_args, **_kwargs):
+        return [current_best, baseline]
+
+    monkeypatch.setattr(
+        accept_service.ArenaDuelsRepo, "get_accept_context_for_update", _get_context
+    )
+    monkeypatch.setattr(
+        accept_service.ArenaDuelsRepo,
+        "list_completed_attempts_for_duel",
+        _list_completed_attempts,
+    )
+
+    result = await accept_service.get_arena_duel_accept_preview(
+        AsyncSessionStub(),
+        duel_id=duel.id,
+        user_id=22,
+        now_utc=NOW_UTC,
+    )
+
+    assert result.duel_id == duel.id
+    assert result.creator_user_id == 33
+    assert result.baseline_attempt_id == current_best.id
+    assert result.score == 7
+    assert result.time_ms == 52_000
 
 
 @pytest.mark.asyncio

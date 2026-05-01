@@ -20,7 +20,11 @@ from app.game.arena_duels.errors import (
     ArenaDuelNotFoundError,
     ArenaDuelOwnAttemptError,
 )
-from app.game.arena_duels.types import ArenaChallengerStartResult, ArenaDuelSnapshot
+from app.game.arena_duels.types import (
+    ArenaActiveDuelSnapshot,
+    ArenaChallengerStartResult,
+    ArenaDuelSnapshot,
+)
 from app.game.duels.constants import DUEL_QUESTION_COUNT
 from app.game.duels.limits import DuelLimitService
 from app.game.sessions.service.sessions_start import start_session
@@ -84,6 +88,44 @@ async def accept_arena_duel(
     )
 
 
+async def get_arena_duel_accept_preview(
+    session: AsyncSession,
+    *,
+    duel_id: UUID,
+    user_id: int,
+    now_utc: datetime,
+) -> ArenaActiveDuelSnapshot:
+    context = await ArenaDuelsRepo.get_accept_context_for_update(
+        session,
+        duel_id=duel_id,
+        user_id=user_id,
+    )
+    if context is None:
+        raise ArenaDuelNotFoundError
+
+    duel = context.duel
+    _ensure_duel_can_be_accepted(
+        duel=duel,
+        user_id=user_id,
+        existing_attempt=context.existing_attempt,
+        now_utc=now_utc,
+    )
+    target_attempt, target_score, target_time_ms = await _get_current_best_attempt(
+        session, duel_id=duel.id
+    )
+
+    return ArenaActiveDuelSnapshot(
+        duel_id=duel.id,
+        creator_user_id=target_attempt.user_id,
+        mode_code=duel.mode_code,
+        question_ids=_validate_question_ids(duel.question_ids),
+        baseline_attempt_id=target_attempt.id,
+        score=target_score,
+        time_ms=target_time_ms,
+        expires_at=duel.expires_at,
+    )
+
+
 def _ensure_duel_can_be_accepted(
     *,
     duel: ArenaDuel,
@@ -102,6 +144,23 @@ def _ensure_duel_can_be_accepted(
     if duel.baseline_attempt_id is None:
         raise ArenaDuelAccessError
     _validate_question_ids(duel.question_ids)
+
+
+async def _get_current_best_attempt(
+    session: AsyncSession, *, duel_id: UUID
+) -> tuple[ArenaAttempt, int, int]:
+    completed_attempts = await ArenaDuelsRepo.list_completed_attempts_for_duel(
+        session,
+        duel_id=duel_id,
+    )
+    if not completed_attempts:
+        raise ArenaDuelAccessError
+    best_attempt = completed_attempts[0]
+    score = best_attempt.score
+    time_ms = best_attempt.time_ms
+    if score is None or time_ms is None:
+        raise ArenaDuelAccessError
+    return best_attempt, score, time_ms
 
 
 def _build_duel_snapshot(duel: ArenaDuel) -> ArenaDuelSnapshot:
