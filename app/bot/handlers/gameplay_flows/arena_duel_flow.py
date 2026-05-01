@@ -11,6 +11,7 @@ from app.bot.handlers.gameplay_views import _format_user_label
 from app.bot.keyboards.duels import (
     ArenaDuelButton,
     build_arena_accept_keyboard,
+    build_arena_back_keyboard,
     build_arena_empty_keyboard,
     build_arena_list_keyboard,
     build_arena_published_keyboard,
@@ -24,6 +25,7 @@ from app.game.arena_duels.errors import (
     ArenaDuelAccessError,
     ArenaDuelAlreadyAttemptedError,
     ArenaDuelExpiredError,
+    ArenaDuelIncompleteError,
     ArenaDuelNotFoundError,
     ArenaDuelOwnAttemptError,
     ArenaDuelPaymentRequiredError,
@@ -36,7 +38,7 @@ from app.game.arena_duels.types import (
     ArenaChallengerStartResult,
 )
 from app.game.questions.catalog import QUICK_MIX_MODE_CODE
-from app.game.sessions.errors import FriendChallengeAccessError
+from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 from app.game.sessions.types import StartSessionResult
 
 _ARENA_MARKERS = ("🔥", "👑", "⚡")
@@ -240,6 +242,69 @@ async def handle_arena_start_attempt(
         ),
         build_question_text=build_question_text,
     )
+
+
+async def handle_arena_publish_friend(
+    callback: CallbackQuery,
+    *,
+    arena_publish_friend_re,
+    parse_uuid_callback,
+    session_local,
+    user_onboarding_service,
+    publish_friend_challenge_to_arena,
+) -> None:
+    friend_challenge_id = _parse_arena_duel_id(
+        callback,
+        pattern=arena_publish_friend_re,
+        parse_uuid_callback=parse_uuid_callback,
+    )
+    if friend_challenge_id is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    if callback.from_user is None or callback.message is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
+    now_utc = datetime.now(timezone.utc)
+    invalid_state = False
+    published_duel = None
+    async with session_local.begin() as session:
+        snapshot = await user_onboarding_service.ensure_home_snapshot(
+            session,
+            telegram_user=callback.from_user,
+        )
+        try:
+            published_duel = await publish_friend_challenge_to_arena(
+                session,
+                user_id=snapshot.user_id,
+                friend_challenge_id=friend_challenge_id,
+                now_utc=now_utc,
+            )
+        except (
+            ArenaDuelAccessError,
+            ArenaDuelIncompleteError,
+            FriendChallengeNotFoundError,
+            FriendChallengeAccessError,
+        ):
+            invalid_state = True
+
+    if invalid_state:
+        await callback.message.answer(
+            TEXTS_DE["msg.duels.arena.friend_publish.invalid"],
+            reply_markup=build_arena_back_keyboard(),
+        )
+        await callback.answer()
+        return
+
+    score_line = _format_published_duel_score_line(published_duel)
+    if score_line is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    await callback.message.answer(
+        TEXTS_DE["msg.duels.arena.friend_published"].format(score_line=score_line),
+        reply_markup=build_arena_published_keyboard(),
+    )
+    await callback.answer()
 
 
 async def send_arena_completion_result(
@@ -487,3 +552,13 @@ def _format_score_line(*, score: int, time_ms: int) -> str:
     total_seconds = max(0, int(round(time_ms / 1000)))
     minutes, seconds = divmod(total_seconds, 60)
     return f"{score}/7 · {minutes:02d}:{seconds:02d}"
+
+
+def _format_published_duel_score_line(published_duel: object | None) -> str | None:
+    if published_duel is None:
+        return None
+    score = getattr(published_duel, "baseline_score", None)
+    time_ms = getattr(published_duel, "baseline_time_ms", None)
+    if not isinstance(score, int) or not isinstance(time_ms, int):
+        return None
+    return _format_score_line(score=score, time_ms=time_ms)

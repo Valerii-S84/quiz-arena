@@ -24,6 +24,7 @@ from app.game.duels.constants import (
     DUEL_MENU_CALLBACK,
 )
 from app.game.duels.limits import DuelLimitService
+from app.game.sessions.service.friend_challenges_manage import publish_friend_challenge_to_arena
 from app.services.user_onboarding import UserOnboardingService
 
 
@@ -93,6 +94,17 @@ async def handle_arena_start_attempt(callback: CallbackQuery) -> None:
     )
 
 
+async def handle_arena_publish_friend(callback: CallbackQuery) -> None:
+    await arena_duel_flow.handle_arena_publish_friend(
+        callback,
+        arena_publish_friend_re=gameplay_callbacks.ARENA_PUBLISH_FRIEND_RE,
+        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
+        session_local=SessionLocal,
+        user_onboarding_service=UserOnboardingService,
+        publish_friend_challenge_to_arena=publish_friend_challenge_to_arena,
+    )
+
+
 async def handle_friend_duel_open(callback: CallbackQuery) -> None:
     if callback.message is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
@@ -116,5 +128,8 @@ def register(router: Router) -> None:
     )
     router.callback_query(F.data.regexp(gameplay_callbacks.ARENA_START_ATTEMPT_RE))(
         handle_arena_start_attempt
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.ARENA_PUBLISH_FRIEND_RE))(
+        handle_arena_publish_friend
     )
     router.callback_query(F.data == DUEL_FRIEND_CALLBACK)(handle_friend_duel_open)

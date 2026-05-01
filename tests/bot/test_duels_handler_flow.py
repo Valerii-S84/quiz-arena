@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
-from app.bot.handlers import gameplay_duels
+from app.bot.handlers import gameplay_callbacks, gameplay_duels
 from app.bot.texts.de import TEXTS_DE
 from tests.bot.helpers import DummyCallback, DummyMessage
 
@@ -16,6 +18,20 @@ def _callback_payloads(reply_markup) -> list[str]:
         for button in row
         if button.callback_data is not None
     ]
+
+
+class _RecordingRouter:
+    def __init__(self) -> None:
+        self.handlers: list[Callable[..., object]] = []
+
+    def callback_query(
+        self, _filter: object
+    ) -> Callable[[Callable[..., object]], Callable[..., object]]:
+        def _decorator(handler: Callable[..., object]) -> Callable[..., object]:
+            self.handlers.append(handler)
+            return handler
+
+        return _decorator
 
 
 @pytest.mark.asyncio
@@ -74,3 +90,40 @@ async def test_arena_create_handler_has_start_and_arena_back_only() -> None:
         "arena:start_create",
         "arena:list",
     ]
+
+
+@pytest.mark.asyncio
+async def test_arena_publish_friend_handler_delegates_to_flow(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    async def _fake_publish_flow(callback, **kwargs):
+        captured["callback"] = callback
+        captured.update(kwargs)
+
+    monkeypatch.setattr(
+        gameplay_duels.arena_duel_flow,
+        "handle_arena_publish_friend",
+        _fake_publish_flow,
+    )
+    callback = DummyCallback(
+        data="arena:publish_friend:00000000-0000-0000-0000-000000000001",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+
+    await gameplay_duels.handle_arena_publish_friend(callback)
+
+    assert captured["callback"] is callback
+    assert captured["arena_publish_friend_re"] is gameplay_callbacks.ARENA_PUBLISH_FRIEND_RE
+    assert captured["parse_uuid_callback"] is gameplay_callbacks.parse_uuid_callback
+    assert captured["publish_friend_challenge_to_arena"] is (
+        gameplay_duels.publish_friend_challenge_to_arena
+    )
+
+
+def test_duels_register_includes_arena_publish_friend_callback() -> None:
+    router = _RecordingRouter()
+
+    gameplay_duels.register(cast(Any, router))
+
+    assert gameplay_duels.handle_arena_publish_friend in router.handlers

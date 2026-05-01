@@ -72,6 +72,14 @@ def build_arena_empty_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def build_arena_back_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="↩️ Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
+        ]
+    )
+
+
 def build_arena_accept_keyboard(*, duel_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[

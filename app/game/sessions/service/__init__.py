@@ -33,6 +33,7 @@ from .friend_challenges_internal import (
 from .friend_challenges_join import join_friend_challenge_by_id, join_friend_challenge_by_token
 from .friend_challenges_manage import (
     cancel_friend_challenge_by_creator,
+    publish_friend_challenge_to_arena,
     repost_friend_challenge_as_open,
 )
 from .friend_challenges_queries import (
@@ -123,6 +124,7 @@ class GameSessionService:
     join_friend_challenge_by_token = staticmethod(join_friend_challenge_by_token)
     repost_friend_challenge_as_open = staticmethod(repost_friend_challenge_as_open)
     cancel_friend_challenge_by_creator = staticmethod(cancel_friend_challenge_by_creator)
+    publish_friend_challenge_to_arena = staticmethod(publish_friend_challenge_to_arena)
     start_friend_challenge_round = staticmethod(start_friend_challenge_round)
     get_friend_challenge_snapshot_for_user = staticmethod(get_friend_challenge_snapshot_for_user)
     list_friend_challenges_for_user = staticmethod(list_friend_challenges_for_user)

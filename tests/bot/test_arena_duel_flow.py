@@ -6,6 +6,7 @@ from uuid import UUID
 
 import pytest
 
+from app.bot.handlers import gameplay_callbacks
 from app.bot.handlers.gameplay_flows import arena_duel_flow
 from app.game.arena_duels.constants import (
     ARENA_ATTEMPT_RESULT_LOSS,
@@ -26,7 +27,7 @@ from app.game.arena_duels.types import (
     ArenaBaselineStartResult,
     ArenaDuelSnapshot,
 )
-from app.game.sessions.errors import FriendChallengeAccessError
+from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 from app.game.sessions.types import SessionQuestionView, StartSessionResult
 from tests.bot.helpers import DummyCallback, DummyMessage
 from tests.type_helpers import AsyncBeginContext
@@ -330,6 +331,60 @@ async def test_arena_start_attempt_limit_hit_shows_duel_paywall_without_accept()
     assert "Duell-Limit" in _text(response.text)
     assert callbacks == ["buy:FRIEND_CHALLENGE_5", "buy:PREMIUM_WEEK", "arena:list"]
     assert "buy:PREMIUM_3_DAYS" not in callbacks
+
+
+@pytest.mark.asyncio
+async def test_arena_publish_friend_publishes_through_service() -> None:
+    captured: dict[str, object] = {}
+
+    async def _publish_friend(*_args, **kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(baseline_score=6, baseline_time_ms=48_000)
+
+    callback = _callback(f"arena:publish_friend:{DUEL_ID}")
+    await arena_duel_flow.handle_arena_publish_friend(
+        callback,
+        arena_publish_friend_re=gameplay_callbacks.ARENA_PUBLISH_FRIEND_RE,
+        parse_uuid_callback=lambda **_kwargs: DUEL_ID,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserService,
+        publish_friend_challenge_to_arena=_publish_friend,
+    )
+
+    response = callback.message.answers[0]
+    assert captured["user_id"] == 101
+    assert captured["friend_challenge_id"] == DUEL_ID
+    assert "🏟 In der Arena veröffentlicht!" in _text(response.text)
+    assert "6/7 · 00:48" in _text(response.text)
+    assert _callbacks(response.kwargs["reply_markup"]) == [
+        "arena:list",
+        "duels:friend",
+        "arena:create",
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [FriendChallengeAccessError, FriendChallengeNotFoundError])
+async def test_arena_publish_friend_maps_invalid_state_to_clean_error(error) -> None:
+    async def _publish_friend(*_args, **_kwargs):
+        raise error
+
+    callback = _callback(f"arena:publish_friend:{DUEL_ID}")
+    await arena_duel_flow.handle_arena_publish_friend(
+        callback,
+        arena_publish_friend_re=SimpleNamespace(
+            match=lambda value: value.startswith("arena:publish_friend:")
+        ),
+        parse_uuid_callback=lambda **_kwargs: DUEL_ID,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserService,
+        publish_friend_challenge_to_arena=_publish_friend,
+    )
+
+    response = callback.message.answers[0]
+    assert "Freundesduell kann noch nicht" in _text(response.text)
+    assert _callbacks(response.kwargs["reply_markup"]) == ["arena:list"]
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 
 @pytest.mark.asyncio
