@@ -8,6 +8,7 @@ from app.bot.handlers.gameplay_flows.energy_zero_flow import handle_energy_insuf
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.keyboards.quiz import build_quiz_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.game.arena_duels.errors import ArenaDuelError
 from app.game.duels.constants import DUEL_QUESTION_COUNT
 from app.game.sessions.errors import DailyChallengeAlreadyPlayedError, EnergyInsufficientError
 from app.game.sessions.types import AnswerSessionResult, FriendChallengeRoundStartResult
@@ -144,6 +145,12 @@ async def continue_regular_mode_after_answer(
                     return
                 next_arena_round = result.arena_answered_round + 1
                 if next_arena_round > DUEL_QUESTION_COUNT:
+                    await game_session_service.complete_arena_creator_baseline(
+                        session,
+                        attempt_id=result.arena_attempt_id,
+                        user_id=snapshot.user_id,
+                        now_utc=now_utc,
+                    )
                     await callback.answer()
                     return
                 start_kwargs.update(
@@ -154,6 +161,9 @@ async def continue_regular_mode_after_answer(
                     }
                 )
             next_result = await game_session_service.start_session(session, **start_kwargs)
+        except ArenaDuelError:
+            await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+            return
         except EnergyInsufficientError:
             await handle_energy_insufficient(
                 callback,

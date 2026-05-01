@@ -49,7 +49,15 @@ def _arena_result(attempt_id: UUID | None, answered_round: int | None) -> Answer
     )
 
 
-async def _continue_arena(result: AnswerSessionResult, start_session, text: str = "unused"):
+async def _continue_arena(
+    result: AnswerSessionResult,
+    start_session,
+    text: str = "unused",
+    complete_arena_creator_baseline=None,
+):
+    async def _default_complete_baseline(*_args, **_kwargs):
+        pytest.fail("Arena baseline finalization was not expected")
+
     callback = _callback()
     await play_flow.continue_regular_mode_after_answer(
         callback,
@@ -57,7 +65,12 @@ async def _continue_arena(result: AnswerSessionResult, start_session, text: str 
         now_utc=NOW_UTC,
         session_local=_SessionLocal(),
         user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_ensure_home_snapshot),
-        game_session_service=SimpleNamespace(start_session=start_session),
+        game_session_service=SimpleNamespace(
+            start_session=start_session,
+            complete_arena_creator_baseline=(
+                complete_arena_creator_baseline or _default_complete_baseline
+            ),
+        ),
         offer_service=SimpleNamespace(),
         offer_logging_error=RuntimeError,
         channel_bonus_service=SimpleNamespace(),
@@ -158,28 +171,46 @@ async def test_continue_after_arena_answer_starts_next_round_with_context() -> N
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("attempt_id", "answered_round", "expected_answer"),
-    [
-        (None, 2, {"text": TEXTS_DE["msg.system.error"], "show_alert": True}),
-        (UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), 7, {"text": None, "show_alert": False}),
-    ],
-)
-async def test_continue_after_arena_answer_rejects_invalid_next_start(
-    attempt_id: UUID | None,
-    answered_round: int,
-    expected_answer: dict[str, object],
-) -> None:
+async def test_continue_after_arena_answer_rejects_missing_attempt_context() -> None:
     async def _unexpected_start_session(*_args, **_kwargs):
         pytest.fail("invalid ARENA_DUEL continuation must not start another session")
 
     callback = await _continue_arena(
-        _arena_result(attempt_id, answered_round),
+        _arena_result(None, 2),
         _unexpected_start_session,
     )
 
     assert callback.message.answers == []
-    assert callback.answer_calls == [expected_answer]
+    assert callback.answer_calls == [{"text": TEXTS_DE["msg.system.error"], "show_alert": True}]
+
+
+@pytest.mark.asyncio
+async def test_continue_after_final_arena_baseline_round_publishes_duel() -> None:
+    arena_attempt_id = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+    completed: list[dict[str, object]] = []
+
+    async def _unexpected_start_session(*_args, **_kwargs):
+        pytest.fail("final ARENA_DUEL round must not start another session")
+
+    async def _complete_baseline(*args, **kwargs):
+        del args
+        completed.append(kwargs)
+
+    callback = await _continue_arena(
+        _arena_result(arena_attempt_id, 7),
+        _unexpected_start_session,
+        complete_arena_creator_baseline=_complete_baseline,
+    )
+
+    assert completed == [
+        {
+            "attempt_id": arena_attempt_id,
+            "user_id": 101,
+            "now_utc": NOW_UTC,
+        }
+    ]
+    assert callback.message.answers == []
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 
 def _return(value):
