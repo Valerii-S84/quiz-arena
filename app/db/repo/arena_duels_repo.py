@@ -81,25 +81,71 @@ class ArenaDuelsRepo:
         duel_id: UUID,
         user_id: int,
     ) -> ArenaDuelAcceptContext | None:
-        duel_stmt = select(ArenaDuel).where(ArenaDuel.id == duel_id).with_for_update()
-        duel_result = await session.execute(duel_stmt)
-        duel = duel_result.scalar_one_or_none()
+        existing_context = await ArenaDuelsRepo._get_existing_accept_context_for_update(
+            session,
+            duel_id=duel_id,
+            user_id=user_id,
+        )
+        if existing_context is not None:
+            return existing_context
+
+        duel = await ArenaDuelsRepo._get_duel_for_update(session, duel_id=duel_id)
         if duel is None:
             return None
 
-        attempt_stmt = (
-            select(ArenaAttempt)
+        existing_attempt = await ArenaDuelsRepo._get_existing_attempt(
+            session,
+            duel_id=duel_id,
+            user_id=user_id,
+        )
+        return ArenaDuelAcceptContext(duel=duel, existing_attempt=existing_attempt)
+
+    @staticmethod
+    async def _get_existing_accept_context_for_update(
+        session: AsyncSession,
+        *,
+        duel_id: UUID,
+        user_id: int,
+    ) -> ArenaDuelAcceptContext | None:
+        stmt = (
+            select(ArenaAttempt, ArenaDuel)
+            .join(ArenaDuel, ArenaDuel.id == ArenaAttempt.arena_duel_id)
             .where(
                 ArenaAttempt.arena_duel_id == duel_id,
                 ArenaAttempt.user_id == user_id,
             )
-            .with_for_update()
+            .with_for_update(of=(ArenaAttempt, ArenaDuel))
+        )
+        result = await session.execute(stmt)
+        row = result.one_or_none()
+        if row is None:
+            return None
+        attempt, duel = row.t
+        return ArenaDuelAcceptContext(duel=duel, existing_attempt=attempt)
+
+    @staticmethod
+    async def _get_duel_for_update(
+        session: AsyncSession,
+        *,
+        duel_id: UUID,
+    ) -> ArenaDuel | None:
+        duel_stmt = select(ArenaDuel).where(ArenaDuel.id == duel_id).with_for_update()
+        duel_result = await session.execute(duel_stmt)
+        return duel_result.scalar_one_or_none()
+
+    @staticmethod
+    async def _get_existing_attempt(
+        session: AsyncSession,
+        *,
+        duel_id: UUID,
+        user_id: int,
+    ) -> ArenaAttempt | None:
+        attempt_stmt = select(ArenaAttempt).where(
+            ArenaAttempt.arena_duel_id == duel_id,
+            ArenaAttempt.user_id == user_id,
         )
         attempt_result = await session.execute(attempt_stmt)
-        return ArenaDuelAcceptContext(
-            duel=duel,
-            existing_attempt=attempt_result.scalar_one_or_none(),
-        )
+        return attempt_result.scalar_one_or_none()
 
     @staticmethod
     async def summarize_completed_attempt(

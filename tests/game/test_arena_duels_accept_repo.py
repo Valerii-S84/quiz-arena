@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -8,14 +9,14 @@ from sqlalchemy.dialects import postgresql
 from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
 from app.db.repo.arena_duels_repo import ArenaDuelAcceptContext, ArenaDuelsRepo
 from tests.game.arena_duels_accept_support import active_duel, challenger_attempt
-from tests.type_helpers import AsyncSessionStub, ScalarResult
+from tests.type_helpers import AsyncSessionStub
 
 
 @pytest.mark.asyncio
 async def test_accept_context_lookup_locks_duel_and_existing_attempt() -> None:
     duel = active_duel()
     attempt = challenger_attempt(duel_id=duel.id)
-    session = _AcceptContextRecordingSession(duel=duel, attempt=attempt)
+    session = _AcceptContextRecordingSession(_RowResult((attempt, duel)))
 
     context = await ArenaDuelsRepo.get_accept_context_for_update(
         session,
@@ -24,19 +25,17 @@ async def test_accept_context_lookup_locks_duel_and_existing_attempt() -> None:
     )
 
     assert context == ArenaDuelAcceptContext(duel=duel, existing_attempt=attempt)
-    assert len(session.statements) == 2
-    duel_query = _postgres_sql(session.statements[0])
-    attempt_query = _postgres_sql(session.statements[1])
-    assert "FROM arena_duels" in duel_query
-    assert "FOR UPDATE" in duel_query
-    assert "arena_attempts.arena_duel_id" in attempt_query
-    assert "arena_attempts.user_id" in attempt_query
-    assert "FOR UPDATE" in attempt_query
+    assert len(session.statements) == 1
+    query = _postgres_sql(session.statements[0])
+    assert "FROM arena_attempts JOIN arena_duels" in query
+    assert "arena_attempts.arena_duel_id" in query
+    assert "arena_attempts.user_id" in query
+    assert "FOR UPDATE OF arena_attempts, arena_duels" in query
 
 
 @pytest.mark.asyncio
 async def test_accept_context_lookup_stops_when_duel_is_missing() -> None:
-    session = _AcceptContextRecordingSession(duel=None, attempt=None)
+    session = _AcceptContextRecordingSession(_RowResult(None), _ScalarResult(None))
 
     context = await ArenaDuelsRepo.get_accept_context_for_update(
         session,
@@ -45,14 +44,20 @@ async def test_accept_context_lookup_stops_when_duel_is_missing() -> None:
     )
 
     assert context is None
-    assert len(session.statements) == 1
-    assert "FROM arena_duels" in _postgres_sql(session.statements[0])
+    assert len(session.statements) == 2
+    assert "FROM arena_attempts JOIN arena_duels" in _postgres_sql(session.statements[0])
+    assert "FROM arena_duels" in _postgres_sql(session.statements[1])
+    assert "FOR UPDATE" in _postgres_sql(session.statements[1])
 
 
 @pytest.mark.asyncio
 async def test_accept_context_lookup_allows_missing_existing_attempt() -> None:
     duel = active_duel()
-    session = _AcceptContextRecordingSession(duel=duel, attempt=None)
+    session = _AcceptContextRecordingSession(
+        _RowResult(None),
+        _ScalarResult(duel),
+        _ScalarResult(None),
+    )
 
     context = await ArenaDuelsRepo.get_accept_context_for_update(
         session,
@@ -61,20 +66,62 @@ async def test_accept_context_lookup_allows_missing_existing_attempt() -> None:
     )
 
     assert context == ArenaDuelAcceptContext(duel=duel, existing_attempt=None)
-    assert len(session.statements) == 2
+    assert len(session.statements) == 3
+    recheck_query = _postgres_sql(session.statements[2])
+    assert "FROM arena_attempts" in recheck_query
+    assert "FOR UPDATE" not in recheck_query
+
+
+@pytest.mark.asyncio
+async def test_accept_context_rechecks_attempt_after_locking_duel() -> None:
+    duel = active_duel()
+    attempt = challenger_attempt(duel_id=duel.id)
+    session = _AcceptContextRecordingSession(
+        _RowResult(None),
+        _ScalarResult(duel),
+        _ScalarResult(attempt),
+    )
+
+    context = await ArenaDuelsRepo.get_accept_context_for_update(
+        session,
+        duel_id=duel.id,
+        user_id=attempt.user_id,
+    )
+
+    assert context == ArenaDuelAcceptContext(duel=duel, existing_attempt=attempt)
+    recheck_query = _postgres_sql(session.statements[2])
+    assert "FROM arena_attempts" in recheck_query
+    assert "FOR UPDATE" not in recheck_query
 
 
 class _AcceptContextRecordingSession(AsyncSessionStub):
-    def __init__(self, *, duel: ArenaDuel | None, attempt: ArenaAttempt | None) -> None:
+    def __init__(self, *results: object) -> None:
         self.statements: list[object] = []
-        self._duel = duel
-        self._attempt = attempt
+        self._results = list(results)
 
     async def execute(self, statement):
         self.statements.append(statement)
-        if len(self.statements) == 1:
-            return ScalarResult(self._duel)
-        return ScalarResult(self._attempt)
+        if not self._results:
+            raise AssertionError("unexpected execute() call")
+        return self._results.pop(0)
+
+
+class _RowResult:
+    def __init__(self, row: tuple[ArenaAttempt, ArenaDuel] | None) -> None:
+        self._row = row
+
+    def one_or_none(self) -> SimpleNamespace | None:
+        if self._row is None:
+            return None
+        return SimpleNamespace(t=self._row)
+
+
+class _ScalarResult:
+    def __init__(self, value: ArenaAttempt | ArenaDuel | None) -> None:
+        self._value = value
+
+    def scalar_one_or_none(self) -> ArenaAttempt | ArenaDuel | None:
+        return self._value
 
 
 def _postgres_sql(statement: Any) -> str:
