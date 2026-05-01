@@ -10,7 +10,11 @@ from app.bot.keyboards.quiz import build_quiz_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.game.arena_duels.errors import ArenaDuelError
 from app.game.duels.constants import DUEL_QUESTION_COUNT
-from app.game.sessions.errors import DailyChallengeAlreadyPlayedError, EnergyInsufficientError
+from app.game.sessions.errors import (
+    DailyChallengeAlreadyPlayedError,
+    EnergyInsufficientError,
+    FriendChallengeAccessError,
+)
 from app.game.sessions.types import AnswerSessionResult, FriendChallengeRoundStartResult
 
 
@@ -161,7 +165,7 @@ async def continue_regular_mode_after_answer(
                     }
                 )
             next_result = await game_session_service.start_session(session, **start_kwargs)
-        except ArenaDuelError:
+        except (ArenaDuelError, FriendChallengeAccessError):
             await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
             return
         except EnergyInsufficientError:

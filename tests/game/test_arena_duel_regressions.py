@@ -12,6 +12,7 @@ from sqlalchemy import Table
 from app.bot.handlers.gameplay_flows import play_flow
 from app.bot.texts.de import TEXTS_DE
 from app.db.models.arena_duels import ArenaDuel
+from app.game.sessions.errors import FriendChallengeAccessError
 from app.game.sessions.service import sessions_submit
 from app.game.sessions.types import AnswerSessionResult
 from tests.bot.gameplay_flow_fixtures import _start_result
@@ -168,6 +169,20 @@ async def test_continue_after_arena_answer_starts_next_round_with_context() -> N
     assert captured[0]["arena_round"] == 3
     assert captured[0]["duel_limit_checked"] is True
     assert callback.message.answers[0].text == "next-arena-question"
+
+
+@pytest.mark.asyncio
+async def test_continue_after_arena_answer_handles_next_round_access_failure() -> None:
+    async def _start_session(*_args, **_kwargs):
+        raise FriendChallengeAccessError
+
+    callback = await _continue_arena(
+        _arena_result(uuid4(), 2),
+        _start_session,
+    )
+
+    assert callback.message.answers == []
+    assert callback.answer_calls == [{"text": TEXTS_DE["msg.system.error"], "show_alert": True}]
 
 
 @pytest.mark.asyncio
