@@ -1,6 +1,11 @@
 from app.bot.keyboards.duels import (
+    ArenaDuelButton,
+    build_arena_accept_keyboard,
     build_arena_create_keyboard,
     build_arena_empty_keyboard,
+    build_arena_list_keyboard,
+    build_arena_published_keyboard,
+    build_arena_result_keyboard,
     build_duels_menu_keyboard,
     build_friend_duel_keyboard,
 )
@@ -28,7 +33,19 @@ def test_duels_keyboards_do_not_offer_topic_level_or_format_selection() -> None:
     keyboards = [
         build_duels_menu_keyboard(),
         build_arena_empty_keyboard(),
+        build_arena_list_keyboard(
+            duels=(
+                ArenaDuelButton(
+                    duel_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    label="Max",
+                    marker="🔥",
+                ),
+            )
+        ),
+        build_arena_accept_keyboard(duel_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
         build_arena_create_keyboard(),
+        build_arena_published_keyboard(),
+        build_arena_result_keyboard(user_won=True),
         build_friend_duel_keyboard(),
     ]
     labels = [button.text for keyboard in keyboards for button in _buttons(keyboard)]

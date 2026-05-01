@@ -148,6 +148,21 @@ class ArenaDuelsRepo:
         return attempt_result.scalar_one_or_none()
 
     @staticmethod
+    async def get_baseline_attempt(
+        session: AsyncSession,
+        *,
+        duel: ArenaDuel,
+    ) -> ArenaAttempt | None:
+        if duel.baseline_attempt_id is None:
+            return None
+        attempt_stmt = select(ArenaAttempt).where(
+            ArenaAttempt.arena_duel_id == duel.id,
+            ArenaAttempt.id == duel.baseline_attempt_id,
+        )
+        attempt_result = await session.execute(attempt_stmt)
+        return attempt_result.scalar_one_or_none()
+
+    @staticmethod
     async def summarize_completed_attempt(
         session: AsyncSession,
         *,

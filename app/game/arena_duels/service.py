@@ -31,6 +31,7 @@ from app.game.arena_duels.scoring import ArenaScoreLine, decide_arena_scoring_ou
 from app.game.arena_duels.types import (
     ArenaActiveDuelSnapshot,
     ArenaAttemptCompletionResult,
+    ArenaAttemptResultLine,
     ArenaBaselineStartResult,
     ArenaBeatenNotification,
     ArenaDuelSnapshot,
@@ -173,7 +174,10 @@ async def complete_arena_attempt_if_applicable(
             user_id=user_id,
             now_utc=now_utc,
         )
-        return ArenaAttemptCompletionResult(duel=snapshot)
+        return ArenaAttemptCompletionResult(
+            duel=snapshot,
+            completed_attempt=_build_attempt_result_line(attempt),
+        )
     if attempt.role == ARENA_ATTEMPT_ROLE_CHALLENGER:
         return await _complete_arena_challenger_context(
             session,
@@ -228,8 +232,10 @@ async def _complete_arena_challenger_context(
     duel = context.duel
     _ensure_challenger_completion_access(attempt=attempt, duel=duel)
     if attempt.completed_at is not None:
+        # The original comparison opponent is not persisted. Suppress replay
+        # rendering instead of pairing the stored result with a changed leaderboard.
         return ArenaAttemptCompletionResult(
-            duel=_build_duel_snapshot(duel=duel, baseline_attempt=None)
+            duel=_build_duel_snapshot(duel=duel, baseline_attempt=None),
         )
 
     summary = await ArenaDuelsRepo.summarize_completed_attempt(session, attempt_id=attempt.id)
@@ -261,6 +267,19 @@ async def _complete_arena_challenger_context(
     return ArenaAttemptCompletionResult(
         duel=_build_duel_snapshot(duel=duel, baseline_attempt=None),
         beaten_notification=notification,
+        completed_attempt=_build_attempt_result_line(attempt),
+        opponent_attempt=_build_attempt_result_line(previous_best),
+    )
+
+
+def _build_attempt_result_line(attempt: ArenaAttempt) -> ArenaAttemptResultLine:
+    if attempt.score is None or attempt.time_ms is None:
+        raise ArenaDuelAccessError
+    return ArenaAttemptResultLine(
+        user_id=attempt.user_id,
+        score=attempt.score,
+        time_ms=attempt.time_ms,
+        result=attempt.result,
     )
 
 

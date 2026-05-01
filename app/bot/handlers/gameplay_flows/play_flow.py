@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import structlog
 from aiogram.types import CallbackQuery
 
+from app.bot.handlers.gameplay_flows.arena_duel_flow import send_arena_completion_result
 from app.bot.handlers.gameplay_flows.energy_zero_flow import handle_energy_insufficient
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.keyboards.quiz import build_quiz_keyboard
@@ -136,6 +137,7 @@ async def continue_regular_mode_after_answer(
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
     arena_notification: ArenaBeatenNotification | None = None
+    arena_completion = None
     arena_attempt_completed = False
     next_result = None
     async with session_local.begin() as session:
@@ -164,6 +166,7 @@ async def continue_regular_mode_after_answer(
                         now_utc=now_utc,
                     )
                     if completion is not None:
+                        arena_completion = completion
                         arena_notification = completion.beaten_notification
                     arena_attempt_completed = True
                 else:
@@ -195,6 +198,13 @@ async def continue_regular_mode_after_answer(
 
     if arena_attempt_completed:
         await callback.answer()
+        if arena_completion is not None:
+            await send_arena_completion_result(
+                callback,
+                completion=arena_completion,
+                session_local=session_local,
+                user_onboarding_service=user_onboarding_service,
+            )
         if arena_notification is not None:
             await _send_arena_beaten_notification_best_effort(
                 notification=arena_notification,

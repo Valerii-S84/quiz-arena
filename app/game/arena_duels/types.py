@@ -54,6 +54,8 @@ class ArenaBeatenNotification:
 class ArenaAttemptCompletionResult:
     duel: ArenaDuelSnapshot
     beaten_notification: ArenaBeatenNotification | None = None
+    completed_attempt: ArenaAttemptResultLine | None = None
+    opponent_attempt: ArenaAttemptResultLine | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,3 +68,11 @@ class ArenaActiveDuelSnapshot:
     score: int
     time_ms: int
     expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ArenaAttemptResultLine:
+    user_id: int
+    score: int
+    time_ms: int
+    result: str | None

@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
 from app.game.arena_duels.constants import (
     ARENA_ATTEMPT_ROLE_CHALLENGER,
+    ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
     ARENA_DUEL_STATUS_ACTIVE,
     ARENA_DUEL_STATUS_DRAFT,
     ARENA_SOURCE,
@@ -70,5 +71,19 @@ def challenger_attempt(*, duel_id: UUID, user_id: int = 22) -> ArenaAttempt:
         time_ms=None,
         result=None,
         completed_at=None,
+        created_at=NOW_UTC,
+    )
+
+
+def baseline_attempt(*, duel_id: UUID, attempt_id: UUID | None = None) -> ArenaAttempt:
+    return ArenaAttempt(
+        id=attempt_id or uuid4(),
+        arena_duel_id=duel_id,
+        user_id=11,
+        role=ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+        score=None,
+        time_ms=None,
+        result=None,
+        completed_at=NOW_UTC,
         created_at=NOW_UTC,
     )
