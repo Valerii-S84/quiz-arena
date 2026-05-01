@@ -74,21 +74,38 @@ class ArenaDuelsRepo:
         *,
         attempt_id: UUID,
     ) -> ArenaAttemptCompletionSummary:
-        correct_count = func.coalesce(
-            func.sum(case((QuizAttempt.is_correct.is_(True), 1), else_=0)),
-            0,
-        )
-        total_time_ms = func.coalesce(func.sum(QuizAttempt.response_ms), 0)
-        stmt = (
-            select(func.count(QuizAttempt.id), correct_count, total_time_ms)
-            .select_from(QuizAttempt)
-            .join(QuizSession, QuizSession.id == QuizAttempt.session_id)
+        first_round_attempts = (
+            select(
+                QuizSession.arena_round.label("arena_round"),
+                QuizAttempt.is_correct.label("is_correct"),
+                QuizAttempt.response_ms.label("response_ms"),
+                func.row_number()
+                .over(
+                    partition_by=QuizSession.arena_round,
+                    order_by=(QuizAttempt.answered_at.asc(), QuizAttempt.id.asc()),
+                )
+                .label("attempt_rank"),
+            )
+            .select_from(QuizSession)
+            .join(QuizAttempt, QuizAttempt.session_id == QuizSession.id)
             .where(
                 QuizSession.source == ARENA_SOURCE,
                 QuizSession.arena_attempt_id == attempt_id,
+                QuizSession.arena_round.is_not(None),
                 QuizSession.status == "COMPLETED",
                 QuizSession.completed_at.is_not(None),
             )
+            .subquery()
+        )
+        correct_count = func.coalesce(
+            func.sum(case((first_round_attempts.c.is_correct.is_(True), 1), else_=0)),
+            0,
+        )
+        total_time_ms = func.coalesce(func.sum(first_round_attempts.c.response_ms), 0)
+        stmt = (
+            select(func.count(first_round_attempts.c.arena_round), correct_count, total_time_ms)
+            .select_from(first_round_attempts)
+            .where(first_round_attempts.c.attempt_rank == 1)
         )
         result = await session.execute(stmt)
         completed_rounds, score, time_ms = result.one()

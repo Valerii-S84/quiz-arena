@@ -254,6 +254,28 @@ async def test_list_active_arena_duels_maps_complete_baselines(
 
 
 @pytest.mark.asyncio
+async def test_arena_baseline_summary_counts_each_completed_round_once() -> None:
+    attempt_id = uuid4()
+    session = _OneRowRecordingSession((7, 6, 48_000))
+
+    summary = await ArenaDuelsRepo.summarize_completed_attempt(session, attempt_id=attempt_id)
+
+    assert summary.completed_rounds == 7
+    assert summary.score == 6
+    assert summary.time_ms == 48_000
+    assert session.statement is not None
+    compiled = session.statement.compile()
+    sql = str(compiled)
+    assert "row_number() OVER" in sql
+    assert "PARTITION BY quiz_sessions.arena_round" in sql
+    assert "ORDER BY quiz_attempts.answered_at ASC, quiz_attempts.id ASC" in sql
+    assert "count(anon_1.arena_round)" in sql
+    assert "count(quiz_attempts.id)" not in sql
+    assert compiled.params["arena_attempt_id_1"] == attempt_id
+    assert compiled.params["attempt_rank_1"] == 1
+
+
+@pytest.mark.asyncio
 async def test_active_arena_repo_listing_requires_publish_ready_baseline() -> None:
     session = _RecordingSession()
 
@@ -279,6 +301,14 @@ class _EmptyRows:
         return []
 
 
+class _OneRow:
+    def __init__(self, row: tuple[int, int, int]) -> None:
+        self._row = row
+
+    def one(self) -> tuple[int, int, int]:
+        return self._row
+
+
 class _RecordingSession(AsyncSessionStub):
     def __init__(self) -> None:
         self.statement = None
@@ -286,3 +316,13 @@ class _RecordingSession(AsyncSessionStub):
     async def execute(self, statement):
         self.statement = statement
         return _EmptyRows()
+
+
+class _OneRowRecordingSession(AsyncSessionStub):
+    def __init__(self, row: tuple[int, int, int]) -> None:
+        self.statement = None
+        self._row = row
+
+    async def execute(self, statement):
+        self.statement = statement
+        return _OneRow(self._row)
