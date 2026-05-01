@@ -23,7 +23,9 @@ from app.game.duels.constants import DUEL_QUESTION_COUNT
 from app.game.duels.limits import DuelLimitService
 from app.game.friend_challenges.constants import (
     DUEL_STATUS_CANCELED,
+    DUEL_STATUS_CREATOR_DONE,
     DUEL_STATUS_EXPIRED,
+    DUEL_TYPE_DIRECT,
     DUEL_TYPE_OPEN,
     normalize_duel_status,
 )
@@ -150,10 +152,7 @@ async def publish_friend_challenge_to_arena(
             happened_at=now_utc,
             source=EVENT_SOURCE_BOT,
         )
-    if challenge.creator_user_id != user_id or challenge.status == DUEL_STATUS_EXPIRED:
-        raise FriendChallengeAccessError
-    if challenge.tournament_match_id is not None:
-        raise FriendChallengeAccessError
+    _ensure_friend_challenge_can_publish_to_arena(challenge=challenge, user_id=user_id)
 
     from app.db.repo.arena_duels_repo import ArenaDuelsRepo
 
@@ -215,6 +214,23 @@ async def publish_friend_challenge_to_arena(
         duel=duel,
         baseline_attempt=baseline_attempt,
     )
+
+
+def _ensure_friend_challenge_can_publish_to_arena(
+    *,
+    challenge: FriendChallenge,
+    user_id: int,
+) -> None:
+    if challenge.creator_user_id != user_id:
+        raise FriendChallengeAccessError
+    if challenge.opponent_user_id is not None:
+        raise FriendChallengeAccessError
+    if challenge.challenge_type != DUEL_TYPE_DIRECT:
+        raise FriendChallengeAccessError
+    if challenge.status != DUEL_STATUS_CREATOR_DONE:
+        raise FriendChallengeAccessError
+    if challenge.tournament_match_id is not None:
+        raise FriendChallengeAccessError
 
 
 def _friend_creator_baseline_is_ready(challenge: FriendChallenge) -> bool:

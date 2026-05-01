@@ -10,7 +10,15 @@ import pytest
 
 from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
 from app.db.repo.arena_duels_repo import ArenaDuelsRepo
-from app.game.friend_challenges.constants import DUEL_STATUS_CANCELED, DUEL_STATUS_EXPIRED
+from app.game.friend_challenges.constants import (
+    DUEL_STATUS_CANCELED,
+    DUEL_STATUS_COMPLETED,
+    DUEL_STATUS_CREATOR_DONE,
+    DUEL_STATUS_EXPIRED,
+    DUEL_STATUS_WALKOVER,
+    DUEL_TYPE_DIRECT,
+    DUEL_TYPE_OPEN,
+)
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 from app.game.sessions.service import friend_challenges_manage
 from tests.type_helpers import AsyncSessionStub
@@ -30,11 +38,13 @@ def _challenge(
     status: str = DUEL_STATUS_EXPIRED,
     creator_user_id: int = 11,
     opponent_user_id: int | None = 22,
+    challenge_type: str = DUEL_TYPE_DIRECT,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid4(),
         creator_user_id=creator_user_id,
         opponent_user_id=opponent_user_id,
+        challenge_type=challenge_type,
         status=status,
         mode_code="QUICK_MIX_A1A2",
         access_type="FREE",
@@ -339,7 +349,11 @@ async def test_cancel_friend_challenge_by_creator_emits_expired_event_before_acc
 async def test_publish_friend_challenge_to_arena_creates_active_duel_from_creator_baseline(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    challenge = _challenge(status="CREATOR_DONE", creator_user_id=11, opponent_user_id=None)
+    challenge = _challenge(
+        status=DUEL_STATUS_CREATOR_DONE,
+        creator_user_id=11,
+        opponent_user_id=None,
+    )
     created: dict[str, object] = {}
 
     async def _fake_create_duel(*_args, **kwargs):
@@ -422,6 +436,65 @@ async def test_publish_friend_challenge_to_arena_rejects_empty_friend_duel(
         ArenaDuelsRepo,
         "create_duel",
         _unexpected_create_duel,
+    )
+
+    with pytest.raises(FriendChallengeAccessError):
+        await friend_challenges_manage.publish_friend_challenge_to_arena(
+            _Session(),
+            user_id=11,
+            friend_challenge_id=challenge.id,
+            now_utc=NOW_UTC,
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "challenge",
+    [
+        _challenge(
+            status=DUEL_STATUS_CREATOR_DONE,
+            creator_user_id=11,
+            opponent_user_id=22,
+        ),
+        _challenge(
+            status=DUEL_STATUS_COMPLETED,
+            creator_user_id=11,
+            opponent_user_id=None,
+        ),
+        _challenge(
+            status=DUEL_STATUS_WALKOVER,
+            creator_user_id=11,
+            opponent_user_id=None,
+        ),
+        _challenge(
+            status=DUEL_STATUS_CREATOR_DONE,
+            creator_user_id=11,
+            opponent_user_id=None,
+            challenge_type=DUEL_TYPE_OPEN,
+        ),
+    ],
+)
+async def test_publish_friend_challenge_to_arena_rejects_unclean_server_state(
+    monkeypatch: pytest.MonkeyPatch,
+    challenge: SimpleNamespace,
+) -> None:
+    async def _unexpected_source_lookup(*_args, **_kwargs):
+        pytest.fail("unclean friend-duel state must not reach Arena lookup")
+
+    monkeypatch.setattr(
+        friend_challenges_manage.FriendChallengesRepo,
+        "get_by_id_for_update",
+        _async_return(challenge),
+    )
+    monkeypatch.setattr(
+        friend_challenges_manage,
+        "_expire_friend_challenge_if_due",
+        lambda **_kwargs: False,
+    )
+    monkeypatch.setattr(
+        ArenaDuelsRepo,
+        "get_source_friend_duel_with_baseline_for_update",
+        _unexpected_source_lookup,
     )
 
     with pytest.raises(FriendChallengeAccessError):
