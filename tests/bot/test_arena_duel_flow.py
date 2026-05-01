@@ -17,6 +17,7 @@ from app.game.arena_duels.errors import (
     ArenaDuelAlreadyAttemptedError,
     ArenaDuelExpiredError,
     ArenaDuelOwnAttemptError,
+    ArenaDuelPaymentRequiredError,
 )
 from app.game.arena_duels.types import (
     ArenaActiveDuelSnapshot,
@@ -218,6 +219,9 @@ async def test_arena_accept_preview_maps_guards_to_clean_messages(error, expecte
 
 @pytest.mark.asyncio
 async def test_arena_start_create_starts_baseline_question() -> None:
+    async def _resolve_create_access(*_args, **_kwargs):
+        return "FREE"
+
     async def _create_baseline(*_args, **_kwargs):
         return ArenaBaselineStartResult(
             duel=_duel_snapshot(),
@@ -230,6 +234,7 @@ async def test_arena_start_create_starts_baseline_question() -> None:
         callback,
         session_local=_SessionLocal(),
         user_onboarding_service=_UserService,
+        resolve_arena_create_access_type=_resolve_create_access,
         create_arena_duel_baseline=_create_baseline,
         build_question_text=lambda **_kwargs: "arena question",
     )
@@ -246,7 +251,37 @@ async def test_arena_start_create_starts_baseline_question() -> None:
 
 
 @pytest.mark.asyncio
+async def test_arena_start_create_limit_hit_shows_duel_paywall_without_start() -> None:
+    async def _resolve_create_access(*_args, **_kwargs):
+        raise ArenaDuelPaymentRequiredError
+
+    async def _unexpected_create_baseline(*_args, **_kwargs):
+        pytest.fail("direct arena:start_create must not bypass the duel limit")
+
+    callback = _callback("arena:start_create")
+    await arena_duel_flow.handle_arena_start_create(
+        callback,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserService,
+        resolve_arena_create_access_type=_resolve_create_access,
+        create_arena_duel_baseline=_unexpected_create_baseline,
+        build_question_text=lambda **_kwargs: "arena question",
+    )
+
+    response = callback.message.answers[0]
+    assert "Dein heutiges Duell-Limit ist erreicht." in _text(response.text)
+    assert _callbacks(response.kwargs["reply_markup"]) == [
+        "buy:FRIEND_CHALLENGE_5",
+        "buy:PREMIUM_WEEK",
+        "arena:list",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_arena_start_attempt_maps_session_access_error_to_guard() -> None:
+    async def _resolve_accept_access(*_args, **_kwargs):
+        return "FREE"
+
     async def _accept(*_args, **_kwargs):
         raise FriendChallengeAccessError
 
@@ -259,12 +294,42 @@ async def test_arena_start_attempt_maps_session_access_error_to_guard() -> None:
         parse_uuid_callback=lambda **_kwargs: DUEL_ID,
         session_local=_SessionLocal(),
         user_onboarding_service=_UserService,
+        resolve_arena_accept_access_type=_resolve_accept_access,
         accept_arena_duel=_accept,
         build_question_text=lambda **_kwargs: "arena question",
     )
 
     assert "Dieses Duell ist abgelaufen." in _text(callback.message.answers[0].text)
     assert callback.answer_calls == [{"text": None, "show_alert": False}]
+
+
+@pytest.mark.asyncio
+async def test_arena_start_attempt_limit_hit_shows_duel_paywall_without_accept() -> None:
+    async def _resolve_accept_access(*_args, **_kwargs):
+        raise ArenaDuelPaymentRequiredError
+
+    async def _unexpected_accept(*_args, **_kwargs):
+        pytest.fail("direct arena:start_attempt must not bypass the duel limit")
+
+    callback = _callback(f"arena:start_attempt:{DUEL_ID}")
+    await arena_duel_flow.handle_arena_start_attempt(
+        callback,
+        arena_start_attempt_re=SimpleNamespace(
+            match=lambda value: value.startswith("arena:start_attempt:")
+        ),
+        parse_uuid_callback=lambda **_kwargs: DUEL_ID,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserService,
+        resolve_arena_accept_access_type=_resolve_accept_access,
+        accept_arena_duel=_unexpected_accept,
+        build_question_text=lambda **_kwargs: "arena question",
+    )
+
+    response = callback.message.answers[0]
+    callbacks = _callbacks(response.kwargs["reply_markup"])
+    assert "Duell-Limit" in _text(response.text)
+    assert callbacks == ["buy:FRIEND_CHALLENGE_5", "buy:PREMIUM_WEEK", "arena:list"]
+    assert "buy:PREMIUM_3_DAYS" not in callbacks
 
 
 @pytest.mark.asyncio

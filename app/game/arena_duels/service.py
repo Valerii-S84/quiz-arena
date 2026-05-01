@@ -48,9 +48,9 @@ async def create_arena_duel_baseline(
     creator_user_id: int,
     mode_code: str,
     now_utc: datetime,
-    duel_limit_checked: bool,
+    access_type: str,
 ) -> ArenaBaselineStartResult:
-    DuelLimitService.assert_start_gate(ARENA_SOURCE, duel_limit_checked=duel_limit_checked)
+    DuelLimitService.assert_resolved_access_type(ARENA_SOURCE, access_type=access_type)
 
     duel_id = uuid4()
     question_ids = await select_duel_question_ids(
@@ -70,6 +70,7 @@ async def create_arena_duel_baseline(
             baseline_attempt_id=None,
             question_ids=list(validated_question_ids),
             mode_code=mode_code,
+            access_type=access_type,
             status=ARENA_DUEL_STATUS_DRAFT,
             expires_at=arena_duel_expires_at(now_utc=now_utc),
             created_at=now_utc,
@@ -85,6 +86,7 @@ async def create_arena_duel_baseline(
             arena_duel_id=duel.id,
             user_id=creator_user_id,
             role=ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+            access_type=access_type,
             score=None,
             time_ms=None,
             result=None,

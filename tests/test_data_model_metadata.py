@@ -106,6 +106,22 @@ def test_critical_constraints_present() -> None:
     }
     assert "ck_friend_challenges_access_type" in friend_check_names
 
+    arena_duels = Base.metadata.tables["arena_duels"]
+    arena_duel_check_names = {
+        constraint.name
+        for constraint in arena_duels.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    assert "ck_arena_duels_access_type" in arena_duel_check_names
+
+    arena_attempts = Base.metadata.tables["arena_attempts"]
+    arena_attempt_check_names = {
+        constraint.name
+        for constraint in arena_attempts.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    assert "ck_arena_attempts_access_type" in arena_attempt_check_names
+
     entitlements = Base.metadata.tables["entitlements"]
     entitlements_indexes = {index.name for index in entitlements.indexes}
     assert "uq_entitlements_active_premium_per_user" in entitlements_indexes

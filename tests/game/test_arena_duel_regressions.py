@@ -123,6 +123,15 @@ def test_arena_beaten_notification_dedupe_index_matches_migration() -> None:
     assert "arena_result_beaten_notification_sent" in migration
 
 
+def test_arena_access_type_constraints_match_migration() -> None:
+    migration = Path("alembic/versions/a9b0c1d2e3f4_m49_arena_duel_access_type.py").read_text()
+
+    assert "ck_arena_duels_access_type" in migration
+    assert "ck_arena_attempts_access_type" in migration
+    assert "access_type IN ('FREE','PAID_TICKET','PREMIUM')" in migration
+    assert 'server_default="FREE"' in migration
+
+
 @pytest.mark.asyncio
 async def test_submit_answer_returns_arena_context(monkeypatch: pytest.MonkeyPatch) -> None:
     arena_attempt_id = uuid4()

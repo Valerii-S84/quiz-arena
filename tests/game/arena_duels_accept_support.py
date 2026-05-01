@@ -11,6 +11,7 @@ from app.game.arena_duels.constants import (
     ARENA_DUEL_STATUS_DRAFT,
     ARENA_SOURCE,
 )
+from app.game.duels.limits import DUEL_ACCESS_FREE
 from app.game.sessions.types import SessionQuestionView, StartSessionResult
 
 NOW_UTC = datetime(2026, 4, 30, 12, 0, tzinfo=UTC)
@@ -46,6 +47,7 @@ def duel(*, duel_id: UUID | None = None, status: str = ARENA_DUEL_STATUS_DRAFT) 
         baseline_attempt_id=None,
         question_ids=question_ids(),
         mode_code=MODE_CODE,
+        access_type=DUEL_ACCESS_FREE,
         status=status,
         expires_at=NOW_UTC + timedelta(hours=1),
         created_at=NOW_UTC,
@@ -67,6 +69,7 @@ def challenger_attempt(*, duel_id: UUID, user_id: int = 22) -> ArenaAttempt:
         arena_duel_id=duel_id,
         user_id=user_id,
         role=ARENA_ATTEMPT_ROLE_CHALLENGER,
+        access_type=DUEL_ACCESS_FREE,
         score=None,
         time_ms=None,
         result=None,
@@ -81,6 +84,7 @@ def baseline_attempt(*, duel_id: UUID, attempt_id: UUID | None = None) -> ArenaA
         arena_duel_id=duel_id,
         user_id=11,
         role=ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+        access_type=DUEL_ACCESS_FREE,
         score=None,
         time_ms=None,
         result=None,

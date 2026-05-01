@@ -36,9 +36,9 @@ async def accept_arena_duel(
     duel_id: UUID,
     user_id: int,
     now_utc: datetime,
-    duel_limit_checked: bool,
+    access_type: str,
 ) -> ArenaChallengerStartResult:
-    DuelLimitService.assert_start_gate(ARENA_SOURCE, duel_limit_checked=duel_limit_checked)
+    DuelLimitService.assert_resolved_access_type(ARENA_SOURCE, access_type=access_type)
 
     context = await ArenaDuelsRepo.get_accept_context_for_update(
         session,
@@ -63,6 +63,7 @@ async def accept_arena_duel(
             arena_duel_id=duel.id,
             user_id=user_id,
             role=ARENA_ATTEMPT_ROLE_CHALLENGER,
+            access_type=access_type,
             score=None,
             time_ms=None,
             result=None,

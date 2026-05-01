@@ -32,6 +32,10 @@ class ArenaDuel(Base):
             "jsonb_typeof(question_ids) = 'array' AND jsonb_array_length(question_ids) = 7",
             name="ck_arena_duels_question_ids_7",
         ),
+        CheckConstraint(
+            "access_type IN ('FREE','PAID_TICKET','PREMIUM')",
+            name="ck_arena_duels_access_type",
+        ),
         ForeignKeyConstraint(
             ["id", "baseline_attempt_id"],
             ["arena_attempts.arena_duel_id", "arena_attempts.id"],
@@ -51,6 +55,12 @@ class ArenaDuel(Base):
     )
     question_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
     mode_code: Mapped[str] = mapped_column(String(32), nullable=False)
+    access_type: Mapped[str] = mapped_column(
+        String(24),
+        nullable=False,
+        default="FREE",
+        server_default="FREE",
+    )
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -77,6 +87,10 @@ class ArenaAttempt(Base):
             "time_ms IS NULL OR time_ms >= 0",
             name="ck_arena_attempts_time_ms_non_negative",
         ),
+        CheckConstraint(
+            "access_type IN ('FREE','PAID_TICKET','PREMIUM')",
+            name="ck_arena_attempts_access_type",
+        ),
         UniqueConstraint("arena_duel_id", "id", name="uq_arena_attempts_duel_id_id"),
         Index("idx_arena_attempts_duel", "arena_duel_id"),
         Index("idx_arena_attempts_user", "user_id"),
@@ -91,6 +105,12 @@ class ArenaAttempt(Base):
     )
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
     role: Mapped[str] = mapped_column(String(24), nullable=False)
+    access_type: Mapped[str] = mapped_column(
+        String(24),
+        nullable=False,
+        default="FREE",
+        server_default="FREE",
+    )
     score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     result: Mapped[str | None] = mapped_column(String(16), nullable=True)

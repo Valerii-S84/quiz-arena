@@ -15,6 +15,7 @@ from app.bot.keyboards.duels import (
     build_arena_list_keyboard,
     build_arena_published_keyboard,
     build_arena_result_keyboard,
+    build_duel_paywall_keyboard,
 )
 from app.bot.keyboards.quiz import build_quiz_keyboard
 from app.bot.texts.de import TEXTS_DE
@@ -25,6 +26,7 @@ from app.game.arena_duels.errors import (
     ArenaDuelExpiredError,
     ArenaDuelNotFoundError,
     ArenaDuelOwnAttemptError,
+    ArenaDuelPaymentRequiredError,
 )
 from app.game.arena_duels.types import (
     ArenaActiveDuelSnapshot,
@@ -147,6 +149,7 @@ async def handle_arena_start_create(
     *,
     session_local,
     user_onboarding_service,
+    resolve_arena_create_access_type,
     create_arena_duel_baseline,
     build_question_text,
 ) -> None:
@@ -154,12 +157,13 @@ async def handle_arena_start_create(
         callback,
         session_local=session_local,
         user_onboarding_service=user_onboarding_service,
-        start_arena_round=lambda session, user_id, now_utc: create_arena_duel_baseline(
+        resolve_access_type=resolve_arena_create_access_type,
+        start_arena_round=lambda session, user_id, now_utc, access_type: create_arena_duel_baseline(
             session,
             creator_user_id=user_id,
             mode_code=QUICK_MIX_MODE_CODE,
             now_utc=now_utc,
-            duel_limit_checked=True,
+            access_type=access_type,
         ),
         build_question_text=build_question_text,
     )
@@ -210,6 +214,7 @@ async def handle_arena_start_attempt(
     parse_uuid_callback,
     session_local,
     user_onboarding_service,
+    resolve_arena_accept_access_type,
     accept_arena_duel,
     build_question_text,
 ) -> None:
@@ -225,12 +230,13 @@ async def handle_arena_start_attempt(
         callback,
         session_local=session_local,
         user_onboarding_service=user_onboarding_service,
-        start_arena_round=lambda session, user_id, now_utc: accept_arena_duel(
+        resolve_access_type=resolve_arena_accept_access_type,
+        start_arena_round=lambda session, user_id, now_utc, access_type: accept_arena_duel(
             session,
             duel_id=duel_id,
             user_id=user_id,
             now_utc=now_utc,
-            duel_limit_checked=True,
+            access_type=access_type,
         ),
         build_question_text=build_question_text,
     )
@@ -286,7 +292,8 @@ async def _start_arena_round(
     *,
     session_local,
     user_onboarding_service,
-    start_arena_round: Callable[[object, int, datetime], Awaitable[object]],
+    resolve_access_type,
+    start_arena_round: Callable[[object, int, datetime, str], Awaitable[object]],
     build_question_text,
 ) -> None:
     if callback.from_user is None or callback.message is None:
@@ -295,6 +302,7 @@ async def _start_arena_round(
 
     now_utc = datetime.now(timezone.utc)
     guard_text_key: str | None = None
+    payment_required = False
     result: object | None = None
     async with session_local.begin() as session:
         snapshot = await user_onboarding_service.ensure_home_snapshot(
@@ -302,7 +310,14 @@ async def _start_arena_round(
             telegram_user=callback.from_user,
         )
         try:
-            result = await start_arena_round(session, snapshot.user_id, now_utc)
+            access_type = await resolve_access_type(
+                session,
+                user_id=snapshot.user_id,
+                now_utc=now_utc,
+            )
+            result = await start_arena_round(session, snapshot.user_id, now_utc, access_type)
+        except ArenaDuelPaymentRequiredError:
+            payment_required = True
         except ArenaDuelOwnAttemptError:
             guard_text_key = "msg.duels.arena.own"
         except ArenaDuelAlreadyAttemptedError:
@@ -314,6 +329,10 @@ async def _start_arena_round(
             FriendChallengeAccessError,
         ):
             guard_text_key = "msg.duels.arena.expired"
+
+    if payment_required:
+        await _send_duel_paywall(callback)
+        return
 
     if guard_text_key is not None:
         await _send_arena_guard(
@@ -446,6 +465,15 @@ async def _resolve_arena_user_label(*, session, user_onboarding_service, user_id
 async def _send_arena_guard(callback: CallbackQuery, *, text_key: str, reply_markup) -> None:
     if callback.message is not None:
         await callback.message.answer(TEXTS_DE[text_key], reply_markup=reply_markup)
+    await callback.answer()
+
+
+async def _send_duel_paywall(callback: CallbackQuery) -> None:
+    if callback.message is not None:
+        await callback.message.answer(
+            TEXTS_DE["msg.duels.limit.reached"],
+            reply_markup=build_duel_paywall_keyboard(),
+        )
     await callback.answer()
 
 

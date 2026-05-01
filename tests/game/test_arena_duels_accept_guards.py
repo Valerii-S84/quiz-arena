@@ -13,6 +13,7 @@ from app.game.arena_duels.errors import (
     ArenaDuelExpiredError,
     ArenaDuelOwnAttemptError,
 )
+from app.game.duels.limits import DUEL_ACCESS_FREE
 from tests.game.arena_duels_accept_support import NOW_UTC, active_duel, challenger_attempt
 from tests.type_helpers import AsyncSessionStub
 
@@ -94,5 +95,5 @@ async def _assert_accept_rejected(
             duel_id=context.duel.id,
             user_id=user_id,
             now_utc=NOW_UTC,
-            duel_limit_checked=True,
+            access_type=DUEL_ACCESS_FREE,
         )

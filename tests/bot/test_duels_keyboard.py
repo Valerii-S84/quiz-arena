@@ -6,6 +6,7 @@ from app.bot.keyboards.duels import (
     build_arena_list_keyboard,
     build_arena_published_keyboard,
     build_arena_result_keyboard,
+    build_duel_paywall_keyboard,
     build_duels_menu_keyboard,
     build_friend_duel_keyboard,
 )
@@ -46,6 +47,7 @@ def test_duels_keyboards_do_not_offer_topic_level_or_format_selection() -> None:
         build_arena_create_keyboard(),
         build_arena_published_keyboard(),
         build_arena_result_keyboard(user_won=True),
+        build_duel_paywall_keyboard(),
         build_friend_duel_keyboard(),
     ]
     labels = [button.text for keyboard in keyboards for button in _buttons(keyboard)]
@@ -72,3 +74,19 @@ def test_friend_duel_clean_entry_uses_single_default_create_callback() -> None:
         "friend:challenge:format:direct:7",
         "duels:menu",
     ]
+
+
+def test_duel_paywall_keyboard_sells_only_ticket_and_premium_week() -> None:
+    buttons = _buttons(build_duel_paywall_keyboard())
+
+    assert [button.text for button in buttons] == [
+        "🎟 Duell-Ticket – 5⭐",
+        "👑 Premium-Woche – 29⭐",
+        "↩️ Später",
+    ]
+    assert [button.callback_data for button in buttons] == [
+        "buy:FRIEND_CHALLENGE_5",
+        "buy:PREMIUM_WEEK",
+        "arena:list",
+    ]
+    assert "buy:PREMIUM_3_DAYS" not in [button.callback_data for button in buttons]

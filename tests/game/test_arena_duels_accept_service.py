@@ -10,6 +10,7 @@ from app.db.repo.arena_duels_repo import ArenaDuelAcceptContext
 from app.game.arena_duels import accept as accept_service
 from app.game.arena_duels.constants import ARENA_ATTEMPT_ROLE_CHALLENGER, ARENA_SOURCE
 from app.game.arena_duels.errors import ArenaDuelAccessError, ArenaDuelNotFoundError
+from app.game.duels.limits import DUEL_ACCESS_FREE
 from app.game.sessions.errors import DuelLimitRequiredError
 from tests.game.arena_duels_accept_support import (
     MODE_CODE,
@@ -52,7 +53,7 @@ async def test_accept_arena_duel_creates_attempt_and_starts_first_round(
         duel_id=duel.id,
         user_id=22,
         now_utc=NOW_UTC,
-        duel_limit_checked=True,
+        access_type=DUEL_ACCESS_FREE,
     )
 
     attempt = captured["attempt"]
@@ -61,6 +62,7 @@ async def test_accept_arena_duel_creates_attempt_and_starts_first_round(
     assert attempt.arena_duel_id == duel.id
     assert attempt.user_id == 22
     assert attempt.role == ARENA_ATTEMPT_ROLE_CHALLENGER
+    assert attempt.access_type == DUEL_ACCESS_FREE
     assert start_kwargs["source"] == ARENA_SOURCE
     assert start_kwargs["mode_code"] == MODE_CODE
     assert start_kwargs["arena_attempt_id"] == attempt.id
@@ -72,7 +74,7 @@ async def test_accept_arena_duel_creates_attempt_and_starts_first_round(
 
 
 @pytest.mark.asyncio
-async def test_accept_arena_duel_requires_limit_before_locked_read(
+async def test_accept_arena_duel_requires_resolved_access_before_locked_read(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def _unexpected_get_context(*_args, **_kwargs):
@@ -90,7 +92,7 @@ async def test_accept_arena_duel_requires_limit_before_locked_read(
             duel_id=uuid4(),
             user_id=22,
             now_utc=NOW_UTC,
-            duel_limit_checked=False,
+            access_type="",
         )
 
 
@@ -113,7 +115,7 @@ async def test_accept_arena_duel_rejects_missing_duel(monkeypatch: pytest.Monkey
             duel_id=uuid4(),
             user_id=22,
             now_utc=NOW_UTC,
-            duel_limit_checked=True,
+            access_type=DUEL_ACCESS_FREE,
         )
 
 
@@ -203,5 +205,5 @@ async def _assert_access_rejected_before_attempt_create(
             duel_id=duel.id,
             user_id=22,
             now_utc=NOW_UTC,
-            duel_limit_checked=True,
+            access_type=DUEL_ACCESS_FREE,
         )
