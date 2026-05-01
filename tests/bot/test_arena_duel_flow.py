@@ -25,6 +25,7 @@ from app.game.arena_duels.types import (
     ArenaBaselineStartResult,
     ArenaDuelSnapshot,
 )
+from app.game.sessions.errors import FriendChallengeAccessError
 from app.game.sessions.types import SessionQuestionView, StartSessionResult
 from tests.bot.helpers import DummyCallback, DummyMessage
 from tests.type_helpers import AsyncBeginContext
@@ -242,6 +243,28 @@ async def test_arena_start_create_starts_baseline_question() -> None:
         "answer:cccccccc-cccc-cccc-cccc-cccccccccccc:3",
         "game:stop:cccccccc-cccc-cccc-cccc-cccccccccccc",
     ]
+
+
+@pytest.mark.asyncio
+async def test_arena_start_attempt_maps_session_access_error_to_guard() -> None:
+    async def _accept(*_args, **_kwargs):
+        raise FriendChallengeAccessError
+
+    callback = _callback(f"arena:start_attempt:{DUEL_ID}")
+    await arena_duel_flow.handle_arena_start_attempt(
+        callback,
+        arena_start_attempt_re=SimpleNamespace(
+            match=lambda value: value.startswith("arena:start_attempt:")
+        ),
+        parse_uuid_callback=lambda **_kwargs: DUEL_ID,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserService,
+        accept_arena_duel=_accept,
+        build_question_text=lambda **_kwargs: "arena question",
+    )
+
+    assert "Dieses Duell ist abgelaufen." in _text(callback.message.answers[0].text)
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 
 @pytest.mark.asyncio

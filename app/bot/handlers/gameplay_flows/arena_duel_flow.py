@@ -34,6 +34,7 @@ from app.game.arena_duels.types import (
     ArenaChallengerStartResult,
 )
 from app.game.questions.catalog import QUICK_MIX_MODE_CODE
+from app.game.sessions.errors import FriendChallengeAccessError
 from app.game.sessions.types import StartSessionResult
 
 _ARENA_MARKERS = ("🔥", "👑", "⚡")
@@ -306,7 +307,12 @@ async def _start_arena_round(
             guard_text_key = "msg.duels.arena.own"
         except ArenaDuelAlreadyAttemptedError:
             guard_text_key = "msg.duels.arena.already_played"
-        except (ArenaDuelExpiredError, ArenaDuelNotFoundError, ArenaDuelAccessError):
+        except (
+            ArenaDuelExpiredError,
+            ArenaDuelNotFoundError,
+            ArenaDuelAccessError,
+            FriendChallengeAccessError,
+        ):
             guard_text_key = "msg.duels.arena.expired"
 
     if guard_text_key is not None:

@@ -296,7 +296,10 @@ async def list_active_arena_duels(
     )
     snapshots: list[ArenaActiveDuelSnapshot] = []
     for row in rows:
-        snapshot = _build_active_duel_snapshot(row)
+        current_best_attempt = await _get_current_best_attempt(session, duel_id=row.duel.id)
+        if current_best_attempt is None:
+            continue
+        snapshot = _build_active_duel_snapshot(row, current_best_attempt=current_best_attempt)
         if snapshot is not None:
             snapshots.append(snapshot)
     return tuple(snapshots)
@@ -345,6 +348,20 @@ async def _get_previous_best_attempt(
     )
     if not completed_attempts:
         raise ArenaDuelAccessError
+    return completed_attempts[0]
+
+
+async def _get_current_best_attempt(
+    session: AsyncSession,
+    *,
+    duel_id: UUID,
+) -> ArenaAttempt | None:
+    completed_attempts = await ArenaDuelsRepo.list_completed_attempts_for_duel(
+        session,
+        duel_id=duel_id,
+    )
+    if not completed_attempts:
+        return None
     return completed_attempts[0]
 
 
@@ -417,18 +434,21 @@ def _build_duel_snapshot(
     )
 
 
-def _build_active_duel_snapshot(row: ArenaActiveDuelRow) -> ArenaActiveDuelSnapshot | None:
-    score = row.baseline_attempt.score
-    time_ms = row.baseline_attempt.time_ms
-    baseline_attempt_id = row.duel.baseline_attempt_id
-    if score is None or time_ms is None or baseline_attempt_id is None:
+def _build_active_duel_snapshot(
+    row: ArenaActiveDuelRow,
+    *,
+    current_best_attempt: ArenaAttempt,
+) -> ArenaActiveDuelSnapshot | None:
+    score = current_best_attempt.score
+    time_ms = current_best_attempt.time_ms
+    if score is None or time_ms is None:
         return None
     return ArenaActiveDuelSnapshot(
         duel_id=row.duel.id,
-        creator_user_id=row.duel.creator_user_id,
+        creator_user_id=current_best_attempt.user_id,
         mode_code=row.duel.mode_code,
         question_ids=_validate_question_ids(row.duel.question_ids),
-        baseline_attempt_id=baseline_attempt_id,
+        baseline_attempt_id=current_best_attempt.id,
         score=score,
         time_ms=time_ms,
         expires_at=row.duel.expires_at,

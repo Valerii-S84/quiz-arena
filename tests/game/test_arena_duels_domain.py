@@ -466,7 +466,15 @@ async def test_list_active_arena_duels_maps_complete_baselines(
     async def _fake_rows(*_args, **_kwargs):
         return [ArenaActiveDuelRow(duel=duel, baseline_attempt=attempt)]
 
+    async def _fake_completed_attempts(*_args, **_kwargs):
+        return [attempt]
+
     monkeypatch.setattr(arena_service.ArenaDuelsRepo, "list_active_with_baseline", _fake_rows)
+    monkeypatch.setattr(
+        arena_service.ArenaDuelsRepo,
+        "list_completed_attempts_for_duel",
+        _fake_completed_attempts,
+    )
 
     result = await arena_service.list_active_arena_duels(AsyncSessionStub(), now_utc=NOW_UTC)
 
@@ -476,6 +484,46 @@ async def test_list_active_arena_duels_maps_complete_baselines(
     assert result[0].score == 7
     assert result[0].time_ms == 55_000
     assert result[0].question_ids == tuple(_question_ids())
+
+
+@pytest.mark.asyncio
+async def test_list_active_arena_duels_maps_current_best_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    duel = _duel(status=ARENA_DUEL_STATUS_ACTIVE)
+    baseline = _baseline_attempt(duel_id=duel.id)
+    duel.baseline_attempt_id = baseline.id
+    baseline.score = 6
+    baseline.time_ms = 48_000
+    baseline.completed_at = NOW_UTC
+    current_best = _completed_attempt(
+        duel_id=duel.id,
+        user_id=33,
+        score=7,
+        time_ms=52_000,
+    )
+
+    async def _fake_rows(*_args, **_kwargs):
+        return [ArenaActiveDuelRow(duel=duel, baseline_attempt=baseline)]
+
+    async def _fake_completed_attempts(*_args, **_kwargs):
+        return [current_best, baseline]
+
+    monkeypatch.setattr(arena_service.ArenaDuelsRepo, "list_active_with_baseline", _fake_rows)
+    monkeypatch.setattr(
+        arena_service.ArenaDuelsRepo,
+        "list_completed_attempts_for_duel",
+        _fake_completed_attempts,
+    )
+
+    result = await arena_service.list_active_arena_duels(AsyncSessionStub(), now_utc=NOW_UTC)
+
+    assert len(result) == 1
+    assert result[0].duel_id == duel.id
+    assert result[0].creator_user_id == 33
+    assert result[0].baseline_attempt_id == current_best.id
+    assert result[0].score == 7
+    assert result[0].time_ms == 52_000
 
 
 @pytest.mark.asyncio
