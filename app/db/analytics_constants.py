@@ -9,8 +9,15 @@ DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES_SQL = ",".join(
     f"'{event_type}'" for event_type in DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES
 )
 
+ARENA_BEATEN_NOTIFICATION_EVENT_TYPES: tuple[str, ...] = ("arena_result_beaten_notification_sent",)
+ARENA_BEATEN_NOTIFICATION_EVENT_TYPES_SQL = ",".join(
+    f"'{event_type}'" for event_type in ARENA_BEATEN_NOTIFICATION_EVENT_TYPES
+)
+
 
 __all__ = [
+    "ARENA_BEATEN_NOTIFICATION_EVENT_TYPES",
+    "ARENA_BEATEN_NOTIFICATION_EVENT_TYPES_SQL",
     "DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES",
     "DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES_SQL",
 ]

@@ -37,6 +37,26 @@ class ArenaChallengerStartResult:
 
 
 @dataclass(frozen=True, slots=True)
+class ArenaBeatenNotification:
+    arena_duel_id: UUID
+    previous_best_attempt_id: UUID
+    previous_best_user_id: int
+    previous_best_score: int
+    previous_best_time_ms: int
+    new_best_attempt_id: UUID
+    new_best_user_id: int
+    new_best_score: int
+    new_best_time_ms: int
+    notification_type: str
+
+
+@dataclass(frozen=True, slots=True)
+class ArenaAttemptCompletionResult:
+    duel: ArenaDuelSnapshot
+    beaten_notification: ArenaBeatenNotification | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ArenaActiveDuelSnapshot:
     duel_id: UUID
     creator_user_id: int

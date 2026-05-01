@@ -34,3 +34,28 @@ async def list_user_ids_by_event_type_and_tournament(
     )
     result = await session.execute(stmt)
     return {int(user_id) for user_id in result.scalars().all() if user_id is not None}
+
+
+async def has_arena_beaten_notification_event(
+    session: AsyncSession,
+    *,
+    event_type: str,
+    user_id: int,
+    payload: dict[str, object],
+) -> bool:
+    stmt = (
+        select(AnalyticsEvent.id)
+        .where(
+            AnalyticsEvent.event_type == event_type,
+            AnalyticsEvent.user_id == user_id,
+            AnalyticsEvent.payload["arena_duel_id"].astext == str(payload["arena_duel_id"]),
+            AnalyticsEvent.payload["previous_best_attempt_id"].astext
+            == str(payload["previous_best_attempt_id"]),
+            AnalyticsEvent.payload["new_best_attempt_id"].astext
+            == str(payload["new_best_attempt_id"]),
+            AnalyticsEvent.payload["notification_type"].astext == str(payload["notification_type"]),
+        )
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none() is not None
