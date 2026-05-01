@@ -11,6 +11,7 @@ from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
 from app.db.models.quiz_attempts import QuizAttempt
 from app.db.models.quiz_sessions import QuizSession
 from app.game.arena_duels.constants import (
+    ARENA_ATTEMPT_ROLE_CHALLENGER,
     ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
     ARENA_DUEL_STATUS_ACTIVE,
     ARENA_SOURCE,
@@ -54,6 +55,58 @@ class ArenaDuelsRepo:
         session.add(attempt)
         await session.flush()
         return attempt
+
+    @staticmethod
+    async def count_creator_duels_by_access_type(
+        session: AsyncSession,
+        *,
+        creator_user_id: int,
+        access_type: str,
+        since: datetime | None = None,
+    ) -> int:
+        stmt = select(func.count(ArenaDuel.id)).where(
+            ArenaDuel.creator_user_id == creator_user_id,
+            ArenaDuel.access_type == access_type,
+        )
+        if since is not None:
+            stmt = stmt.where(ArenaDuel.created_at >= since)
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_challenger_attempts_by_access_type(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        access_type: str,
+        since: datetime | None = None,
+    ) -> int:
+        stmt = select(func.count(ArenaAttempt.id)).where(
+            ArenaAttempt.user_id == user_id,
+            ArenaAttempt.role == ARENA_ATTEMPT_ROLE_CHALLENGER,
+            ArenaAttempt.access_type == access_type,
+        )
+        if since is not None:
+            stmt = stmt.where(ArenaAttempt.created_at >= since)
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_paid_ticket_usage(session: AsyncSession, *, user_id: int) -> int:
+        duel_result = await session.execute(
+            select(func.count(ArenaDuel.id)).where(
+                ArenaDuel.creator_user_id == user_id,
+                ArenaDuel.access_type == "PAID_TICKET",
+            )
+        )
+        attempt_result = await session.execute(
+            select(func.count(ArenaAttempt.id)).where(
+                ArenaAttempt.user_id == user_id,
+                ArenaAttempt.role == ARENA_ATTEMPT_ROLE_CHALLENGER,
+                ArenaAttempt.access_type == "PAID_TICKET",
+            )
+        )
+        return int(duel_result.scalar_one() or 0) + int(attempt_result.scalar_one() or 0)
 
     @staticmethod
     async def get_attempt_duel_for_update(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
@@ -10,6 +11,8 @@ from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
 from app.db.repo.arena_duels_repo import ArenaDuelAcceptContext, ArenaDuelsRepo
 from tests.game.arena_duels_accept_support import active_duel, challenger_attempt
 from tests.type_helpers import AsyncSessionStub
+
+NOW_UTC = datetime(2026, 5, 1, 10, 0, tzinfo=UTC)
 
 
 @pytest.mark.asyncio
@@ -94,6 +97,61 @@ async def test_accept_context_rechecks_attempt_after_locking_duel() -> None:
     assert "FOR UPDATE" not in recheck_query
 
 
+@pytest.mark.asyncio
+async def test_count_creator_duels_by_access_type_is_server_side() -> None:
+    session = _AcceptContextRecordingSession(_CountResult(1))
+
+    count = await ArenaDuelsRepo.count_creator_duels_by_access_type(
+        session,
+        creator_user_id=11,
+        access_type="FREE",
+        since=NOW_UTC,
+    )
+
+    assert count == 1
+    query = _postgres_sql(session.statements[0])
+    assert "count(arena_duels.id)" in query
+    assert "arena_duels.creator_user_id" in query
+    assert "arena_duels.access_type" in query
+    assert "arena_duels.created_at >=" in query
+
+
+@pytest.mark.asyncio
+async def test_count_challenger_attempts_by_access_type_is_server_side() -> None:
+    session = _AcceptContextRecordingSession(_CountResult(3))
+
+    count = await ArenaDuelsRepo.count_challenger_attempts_by_access_type(
+        session,
+        user_id=22,
+        access_type="FREE",
+        since=NOW_UTC,
+    )
+
+    assert count == 3
+    query = _postgres_sql(session.statements[0])
+    assert "count(arena_attempts.id)" in query
+    assert "arena_attempts.user_id" in query
+    assert "arena_attempts.role" in query
+    assert "arena_attempts.access_type" in query
+    assert "arena_attempts.created_at >=" in query
+
+
+@pytest.mark.asyncio
+async def test_count_paid_ticket_usage_counts_arena_create_and_accept_usage() -> None:
+    session = _AcceptContextRecordingSession(_CountResult(1), _CountResult(2))
+
+    count = await ArenaDuelsRepo.count_paid_ticket_usage(session, user_id=22)
+
+    assert count == 3
+    duel_query = _postgres_sql(session.statements[0])
+    attempt_query = _postgres_sql(session.statements[1])
+    assert "FROM arena_duels" in duel_query
+    assert "arena_duels.access_type = %(access_type_1)s" in duel_query
+    assert "FROM arena_attempts" in attempt_query
+    assert "arena_attempts.role = %(role_1)s" in attempt_query
+    assert "arena_attempts.access_type = %(access_type_1)s" in attempt_query
+
+
 class _AcceptContextRecordingSession(AsyncSessionStub):
     def __init__(self, *results: object) -> None:
         self.statements: list[object] = []
@@ -121,6 +179,14 @@ class _ScalarResult:
         self._value = value
 
     def scalar_one_or_none(self) -> ArenaAttempt | ArenaDuel | None:
+        return self._value
+
+
+class _CountResult:
+    def __init__(self, value: int) -> None:
+        self._value = value
+
+    def scalar_one(self) -> int:
         return self._value
 
 

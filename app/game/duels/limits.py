@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +13,8 @@ from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.users_repo import UsersRepo
 from app.game.duels.constants import (
     DUEL_FREE_LIMITS_PER_DAY,
+    DUEL_LIMIT_ACTION_ARENA_ACCEPT,
+    DUEL_LIMIT_ACTION_ARENA_CREATE,
     DUEL_LIMIT_ACTION_FRIEND_CREATE,
     DUEL_PAYWALL_PRODUCT_CODES,
     DUEL_TICKET_PRODUCT_CODE,
@@ -24,6 +27,8 @@ if TYPE_CHECKING:
 DUEL_ACCESS_FREE = "FREE"
 DUEL_ACCESS_PAID_TICKET = "PAID_TICKET"
 DUEL_ACCESS_PREMIUM = "PREMIUM"
+DUEL_ACCESS_TYPES = frozenset({DUEL_ACCESS_FREE, DUEL_ACCESS_PAID_TICKET, DUEL_ACCESS_PREMIUM})
+_BERLIN_TZ = ZoneInfo("Europe/Berlin")
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +70,13 @@ class DuelLimitService:
             from app.game.sessions.errors import DuelLimitRequiredError
 
             raise DuelLimitRequiredError
+
+    @staticmethod
+    def assert_resolved_access_type(source: str, *, access_type: str) -> None:
+        DuelLimitService.assert_start_gate(
+            source,
+            duel_limit_checked=access_type in DUEL_ACCESS_TYPES,
+        )
 
     @staticmethod
     def resolve_access_type(
@@ -152,10 +164,9 @@ class DuelLimitService:
         ):
             return DUEL_ACCESS_FREE
 
-        paid_ticket_uses = await FriendChallengesRepo.count_by_creator_access_type(
+        paid_ticket_uses = await DuelLimitService._count_paid_ticket_uses(
             session,
-            creator_user_id=creator_user_id,
-            access_type=DUEL_ACCESS_PAID_TICKET,
+            user_id=creator_user_id,
         )
         credited_tickets = await PurchasesRepo.count_credited_product(
             session,
@@ -172,3 +183,134 @@ class DuelLimitService:
         if not decision.allowed or decision.access_type is None:
             raise FriendChallengePaymentRequiredError
         return decision.access_type
+
+    @staticmethod
+    async def resolve_arena_create_access_type(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        now_utc: datetime,
+    ) -> str:
+        from app.db.repo.arena_duels_repo import ArenaDuelsRepo
+        from app.game.arena_duels.errors import ArenaDuelAccessError, ArenaDuelPaymentRequiredError
+
+        await DuelLimitService._ensure_user_exists(
+            session,
+            user_id=user_id,
+            access_error=ArenaDuelAccessError,
+        )
+        premium_active = await EntitlementsRepo.has_active_premium(session, user_id, now_utc)
+        if premium_active:
+            return DUEL_ACCESS_PREMIUM
+
+        day_start = _berlin_day_start_utc(now_utc)
+        free_used_today = await ArenaDuelsRepo.count_creator_duels_by_access_type(
+            session,
+            creator_user_id=user_id,
+            access_type=DUEL_ACCESS_FREE,
+            since=day_start,
+        )
+        return await DuelLimitService._resolve_non_premium_access_type(
+            session,
+            user_id=user_id,
+            action=DUEL_LIMIT_ACTION_ARENA_CREATE,
+            free_used_today=free_used_today,
+            payment_required_error=ArenaDuelPaymentRequiredError,
+        )
+
+    @staticmethod
+    async def resolve_arena_accept_access_type(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        now_utc: datetime,
+    ) -> str:
+        from app.db.repo.arena_duels_repo import ArenaDuelsRepo
+        from app.game.arena_duels.errors import ArenaDuelAccessError, ArenaDuelPaymentRequiredError
+
+        await DuelLimitService._ensure_user_exists(
+            session,
+            user_id=user_id,
+            access_error=ArenaDuelAccessError,
+        )
+        premium_active = await EntitlementsRepo.has_active_premium(session, user_id, now_utc)
+        if premium_active:
+            return DUEL_ACCESS_PREMIUM
+
+        day_start = _berlin_day_start_utc(now_utc)
+        free_used_today = await ArenaDuelsRepo.count_challenger_attempts_by_access_type(
+            session,
+            user_id=user_id,
+            access_type=DUEL_ACCESS_FREE,
+            since=day_start,
+        )
+        return await DuelLimitService._resolve_non_premium_access_type(
+            session,
+            user_id=user_id,
+            action=DUEL_LIMIT_ACTION_ARENA_ACCEPT,
+            free_used_today=free_used_today,
+            payment_required_error=ArenaDuelPaymentRequiredError,
+        )
+
+    @staticmethod
+    async def _resolve_non_premium_access_type(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        action: str,
+        free_used_today: int,
+        payment_required_error: type[Exception],
+    ) -> str:
+        paid_ticket_uses = await DuelLimitService._count_paid_ticket_uses(
+            session,
+            user_id=user_id,
+        )
+        credited_tickets = await PurchasesRepo.count_credited_product(
+            session,
+            user_id=user_id,
+            product_code=DUEL_TICKET_PRODUCT_CODE,
+        )
+        decision = DuelLimitService.resolve_access_type(
+            action=action,
+            premium_active=False,
+            free_used_today=free_used_today,
+            paid_ticket_uses=paid_ticket_uses,
+            credited_tickets=credited_tickets,
+        )
+        if not decision.allowed or decision.access_type is None:
+            raise payment_required_error
+        return decision.access_type
+
+    @staticmethod
+    async def _count_paid_ticket_uses(session: AsyncSession, *, user_id: int) -> int:
+        from app.db.repo.arena_duels_repo import ArenaDuelsRepo
+
+        friend_uses = await FriendChallengesRepo.count_by_creator_access_type(
+            session,
+            creator_user_id=user_id,
+            access_type=DUEL_ACCESS_PAID_TICKET,
+        )
+        arena_uses = await ArenaDuelsRepo.count_paid_ticket_usage(session, user_id=user_id)
+        return friend_uses + arena_uses
+
+    @staticmethod
+    async def _ensure_user_exists(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        access_error: type[Exception],
+    ) -> None:
+        user = await UsersRepo.get_by_id_for_update(session, user_id)
+        if user is None:
+            raise access_error
+
+
+def _berlin_day_start_utc(now_utc: datetime) -> datetime:
+    aware_now = now_utc if now_utc.tzinfo is not None else now_utc.replace(tzinfo=timezone.utc)
+    berlin_start = aware_now.astimezone(_BERLIN_TZ).replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    return berlin_start.astimezone(timezone.utc)

@@ -23,6 +23,7 @@ from app.game.duels.constants import (
     DUEL_FRIEND_CALLBACK,
     DUEL_MENU_CALLBACK,
 )
+from app.game.duels.limits import DuelLimitService
 from app.services.user_onboarding import UserOnboardingService
 
 
@@ -62,6 +63,7 @@ async def handle_arena_start_create(callback: CallbackQuery) -> None:
         callback,
         session_local=SessionLocal,
         user_onboarding_service=UserOnboardingService,
+        resolve_arena_create_access_type=DuelLimitService.resolve_arena_create_access_type,
         create_arena_duel_baseline=create_arena_duel_baseline,
         build_question_text=_build_question_text,
     )
@@ -85,6 +87,7 @@ async def handle_arena_start_attempt(callback: CallbackQuery) -> None:
         parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
         session_local=SessionLocal,
         user_onboarding_service=UserOnboardingService,
+        resolve_arena_accept_access_type=DuelLimitService.resolve_arena_accept_access_type,
         accept_arena_duel=accept_arena_duel,
         build_question_text=_build_question_text,
     )

@@ -26,6 +26,7 @@ from app.game.arena_duels.constants import (
     ARENA_SOURCE,
 )
 from app.game.arena_duels.errors import ArenaDuelIncompleteError
+from app.game.duels.limits import DUEL_ACCESS_FREE
 from app.game.sessions.errors import DuelLimitRequiredError
 from app.game.sessions.types import SessionQuestionView, StartSessionResult
 from tests.type_helpers import AsyncSessionStub
@@ -63,6 +64,7 @@ def _duel(*, duel_id: UUID | None = None, status: str = ARENA_DUEL_STATUS_DRAFT)
         baseline_attempt_id=None,
         question_ids=_question_ids(),
         mode_code=MODE_CODE,
+        access_type=DUEL_ACCESS_FREE,
         status=status,
         expires_at=NOW_UTC + timedelta(hours=1),
         created_at=NOW_UTC,
@@ -77,6 +79,7 @@ def _baseline_attempt(*, duel_id: UUID) -> ArenaAttempt:
         arena_duel_id=duel_id,
         user_id=11,
         role=ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+        access_type=DUEL_ACCESS_FREE,
         score=None,
         time_ms=None,
         result=None,
@@ -91,6 +94,7 @@ def _challenger_attempt(*, duel_id: UUID) -> ArenaAttempt:
         arena_duel_id=duel_id,
         user_id=22,
         role=ARENA_ATTEMPT_ROLE_CHALLENGER,
+        access_type=DUEL_ACCESS_FREE,
         score=None,
         time_ms=None,
         result=None,
@@ -112,6 +116,7 @@ def _completed_attempt(
         arena_duel_id=duel_id,
         user_id=user_id,
         role=role,
+        access_type=DUEL_ACCESS_FREE,
         score=score,
         time_ms=time_ms,
         result=ARENA_ATTEMPT_RESULT_WIN,
@@ -152,7 +157,7 @@ async def test_create_arena_duel_baseline_creates_draft_attempt_and_starts_round
         creator_user_id=11,
         mode_code=MODE_CODE,
         now_utc=NOW_UTC,
-        duel_limit_checked=True,
+        access_type=DUEL_ACCESS_FREE,
     )
 
     duel = captured["duel"]
@@ -164,9 +169,11 @@ async def test_create_arena_duel_baseline_creates_draft_attempt_and_starts_round
     assert isinstance(attempt, ArenaAttempt)
     assert duel.status == ARENA_DUEL_STATUS_DRAFT
     assert duel.question_ids == _question_ids()
+    assert duel.access_type == DUEL_ACCESS_FREE
     assert duel.baseline_attempt_id is None
     assert attempt.arena_duel_id == duel.id
     assert attempt.role == ARENA_ATTEMPT_ROLE_CREATOR_BASELINE
+    assert attempt.access_type == DUEL_ACCESS_FREE
     assert start_kwargs["source"] == ARENA_SOURCE
     assert start_kwargs["arena_attempt_id"] == attempt.id
     assert start_kwargs["arena_round"] == 1
@@ -178,7 +185,7 @@ async def test_create_arena_duel_baseline_creates_draft_attempt_and_starts_round
 
 
 @pytest.mark.asyncio
-async def test_create_arena_duel_baseline_requires_duel_limit_before_creating_rows(
+async def test_create_arena_duel_baseline_requires_resolved_access_before_creating_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def _unexpected_create(*_args, **_kwargs):
@@ -193,7 +200,7 @@ async def test_create_arena_duel_baseline_requires_duel_limit_before_creating_ro
             creator_user_id=11,
             mode_code=MODE_CODE,
             now_utc=NOW_UTC,
-            duel_limit_checked=False,
+            access_type="",
         )
 
 

@@ -27,3 +27,7 @@ class ArenaDuelOwnAttemptError(ArenaDuelAccessError):
 
 class ArenaDuelIncompleteError(ArenaDuelError):
     pass
+
+
+class ArenaDuelPaymentRequiredError(ArenaDuelError):
+    pass
