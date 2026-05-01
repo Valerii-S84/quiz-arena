@@ -163,6 +163,7 @@ async def publish_friend_challenge_to_arena(
     existing = await ArenaDuelsRepo.get_source_friend_duel_with_baseline_for_update(
         session,
         source_friend_challenge_id=challenge.id,
+        now_utc=now_utc,
     )
     if existing is not None:
         return _build_arena_duel_snapshot(

@@ -61,6 +61,7 @@ class ArenaDuelsRepo:
         session: AsyncSession,
         *,
         source_friend_challenge_id: UUID,
+        now_utc: datetime,
     ) -> ArenaActiveDuelRow | None:
         stmt = (
             select(ArenaDuel, ArenaAttempt)
@@ -74,6 +75,7 @@ class ArenaDuelsRepo:
             .where(ArenaDuel.source_friend_challenge_id == source_friend_challenge_id)
             .where(
                 ArenaDuel.status == ARENA_DUEL_STATUS_ACTIVE,
+                ArenaDuel.expires_at > now_utc,
                 ArenaAttempt.score.is_not(None),
                 ArenaAttempt.time_ms.is_not(None),
                 ArenaAttempt.completed_at.is_not(None),
@@ -126,10 +128,12 @@ class ArenaDuelsRepo:
 
     @staticmethod
     async def count_paid_ticket_usage(session: AsyncSession, *, user_id: int) -> int:
+        # Friend-published arena rows reuse the original friend challenge entitlement.
         duel_result = await session.execute(
             select(func.count(ArenaDuel.id)).where(
                 ArenaDuel.creator_user_id == user_id,
                 ArenaDuel.access_type == "PAID_TICKET",
+                ArenaDuel.source_friend_challenge_id.is_(None),
             )
         )
         attempt_result = await session.execute(
