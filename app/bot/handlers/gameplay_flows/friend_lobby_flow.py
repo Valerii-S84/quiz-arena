@@ -112,6 +112,7 @@ async def handle_friend_challenge_create_selected(
         invite_link=invite_link,
         challenge_id=str(challenge.challenge_id),
         total_rounds=challenge.total_rounds,
+        allow_arena_publish=challenge.challenge_type == DUEL_TYPE_DIRECT,
     )
     if welcome_image_file_id:
         bot = callback.bot

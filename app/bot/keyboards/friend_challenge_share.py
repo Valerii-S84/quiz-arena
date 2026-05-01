@@ -26,6 +26,7 @@ def build_friend_challenge_share_keyboard(
     invite_link: str | None,
     challenge_id: str | None,
     total_rounds: int = 12,
+    allow_arena_publish: bool = False,
 ) -> InlineKeyboardMarkup:
     if not invite_link or not challenge_id:
         return InlineKeyboardMarkup(
@@ -56,7 +57,7 @@ def build_friend_challenge_share_keyboard(
             )
         ],
     ]
-    if int(total_rounds) == 7:
+    if allow_arena_publish and int(total_rounds) == 7:
         rows.append(
             [
                 InlineKeyboardButton(
