@@ -13,12 +13,15 @@ from app.db.repo.analytics_aggregations import (  # noqa: F401
 )
 from app.db.repo.analytics_models import AnalyticsDailyUpsert  # noqa: F401
 from app.db.repo.analytics_mutations import (  # noqa: F401
+    create_arena_beaten_notification_event_once,
     create_daily_cup_push_event_once,
     create_event,
     delete_events_created_before,
+    lock_arena_beaten_notification_event_key,
     upsert_daily,
 )
 from app.db.repo.analytics_queries import (  # noqa: F401
+    has_arena_beaten_notification_event,
     list_daily,
     list_user_ids_by_event_type_and_tournament,
 )
@@ -27,6 +30,13 @@ from app.db.repo.analytics_queries import (  # noqa: F401
 class AnalyticsRepo:
     create_event = staticmethod(create_event)
     create_daily_cup_push_event_once = staticmethod(create_daily_cup_push_event_once)
+    create_arena_beaten_notification_event_once = staticmethod(
+        create_arena_beaten_notification_event_once
+    )
+    lock_arena_beaten_notification_event_key = staticmethod(
+        lock_arena_beaten_notification_event_key
+    )
+    has_arena_beaten_notification_event = staticmethod(has_arena_beaten_notification_event)
     count_distinct_active_users_between = staticmethod(count_distinct_active_users_between)
     count_credited_purchases_between = staticmethod(count_credited_purchases_between)
     count_distinct_credited_purchasers_between = staticmethod(

@@ -11,10 +11,14 @@ from sqlalchemy import Table
 
 from app.bot.handlers.gameplay_flows import play_flow
 from app.bot.texts.de import TEXTS_DE
+from app.db.models.analytics_events import AnalyticsEvent
 from app.db.models.arena_duels import ArenaDuel
+from app.game.arena_duels.constants import ARENA_BEATEN_NOTIFICATION_TYPE
+from app.game.arena_duels.types import ArenaBeatenNotification
 from app.game.sessions.errors import FriendChallengeAccessError
 from app.game.sessions.service import sessions_submit
 from app.game.sessions.types import AnswerSessionResult
+from app.workers.tasks import arena_duels as arena_notifications
 from tests.bot.gameplay_flow_fixtures import _start_result
 from tests.bot.helpers import DummyCallback, DummyMessage
 from tests.type_helpers import AsyncBeginContext, AsyncSessionStub
@@ -54,12 +58,13 @@ async def _continue_arena(
     result: AnswerSessionResult,
     start_session,
     text: str = "unused",
-    complete_arena_creator_baseline_if_applicable=None,
+    complete_arena_attempt_if_applicable=None,
+    callback: DummyCallback | None = None,
 ):
-    async def _default_complete_baseline(*_args, **_kwargs):
-        pytest.fail("Arena baseline finalization was not expected")
+    async def _default_complete_attempt(*_args, **_kwargs):
+        pytest.fail("Arena attempt finalization was not expected")
 
-    callback = _callback()
+    callback = callback or _callback()
     await play_flow.continue_regular_mode_after_answer(
         callback,
         result=result,
@@ -68,8 +73,8 @@ async def _continue_arena(
         user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_ensure_home_snapshot),
         game_session_service=SimpleNamespace(
             start_session=start_session,
-            complete_arena_creator_baseline_if_applicable=(
-                complete_arena_creator_baseline_if_applicable or _default_complete_baseline
+            complete_arena_attempt_if_applicable=(
+                complete_arena_attempt_if_applicable or _default_complete_attempt
             ),
         ),
         offer_service=SimpleNamespace(),
@@ -97,6 +102,25 @@ def test_arena_baseline_fk_requires_same_duel_in_model_and_migration() -> None:
     assert '"uq_arena_attempts_duel_id_id"' in migration
     assert '["id", "baseline_attempt_id"]' in migration
     assert '["arena_duel_id", "id"]' in migration
+
+
+def test_arena_beaten_notification_dedupe_index_matches_migration() -> None:
+    analytics_table = cast(Table, AnalyticsEvent.__table__)
+    index = next(
+        db_index
+        for db_index in analytics_table.indexes
+        if db_index.name == "uq_analytics_events_arena_beaten_notice_once"
+    )
+    migration = Path(
+        "alembic/versions/f8a9b0c1d2e3_m48_arena_beaten_notification_dedupe.py"
+    ).read_text()
+
+    assert index.unique is True
+    assert "payload ->> 'arena_duel_id'" in migration
+    assert "payload ->> 'previous_best_attempt_id'" in migration
+    assert "payload ->> 'new_best_attempt_id'" in migration
+    assert "payload ->> 'notification_type'" in migration
+    assert "arena_result_beaten_notification_sent" in migration
 
 
 @pytest.mark.asyncio
@@ -207,14 +231,15 @@ async def test_continue_after_final_arena_baseline_round_publishes_duel() -> Non
     async def _unexpected_start_session(*_args, **_kwargs):
         pytest.fail("final ARENA_DUEL round must not start another session")
 
-    async def _complete_baseline(*args, **kwargs):
+    async def _complete_attempt(*args, **kwargs):
         del args
         completed.append(kwargs)
+        return SimpleNamespace(beaten_notification=None)
 
     callback = await _continue_arena(
         _arena_result(arena_attempt_id, 7),
         _unexpected_start_session,
-        complete_arena_creator_baseline_if_applicable=_complete_baseline,
+        complete_arena_attempt_if_applicable=_complete_attempt,
     )
 
     assert completed == [
@@ -239,12 +264,12 @@ async def test_continue_after_final_arena_challenger_round_does_not_publish_base
     async def _complete_if_applicable(*args, **kwargs):
         del args
         completed.append(kwargs)
-        return None
+        return SimpleNamespace(beaten_notification=None)
 
     callback = await _continue_arena(
         _arena_result(arena_attempt_id, 7),
         _unexpected_start_session,
-        complete_arena_creator_baseline_if_applicable=_complete_if_applicable,
+        complete_arena_attempt_if_applicable=_complete_if_applicable,
     )
 
     assert completed == [
@@ -256,6 +281,161 @@ async def test_continue_after_final_arena_challenger_round_does_not_publish_base
     ]
     assert callback.message.answers == []
     assert callback.answer_calls == [{"text": None, "show_alert": False}]
+
+
+@pytest.mark.asyncio
+async def test_continue_after_final_arena_challenger_round_sends_beaten_notification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    arena_attempt_id = UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")
+    notification = ArenaBeatenNotification(
+        arena_duel_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        previous_best_attempt_id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+        previous_best_user_id=11,
+        previous_best_score=6,
+        previous_best_time_ms=48_000,
+        new_best_attempt_id=arena_attempt_id,
+        new_best_user_id=101,
+        new_best_score=7,
+        new_best_time_ms=52_000,
+        notification_type=ARENA_BEATEN_NOTIFICATION_TYPE,
+    )
+    sent: list[dict[str, object]] = []
+
+    async def _unexpected_start_session(*_args, **_kwargs):
+        pytest.fail("final ARENA_DUEL round must not start another session")
+
+    async def _complete_if_applicable(*_args, **_kwargs):
+        return SimpleNamespace(beaten_notification=notification)
+
+    async def _send_notification(**kwargs):
+        sent.append(kwargs)
+        return {"sent_total": 1, "failed_total": 0, "skipped_total": 0}
+
+    monkeypatch.setattr(arena_notifications, "send_arena_beaten_notification", _send_notification)
+
+    callback = await _continue_arena(
+        _arena_result(arena_attempt_id, 7),
+        _unexpected_start_session,
+        complete_arena_attempt_if_applicable=_complete_if_applicable,
+    )
+
+    assert sent == [
+        {
+            "notification": notification,
+            "happened_at": NOW_UTC,
+            "bot": callback.bot,
+            "source": "BOT",
+        }
+    ]
+    assert callback.message.answers == []
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
+
+
+@pytest.mark.asyncio
+async def test_continue_after_final_arena_challenger_round_acknowledges_before_notification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    arena_attempt_id = UUID("ffffffff-ffff-ffff-ffff-ffffffffffff")
+    notification = ArenaBeatenNotification(
+        arena_duel_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        previous_best_attempt_id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+        previous_best_user_id=11,
+        previous_best_score=6,
+        previous_best_time_ms=48_000,
+        new_best_attempt_id=arena_attempt_id,
+        new_best_user_id=101,
+        new_best_score=7,
+        new_best_time_ms=52_000,
+        notification_type=ARENA_BEATEN_NOTIFICATION_TYPE,
+    )
+    callback = _callback()
+    sent: list[dict[str, object]] = []
+
+    async def _unexpected_start_session(*_args, **_kwargs):
+        pytest.fail("final ARENA_DUEL round must not start another session")
+
+    async def _complete_if_applicable(*_args, **_kwargs):
+        return SimpleNamespace(beaten_notification=notification)
+
+    async def _send_notification(**kwargs):
+        assert callback.answer_calls == [{"text": None, "show_alert": False}]
+        sent.append(kwargs)
+        return {"sent_total": 1, "failed_total": 0, "skipped_total": 0}
+
+    monkeypatch.setattr(arena_notifications, "send_arena_beaten_notification", _send_notification)
+
+    callback = await _continue_arena(
+        _arena_result(arena_attempt_id, 7),
+        _unexpected_start_session,
+        complete_arena_attempt_if_applicable=_complete_if_applicable,
+        callback=callback,
+    )
+
+    assert sent == [
+        {
+            "notification": notification,
+            "happened_at": NOW_UTC,
+            "bot": callback.bot,
+            "source": "BOT",
+        }
+    ]
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
+
+
+@pytest.mark.asyncio
+async def test_continue_after_final_arena_challenger_round_keeps_notification_best_effort(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    arena_attempt_id = UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
+    notification = ArenaBeatenNotification(
+        arena_duel_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        previous_best_attempt_id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+        previous_best_user_id=11,
+        previous_best_score=6,
+        previous_best_time_ms=48_000,
+        new_best_attempt_id=arena_attempt_id,
+        new_best_user_id=101,
+        new_best_score=7,
+        new_best_time_ms=52_000,
+        notification_type=ARENA_BEATEN_NOTIFICATION_TYPE,
+    )
+    warnings: list[dict[str, object]] = []
+
+    async def _unexpected_start_session(*_args, **_kwargs):
+        pytest.fail("final ARENA_DUEL round must not start another session")
+
+    async def _complete_if_applicable(*_args, **_kwargs):
+        return SimpleNamespace(beaten_notification=notification)
+
+    async def _failing_send_notification(**_kwargs):
+        raise RuntimeError("notification backend unavailable")
+
+    def _warning(event: str, **kwargs) -> None:
+        warnings.append({"event": event, **kwargs})
+
+    monkeypatch.setattr(
+        arena_notifications, "send_arena_beaten_notification", _failing_send_notification
+    )
+    monkeypatch.setattr(play_flow, "logger", SimpleNamespace(warning=_warning))
+
+    callback = await _continue_arena(
+        _arena_result(arena_attempt_id, 7),
+        _unexpected_start_session,
+        complete_arena_attempt_if_applicable=_complete_if_applicable,
+    )
+
+    assert callback.message.answers == []
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
+    assert warnings == [
+        {
+            "event": "arena_beaten_notification_failed",
+            "arena_duel_id": str(notification.arena_duel_id),
+            "previous_best_attempt_id": str(notification.previous_best_attempt_id),
+            "new_best_attempt_id": str(notification.new_best_attempt_id),
+            "error_type": "RuntimeError",
+        }
+    ]
 
 
 def _return(value):

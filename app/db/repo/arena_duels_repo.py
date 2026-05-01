@@ -195,6 +195,33 @@ class ArenaDuelsRepo:
         )
 
     @staticmethod
+    async def list_completed_attempts_for_duel(
+        session: AsyncSession,
+        *,
+        duel_id: UUID,
+        exclude_attempt_id: UUID | None = None,
+    ) -> list[ArenaAttempt]:
+        stmt = (
+            select(ArenaAttempt)
+            .where(
+                ArenaAttempt.arena_duel_id == duel_id,
+                ArenaAttempt.completed_at.is_not(None),
+                ArenaAttempt.score.is_not(None),
+                ArenaAttempt.time_ms.is_not(None),
+            )
+            .order_by(
+                ArenaAttempt.score.desc(),
+                ArenaAttempt.time_ms.asc(),
+                ArenaAttempt.completed_at.asc(),
+                ArenaAttempt.id.asc(),
+            )
+        )
+        if exclude_attempt_id is not None:
+            stmt = stmt.where(ArenaAttempt.id != exclude_attempt_id)
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
     async def list_active_with_baseline(
         session: AsyncSession,
         *,

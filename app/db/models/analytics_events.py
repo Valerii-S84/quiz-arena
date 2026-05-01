@@ -6,7 +6,10 @@ from sqlalchemy import BigInteger, CheckConstraint, Date, DateTime, ForeignKey, 
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.analytics_constants import DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES_SQL
+from app.db.analytics_constants import (
+    ARENA_BEATEN_NOTIFICATION_EVENT_TYPES_SQL,
+    DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES_SQL,
+)
 from app.db.models.base import Base
 
 
@@ -32,6 +35,25 @@ class AnalyticsEvent(Base):
                 "AND payload ? 'tournament_id' "
                 "AND event_type IN "
                 f"({DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES_SQL})"
+            ),
+        ),
+        Index(
+            "uq_analytics_events_arena_beaten_notice_once",
+            "event_type",
+            "user_id",
+            text("(payload ->> 'arena_duel_id')"),
+            text("(payload ->> 'previous_best_attempt_id')"),
+            text("(payload ->> 'new_best_attempt_id')"),
+            text("(payload ->> 'notification_type')"),
+            unique=True,
+            postgresql_where=text(
+                "user_id IS NOT NULL "
+                "AND payload ? 'arena_duel_id' "
+                "AND payload ? 'previous_best_attempt_id' "
+                "AND payload ? 'new_best_attempt_id' "
+                "AND payload ? 'notification_type' "
+                "AND event_type IN "
+                f"({ARENA_BEATEN_NOTIFICATION_EVENT_TYPES_SQL})"
             ),
         ),
     )

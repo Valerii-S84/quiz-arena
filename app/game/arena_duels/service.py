@@ -10,7 +10,12 @@ from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
 from app.db.repo.arena_duels_repo import ArenaActiveDuelRow, ArenaAttemptDuelContext, ArenaDuelsRepo
 from app.game.arena_duels.constants import (
     ARENA_ATTEMPT_RESULT_BASELINE,
+    ARENA_ATTEMPT_RESULT_DRAW,
+    ARENA_ATTEMPT_RESULT_LOSS,
+    ARENA_ATTEMPT_RESULT_WIN,
+    ARENA_ATTEMPT_ROLE_CHALLENGER,
     ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+    ARENA_BEATEN_NOTIFICATION_TYPE,
     ARENA_DEFAULT_ACTIVE_LIST_LIMIT,
     ARENA_DUEL_STATUS_ACTIVE,
     ARENA_DUEL_STATUS_DRAFT,
@@ -22,9 +27,12 @@ from app.game.arena_duels.errors import (
     ArenaDuelIncompleteError,
     ArenaDuelNotFoundError,
 )
+from app.game.arena_duels.scoring import ArenaScoreLine, decide_arena_scoring_outcome
 from app.game.arena_duels.types import (
     ArenaActiveDuelSnapshot,
+    ArenaAttemptCompletionResult,
     ArenaBaselineStartResult,
+    ArenaBeatenNotification,
     ArenaDuelSnapshot,
 )
 from app.game.duels.constants import DUEL_QUESTION_COUNT
@@ -144,6 +152,37 @@ async def complete_arena_creator_baseline_if_applicable(
     )
 
 
+async def complete_arena_attempt_if_applicable(
+    session: AsyncSession,
+    *,
+    attempt_id: UUID,
+    user_id: int,
+    now_utc: datetime,
+) -> ArenaAttemptCompletionResult | None:
+    context = await ArenaDuelsRepo.get_attempt_duel_for_update(session, attempt_id=attempt_id)
+    if context is None:
+        raise ArenaDuelNotFoundError
+
+    attempt = context.attempt
+    if attempt.user_id != user_id:
+        raise ArenaDuelAccessError
+    if attempt.role == ARENA_ATTEMPT_ROLE_CREATOR_BASELINE:
+        snapshot = await _complete_arena_creator_baseline_context(
+            session,
+            context=context,
+            user_id=user_id,
+            now_utc=now_utc,
+        )
+        return ArenaAttemptCompletionResult(duel=snapshot)
+    if attempt.role == ARENA_ATTEMPT_ROLE_CHALLENGER:
+        return await _complete_arena_challenger_context(
+            session,
+            context=context,
+            now_utc=now_utc,
+        )
+    return None
+
+
 async def _complete_arena_creator_baseline_context(
     session: AsyncSession,
     *,
@@ -179,6 +218,52 @@ async def _complete_arena_creator_baseline_context(
     return _build_duel_snapshot(duel=duel, baseline_attempt=attempt)
 
 
+async def _complete_arena_challenger_context(
+    session: AsyncSession,
+    *,
+    context: ArenaAttemptDuelContext,
+    now_utc: datetime,
+) -> ArenaAttemptCompletionResult:
+    attempt = context.attempt
+    duel = context.duel
+    _ensure_challenger_completion_access(attempt=attempt, duel=duel)
+    if attempt.completed_at is not None:
+        return ArenaAttemptCompletionResult(
+            duel=_build_duel_snapshot(duel=duel, baseline_attempt=None)
+        )
+
+    summary = await ArenaDuelsRepo.summarize_completed_attempt(session, attempt_id=attempt.id)
+    if summary.completed_rounds != DUEL_QUESTION_COUNT:
+        raise ArenaDuelIncompleteError
+
+    previous_best = await _get_previous_best_attempt(
+        session, duel_id=duel.id, attempt_id=attempt.id
+    )
+    attempt.score = summary.score
+    attempt.time_ms = summary.time_ms
+    attempt.completed_at = now_utc
+
+    notification = _build_beaten_notification(
+        duel=duel,
+        previous_best=previous_best,
+        new_attempt=attempt,
+    )
+    attempt.result = (
+        ARENA_ATTEMPT_RESULT_WIN
+        if notification is not None
+        else _resolve_loss_or_draw(
+            previous_best=previous_best,
+            new_attempt=attempt,
+        )
+    )
+    duel.updated_at = now_utc
+
+    return ArenaAttemptCompletionResult(
+        duel=_build_duel_snapshot(duel=duel, baseline_attempt=None),
+        beaten_notification=notification,
+    )
+
+
 async def list_active_arena_duels(
     session: AsyncSession,
     *,
@@ -211,6 +296,86 @@ def _ensure_creator_baseline_access(
         or attempt.role != ARENA_ATTEMPT_ROLE_CREATOR_BASELINE
     ):
         raise ArenaDuelAccessError
+
+
+def _ensure_challenger_completion_access(
+    *,
+    attempt: ArenaAttempt,
+    duel: ArenaDuel,
+) -> None:
+    if (
+        attempt.role != ARENA_ATTEMPT_ROLE_CHALLENGER
+        or attempt.arena_duel_id != duel.id
+        or duel.status != ARENA_DUEL_STATUS_ACTIVE
+        or duel.baseline_attempt_id is None
+    ):
+        raise ArenaDuelAccessError
+    _validate_question_ids(duel.question_ids)
+
+
+async def _get_previous_best_attempt(
+    session: AsyncSession,
+    *,
+    duel_id: UUID,
+    attempt_id: UUID,
+) -> ArenaAttempt:
+    completed_attempts = await ArenaDuelsRepo.list_completed_attempts_for_duel(
+        session,
+        duel_id=duel_id,
+        exclude_attempt_id=attempt_id,
+    )
+    if not completed_attempts:
+        raise ArenaDuelAccessError
+    return completed_attempts[0]
+
+
+def _build_beaten_notification(
+    *,
+    duel: ArenaDuel,
+    previous_best: ArenaAttempt,
+    new_attempt: ArenaAttempt,
+) -> ArenaBeatenNotification | None:
+    previous_line = _score_line(previous_best)
+    new_line = _score_line(new_attempt)
+    outcome = decide_arena_scoring_outcome(baseline=previous_line, challenger=new_line)
+    if not outcome.challenger_won:
+        return None
+    return ArenaBeatenNotification(
+        arena_duel_id=duel.id,
+        previous_best_attempt_id=previous_best.id,
+        previous_best_user_id=previous_best.user_id,
+        previous_best_score=previous_line.score,
+        previous_best_time_ms=previous_line.time_ms,
+        new_best_attempt_id=new_attempt.id,
+        new_best_user_id=new_attempt.user_id,
+        new_best_score=new_line.score,
+        new_best_time_ms=new_line.time_ms,
+        notification_type=ARENA_BEATEN_NOTIFICATION_TYPE,
+    )
+
+
+def _resolve_loss_or_draw(
+    *,
+    previous_best: ArenaAttempt,
+    new_attempt: ArenaAttempt,
+) -> str:
+    outcome = decide_arena_scoring_outcome(
+        baseline=_score_line(previous_best),
+        challenger=_score_line(new_attempt),
+    )
+    if outcome.challenger_result == ARENA_ATTEMPT_RESULT_DRAW:
+        return ARENA_ATTEMPT_RESULT_DRAW
+    return ARENA_ATTEMPT_RESULT_LOSS
+
+
+def _score_line(attempt: ArenaAttempt) -> ArenaScoreLine:
+    if attempt.score is None or attempt.time_ms is None:
+        raise ArenaDuelAccessError
+    return ArenaScoreLine(
+        user_id=attempt.user_id,
+        score=attempt.score,
+        time_ms=attempt.time_ms,
+    )
 
 
 def _build_duel_snapshot(
