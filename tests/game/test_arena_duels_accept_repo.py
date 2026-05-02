@@ -113,6 +113,7 @@ async def test_count_creator_duels_by_access_type_is_server_side() -> None:
     assert "count(arena_duels.id)" in query
     assert "arena_duels.creator_user_id" in query
     assert "arena_duels.access_type" in query
+    assert "arena_duels.source_friend_challenge_id IS NULL" in query
     assert "arena_duels.created_at >=" in query
 
 

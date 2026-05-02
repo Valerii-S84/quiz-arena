@@ -57,6 +57,41 @@ class ArenaDuelsRepo:
         return attempt
 
     @staticmethod
+    async def get_source_friend_duel_with_baseline_for_update(
+        session: AsyncSession,
+        *,
+        source_friend_challenge_id: UUID,
+        now_utc: datetime,
+    ) -> ArenaActiveDuelRow | None:
+        stmt = (
+            select(ArenaDuel, ArenaAttempt)
+            .join(
+                ArenaAttempt,
+                and_(
+                    ArenaAttempt.arena_duel_id == ArenaDuel.id,
+                    ArenaAttempt.id == ArenaDuel.baseline_attempt_id,
+                ),
+            )
+            .where(ArenaDuel.source_friend_challenge_id == source_friend_challenge_id)
+            .where(
+                ArenaDuel.status == ARENA_DUEL_STATUS_ACTIVE,
+                ArenaDuel.expires_at > now_utc,
+                ArenaAttempt.score.is_not(None),
+                ArenaAttempt.time_ms.is_not(None),
+                ArenaAttempt.completed_at.is_not(None),
+            )
+            .order_by(ArenaDuel.created_at.desc(), ArenaDuel.id.desc())
+            .limit(1)
+            .with_for_update(of=(ArenaDuel, ArenaAttempt))
+        )
+        result = await session.execute(stmt)
+        row = result.one_or_none()
+        if row is None:
+            return None
+        duel, baseline_attempt = row.t
+        return ArenaActiveDuelRow(duel=duel, baseline_attempt=baseline_attempt)
+
+    @staticmethod
     async def count_creator_duels_by_access_type(
         session: AsyncSession,
         *,
@@ -67,6 +102,7 @@ class ArenaDuelsRepo:
         stmt = select(func.count(ArenaDuel.id)).where(
             ArenaDuel.creator_user_id == creator_user_id,
             ArenaDuel.access_type == access_type,
+            ArenaDuel.source_friend_challenge_id.is_(None),
         )
         if since is not None:
             stmt = stmt.where(ArenaDuel.created_at >= since)
@@ -93,10 +129,12 @@ class ArenaDuelsRepo:
 
     @staticmethod
     async def count_paid_ticket_usage(session: AsyncSession, *, user_id: int) -> int:
+        # Friend-published arena rows reuse the original friend challenge entitlement.
         duel_result = await session.execute(
             select(func.count(ArenaDuel.id)).where(
                 ArenaDuel.creator_user_id == user_id,
                 ArenaDuel.access_type == "PAID_TICKET",
+                ArenaDuel.source_friend_challenge_id.is_(None),
             )
         )
         attempt_result = await session.execute(

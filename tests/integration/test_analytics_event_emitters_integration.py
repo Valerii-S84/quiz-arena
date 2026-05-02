@@ -248,7 +248,7 @@ async def test_friend_challenge_flow_emits_created_joined_completed_and_rematch_
 @pytest.mark.asyncio
 async def test_daily_challenge_flow_emits_started_abandoned_completed_and_blocked_events() -> None:
     user_id = await _create_user("daily-events")
-    now_utc = datetime.now(UTC)
+    now_utc = datetime(2026, 1, 15, 12, 0, tzinfo=UTC)
 
     async with SessionLocal.begin() as session:
         started = await GameSessionService.start_session(

@@ -31,7 +31,10 @@ DAILY_CUP_PROOF_RE = re.compile(r"^daily:cup:proof:([0-9a-f\-]{36})$")
 DAILY_RESULT_RE = re.compile(r"^daily:result:([0-9a-f\-]{36})$")
 ARENA_ACCEPT_RE = re.compile(r"^arena:accept:([0-9a-f\-]{36})$")
 ARENA_START_ATTEMPT_RE = re.compile(r"^arena:start_attempt:([0-9a-f\-]{36})$")
-ARENA_PUBLISH_FRIEND_RE = re.compile(r"^arena:publish_friend:([0-9a-f\-]{36})$")
+ARENA_PUBLISH_FRIEND_RE = re.compile(
+    r"^arena:publish_friend:" r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+    re.IGNORECASE,
+)
 
 
 def parse_answer_callback(callback_data: str) -> tuple[UUID, int] | None:

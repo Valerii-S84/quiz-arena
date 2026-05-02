@@ -32,3 +32,20 @@ def test_arena_uuid_callbacks_are_declared() -> None:
         pattern=gameplay_callbacks.ARENA_PUBLISH_FRIEND_RE,
         callback_data=f"arena:publish_friend:{challenge_id}",
     ) == UUID(challenge_id)
+
+
+def test_arena_publish_friend_rejects_malformed_uuid() -> None:
+    malformed_payloads = [
+        "arena:publish_friend:not-a-uuid",
+        "arena:publish_friend:00000000000000000000000000000001",
+        "arena:publish_friend:00000000-0000-0000-0000-00000000000g",
+        "arena:publish_friend:00000000-0000-0000-0000-000000000001:extra",
+    ]
+    for payload in malformed_payloads:
+        assert (
+            gameplay_callbacks.parse_uuid_callback(
+                pattern=gameplay_callbacks.ARENA_PUBLISH_FRIEND_RE,
+                callback_data=payload,
+            )
+            is None
+        )

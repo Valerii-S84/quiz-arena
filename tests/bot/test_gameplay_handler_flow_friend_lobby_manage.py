@@ -32,7 +32,7 @@ async def test_handle_friend_open_repost_creates_new_open_duel_and_shows_share(
             creator_user_id=17,
             opponent_user_id=None,
             current_round=1,
-            total_rounds=5,
+            total_rounds=7,
             creator_score=0,
             opponent_score=0,
             winner_user_id=None,
@@ -64,7 +64,14 @@ async def test_handle_friend_open_repost_creates_new_open_duel_and_shows_share(
         for button in row
         if button.switch_inline_query
     ]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
     assert inline_queries == ["invite:duel:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"]
+    assert "arena:publish_friend:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" not in callbacks
 
 
 @pytest.mark.asyncio

@@ -123,7 +123,47 @@ def test_friend_challenge_share_keyboard_omits_accept_url_for_creator() -> None:
         button.callback_data == "friend:invite:required:00000000-0000-0000-0000-000000000001"
         for button in buttons
     )
+    assert not any(
+        button.callback_data == "arena:publish_friend:00000000-0000-0000-0000-000000000001"
+        for button in buttons
+    )
     assert any(button.callback_data == "menu:main" for button in buttons)
+
+
+def test_friend_challenge_share_keyboard_includes_arena_publish_for_clean_seven() -> None:
+    keyboard = build_friend_challenge_share_keyboard(
+        invite_link="https://t.me/quizarena_bot?start=fc_token",
+        challenge_id="00000000-0000-0000-0000-000000000001",
+        total_rounds=7,
+        allow_arena_publish=True,
+    )
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    assert [button.text for button in buttons] == [
+        "📤 Teilen ->",
+        "✅ Einladung gesendet",
+        "⚔️ Jetzt spielen",
+        "🏟 In der Arena veröffentlichen",
+        "⏳ Auf Freund warten",
+    ]
+    assert any(
+        button.callback_data == "arena:publish_friend:00000000-0000-0000-0000-000000000001"
+        for button in buttons
+    )
+
+
+def test_friend_challenge_share_keyboard_hides_arena_publish_without_allow_flag() -> None:
+    keyboard = build_friend_challenge_share_keyboard(
+        invite_link="https://t.me/quizarena_bot?start=fc_token",
+        challenge_id="00000000-0000-0000-0000-000000000001",
+        total_rounds=7,
+    )
+    callbacks = [
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "arena:publish_friend:00000000-0000-0000-0000-000000000001" not in callbacks
 
 
 def test_friend_challenge_share_keyboard_without_link_contains_back_only() -> None:
@@ -190,3 +230,4 @@ def test_friend_challenge_result_share_keyboard_contains_share_and_navigation() 
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert "friend:rematch:00000000-0000-0000-0000-000000000001" in callbacks
     assert "home:open" in callbacks
+    assert "arena:publish_friend:00000000-0000-0000-0000-000000000001" not in callbacks

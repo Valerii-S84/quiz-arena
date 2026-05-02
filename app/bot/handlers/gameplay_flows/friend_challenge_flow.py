@@ -85,6 +85,7 @@ async def handle_friend_challenge_create_selected(
                 invite_link=None,
                 challenge_id=str(challenge.challenge_id),
                 total_rounds=challenge.total_rounds,
+                allow_arena_publish=True,
             ),
         )
     else:
@@ -98,6 +99,7 @@ async def handle_friend_challenge_create_selected(
                 invite_link=invite_link,
                 challenge_id=str(challenge.challenge_id),
                 total_rounds=challenge.total_rounds,
+                allow_arena_publish=True,
             ),
         )
     await callback.answer()

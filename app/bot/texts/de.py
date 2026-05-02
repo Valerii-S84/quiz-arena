@@ -55,6 +55,8 @@ TEXTS_DE: dict[str, str] = {
     "msg.duels.arena.accept": "🔥 Arena-Duell\n\nSchlage das Ergebnis von {opponent_label}.\n\n{opponent_label}:\n{score_line}\n\nDu spielst dieselben Fragen.\nDu hast genau einen Versuch.",
     "msg.duels.arena.create": "🎯 Arena-Duell erstellen\n\nSpiele eine kurze Runde.\nDein Ergebnis bleibt 24 Stunden in der Offenen Arena.\n\nAndere Spieler können versuchen, dich zu schlagen.",
     "msg.duels.arena.published": "🏟 Dein Arena-Duell ist aktiv!\n\nDein Ergebnis:\n{score_line}\n\nAndere Spieler können dein Ergebnis jetzt schlagen.\nDein Duell läuft 24 Stunden.",
+    "msg.duels.arena.friend_published": "🏟 In der Arena veröffentlicht!\n\nDein Ergebnis:\n{score_line}\n\nAndere Spieler können dein Ergebnis jetzt schlagen.",
+    "msg.duels.arena.friend_publish.invalid": "Dieses Freundesduell kann noch nicht in der Arena veröffentlicht werden.\n\nSpiele zuerst dein Ergebnis fertig und versuche es erneut.",
     "msg.duels.arena.result.win.score": "🎉 Gewonnen!\n\nDu:\n{user_score_line}\n\n{opponent_label}:\n{opponent_score_line}\n\nDu hast das Ergebnis von {opponent_label} geschlagen.",
     "msg.duels.arena.result.win.time": "🎉 Gewonnen!\n\nIhr habt beide {score}/7.\nDu warst schneller.\n\nDu:\n{user_score_line}\n\n{opponent_label}:\n{opponent_score_line}",
     "msg.duels.arena.result.loss.score": "{opponent_label} bleibt vorne.\n\nDu:\n{user_score_line}\n\n{opponent_label}:\n{opponent_score_line}\n\nVersuch ein anderes Duell oder erstelle dein eigenes Arena-Duell.",
