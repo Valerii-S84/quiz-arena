@@ -56,7 +56,7 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
             creator_user_id=17,
             opponent_user_id=None,
             current_round=1,
-            total_rounds=5,
+            total_rounds=7,
             creator_score=0,
             opponent_score=0,
             winner_user_id=None,
@@ -80,7 +80,7 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
     )
 
     callback = DummyCallback(
-        data="friend:challenge:format:direct:5",
+        data="friend:challenge:format:direct:7",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(bot=DummyBot()),
     )
@@ -104,5 +104,6 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
     assert callbacks == [
         "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "friend:invite:required:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "arena:publish_friend:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "menu:main",
     ]

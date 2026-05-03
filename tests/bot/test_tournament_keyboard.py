@@ -1,4 +1,5 @@
 from app.bot.keyboards.tournament import (
+    TOURNAMENT_CREATE_CALLBACK,
     build_tournament_created_keyboard,
     build_tournament_format_keyboard,
     build_tournament_lobby_keyboard,
@@ -22,7 +23,10 @@ def test_tournament_format_keyboard_contains_5_12_and_back() -> None:
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
     assert "friend:tournament:format:5" in callbacks
     assert "friend:tournament:format:12" in callbacks
-    assert "friend:challenge:create" in callbacks
+    assert TOURNAMENT_CREATE_CALLBACK in callbacks
+    assert "friend:challenge:create" not in callbacks
+    assert "friend:challenge:format:direct:7" not in callbacks
+    assert "duels:friend" not in callbacks
 
 
 def test_tournament_created_keyboard_contains_share_copy_and_optional_start() -> None:
@@ -58,7 +62,11 @@ def test_tournament_lobby_keyboard_contains_join_play_and_share_when_enabled() -
     assert "friend:tournament:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
     assert "friend:next:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" in callbacks
     assert "friend:tournament:share:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
-    assert "create_tournament_start" in callbacks
+    assert TOURNAMENT_CREATE_CALLBACK in callbacks
+    assert "create_tournament_start" not in callbacks
+    assert "friend:challenge:create" not in callbacks
+    assert "friend:challenge:format:direct:7" not in callbacks
+    assert "duels:friend" not in callbacks
 
 
 def test_tournament_share_keyboard_contains_url_and_refresh() -> None:

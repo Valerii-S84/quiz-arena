@@ -14,30 +14,19 @@ from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessio
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_type_tournament_shows_format_picker(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    "callback_data",
+    [
+        "friend:challenge:type:direct",
+        "friend:challenge:type:open",
+        "friend:challenge:type:tournament",
+    ],
+)
+async def test_handle_friend_challenge_type_legacy_callbacks_redirect_to_canonical_duel_entry(
+    callback_data: str,
+) -> None:
     callback = DummyCallback(
-        data="friend:challenge:type:tournament",
-        from_user=SimpleNamespace(id=17),
-        message=DummyMessage(),
-    )
-    await gameplay_friend_challenge.handle_friend_challenge_type_selected(callback)
-
-    response = callback.message.answers[0]
-    assert response.text == TEXTS_DE["msg.friend.challenge.tournament.format"]
-    callbacks = [
-        button.callback_data
-        for row in response.kwargs["reply_markup"].inline_keyboard
-        for button in row
-        if button.callback_data
-    ]
-    assert "friend:tournament:format:5" in callbacks
-    assert "friend:tournament:format:12" in callbacks
-
-
-@pytest.mark.asyncio
-async def test_handle_friend_challenge_type_direct_opens_canonical_duel_entry() -> None:
-    callback = DummyCallback(
-        data="friend:challenge:type:direct",
+        data=callback_data,
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(),
     )
@@ -52,47 +41,6 @@ async def test_handle_friend_challenge_type_direct_opens_canonical_duel_entry() 
         if button.callback_data
     ]
     assert callbacks == ["friend:challenge:format:direct:7", "duels:menu"]
-
-
-@pytest.mark.asyncio
-async def test_handle_friend_challenge_type_open_preserves_open_create_callback() -> None:
-    callback = DummyCallback(
-        data="friend:challenge:type:open",
-        from_user=SimpleNamespace(id=17),
-        message=DummyMessage(),
-    )
-    await gameplay_friend_challenge.handle_friend_challenge_type_selected(callback)
-
-    response = callback.message.answers[0]
-    assert response.text == TEXTS_DE["msg.duels.friend"]
-    callbacks = [
-        button.callback_data
-        for row in response.kwargs["reply_markup"].inline_keyboard
-        for button in row
-        if button.callback_data
-    ]
-    assert callbacks == ["friend:challenge:format:open:7", "duels:menu"]
-
-
-@pytest.mark.asyncio
-async def test_handle_create_tournament_start_shortcut_shows_format_picker() -> None:
-    callback = DummyCallback(
-        data="create_tournament_start",
-        from_user=SimpleNamespace(id=17),
-        message=DummyMessage(),
-    )
-    await gameplay_friend_challenge.handle_create_tournament_start(callback)
-
-    response = callback.message.answers[0]
-    assert response.text == TEXTS_DE["msg.friend.challenge.tournament.format"]
-    callbacks = [
-        button.callback_data
-        for row in response.kwargs["reply_markup"].inline_keyboard
-        for button in row
-        if button.callback_data
-    ]
-    assert "friend:tournament:format:5" in callbacks
-    assert "friend:tournament:format:12" in callbacks
 
 
 @pytest.mark.asyncio
@@ -142,7 +90,7 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
     )
 
     callback = DummyCallback(
-        data="friend:challenge:format:direct:5",
+        data="friend:challenge:format:direct:7",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(),
     )
@@ -165,7 +113,18 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_create_selected_preserves_open_type(monkeypatch) -> None:
+@pytest.mark.parametrize(
+    "callback_data",
+    [
+        "friend:challenge:format:open:7",
+        "friend:challenge:create:5",
+        "friend:challenge:create:12",
+    ],
+)
+async def test_handle_friend_challenge_create_selected_normalizes_legacy_payloads_to_direct(
+    monkeypatch,
+    callback_data: str,
+) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
     captured: dict[str, object] = {}
 
@@ -179,7 +138,7 @@ async def test_handle_friend_challenge_create_selected_preserves_open_type(monke
         return FriendChallengeSnapshot(
             challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
             invite_token="token",
-            challenge_type="OPEN",
+            challenge_type="DIRECT",
             mode_code="QUICK_MIX_A1A2",
             access_type="FREE",
             status="ACTIVE",
@@ -210,13 +169,11 @@ async def test_handle_friend_challenge_create_selected_preserves_open_type(monke
     )
 
     callback = DummyCallback(
-        data="friend:challenge:format:open:7",
-        from_user=SimpleNamespace(id=17),
-        message=DummyMessage(),
+        data=callback_data, from_user=SimpleNamespace(id=17), message=DummyMessage()
     )
     await gameplay_friend_challenge.handle_friend_challenge_create_selected(callback)
 
-    assert captured["challenge_type"] == "OPEN"
+    assert captured["challenge_type"] == "DIRECT"
     assert captured["total_rounds"] == 7
 
 
