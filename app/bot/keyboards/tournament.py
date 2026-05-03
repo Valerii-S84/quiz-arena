@@ -4,8 +4,6 @@ from urllib.parse import quote_plus
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-TOURNAMENT_CREATE_CALLBACK = "friend:tournament:create"
-
 
 def build_tournament_share_url(*, base_link: str, share_text: str) -> str:
     return (
@@ -22,7 +20,7 @@ def build_tournament_format_keyboard() -> InlineKeyboardMarkup:
                     text="🧠 12 Fragen", callback_data="friend:tournament:format:12"
                 )
             ],
-            [InlineKeyboardButton(text="↩️ Zurück", callback_data=TOURNAMENT_CREATE_CALLBACK)],
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data="friend:challenge:create")],
         ]
     )
 
@@ -120,7 +118,7 @@ def build_tournament_lobby_keyboard(
             [
                 InlineKeyboardButton(
                     text="🔄 Neues Turnier erstellen",
-                    callback_data=TOURNAMENT_CREATE_CALLBACK,
+                    callback_data="create_tournament_start",
                 )
             ]
         )

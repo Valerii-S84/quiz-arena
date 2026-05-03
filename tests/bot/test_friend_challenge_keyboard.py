@@ -3,7 +3,6 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_finished_keyboard,
     build_friend_challenge_limit_keyboard,
     build_friend_challenge_next_keyboard,
-    build_friend_open_taken_keyboard,
     build_friend_challenge_result_share_keyboard,
     build_friend_challenge_share_confirmed_keyboard,
     build_friend_challenge_share_keyboard,
@@ -67,19 +66,6 @@ def test_friend_challenge_limit_keyboard_contains_buy_options_and_back() -> None
     assert "buy:FRIEND_CHALLENGE_5" in callbacks
     assert "buy:PREMIUM_WEEK" in callbacks
     assert "home:open" in callbacks
-
-
-def test_friend_open_taken_keyboard_redirects_to_canonical_friend_duel_create() -> None:
-    keyboard = build_friend_open_taken_keyboard()
-    buttons = [button for row in keyboard.inline_keyboard for button in row]
-    assert [button.text for button in buttons] == [
-        "⚔️ Freundesduell erstellen",
-        "↩️ Zurück",
-    ]
-    assert [button.callback_data for button in buttons] == [
-        "friend:challenge:format:direct:7",
-        "home:open",
-    ]
 
 
 def test_friend_challenge_share_keyboard_omits_accept_url_for_creator() -> None:

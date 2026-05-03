@@ -96,16 +96,16 @@ def _build_friend_signature(*, challenge: FriendChallengeSnapshot, user_id: int)
 
     score_diff = my_score - opponent_score
     if challenge.status == "EXPIRED":
-        return "Zeitfenster gehalten"
+        return "Deadline Survivor"
     if score_diff >= 3:
-        return "Artikel-König"
+        return "Artikel-Koenig"
     if score_diff > 0:
-        return "Satzbau-Meister"
+        return "Satzbau-Boss"
     if score_diff == 0:
-        return "Revanche-Magnet"
+        return "Rematch-Magnet"
     if score_diff <= -3:
         return "Chaos im Satzbau"
-    return "Revanche-Läufer"
+    return "Revanche-Laeufer"
 
 
 def _build_public_badge_label(
@@ -116,7 +116,7 @@ def _build_public_badge_label(
     series_opponent_wins: int = 0,
 ) -> str:
     if challenge.series_best_of > 1 and series_my_wins > series_opponent_wins:
-        return "Serien-Sieger"
+        return "Series Closer"
     return _build_friend_signature(challenge=challenge, user_id=user_id)
 
 

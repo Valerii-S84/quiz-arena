@@ -3,15 +3,7 @@ from uuid import UUID
 from app.bot.handlers import gameplay_callbacks
 
 
-def test_friend_format_parser_normalizes_legacy_types_and_formats_to_clean_seven() -> None:
-    assert gameplay_callbacks.parse_friend_create_format("friend:challenge:create:5") == (
-        "direct",
-        7,
-    )
-    assert gameplay_callbacks.parse_friend_create_format("friend:challenge:create:12") == (
-        "direct",
-        7,
-    )
+def test_friend_format_parser_normalizes_legacy_formats_to_clean_seven() -> None:
     assert gameplay_callbacks.parse_friend_create_format("friend:challenge:format:direct:5") == (
         "direct",
         7,
@@ -21,10 +13,6 @@ def test_friend_format_parser_normalizes_legacy_types_and_formats_to_clean_seven
         7,
     )
     assert gameplay_callbacks.parse_friend_create_format("friend:challenge:format:direct:7") == (
-        "direct",
-        7,
-    )
-    assert gameplay_callbacks.parse_friend_create_format("friend:challenge:format:open:7") == (
         "direct",
         7,
     )

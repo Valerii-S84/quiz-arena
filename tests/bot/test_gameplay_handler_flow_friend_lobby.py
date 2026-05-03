@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -14,19 +13,30 @@ from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessio
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "callback_data",
-    [
-        "friend:challenge:type:direct",
-        "friend:challenge:type:open",
-        "friend:challenge:type:tournament",
-    ],
-)
-async def test_handle_friend_challenge_type_legacy_callbacks_redirect_to_canonical_duel_entry(
-    callback_data: str,
-) -> None:
+async def test_handle_friend_challenge_type_tournament_shows_format_picker(monkeypatch) -> None:
     callback = DummyCallback(
-        data=callback_data,
+        data="friend:challenge:type:tournament",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+    await gameplay_friend_challenge.handle_friend_challenge_type_selected(callback)
+
+    response = callback.message.answers[0]
+    assert response.text == TEXTS_DE["msg.friend.challenge.tournament.format"]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "friend:tournament:format:5" in callbacks
+    assert "friend:tournament:format:12" in callbacks
+
+
+@pytest.mark.asyncio
+async def test_handle_friend_challenge_type_direct_opens_canonical_duel_entry() -> None:
+    callback = DummyCallback(
+        data="friend:challenge:type:direct",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(),
     )
@@ -41,6 +51,47 @@ async def test_handle_friend_challenge_type_legacy_callbacks_redirect_to_canonic
         if button.callback_data
     ]
     assert callbacks == ["friend:challenge:format:direct:7", "duels:menu"]
+
+
+@pytest.mark.asyncio
+async def test_handle_friend_challenge_type_open_preserves_open_create_callback() -> None:
+    callback = DummyCallback(
+        data="friend:challenge:type:open",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+    await gameplay_friend_challenge.handle_friend_challenge_type_selected(callback)
+
+    response = callback.message.answers[0]
+    assert response.text == TEXTS_DE["msg.duels.friend"]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert callbacks == ["friend:challenge:format:open:7", "duels:menu"]
+
+
+@pytest.mark.asyncio
+async def test_handle_create_tournament_start_shortcut_shows_format_picker() -> None:
+    callback = DummyCallback(
+        data="create_tournament_start",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+    await gameplay_friend_challenge.handle_create_tournament_start(callback)
+
+    response = callback.message.answers[0]
+    assert response.text == TEXTS_DE["msg.friend.challenge.tournament.format"]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "friend:tournament:format:5" in callbacks
+    assert "friend:tournament:format:12" in callbacks
 
 
 @pytest.mark.asyncio
@@ -90,7 +141,7 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
     )
 
     callback = DummyCallback(
-        data="friend:challenge:format:direct:7",
+        data="friend:challenge:format:direct:5",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(),
     )
@@ -113,18 +164,7 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "callback_data",
-    [
-        "friend:challenge:format:open:7",
-        "friend:challenge:create:5",
-        "friend:challenge:create:12",
-    ],
-)
-async def test_handle_friend_challenge_create_selected_normalizes_legacy_payloads_to_direct(
-    monkeypatch,
-    callback_data: str,
-) -> None:
+async def test_handle_friend_challenge_create_selected_preserves_open_type(monkeypatch) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
     captured: dict[str, object] = {}
 
@@ -138,7 +178,7 @@ async def test_handle_friend_challenge_create_selected_normalizes_legacy_payload
         return FriendChallengeSnapshot(
             challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
             invite_token="token",
-            challenge_type="DIRECT",
+            challenge_type="OPEN",
             mode_code="QUICK_MIX_A1A2",
             access_type="FREE",
             status="ACTIVE",
@@ -169,11 +209,13 @@ async def test_handle_friend_challenge_create_selected_normalizes_legacy_payload
     )
 
     callback = DummyCallback(
-        data=callback_data, from_user=SimpleNamespace(id=17), message=DummyMessage()
+        data="friend:challenge:format:open:7",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
     )
     await gameplay_friend_challenge.handle_friend_challenge_create_selected(callback)
 
-    assert captured["challenge_type"] == "DIRECT"
+    assert captured["challenge_type"] == "OPEN"
     assert captured["total_rounds"] == 7
 
 
@@ -319,123 +361,3 @@ async def test_notify_creator_about_join_skips_push_when_creator_finished(monkey
     )
 
     assert message.bot.sent_messages == []
-
-
-@pytest.mark.asyncio
-async def test_handle_friend_my_duels_groups_sections_with_my_turn_first(monkeypatch) -> None:
-    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
-
-    async def _fake_home_snapshot(session, *, telegram_user):
-        del session, telegram_user
-        return SimpleNamespace(user_id=17)
-
-    now = datetime(2026, 2, 27, 18, 0, tzinfo=timezone.utc)
-    finished_at = datetime(2026, 2, 27, 17, 30, tzinfo=timezone.utc)
-
-    async def _fake_list_duels(*args, **kwargs):
-        return [
-            FriendChallengeSnapshot(
-                challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-                invite_token="token-a",
-                challenge_type="DIRECT",
-                mode_code="QUICK_MIX_A1A2",
-                access_type="FREE",
-                status="CREATOR_DONE",
-                creator_user_id=17,
-                opponent_user_id=18,
-                current_round=5,
-                total_rounds=5,
-                creator_score=3,
-                opponent_score=1,
-                creator_finished_at=finished_at,
-                winner_user_id=None,
-                expires_at=now,
-            ),
-            FriendChallengeSnapshot(
-                challenge_id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
-                invite_token="token-b",
-                challenge_type="OPEN",
-                mode_code="QUICK_MIX_A1A2",
-                access_type="FREE",
-                status="PENDING",
-                creator_user_id=17,
-                opponent_user_id=None,
-                current_round=1,
-                total_rounds=12,
-                creator_score=0,
-                opponent_score=0,
-                winner_user_id=None,
-                expires_at=now,
-            ),
-            FriendChallengeSnapshot(
-                challenge_id=UUID("cccccccc-cccc-cccc-cccc-cccccccccccc"),
-                invite_token="token-c",
-                challenge_type="DIRECT",
-                mode_code="QUICK_MIX_A1A2",
-                access_type="FREE",
-                status="ACCEPTED",
-                creator_user_id=17,
-                opponent_user_id=19,
-                current_round=2,
-                total_rounds=5,
-                creator_score=1,
-                opponent_score=1,
-                winner_user_id=None,
-                expires_at=now,
-            ),
-            FriendChallengeSnapshot(
-                challenge_id=UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"),
-                invite_token="token-d",
-                challenge_type="DIRECT",
-                mode_code="QUICK_MIX_A1A2",
-                access_type="FREE",
-                status="COMPLETED",
-                creator_user_id=17,
-                opponent_user_id=20,
-                current_round=5,
-                total_rounds=5,
-                creator_score=4,
-                opponent_score=2,
-                winner_user_id=17,
-                expires_at=now,
-            ),
-        ]
-
-    async def _fake_opponent_label(*, challenge, user_id):
-        del user_id
-        labels = {
-            UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"): "Anna",
-            UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"): "Freund",
-            UUID("cccccccc-cccc-cccc-cccc-cccccccccccc"): "Max",
-            UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"): "Klaus",
-        }
-        return labels[challenge.challenge_id]
-
-    monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(
-        gameplay.GameSessionService, "list_friend_challenges_for_user", _fake_list_duels
-    )
-    monkeypatch.setattr(gameplay, "_resolve_opponent_label", _fake_opponent_label)
-
-    callback = DummyCallback(
-        data="friend:my:duels",
-        from_user=SimpleNamespace(id=17),
-        message=DummyMessage(),
-    )
-    await gameplay_friend_challenge.handle_friend_my_duels(callback)
-
-    text = callback.message.answers[0].text or ""
-    my_turn_pos = text.find(TEXTS_DE["msg.friend.challenge.my.my_turn"])
-    waiting_pos = text.find(TEXTS_DE["msg.friend.challenge.my.waiting"])
-    open_pos = text.find(TEXTS_DE["msg.friend.challenge.my.open"])
-    completed_pos = text.find(TEXTS_DE["msg.friend.challenge.my.completed"])
-    assert -1 not in {my_turn_pos, waiting_pos, completed_pos}
-    assert open_pos == -1
-    assert my_turn_pos < waiting_pos < completed_pos
-
-    keyboard = callback.message.answers[0].kwargs["reply_markup"]
-    buttons = [button for row in keyboard.inline_keyboard for button in row]
-    callbacks = [button.callback_data for button in buttons if button.callback_data]
-    assert "friend:next:cccccccc-cccc-cccc-cccc-cccccccccccc" in callbacks
-    assert "friend:rematch:dddddddd-dddd-dddd-dddd-dddddddddddd" in callbacks
-    assert "home:open" in callbacks

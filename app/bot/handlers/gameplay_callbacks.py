@@ -68,15 +68,12 @@ def parse_stop_callback(callback_data: str) -> UUID | None:
 
 
 def parse_friend_create_format(callback_data: str) -> tuple[str, int] | None:
-    """Normalizes legacy friend create callbacks to the canonical duel contract."""
+    """Parses friend challenge format callback into type and canonical rounds."""
 
-    legacy_match = FRIEND_CREATE_LEGACY_RE.match(callback_data)
-    if legacy_match is not None:
-        return "direct", DUEL_QUESTION_COUNT
     matched = FRIEND_CREATE_FORMAT_RE.match(callback_data)
     if matched is None:
         return None
-    return "direct", DUEL_QUESTION_COUNT
+    return matched.group(1), DUEL_QUESTION_COUNT
 
 
 def parse_challenge_rounds(callback_data: str) -> int | None:

@@ -1,7 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.keyboards import friend_challenge_share
-from app.game.duels.constants import DUEL_PAYWALL_PRODUCT_CODES, FRIEND_DUEL_CREATE_CALLBACK
+from app.game.duels.constants import DUEL_PAYWALL_PRODUCT_CODES
 
 build_friend_challenge_share_url = friend_challenge_share.build_friend_challenge_share_url
 build_friend_challenge_share_keyboard = friend_challenge_share.build_friend_challenge_share_keyboard
@@ -99,8 +99,8 @@ def build_friend_open_taken_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="⚔️ Freundesduell erstellen",
-                    callback_data=FRIEND_DUEL_CREATE_CALLBACK,
+                    text="🌍 Neue offene Herausforderung",
+                    callback_data="friend:challenge:type:open",
                 )
             ],
             [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
