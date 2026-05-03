@@ -14,27 +14,6 @@ from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessio
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_type_tournament_shows_format_picker(monkeypatch) -> None:
-    callback = DummyCallback(
-        data="friend:challenge:type:tournament",
-        from_user=SimpleNamespace(id=17),
-        message=DummyMessage(),
-    )
-    await gameplay_friend_challenge.handle_friend_challenge_type_selected(callback)
-
-    response = callback.message.answers[0]
-    assert response.text == TEXTS_DE["msg.friend.challenge.tournament.format"]
-    callbacks = [
-        button.callback_data
-        for row in response.kwargs["reply_markup"].inline_keyboard
-        for button in row
-        if button.callback_data
-    ]
-    assert "friend:tournament:format:5" in callbacks
-    assert "friend:tournament:format:12" in callbacks
-
-
-@pytest.mark.asyncio
 async def test_handle_friend_challenge_type_direct_opens_canonical_duel_entry() -> None:
     callback = DummyCallback(
         data="friend:challenge:type:direct",

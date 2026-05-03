@@ -13,7 +13,6 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_share_confirmed_keyboard,
     build_friend_challenge_share_keyboard,
 )
-from app.bot.keyboards.tournament import build_tournament_format_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.core.config import get_settings
 from app.game.friend_challenges.constants import DUEL_TYPE_DIRECT, DUEL_TYPE_OPEN
@@ -40,13 +39,6 @@ async def handle_friend_challenge_type_selected(
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
     selected_type = matched.group(1)
-    if selected_type == "tournament":
-        await callback.message.answer(
-            TEXTS_DE["msg.friend.challenge.tournament.format"],
-            reply_markup=build_tournament_format_keyboard(),
-        )
-        await callback.answer()
-        return
     await callback.message.answer(
         TEXTS_DE["msg.duels.friend"],
         reply_markup=build_friend_duel_keyboard(challenge_type=selected_type),
