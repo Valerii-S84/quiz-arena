@@ -13,7 +13,9 @@ from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage, DummySessio
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_create_opens_format_picker(monkeypatch) -> None:
+async def test_handle_friend_challenge_create_opens_canonical_friend_duel_entry(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
 
     callback = DummyCallback(
@@ -24,16 +26,14 @@ async def test_handle_friend_challenge_create_opens_format_picker(monkeypatch) -
     await gameplay.handle_friend_challenge_create(callback)
 
     response = callback.message.answers[0]
-    assert response.text == TEXTS_DE["msg.friend.challenge.create.choose"]
+    assert response.text == TEXTS_DE["msg.duels.friend"]
     callbacks = [
         button.callback_data
         for row in response.kwargs["reply_markup"].inline_keyboard
         for button in row
         if button.callback_data
     ]
-    assert "friend:challenge:type:direct" in callbacks
-    assert "friend:challenge:type:open" not in callbacks
-    assert "friend:challenge:type:tournament" not in callbacks
+    assert callbacks == ["friend:challenge:format:direct:7", "duels:menu"]
 
 
 @pytest.mark.asyncio

@@ -3,19 +3,25 @@ from uuid import UUID
 from app.bot.handlers import gameplay_callbacks
 
 
-def test_friend_format_parser_keeps_legacy_formats_and_accepts_clean_seven() -> None:
+def test_friend_format_parser_normalizes_legacy_formats_to_clean_seven() -> None:
     assert gameplay_callbacks.parse_friend_create_format("friend:challenge:format:direct:5") == (
         "direct",
-        5,
+        7,
     )
     assert gameplay_callbacks.parse_friend_create_format("friend:challenge:format:direct:12") == (
         "direct",
-        12,
+        7,
     )
     assert gameplay_callbacks.parse_friend_create_format("friend:challenge:format:direct:7") == (
         "direct",
         7,
     )
+
+
+def test_legacy_round_parsers_return_canonical_seven_questions() -> None:
+    assert gameplay_callbacks.parse_challenge_rounds("friend:challenge:create:5") == 7
+    assert gameplay_callbacks.parse_challenge_rounds("friend:challenge:create:12") == 7
+    assert gameplay_callbacks.parse_challenge_rounds("friend:challenge:format:direct:5") == 7
 
 
 def test_arena_uuid_callbacks_are_declared() -> None:

@@ -14,8 +14,7 @@ from app.game.sessions.types import FriendChallengeSnapshot, StartSessionResult
 
 def _build_friend_plan_text(*, total_rounds: int) -> str:
     rounds = max(1, int(total_rounds))
-    mode_label = "Sprint" if rounds <= 5 else "Mix"
-    return f"{rounds} Fragen {mode_label}. Keine Energie-Kosten."
+    return f"{rounds} Fragen. Keine Energie-Kosten."
 
 
 def _build_friend_ttl_text(*, challenge: FriendChallengeSnapshot, now_utc: datetime) -> str | None:

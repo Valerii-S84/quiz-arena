@@ -1,7 +1,5 @@
-from app.bot.keyboards import friend_challenge as friend_challenge_keyboard
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
-    build_friend_challenge_create_keyboard,
     build_friend_challenge_finished_keyboard,
     build_friend_challenge_limit_keyboard,
     build_friend_challenge_next_keyboard,
@@ -26,33 +24,6 @@ def test_friend_challenge_back_keyboard_contains_home_only() -> None:
     keyboard = build_friend_challenge_back_keyboard()
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
     assert callbacks == ["home:open"]
-
-
-def test_friend_challenge_create_keyboard_hides_tournament_by_default() -> None:
-    keyboard = build_friend_challenge_create_keyboard()
-    buttons = [button for row in keyboard.inline_keyboard for button in row]
-    assert [button.text for button in buttons] == [
-        "👤 Freund herausfordern",
-        "🥊 Arena Cup",
-        "↩️ Zurück",
-    ]
-    callbacks = [button.callback_data for button in buttons]
-    assert callbacks == [
-        "friend:challenge:type:direct",
-        "daily:cup:menu",
-        "home:open",
-    ]
-
-
-def test_friend_challenge_create_keyboard_can_show_tournament_when_enabled(monkeypatch) -> None:
-    monkeypatch.setattr(
-        friend_challenge_keyboard,
-        "get_settings",
-        lambda: type("Settings", (), {"tournament_friends_enabled": True})(),
-    )
-    keyboard = build_friend_challenge_create_keyboard()
-    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
-    assert "friend:challenge:type:tournament" in callbacks
 
 
 def test_friend_challenge_finished_keyboard_contains_rematch_and_back() -> None:

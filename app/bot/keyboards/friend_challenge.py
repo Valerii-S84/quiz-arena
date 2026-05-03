@@ -1,7 +1,6 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.keyboards import friend_challenge_share
-from app.core.config import get_settings
 from app.game.duels.constants import DUEL_PAYWALL_PRODUCT_CODES
 
 build_friend_challenge_share_url = friend_challenge_share.build_friend_challenge_share_url
@@ -12,54 +11,6 @@ build_friend_challenge_share_confirmed_keyboard = (
 build_friend_challenge_result_share_keyboard = (
     friend_challenge_share.build_friend_challenge_result_share_keyboard
 )
-
-
-def build_friend_challenge_create_keyboard() -> InlineKeyboardMarkup:
-    settings = get_settings()
-    rows = [
-        [
-            InlineKeyboardButton(
-                text="👤 Freund herausfordern",
-                callback_data="friend:challenge:type:direct",
-            )
-        ],
-    ]
-    if settings.tournament_friends_enabled:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text="🏆 Turnier mit Freunden",
-                    callback_data="friend:challenge:type:tournament",
-                )
-            ]
-        )
-    rows.extend(
-        [
-            [InlineKeyboardButton(text="🥊 Arena Cup", callback_data="daily:cup:menu")],
-            [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
-        ]
-    )
-    return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
-def build_friend_challenge_format_keyboard(*, challenge_type: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="⚡ Blitz – 5 Fragen",
-                    callback_data=f"friend:challenge:format:{challenge_type}:5",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="🧠 Voll – 12 Fragen",
-                    callback_data=f"friend:challenge:format:{challenge_type}:12",
-                )
-            ],
-            [InlineKeyboardButton(text="↩️ Zurück", callback_data="friend:challenge:create")],
-        ]
-    )
 
 
 def build_friend_challenge_next_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:

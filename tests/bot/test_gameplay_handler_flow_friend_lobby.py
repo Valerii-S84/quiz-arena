@@ -35,6 +35,26 @@ async def test_handle_friend_challenge_type_tournament_shows_format_picker(monke
 
 
 @pytest.mark.asyncio
+async def test_handle_friend_challenge_type_direct_opens_canonical_duel_entry() -> None:
+    callback = DummyCallback(
+        data="friend:challenge:type:direct",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+    await gameplay_friend_challenge.handle_friend_challenge_type_selected(callback)
+
+    response = callback.message.answers[0]
+    assert response.text == TEXTS_DE["msg.duels.friend"]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert callbacks == ["friend:challenge:format:direct:7", "duels:menu"]
+
+
+@pytest.mark.asyncio
 async def test_handle_create_tournament_start_shortcut_shows_format_picker() -> None:
     callback = DummyCallback(
         data="create_tournament_start",
@@ -58,13 +78,15 @@ async def test_handle_create_tournament_start_shortcut_shows_format_picker() -> 
 @pytest.mark.asyncio
 async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(monkeypatch) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+    captured: dict[str, object] = {}
 
     async def _fake_home_snapshot(session, *, telegram_user):
         del session, telegram_user
         return SimpleNamespace(user_id=17)
 
     async def _fake_create_friend_challenge(*args, **kwargs):
-        del args, kwargs
+        del args
+        captured.update(kwargs)
         return FriendChallengeSnapshot(
             challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
             invite_token="token",
@@ -75,7 +97,7 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
             creator_user_id=17,
             opponent_user_id=None,
             current_round=1,
-            total_rounds=5,
+            total_rounds=7,
             creator_score=0,
             opponent_score=0,
             winner_user_id=None,
@@ -110,10 +132,12 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
     invite_buttons = [
         button for row in invite_message.kwargs["reply_markup"].inline_keyboard for button in row
     ]
+    assert captured["total_rounds"] == 7
     assert [button.text for button in invite_buttons] == [
         "📤 Teilen ->",
         "✅ Einladung gesendet",
         "⚔️ Jetzt spielen",
+        "🏟 In der Arena veröffentlichen",
         "⏳ Auf Freund warten",
     ]
     assert not any(button.url and "duel_" in button.url for button in invite_buttons)

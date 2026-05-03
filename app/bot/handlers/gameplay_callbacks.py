@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from uuid import UUID
 
+from app.game.duels.constants import DUEL_QUESTION_COUNT
+
 _STRICT_UUID_RE = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 
 ANSWER_RE = re.compile(r"^answer:([0-9a-f\-]{36}):([0-3])$")
@@ -66,12 +68,12 @@ def parse_stop_callback(callback_data: str) -> UUID | None:
 
 
 def parse_friend_create_format(callback_data: str) -> tuple[str, int] | None:
-    """Parses friend challenge format callback into type and rounds."""
+    """Parses friend challenge format callback into type and canonical rounds."""
 
     matched = FRIEND_CREATE_FORMAT_RE.match(callback_data)
     if matched is None:
         return None
-    return matched.group(1), int(matched.group(2))
+    return matched.group(1), DUEL_QUESTION_COUNT
 
 
 def parse_challenge_rounds(callback_data: str) -> int | None:
@@ -79,7 +81,7 @@ def parse_challenge_rounds(callback_data: str) -> int | None:
 
     legacy_match = FRIEND_CREATE_LEGACY_RE.match(callback_data)
     if legacy_match is not None:
-        return int(legacy_match.group(1))
+        return DUEL_QUESTION_COUNT
     parsed = parse_friend_create_format(callback_data)
     if parsed is None:
         return None
