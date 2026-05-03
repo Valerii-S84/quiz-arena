@@ -193,14 +193,22 @@ async def test_arena_accept_preview_shows_start_screen() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("error", "expected_text"),
+    ("error", "expected_text", "expected_callbacks"),
     [
-        (ArenaDuelOwnAttemptError, "Das ist dein eigenes Arena-Duell."),
-        (ArenaDuelAlreadyAttemptedError, "Du hast dieses Arena-Duell bereits gespielt."),
-        (ArenaDuelExpiredError, "Dieses Duell ist abgelaufen."),
+        (ArenaDuelOwnAttemptError, "Das ist dein eigenes Arena-Duell.", ["arena:list"]),
+        (
+            ArenaDuelAlreadyAttemptedError,
+            "Du hast dieses Arena-Duell bereits gespielt.",
+            ["arena:list"],
+        ),
+        (ArenaDuelExpiredError, "Dieses Duell ist abgelaufen.", ["arena:list", "arena:create"]),
     ],
 )
-async def test_arena_accept_preview_maps_guards_to_clean_messages(error, expected_text) -> None:
+async def test_arena_accept_preview_maps_guards_to_clean_messages(
+    error,
+    expected_text,
+    expected_callbacks,
+) -> None:
     async def _preview(*_args, **_kwargs):
         raise error
 
@@ -215,6 +223,7 @@ async def test_arena_accept_preview_maps_guards_to_clean_messages(error, expecte
     )
 
     assert expected_text in _text(callback.message.answers[0].text)
+    assert _callbacks(callback.message.answers[0].kwargs["reply_markup"]) == expected_callbacks
     assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 
@@ -272,8 +281,8 @@ async def test_arena_start_create_limit_hit_shows_duel_paywall_without_start() -
     response = callback.message.answers[0]
     assert "Dein heutiges Duell-Limit ist erreicht." in _text(response.text)
     assert _callbacks(response.kwargs["reply_markup"]) == [
-        "buy:FRIEND_CHALLENGE_5",
-        "buy:PREMIUM_WEEK",
+        "buy:FRIEND_CHALLENGE_5:duel",
+        "buy:PREMIUM_WEEK:duel",
         "arena:list",
     ]
 
@@ -300,7 +309,9 @@ async def test_arena_start_attempt_maps_session_access_error_to_guard() -> None:
         build_question_text=lambda **_kwargs: "arena question",
     )
 
-    assert "Dieses Duell ist abgelaufen." in _text(callback.message.answers[0].text)
+    response = callback.message.answers[0]
+    assert "Dieses Duell ist abgelaufen." in _text(response.text)
+    assert _callbacks(response.kwargs["reply_markup"]) == ["arena:list", "arena:create"]
     assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 
@@ -329,7 +340,7 @@ async def test_arena_start_attempt_limit_hit_shows_duel_paywall_without_accept()
     response = callback.message.answers[0]
     callbacks = _callbacks(response.kwargs["reply_markup"])
     assert "Duell-Limit" in _text(response.text)
-    assert callbacks == ["buy:FRIEND_CHALLENGE_5", "buy:PREMIUM_WEEK", "arena:list"]
+    assert callbacks == ["buy:FRIEND_CHALLENGE_5:duel", "buy:PREMIUM_WEEK:duel", "arena:list"]
     assert "buy:PREMIUM_3_DAYS" not in callbacks
 
 
@@ -466,3 +477,34 @@ async def test_arena_completion_challenger_result_screen() -> None:
     assert "7/7 · 00:52" in text
     assert "6/7 · 00:48" in text
     assert _callbacks(response.kwargs["reply_markup"]) == ["arena:create", "arena:list"]
+
+
+@pytest.mark.asyncio
+async def test_arena_completion_challenger_loss_result_has_next_actions() -> None:
+    callback = _callback("answer")
+    completion = ArenaAttemptCompletionResult(
+        duel=_duel_snapshot(),
+        completed_attempt=ArenaAttemptResultLine(
+            user_id=101,
+            score=5,
+            time_ms=52_000,
+            result=ARENA_ATTEMPT_RESULT_LOSS,
+        ),
+        opponent_attempt=ArenaAttemptResultLine(
+            user_id=11,
+            score=6,
+            time_ms=48_000,
+            result=ARENA_ATTEMPT_RESULT_WIN,
+        ),
+    )
+
+    await arena_duel_flow.send_arena_completion_result(
+        callback,
+        completion=completion,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserService,
+    )
+
+    response = callback.message.answers[0]
+    assert "Max bleibt vorne." in _text(response.text)
+    assert _callbacks(response.kwargs["reply_markup"]) == ["arena:list", "arena:create"]

@@ -8,6 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
 from app.db.repo.arena_duels_repo import ArenaDuelsRepo
+from app.game.arena_duels.analytics import (
+    ARENA_EVENT_ARENA_DUEL_ACCEPTED,
+    ARENA_EVENT_ARENA_DUEL_STARTED,
+    build_arena_event_payload,
+    emit_arena_analytics_event,
+)
 from app.game.arena_duels.constants import (
     ARENA_ATTEMPT_ROLE_CHALLENGER,
     ARENA_DUEL_STATUS_ACTIVE,
@@ -81,6 +87,32 @@ async def accept_arena_duel(
         arena_attempt_id=challenger_attempt.id,
         arena_round=1,
         duel_limit_checked=True,
+    )
+    await emit_arena_analytics_event(
+        session,
+        event_type=ARENA_EVENT_ARENA_DUEL_ACCEPTED,
+        happened_at=now_utc,
+        user_id=user_id,
+        payload=build_arena_event_payload(
+            user_id=user_id,
+            arena_duel_id=duel.id,
+            attempt_id=challenger_attempt.id,
+            action="accept",
+            access_type=access_type,
+        ),
+    )
+    await emit_arena_analytics_event(
+        session,
+        event_type=ARENA_EVENT_ARENA_DUEL_STARTED,
+        happened_at=now_utc,
+        user_id=user_id,
+        payload=build_arena_event_payload(
+            user_id=user_id,
+            arena_duel_id=duel.id,
+            attempt_id=challenger_attempt.id,
+            action="accept",
+            access_type=access_type,
+        ),
     )
     return ArenaChallengerStartResult(
         duel=_build_duel_snapshot(duel),

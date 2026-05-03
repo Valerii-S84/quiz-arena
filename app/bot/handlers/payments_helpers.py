@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 from uuid import UUID
 
+from app.game.duels.constants import DUEL_PAYWALL_CALLBACK_CONTEXT
+
 
 def _token_hash(value: str, *, length: int) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:length]
@@ -38,6 +40,8 @@ def extract_offer_impression_id_from_purchase_idempotency_key(
 def parse_buy_callback_data(callback_data: str) -> tuple[str, UUID | None, int | None]:
     parts = callback_data.split(":")
     if len(parts) == 2:
+        return parts[1], None, None
+    if len(parts) == 3 and parts[2] == DUEL_PAYWALL_CALLBACK_CONTEXT:
         return parts[1], None, None
     if len(parts) == 4 and parts[2] == "promo":
         return parts[1], UUID(parts[3]), None

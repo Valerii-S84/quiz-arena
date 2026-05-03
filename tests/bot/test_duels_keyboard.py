@@ -3,6 +3,8 @@ from app.bot.keyboards.duels import (
     build_arena_accept_keyboard,
     build_arena_create_keyboard,
     build_arena_empty_keyboard,
+    build_arena_expired_guard_keyboard,
+    build_arena_guard_back_keyboard,
     build_arena_list_keyboard,
     build_arena_published_keyboard,
     build_arena_result_keyboard,
@@ -45,6 +47,8 @@ def test_duels_keyboards_do_not_offer_topic_level_or_format_selection() -> None:
         ),
         build_arena_accept_keyboard(duel_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
         build_arena_create_keyboard(),
+        build_arena_expired_guard_keyboard(),
+        build_arena_guard_back_keyboard(),
         build_arena_published_keyboard(),
         build_arena_result_keyboard(user_won=True),
         build_duel_paywall_keyboard(),
@@ -62,6 +66,19 @@ def test_arena_create_keyboard_uses_canonical_callbacks() -> None:
         "arena:start_create",
         "arena:list",
     ]
+
+
+def test_arena_guard_keyboards_match_vision() -> None:
+    expired_buttons = _buttons(build_arena_expired_guard_keyboard())
+    single_back_buttons = _buttons(build_arena_guard_back_keyboard())
+
+    assert [button.text for button in expired_buttons] == [
+        "🏟 Zur Arena",
+        "🎯 Eigenes Arena-Duell erstellen",
+    ]
+    assert [button.callback_data for button in expired_buttons] == ["arena:list", "arena:create"]
+    assert [button.text for button in single_back_buttons] == ["🏟 Zur Arena"]
+    assert [button.callback_data for button in single_back_buttons] == ["arena:list"]
 
 
 def test_friend_duel_clean_entry_uses_single_default_create_callback() -> None:
@@ -85,8 +102,8 @@ def test_duel_paywall_keyboard_sells_only_ticket_and_premium_week() -> None:
         "↩️ Später",
     ]
     assert [button.callback_data for button in buttons] == [
-        "buy:FRIEND_CHALLENGE_5",
-        "buy:PREMIUM_WEEK",
+        "buy:FRIEND_CHALLENGE_5:duel",
+        "buy:PREMIUM_WEEK:duel",
         "arena:list",
     ]
     assert "buy:PREMIUM_3_DAYS" not in [button.callback_data for button in buttons]

@@ -69,6 +69,30 @@ Catalog of runtime product/operational events as implemented in code.
 | `duel_reposted_as_open` | `app/game/sessions/service/friend_challenges_manage.py` | internal analytics dashboards |
 | `duel_canceled_by_creator` | `app/game/sessions/service/friend_challenges_manage.py` | internal analytics dashboards |
 | `duel_share_clicked` | `app/bot/handlers/gameplay_flows/proof_card_flow.py` | internal analytics dashboards |
+| `duel_menu_opened` | `app/bot/handlers/gameplay_duels.py` | internal analytics dashboards |
+| `duel_mode_selected` | `app/bot/handlers/gameplay_duels.py` | internal analytics dashboards |
+| `arena_opened` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
+| `arena_duel_created` | `app/game/arena_duels/service.py` | internal analytics dashboards |
+| `arena_duel_started` | `app/game/arena_duels/service.py`, `app/game/arena_duels/accept.py` | internal analytics dashboards |
+| `arena_duel_completed` | `app/game/arena_duels/service.py` | internal analytics dashboards |
+| `arena_duel_published` | `app/game/arena_duels/service.py`, `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
+| `arena_duel_accepted` | `app/game/arena_duels/accept.py` | internal analytics dashboards |
+| `arena_result_shown` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
+| `arena_result_beaten_notification_sent` | `app/workers/tasks/arena_duels.py` | internal analytics dashboards |
+| `duel_limit_hit` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
+| `duel_paywall_shown` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
+| `duel_ticket_clicked` | `app/bot/handlers/payments.py` | internal analytics dashboards |
+| `premium_week_clicked` | `app/bot/handlers/payments.py` | internal analytics dashboards |
+
+Arena/Duelle payload contract:
+- `user_id`: app user id when the event is user-scoped.
+- `arena_duel_id`: Arena duel UUID when the event is tied to one duel.
+- `attempt_id`: Arena attempt UUID for start/completion/accept events.
+- `action`: compact action label such as `menu`, `arena`, `friend`, `create`, `accept`, `creator_baseline`, `challenger`, `publish_friend`, or `buy`.
+- `access_type`: resolved duel access type (`FREE`, `PAID_TICKET`, `PREMIUM`) or clicked duel product code for paywall click events.
+- `result`: Arena result code when a result exists.
+- `score`: completed score when known.
+- `time_ms`: completed time in milliseconds when known.
 
 ### 2.5 Private tournaments
 

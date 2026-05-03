@@ -8,6 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
 from app.db.repo.arena_duels_repo import ArenaActiveDuelRow, ArenaAttemptDuelContext, ArenaDuelsRepo
+from app.game.arena_duels.analytics import (
+    ARENA_EVENT_ARENA_DUEL_COMPLETED,
+    ARENA_EVENT_ARENA_DUEL_CREATED,
+    ARENA_EVENT_ARENA_DUEL_PUBLISHED,
+    ARENA_EVENT_ARENA_DUEL_STARTED,
+    build_arena_event_payload,
+    emit_arena_analytics_event,
+)
 from app.game.arena_duels.constants import (
     ARENA_ATTEMPT_RESULT_BASELINE,
     ARENA_ATTEMPT_RESULT_DRAW,
@@ -19,6 +27,7 @@ from app.game.arena_duels.constants import (
     ARENA_DEFAULT_ACTIVE_LIST_LIMIT,
     ARENA_DUEL_STATUS_ACTIVE,
     ARENA_DUEL_STATUS_DRAFT,
+    ARENA_DUEL_STATUS_EXPIRED,
     ARENA_SOURCE,
     arena_duel_expires_at,
 )
@@ -104,6 +113,32 @@ async def create_arena_duel_baseline(
         arena_attempt_id=baseline_attempt.id,
         arena_round=1,
         duel_limit_checked=True,
+    )
+    await emit_arena_analytics_event(
+        session,
+        event_type=ARENA_EVENT_ARENA_DUEL_CREATED,
+        happened_at=now_utc,
+        user_id=creator_user_id,
+        payload=build_arena_event_payload(
+            user_id=creator_user_id,
+            arena_duel_id=duel.id,
+            attempt_id=baseline_attempt.id,
+            action="create",
+            access_type=access_type,
+        ),
+    )
+    await emit_arena_analytics_event(
+        session,
+        event_type=ARENA_EVENT_ARENA_DUEL_STARTED,
+        happened_at=now_utc,
+        user_id=creator_user_id,
+        payload=build_arena_event_payload(
+            user_id=creator_user_id,
+            arena_duel_id=duel.id,
+            attempt_id=baseline_attempt.id,
+            action="create",
+            access_type=access_type,
+        ),
     )
     return ArenaBaselineStartResult(
         duel=_build_duel_snapshot(duel=duel, baseline_attempt=None),
@@ -203,7 +238,11 @@ async def _complete_arena_creator_baseline_context(
         if duel.status == ARENA_DUEL_STATUS_ACTIVE and duel.baseline_attempt_id == attempt.id:
             return _build_duel_snapshot(duel=duel, baseline_attempt=attempt)
         raise ArenaDuelAccessError
-    if duel.status != ARENA_DUEL_STATUS_DRAFT or duel.baseline_attempt_id is not None:
+    if not _creator_baseline_status_allows_completion(
+        attempt=attempt,
+        duel=duel,
+        now_utc=now_utc,
+    ):
         raise ArenaDuelAccessError
 
     _validate_question_ids(duel.question_ids)
@@ -221,6 +260,22 @@ async def _complete_arena_creator_baseline_context(
     duel.expires_at = arena_duel_expires_at(now_utc=now_utc)
     duel.updated_at = now_utc
 
+    await _emit_arena_completion_events(
+        session,
+        event_type=ARENA_EVENT_ARENA_DUEL_COMPLETED,
+        happened_at=now_utc,
+        duel=duel,
+        attempt=attempt,
+        action="creator_baseline",
+    )
+    await _emit_arena_completion_events(
+        session,
+        event_type=ARENA_EVENT_ARENA_DUEL_PUBLISHED,
+        happened_at=now_utc,
+        duel=duel,
+        attempt=attempt,
+        action="creator_baseline",
+    )
     return _build_duel_snapshot(duel=duel, baseline_attempt=attempt)
 
 
@@ -232,7 +287,7 @@ async def _complete_arena_challenger_context(
 ) -> ArenaAttemptCompletionResult:
     attempt = context.attempt
     duel = context.duel
-    _ensure_challenger_completion_access(attempt=attempt, duel=duel)
+    _ensure_challenger_completion_access(attempt=attempt, duel=duel, now_utc=now_utc)
     if attempt.completed_at is not None:
         # The original comparison opponent is not persisted. Suppress replay
         # rendering instead of pairing the stored result with a changed leaderboard.
@@ -266,6 +321,14 @@ async def _complete_arena_challenger_context(
     )
     duel.updated_at = now_utc
 
+    await _emit_arena_completion_events(
+        session,
+        event_type=ARENA_EVENT_ARENA_DUEL_COMPLETED,
+        happened_at=now_utc,
+        duel=duel,
+        attempt=attempt,
+        action="challenger",
+    )
     return ArenaAttemptCompletionResult(
         duel=_build_duel_snapshot(duel=duel, baseline_attempt=None),
         beaten_notification=notification,
@@ -282,6 +345,33 @@ def _build_attempt_result_line(attempt: ArenaAttempt) -> ArenaAttemptResultLine:
         score=attempt.score,
         time_ms=attempt.time_ms,
         result=attempt.result,
+    )
+
+
+async def _emit_arena_completion_events(
+    session: AsyncSession,
+    *,
+    event_type: str,
+    happened_at: datetime,
+    duel: ArenaDuel,
+    attempt: ArenaAttempt,
+    action: str,
+) -> None:
+    await emit_arena_analytics_event(
+        session,
+        event_type=event_type,
+        happened_at=happened_at,
+        user_id=attempt.user_id,
+        payload=build_arena_event_payload(
+            user_id=attempt.user_id,
+            arena_duel_id=duel.id,
+            attempt_id=attempt.id,
+            action=action,
+            access_type=attempt.access_type,
+            result=attempt.result,
+            score=attempt.score,
+            time_ms=attempt.time_ms,
+        ),
     )
 
 
@@ -326,15 +416,52 @@ def _ensure_challenger_completion_access(
     *,
     attempt: ArenaAttempt,
     duel: ArenaDuel,
+    now_utc: datetime,
 ) -> None:
     if (
         attempt.role != ARENA_ATTEMPT_ROLE_CHALLENGER
         or attempt.arena_duel_id != duel.id
-        or duel.status != ARENA_DUEL_STATUS_ACTIVE
         or duel.baseline_attempt_id is None
     ):
         raise ArenaDuelAccessError
-    _validate_question_ids(duel.question_ids)
+    if duel.status == ARENA_DUEL_STATUS_ACTIVE:
+        _validate_question_ids(duel.question_ids)
+        return
+    if (
+        duel.status == ARENA_DUEL_STATUS_EXPIRED
+        and duel.expires_at <= now_utc
+        and _attempt_started_before_duel_expiry(
+            attempt=attempt,
+            duel=duel,
+        )
+    ):
+        _validate_question_ids(duel.question_ids)
+        return
+    raise ArenaDuelAccessError
+
+
+def _creator_baseline_status_allows_completion(
+    *,
+    attempt: ArenaAttempt,
+    duel: ArenaDuel,
+    now_utc: datetime,
+) -> bool:
+    if duel.baseline_attempt_id is not None:
+        return False
+    if duel.status == ARENA_DUEL_STATUS_DRAFT:
+        return True
+    return (
+        duel.status == ARENA_DUEL_STATUS_EXPIRED
+        and duel.expires_at <= now_utc
+        and _attempt_started_before_duel_expiry(
+            attempt=attempt,
+            duel=duel,
+        )
+    )
+
+
+def _attempt_started_before_duel_expiry(*, attempt: ArenaAttempt, duel: ArenaDuel) -> bool:
+    return attempt.created_at <= duel.expires_at
 
 
 async def _get_previous_best_attempt(

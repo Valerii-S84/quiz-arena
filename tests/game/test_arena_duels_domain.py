@@ -23,6 +23,7 @@ from app.game.arena_duels.constants import (
     ARENA_BEATEN_NOTIFICATION_TYPE,
     ARENA_DUEL_STATUS_ACTIVE,
     ARENA_DUEL_STATUS_DRAFT,
+    ARENA_DUEL_STATUS_EXPIRED,
     ARENA_SOURCE,
 )
 from app.game.arena_duels.errors import ArenaDuelIncompleteError
@@ -241,6 +242,38 @@ async def test_complete_arena_creator_baseline_publishes_active_for_24_hours(
 
 
 @pytest.mark.asyncio
+async def test_complete_arena_creator_baseline_allows_attempt_after_worker_expiry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    duel = _duel(status=ARENA_DUEL_STATUS_EXPIRED)
+    duel.expires_at = NOW_UTC - timedelta(minutes=1)
+    attempt = _baseline_attempt(duel_id=duel.id)
+    attempt.created_at = NOW_UTC - timedelta(hours=1)
+
+    async def _fake_get_context(*_args, **_kwargs):
+        return ArenaAttemptDuelContext(attempt=attempt, duel=duel)
+
+    async def _fake_summary(*_args, **_kwargs):
+        return ArenaAttemptCompletionSummary(completed_rounds=7, score=6, time_ms=48_000)
+
+    monkeypatch.setattr(
+        arena_service.ArenaDuelsRepo, "get_attempt_duel_for_update", _fake_get_context
+    )
+    monkeypatch.setattr(arena_service.ArenaDuelsRepo, "summarize_completed_attempt", _fake_summary)
+
+    result = await arena_service.complete_arena_creator_baseline(
+        AsyncSessionStub(),
+        attempt_id=attempt.id,
+        user_id=11,
+        now_utc=NOW_UTC,
+    )
+
+    assert duel.status == ARENA_DUEL_STATUS_ACTIVE
+    assert duel.expires_at == NOW_UTC + timedelta(hours=24)
+    assert result.baseline_attempt_id == attempt.id
+
+
+@pytest.mark.asyncio
 async def test_complete_arena_creator_baseline_if_applicable_ignores_challengers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -322,6 +355,55 @@ async def test_complete_arena_challenger_without_new_best_sends_no_notification(
     assert attempt.score == 5
     assert attempt.time_ms == 44_000
     assert attempt.result == ARENA_ATTEMPT_RESULT_LOSS
+
+
+@pytest.mark.asyncio
+async def test_complete_arena_challenger_allows_attempt_after_worker_expiry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    duel = _duel(status=ARENA_DUEL_STATUS_EXPIRED)
+    duel.expires_at = NOW_UTC - timedelta(minutes=1)
+    previous_best = _completed_attempt(
+        duel_id=duel.id,
+        user_id=11,
+        score=6,
+        time_ms=48_000,
+        role=ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+    )
+    attempt = _challenger_attempt(duel_id=duel.id)
+    attempt.created_at = NOW_UTC - timedelta(hours=1)
+    duel.baseline_attempt_id = previous_best.id
+
+    async def _fake_get_context(*_args, **_kwargs):
+        return ArenaAttemptDuelContext(attempt=attempt, duel=duel)
+
+    async def _fake_summary(*_args, **_kwargs):
+        return ArenaAttemptCompletionSummary(completed_rounds=7, score=5, time_ms=44_000)
+
+    async def _fake_completed_attempts(*_args, **_kwargs):
+        return [previous_best]
+
+    monkeypatch.setattr(
+        arena_service.ArenaDuelsRepo, "get_attempt_duel_for_update", _fake_get_context
+    )
+    monkeypatch.setattr(arena_service.ArenaDuelsRepo, "summarize_completed_attempt", _fake_summary)
+    monkeypatch.setattr(
+        arena_service.ArenaDuelsRepo,
+        "list_completed_attempts_for_duel",
+        _fake_completed_attempts,
+    )
+
+    result = await arena_service.complete_arena_attempt_if_applicable(
+        AsyncSessionStub(),
+        attempt_id=attempt.id,
+        user_id=22,
+        now_utc=NOW_UTC,
+    )
+
+    assert result is not None
+    assert result.completed_attempt is not None
+    assert result.completed_attempt.score == 5
+    assert attempt.completed_at == NOW_UTC
 
 
 @pytest.mark.asyncio
@@ -577,14 +659,13 @@ async def test_active_arena_repo_listing_requires_publish_ready_baseline() -> No
 
 
 @pytest.mark.asyncio
-async def test_source_friend_arena_dedupe_requires_unexpired_active_baseline() -> None:
+async def test_source_friend_arena_dedupe_finds_any_published_baseline() -> None:
     source_friend_challenge_id = uuid4()
     session = _RecordingSession()
 
     result = await ArenaDuelsRepo.get_source_friend_duel_with_baseline_for_update(
         session,
         source_friend_challenge_id=source_friend_challenge_id,
-        now_utc=NOW_UTC,
     )
 
     assert result is None
@@ -592,14 +673,34 @@ async def test_source_friend_arena_dedupe_requires_unexpired_active_baseline() -
     compiled = session.statement.compile()
     sql = str(compiled)
     assert compiled.params["source_friend_challenge_id_1"] == source_friend_challenge_id
-    assert compiled.params["status_1"] == ARENA_DUEL_STATUS_ACTIVE
-    assert compiled.params["expires_at_1"] == NOW_UTC
     assert "arena_duels.source_friend_challenge_id = :source_friend_challenge_id_1" in sql
-    assert "arena_duels.status = :status_1" in sql
-    assert "arena_duels.expires_at > :expires_at_1" in sql
+    assert "arena_duels.status = :status_1" not in sql
+    assert "arena_duels.expires_at > :expires_at_1" not in sql
     assert "arena_attempts.score IS NOT NULL" in sql
     assert "arena_attempts.time_ms IS NOT NULL" in sql
     assert "arena_attempts.completed_at IS NOT NULL" in sql
+
+
+@pytest.mark.asyncio
+async def test_arena_repo_expiry_updates_active_and_draft_duels() -> None:
+    active_session = _RowcountRecordingSession(rowcount=2)
+    draft_session = _RowcountRecordingSession(rowcount=1)
+
+    active_total = await ArenaDuelsRepo.expire_active_duels(active_session, now_utc=NOW_UTC)
+    draft_total = await ArenaDuelsRepo.expire_draft_duels(draft_session, now_utc=NOW_UTC)
+
+    assert active_total == 2
+    assert draft_total == 1
+    active_statement = active_session.statement
+    draft_statement = draft_session.statement
+    assert active_statement is not None
+    assert draft_statement is not None
+    active_sql = str(active_statement.compile())
+    assert "UPDATE arena_duels" in active_sql
+    assert "arena_duels.status = :status_1" in active_sql
+    assert "arena_duels.expires_at <= :expires_at_1" in active_sql
+    assert active_statement.compile().params["status_1"] == ARENA_DUEL_STATUS_ACTIVE
+    assert draft_statement.compile().params["status_1"] == ARENA_DUEL_STATUS_DRAFT
 
 
 @pytest.mark.asyncio
@@ -658,6 +759,21 @@ class _ScalarRecordingSession(AsyncSessionStub):
     async def execute(self, statement):
         self.statements.append(statement)
         return _ScalarRows(next(self._values))
+
+
+class _RowcountResult:
+    def __init__(self, *, rowcount: int) -> None:
+        self.rowcount = rowcount
+
+
+class _RowcountRecordingSession(AsyncSessionStub):
+    def __init__(self, *, rowcount: int) -> None:
+        self.statement = None
+        self._rowcount = rowcount
+
+    async def execute(self, statement):
+        self.statement = statement
+        return _RowcountResult(rowcount=self._rowcount)
 
 
 class _OneRowRecordingSession(AsyncSessionStub):

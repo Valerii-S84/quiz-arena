@@ -13,6 +13,8 @@ from app.bot.keyboards.duels import (
     build_arena_accept_keyboard,
     build_arena_back_keyboard,
     build_arena_empty_keyboard,
+    build_arena_expired_guard_keyboard,
+    build_arena_guard_back_keyboard,
     build_arena_list_keyboard,
     build_arena_published_keyboard,
     build_arena_result_keyboard,
@@ -20,6 +22,15 @@ from app.bot.keyboards.duels import (
 )
 from app.bot.keyboards.quiz import build_quiz_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.game.arena_duels.analytics import (
+    ARENA_EVENT_ARENA_DUEL_PUBLISHED,
+    ARENA_EVENT_ARENA_OPENED,
+    ARENA_EVENT_ARENA_RESULT_SHOWN,
+    ARENA_EVENT_DUEL_LIMIT_HIT,
+    ARENA_EVENT_DUEL_PAYWALL_SHOWN,
+    build_arena_event_payload,
+    emit_arena_analytics_event,
+)
 from app.game.arena_duels.constants import ARENA_ATTEMPT_RESULT_DRAW, ARENA_ATTEMPT_RESULT_WIN
 from app.game.arena_duels.errors import (
     ArenaDuelAccessError,
@@ -64,7 +75,7 @@ async def handle_arena_open(
 
     now_utc = datetime.now(timezone.utc)
     async with session_local.begin() as session:
-        await user_onboarding_service.ensure_home_snapshot(
+        snapshot = await user_onboarding_service.ensure_home_snapshot(
             session,
             telegram_user=callback.from_user,
         )
@@ -73,6 +84,13 @@ async def handle_arena_open(
             session=session,
             user_onboarding_service=user_onboarding_service,
             active_duels=active_duels,
+        )
+        await emit_arena_analytics_event(
+            session,
+            event_type=ARENA_EVENT_ARENA_OPENED,
+            happened_at=now_utc,
+            user_id=snapshot.user_id,
+            payload=build_arena_event_payload(user_id=snapshot.user_id, action="open"),
         )
 
     if not items:
@@ -126,7 +144,7 @@ async def handle_arena_accept_preview(
         await _send_arena_guard(
             callback,
             text_key=screen.guard_text_key,
-            reply_markup=build_arena_empty_keyboard(),
+            reply_markup=_build_arena_guard_keyboard(screen.guard_text_key),
         )
         return
     if screen.duel is None:
@@ -280,6 +298,21 @@ async def handle_arena_publish_friend(
                 friend_challenge_id=friend_challenge_id,
                 now_utc=now_utc,
             )
+            published_score = getattr(published_duel, "baseline_score", None)
+            published_time_ms = getattr(published_duel, "baseline_time_ms", None)
+            await emit_arena_analytics_event(
+                session,
+                event_type=ARENA_EVENT_ARENA_DUEL_PUBLISHED,
+                happened_at=now_utc,
+                user_id=snapshot.user_id,
+                payload=build_arena_event_payload(
+                    user_id=snapshot.user_id,
+                    arena_duel_id=getattr(published_duel, "duel_id", None),
+                    action="publish_friend",
+                    score=published_score if isinstance(published_score, int) else None,
+                    time_ms=published_time_ms if isinstance(published_time_ms, int) else None,
+                ),
+            )
         except (
             ArenaDuelAccessError,
             ArenaDuelIncompleteError,
@@ -331,6 +364,12 @@ async def send_arena_completion_result(
             ),
             reply_markup=build_arena_published_keyboard(),
         )
+        await _emit_arena_result_shown(
+            session_local=session_local,
+            completion=completion,
+            completed_attempt=completed_attempt,
+            action="creator_baseline",
+        )
         return
 
     async with session_local.begin() as session:
@@ -349,6 +388,12 @@ async def send_arena_completion_result(
         reply_markup=build_arena_result_keyboard(
             user_won=completed_attempt.result == ARENA_ATTEMPT_RESULT_WIN
         ),
+    )
+    await _emit_arena_result_shown(
+        session_local=session_local,
+        completion=completion,
+        completed_attempt=completed_attempt,
+        action="challenger",
     )
 
 
@@ -383,6 +428,21 @@ async def _start_arena_round(
             result = await start_arena_round(session, snapshot.user_id, now_utc, access_type)
         except ArenaDuelPaymentRequiredError:
             payment_required = True
+            action = _arena_action_from_callback_data(callback.data)
+            await emit_arena_analytics_event(
+                session,
+                event_type=ARENA_EVENT_DUEL_LIMIT_HIT,
+                happened_at=now_utc,
+                user_id=snapshot.user_id,
+                payload=build_arena_event_payload(user_id=snapshot.user_id, action=action),
+            )
+            await emit_arena_analytics_event(
+                session,
+                event_type=ARENA_EVENT_DUEL_PAYWALL_SHOWN,
+                happened_at=now_utc,
+                user_id=snapshot.user_id,
+                payload=build_arena_event_payload(user_id=snapshot.user_id, action=action),
+            )
         except ArenaDuelOwnAttemptError:
             guard_text_key = "msg.duels.arena.own"
         except ArenaDuelAlreadyAttemptedError:
@@ -403,7 +463,7 @@ async def _start_arena_round(
         await _send_arena_guard(
             callback,
             text_key=guard_text_key,
-            reply_markup=build_arena_empty_keyboard(),
+            reply_markup=_build_arena_guard_keyboard(guard_text_key),
         )
         return
 
@@ -540,6 +600,44 @@ async def _send_duel_paywall(callback: CallbackQuery) -> None:
             reply_markup=build_duel_paywall_keyboard(),
         )
     await callback.answer()
+
+
+async def _emit_arena_result_shown(
+    *,
+    session_local,
+    completion: ArenaAttemptCompletionResult,
+    completed_attempt: ArenaAttemptResultLine,
+    action: str,
+) -> None:
+    async with session_local.begin() as session:
+        await emit_arena_analytics_event(
+            session,
+            event_type=ARENA_EVENT_ARENA_RESULT_SHOWN,
+            happened_at=datetime.now(timezone.utc),
+            user_id=completed_attempt.user_id,
+            payload=build_arena_event_payload(
+                user_id=completed_attempt.user_id,
+                arena_duel_id=completion.duel.duel_id,
+                action=action,
+                result=completed_attempt.result,
+                score=completed_attempt.score,
+                time_ms=completed_attempt.time_ms,
+            ),
+        )
+
+
+def _build_arena_guard_keyboard(text_key: str) -> object:
+    if text_key == "msg.duels.arena.expired":
+        return build_arena_expired_guard_keyboard()
+    return build_arena_guard_back_keyboard()
+
+
+def _arena_action_from_callback_data(callback_data: str | None) -> str:
+    if callback_data == "arena:start_create":
+        return "create"
+    if callback_data is not None and callback_data.startswith("arena:start_attempt:"):
+        return "accept"
+    return "arena"
 
 
 def _parse_arena_duel_id(callback: CallbackQuery, *, pattern, parse_uuid_callback) -> UUID | None:

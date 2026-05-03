@@ -112,7 +112,9 @@ def test_critical_constraints_present() -> None:
         for constraint in arena_duels.constraints
         if isinstance(constraint, CheckConstraint)
     }
+    arena_duel_index_names = {index.name for index in arena_duels.indexes}
     assert "ck_arena_duels_access_type" in arena_duel_check_names
+    assert "uq_arena_duels_source_friend_once" in arena_duel_index_names
 
     arena_attempts = Base.metadata.tables["arena_attempts"]
     arena_attempt_check_names = {

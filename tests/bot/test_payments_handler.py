@@ -5,6 +5,7 @@ import pytest
 from app.bot.handlers.payments import (
     _build_purchase_idempotency_key,
     _extract_offer_impression_id_from_purchase_idempotency_key,
+    _is_duel_paywall_callback,
     _parse_buy_callback_data,
 )
 
@@ -15,6 +16,16 @@ def test_parse_buy_callback_without_optional_payload() -> None:
     )
 
     assert product_code == "ENERGY_10"
+    assert promo_redemption_id is None
+    assert offer_impression_id is None
+
+
+def test_parse_buy_callback_with_duel_context_payload() -> None:
+    product_code, promo_redemption_id, offer_impression_id = _parse_buy_callback_data(
+        "buy:PREMIUM_WEEK:duel"
+    )
+
+    assert product_code == "PREMIUM_WEEK"
     assert promo_redemption_id is None
     assert offer_impression_id is None
 
@@ -42,6 +53,16 @@ def test_parse_buy_callback_with_offer_payload() -> None:
 def test_parse_buy_callback_raises_for_invalid_payload() -> None:
     with pytest.raises(ValueError):
         _parse_buy_callback_data("buy:ENERGY_10:offer:not-a-number")
+
+
+def test_duel_paywall_callback_context_is_explicit() -> None:
+    assert _is_duel_paywall_callback("buy:PREMIUM_WEEK:duel", product_code="PREMIUM_WEEK")
+    assert not _is_duel_paywall_callback("buy:PREMIUM_WEEK", product_code="PREMIUM_WEEK")
+    assert not _is_duel_paywall_callback(
+        "buy:PREMIUM_WEEK:offer:42",
+        product_code="PREMIUM_WEEK",
+    )
+    assert not _is_duel_paywall_callback("buy:ENERGY_10:duel", product_code="ENERGY_10")
 
 
 def test_build_purchase_idempotency_key_embeds_offer_impression_id() -> None:

@@ -163,9 +163,10 @@ async def publish_friend_challenge_to_arena(
     existing = await ArenaDuelsRepo.get_source_friend_duel_with_baseline_for_update(
         session,
         source_friend_challenge_id=challenge.id,
-        now_utc=now_utc,
     )
     if existing is not None:
+        if existing.duel.status != ARENA_DUEL_STATUS_ACTIVE or existing.duel.expires_at <= now_utc:
+            raise FriendChallengeAccessError
         return _build_arena_duel_snapshot(
             duel=existing.duel,
             baseline_attempt=existing.baseline_attempt,

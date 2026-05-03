@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -45,6 +46,12 @@ class ArenaDuel(Base):
         Index("idx_arena_duels_creator_created", "creator_user_id", "created_at"),
         Index("idx_arena_duels_status_expires_created", "status", "expires_at", "created_at"),
         Index("idx_arena_duels_source_friend", "source_friend_challenge_id"),
+        Index(
+            "uq_arena_duels_source_friend_once",
+            "source_friend_challenge_id",
+            unique=True,
+            postgresql_where=text("source_friend_challenge_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True)

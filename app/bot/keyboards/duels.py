@@ -13,6 +13,7 @@ from app.game.duels.constants import (
     DUEL_ARENA_CALLBACK,
     DUEL_FRIEND_CALLBACK,
     DUEL_MENU_CALLBACK,
+    DUEL_PAYWALL_CALLBACK_CONTEXT,
     DUEL_PAYWALL_PRODUCT_CODES,
     FRIEND_DUEL_CREATE_CALLBACK,
 )
@@ -76,6 +77,28 @@ def build_arena_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="↩️ Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
+        ]
+    )
+
+
+def build_arena_expired_guard_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
+            [
+                InlineKeyboardButton(
+                    text="🎯 Eigenes Arena-Duell erstellen",
+                    callback_data=ARENA_CREATE_CALLBACK,
+                )
+            ],
+        ]
+    )
+
+
+def build_arena_guard_back_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
         ]
     )
 
@@ -153,13 +176,15 @@ def build_duel_paywall_keyboard() -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="🎟 Duell-Ticket – 5⭐",
-                    callback_data=f"buy:{ticket_product_code}",
+                    callback_data=f"buy:{ticket_product_code}:{DUEL_PAYWALL_CALLBACK_CONTEXT}",
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="👑 Premium-Woche – 29⭐",
-                    callback_data=f"buy:{premium_week_product_code}",
+                    callback_data=(
+                        f"buy:{premium_week_product_code}:{DUEL_PAYWALL_CALLBACK_CONTEXT}"
+                    ),
                 )
             ],
             [InlineKeyboardButton(text="↩️ Später", callback_data=ARENA_LIST_CALLBACK)],

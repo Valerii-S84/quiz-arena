@@ -9,7 +9,13 @@ from uuid import uuid4
 import pytest
 
 from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
-from app.db.repo.arena_duels_repo import ArenaDuelsRepo
+from app.db.repo.arena_duels_repo import ArenaActiveDuelRow, ArenaDuelsRepo
+from app.game.arena_duels.constants import (
+    ARENA_ATTEMPT_RESULT_BASELINE,
+    ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+    ARENA_DUEL_STATUS_ACTIVE,
+    ARENA_DUEL_STATUS_EXPIRED,
+)
 from app.game.friend_challenges.constants import (
     DUEL_STATUS_CANCELED,
     DUEL_STATUS_COMPLETED,
@@ -448,6 +454,97 @@ async def test_publish_friend_challenge_to_arena_rejects_empty_friend_duel(
 
 
 @pytest.mark.asyncio
+async def test_publish_friend_challenge_to_arena_returns_existing_active_publish(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    challenge = _challenge(
+        status=DUEL_STATUS_CREATOR_DONE,
+        creator_user_id=11,
+        opponent_user_id=None,
+    )
+    existing_duel = _arena_duel_from_friend(challenge_id=challenge.id)
+    existing_attempt = _arena_baseline_attempt(duel_id=existing_duel.id)
+    existing_duel.baseline_attempt_id = existing_attempt.id
+
+    async def _unexpected_create_duel(*_args, **_kwargs):
+        pytest.fail("duplicate friend publish must not create another Arena duel")
+
+    monkeypatch.setattr(
+        friend_challenges_manage.FriendChallengesRepo,
+        "get_by_id_for_update",
+        _async_return(challenge),
+    )
+    monkeypatch.setattr(
+        friend_challenges_manage,
+        "_expire_friend_challenge_if_due",
+        lambda **_kwargs: False,
+    )
+    monkeypatch.setattr(
+        ArenaDuelsRepo,
+        "get_source_friend_duel_with_baseline_for_update",
+        _async_return(ArenaActiveDuelRow(existing_duel, existing_attempt)),
+    )
+    monkeypatch.setattr(ArenaDuelsRepo, "create_duel", _unexpected_create_duel)
+
+    result = await friend_challenges_manage.publish_friend_challenge_to_arena(
+        _Session(),
+        user_id=11,
+        friend_challenge_id=challenge.id,
+        now_utc=NOW_UTC,
+    )
+
+    assert result.duel_id == existing_duel.id
+    assert result.baseline_attempt_id == existing_attempt.id
+    assert result.baseline_score == existing_attempt.score
+    assert result.baseline_time_ms == existing_attempt.time_ms
+
+
+@pytest.mark.asyncio
+async def test_publish_friend_challenge_to_arena_rejects_expired_duplicate_publish(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    challenge = _challenge(
+        status=DUEL_STATUS_CREATOR_DONE,
+        creator_user_id=11,
+        opponent_user_id=None,
+    )
+    existing_duel = _arena_duel_from_friend(
+        challenge_id=challenge.id,
+        status=ARENA_DUEL_STATUS_EXPIRED,
+    )
+    existing_attempt = _arena_baseline_attempt(duel_id=existing_duel.id)
+    existing_duel.baseline_attempt_id = existing_attempt.id
+
+    async def _unexpected_create_duel(*_args, **_kwargs):
+        pytest.fail("expired duplicate publish must be denied, not recreated")
+
+    monkeypatch.setattr(
+        friend_challenges_manage.FriendChallengesRepo,
+        "get_by_id_for_update",
+        _async_return(challenge),
+    )
+    monkeypatch.setattr(
+        friend_challenges_manage,
+        "_expire_friend_challenge_if_due",
+        lambda **_kwargs: False,
+    )
+    monkeypatch.setattr(
+        ArenaDuelsRepo,
+        "get_source_friend_duel_with_baseline_for_update",
+        _async_return(ArenaActiveDuelRow(existing_duel, existing_attempt)),
+    )
+    monkeypatch.setattr(ArenaDuelsRepo, "create_duel", _unexpected_create_duel)
+
+    with pytest.raises(FriendChallengeAccessError):
+        await friend_challenges_manage.publish_friend_challenge_to_arena(
+            _Session(),
+            user_id=11,
+            friend_challenge_id=challenge.id,
+            now_utc=NOW_UTC,
+        )
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "challenge",
     [
@@ -511,3 +608,38 @@ def _async_return(value):
         return value
 
     return _inner
+
+
+def _arena_duel_from_friend(
+    *,
+    challenge_id,
+    status: str = ARENA_DUEL_STATUS_ACTIVE,
+) -> ArenaDuel:
+    return ArenaDuel(
+        id=uuid4(),
+        creator_user_id=11,
+        baseline_attempt_id=None,
+        question_ids=[f"duel-q-{index}" for index in range(1, 8)],
+        mode_code="QUICK_MIX_A1A2",
+        access_type="FREE",
+        status=status,
+        expires_at=NOW_UTC.replace(hour=13),
+        created_at=NOW_UTC,
+        updated_at=NOW_UTC,
+        source_friend_challenge_id=challenge_id,
+    )
+
+
+def _arena_baseline_attempt(*, duel_id) -> ArenaAttempt:
+    return ArenaAttempt(
+        id=uuid4(),
+        arena_duel_id=duel_id,
+        user_id=11,
+        role=ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+        access_type="FREE",
+        score=6,
+        time_ms=48_000,
+        result=ARENA_ATTEMPT_RESULT_BASELINE,
+        completed_at=NOW_UTC,
+        created_at=NOW_UTC,
+    )
