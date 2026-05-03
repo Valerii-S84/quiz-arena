@@ -10,6 +10,10 @@ from app.bot.handlers.gameplay_views import _format_user_label
 from app.bot.keyboards.friend_challenge import build_friend_challenge_next_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.game.arena_duels.errors import ArenaDuelAccessError
+from app.game.arena_duels.revanche_delivery_guard import (
+    is_arena_revanche_sent,
+    lock_arena_revanche_delivery,
+)
 from app.game.arena_duels.revanche_types import ArenaRevancheRequest
 
 
@@ -53,18 +57,21 @@ async def create_and_send_revanche(
     ):
         raise ArenaDuelAccessError
 
-    await bot.send_message(
-        chat_id=delivery.opponent_chat_id,
-        text=TEXTS_DE["msg.duels.revanche.incoming"].format(
-            opponent_label=delivery.sender_label,
-        ),
-        reply_markup=build_friend_challenge_next_keyboard(
-            challenge_id=str(delivery.challenge_id),
-        ),
-    )
     if delivery.request is None:
         raise ArenaDuelAccessError
     async with session_local.begin() as session:
+        await lock_arena_revanche_delivery(session, request=delivery.request)
+        if await is_arena_revanche_sent(session, request=delivery.request):
+            return delivery.opponent_label
+        await bot.send_message(
+            chat_id=delivery.opponent_chat_id,
+            text=TEXTS_DE["msg.duels.revanche.incoming"].format(
+                opponent_label=delivery.sender_label,
+            ),
+            reply_markup=build_friend_challenge_next_keyboard(
+                challenge_id=str(delivery.challenge_id),
+            ),
+        )
         await record_arena_revanche_sent(
             session,
             request=delivery.request,
