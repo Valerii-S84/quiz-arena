@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import and_, case, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
@@ -14,6 +14,8 @@ from app.game.arena_duels.constants import (
     ARENA_ATTEMPT_ROLE_CHALLENGER,
     ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
     ARENA_DUEL_STATUS_ACTIVE,
+    ARENA_DUEL_STATUS_DRAFT,
+    ARENA_DUEL_STATUS_EXPIRED,
     ARENA_SOURCE,
 )
 
@@ -61,7 +63,6 @@ class ArenaDuelsRepo:
         session: AsyncSession,
         *,
         source_friend_challenge_id: UUID,
-        now_utc: datetime,
     ) -> ArenaActiveDuelRow | None:
         stmt = (
             select(ArenaDuel, ArenaAttempt)
@@ -74,8 +75,6 @@ class ArenaDuelsRepo:
             )
             .where(ArenaDuel.source_friend_challenge_id == source_friend_challenge_id)
             .where(
-                ArenaDuel.status == ARENA_DUEL_STATUS_ACTIVE,
-                ArenaDuel.expires_at > now_utc,
                 ArenaAttempt.score.is_not(None),
                 ArenaAttempt.time_ms.is_not(None),
                 ArenaAttempt.completed_at.is_not(None),
@@ -90,6 +89,32 @@ class ArenaDuelsRepo:
             return None
         duel, baseline_attempt = row.t
         return ArenaActiveDuelRow(duel=duel, baseline_attempt=baseline_attempt)
+
+    @staticmethod
+    async def expire_active_duels(session: AsyncSession, *, now_utc: datetime) -> int:
+        stmt = (
+            update(ArenaDuel)
+            .where(
+                ArenaDuel.status == ARENA_DUEL_STATUS_ACTIVE,
+                ArenaDuel.expires_at <= now_utc,
+            )
+            .values(status=ARENA_DUEL_STATUS_EXPIRED, updated_at=now_utc)
+        )
+        result = await session.execute(stmt)
+        return int(getattr(result, "rowcount", 0) or 0)
+
+    @staticmethod
+    async def expire_draft_duels(session: AsyncSession, *, now_utc: datetime) -> int:
+        stmt = (
+            update(ArenaDuel)
+            .where(
+                ArenaDuel.status == ARENA_DUEL_STATUS_DRAFT,
+                ArenaDuel.expires_at <= now_utc,
+            )
+            .values(status=ARENA_DUEL_STATUS_EXPIRED, updated_at=now_utc)
+        )
+        result = await session.execute(stmt)
+        return int(getattr(result, "rowcount", 0) or 0)
 
     @staticmethod
     async def count_creator_duels_by_access_type(

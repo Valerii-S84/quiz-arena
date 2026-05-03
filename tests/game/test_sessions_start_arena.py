@@ -327,3 +327,77 @@ async def test_arena_duel_start_is_zero_energy_after_duel_limit_gate(
     assert result.energy_paid == 0
     assert result.session.question_number == 3
     assert result.session.total_questions == 7
+
+
+@pytest.mark.asyncio
+async def test_arena_duel_existing_attempt_can_continue_after_expiry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    created_sessions: list[QuizSession] = []
+    arena_attempt_id = uuid4()
+
+    async def _fake_get_existing(*_args, **_kwargs):
+        return None
+
+    async def _fake_get_question_by_id(*_args, **_kwargs):
+        return SimpleNamespace(
+            question_id="arena-q-3",
+            text="Question?",
+            options=("A", "B", "C", "D"),
+            category="Arena",
+        )
+
+    async def _fake_create(*_args, **kwargs):
+        created_sessions.append(kwargs["quiz_session"])
+        return kwargs["quiz_session"]
+
+    async def _fake_get_start_context(*_args, **_kwargs):
+        return SimpleNamespace(
+            attempt=SimpleNamespace(
+                id=arena_attempt_id,
+                user_id=11,
+                role="CHALLENGER",
+                score=None,
+                time_ms=None,
+                result=None,
+                completed_at=None,
+                created_at=NOW_UTC - timedelta(hours=1),
+            ),
+            duel=SimpleNamespace(
+                mode_code="QUICK_MIX_A1A2",
+                question_ids=[f"arena-q-{number}" for number in range(1, 8)],
+                status="EXPIRED",
+                expires_at=NOW_UTC - timedelta(minutes=1),
+            ),
+        )
+
+    monkeypatch.setattr(
+        sessions_start.QuizSessionsRepo,
+        "get_by_idempotency_key",
+        _fake_get_existing,
+    )
+    monkeypatch.setattr(sessions_start.QuizSessionsRepo, "create", _fake_create)
+    monkeypatch.setattr(
+        sessions_start.ArenaAttemptsRepo,
+        "get_start_context_for_update",
+        _fake_get_start_context,
+    )
+
+    from app.game.sessions import service as service_module
+
+    monkeypatch.setattr(service_module, "get_question_by_id", _fake_get_question_by_id)
+
+    result = await sessions_start.start_session(
+        _Session(),
+        user_id=11,
+        mode_code="QUICK_MIX_A1A2",
+        source="ARENA_DUEL",
+        idempotency_key="arena:expired-continuation",
+        now_utc=NOW_UTC,
+        arena_attempt_id=arena_attempt_id,
+        arena_round=3,
+        duel_limit_checked=True,
+    )
+
+    assert created_sessions[0].arena_attempt_id == arena_attempt_id
+    assert result.session.question_number == 3

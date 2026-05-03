@@ -132,6 +132,18 @@ def test_arena_access_type_constraints_match_migration() -> None:
     assert 'server_default="FREE"' in migration
 
 
+def test_arena_source_friend_unique_index_matches_migration() -> None:
+    migration = Path("alembic/versions/b0c1d2e3f4a5_m50_arena_source_friend_unique.py").read_text()
+
+    assert "uq_arena_duels_source_friend_once" in migration
+    assert "ranked_source_duels" in migration
+    assert "row_number() OVER" in migration
+    assert "PARTITION BY source_friend_challenge_id" in migration
+    assert "source_friend_challenge_id = NULL" in migration
+    assert "source_friend_challenge_id IS NOT NULL" in migration
+    assert "unique=True" in migration
+
+
 @pytest.mark.asyncio
 async def test_submit_answer_returns_arena_context(monkeypatch: pytest.MonkeyPatch) -> None:
     arena_attempt_id = uuid4()

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -8,6 +8,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from app.bot.application import build_bot
 from app.core.analytics_events import BERLIN_TIMEZONE, EVENT_SOURCE_WORKER
 from app.db.repo.analytics_repo import AnalyticsRepo
+from app.db.repo.arena_duels_repo import ArenaDuelsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.arena_duels.constants import ARENA_BEATEN_NOTIFICATION_EVENT
@@ -15,6 +16,7 @@ from app.game.arena_duels.types import ArenaBeatenNotification
 from app.game.duels.constants import ARENA_LIST_CALLBACK
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
+from app.workers.tasks.arena_duels_schedule import configure_arena_duels_schedule
 
 
 def build_arena_beaten_notification_keyboard() -> InlineKeyboardMarkup:
@@ -23,6 +25,23 @@ def build_arena_beaten_notification_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
         ]
     )
+
+
+async def expire_arena_duels(*, now_utc: datetime | None = None) -> dict[str, int]:
+    resolved_now_utc = now_utc or datetime.now(timezone.utc)
+    async with SessionLocal.begin() as session:
+        expired_active_total = await ArenaDuelsRepo.expire_active_duels(
+            session,
+            now_utc=resolved_now_utc,
+        )
+        expired_draft_total = await ArenaDuelsRepo.expire_draft_duels(
+            session,
+            now_utc=resolved_now_utc,
+        )
+    return {
+        "expired_active_total": expired_active_total,
+        "expired_draft_total": expired_draft_total,
+    }
 
 
 async def send_arena_beaten_notification(
@@ -176,6 +195,14 @@ def send_arena_beaten_notification_task(
     )
 
 
+@celery_app.task(name="app.workers.tasks.arena_duels.expire_arena_duels")
+def expire_arena_duels_task() -> dict[str, int]:
+    return run_async_job(expire_arena_duels())
+
+
+configure_arena_duels_schedule(celery_app)
+
+
 def _notification_from_payload(payload: dict[str, object]) -> ArenaBeatenNotification:
     from uuid import UUID
 
@@ -204,6 +231,8 @@ def _payload_int(payload: dict[str, object], key: str) -> int:
 
 __all__ = [
     "build_arena_beaten_notification_keyboard",
+    "expire_arena_duels",
+    "expire_arena_duels_task",
     "send_arena_beaten_notification",
     "send_arena_beaten_notification_task",
 ]

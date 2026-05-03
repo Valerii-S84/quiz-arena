@@ -16,6 +16,7 @@ from app.game.arena_duels.constants import (
     ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
     ARENA_DUEL_STATUS_ACTIVE,
     ARENA_DUEL_STATUS_DRAFT,
+    ARENA_DUEL_STATUS_EXPIRED,
 )
 from app.game.duels.constants import DUEL_QUESTION_COUNT
 from app.game.duels.limits import DuelLimitService
@@ -326,6 +327,7 @@ async def _ensure_arena_attempt_can_start(
     duel = context.duel
     _ensure_arena_duel_allows_attempt_start(
         duel=duel,
+        attempt=attempt,
         attempt_role=attempt.role,
         now_utc=now_utc,
     )
@@ -340,21 +342,36 @@ async def _ensure_arena_attempt_can_start(
 def _ensure_arena_duel_allows_attempt_start(
     *,
     duel: object,
+    attempt: object,
     attempt_role: str,
     now_utc: datetime,
 ) -> None:
     expires_at = getattr(duel, "expires_at", None)
-    if not isinstance(expires_at, datetime) or expires_at <= now_utc:
+    if not isinstance(expires_at, datetime):
         raise FriendChallengeAccessError
 
     status = getattr(duel, "status", None)
+    started_before_expiry = _arena_attempt_started_before_expiry(
+        attempt=attempt,
+        expires_at=expires_at,
+    )
     if attempt_role == ARENA_ATTEMPT_ROLE_CREATOR_BASELINE:
-        if status != ARENA_DUEL_STATUS_DRAFT:
-            raise FriendChallengeAccessError
-        return
-    if attempt_role == ARENA_ATTEMPT_ROLE_CHALLENGER and status == ARENA_DUEL_STATUS_ACTIVE:
+        if status == ARENA_DUEL_STATUS_DRAFT and (expires_at > now_utc or started_before_expiry):
+            return
+        if status == ARENA_DUEL_STATUS_EXPIRED and expires_at <= now_utc and started_before_expiry:
+            return
+        raise FriendChallengeAccessError
+    if attempt_role == ARENA_ATTEMPT_ROLE_CHALLENGER and (
+        (status == ARENA_DUEL_STATUS_ACTIVE and (expires_at > now_utc or started_before_expiry))
+        or (status == ARENA_DUEL_STATUS_EXPIRED and expires_at <= now_utc and started_before_expiry)
+    ):
         return
     raise FriendChallengeAccessError
+
+
+def _arena_attempt_started_before_expiry(*, attempt: object, expires_at: datetime) -> bool:
+    created_at = getattr(attempt, "created_at", None)
+    return isinstance(created_at, datetime) and created_at <= expires_at
 
 
 def _arena_duel_question_id(question_ids: object, arena_round: int) -> str | None:
