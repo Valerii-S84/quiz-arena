@@ -49,7 +49,7 @@ async def handle_friend_challenge_type_selected(
         return
     await callback.message.answer(
         TEXTS_DE["msg.duels.friend"],
-        reply_markup=build_friend_duel_keyboard(),
+        reply_markup=build_friend_duel_keyboard(challenge_type=selected_type),
     )
     await callback.answer()
 

@@ -55,6 +55,26 @@ async def test_handle_friend_challenge_type_direct_opens_canonical_duel_entry() 
 
 
 @pytest.mark.asyncio
+async def test_handle_friend_challenge_type_open_preserves_open_create_callback() -> None:
+    callback = DummyCallback(
+        data="friend:challenge:type:open",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+    await gameplay_friend_challenge.handle_friend_challenge_type_selected(callback)
+
+    response = callback.message.answers[0]
+    assert response.text == TEXTS_DE["msg.duels.friend"]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert callbacks == ["friend:challenge:format:open:7", "duels:menu"]
+
+
+@pytest.mark.asyncio
 async def test_handle_create_tournament_start_shortcut_shows_format_picker() -> None:
     callback = DummyCallback(
         data="create_tournament_start",
@@ -142,6 +162,62 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
     ]
     assert not any(button.url and "duel_" in button.url for button in invite_buttons)
     assert len(callback.message.answers) == 1
+
+
+@pytest.mark.asyncio
+async def test_handle_friend_challenge_create_selected_preserves_open_type(monkeypatch) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+    captured: dict[str, object] = {}
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        del session, telegram_user
+        return SimpleNamespace(user_id=17)
+
+    async def _fake_create_friend_challenge(*args, **kwargs):
+        del args
+        captured.update(kwargs)
+        return FriendChallengeSnapshot(
+            challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            invite_token="token",
+            challenge_type="OPEN",
+            mode_code="QUICK_MIX_A1A2",
+            access_type="FREE",
+            status="ACTIVE",
+            creator_user_id=17,
+            opponent_user_id=None,
+            current_round=1,
+            total_rounds=7,
+            creator_score=0,
+            opponent_score=0,
+            winner_user_id=None,
+        )
+
+    async def _fake_build_invite_link(callback, *, challenge_id: str):
+        del callback, challenge_id
+        return "https://t.me/testbot?start=duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+    monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(
+        gameplay.GameSessionService,
+        "create_friend_challenge",
+        _fake_create_friend_challenge,
+    )
+    monkeypatch.setattr(gameplay, "_build_friend_invite_link", _fake_build_invite_link)
+    monkeypatch.setattr(
+        friend_lobby_flow,
+        "get_settings",
+        lambda: SimpleNamespace(resolved_welcome_image_file_id=""),
+    )
+
+    callback = DummyCallback(
+        data="friend:challenge:format:open:7",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+    await gameplay_friend_challenge.handle_friend_challenge_create_selected(callback)
+
+    assert captured["challenge_type"] == "OPEN"
+    assert captured["total_rounds"] == 7
 
 
 @pytest.mark.asyncio
