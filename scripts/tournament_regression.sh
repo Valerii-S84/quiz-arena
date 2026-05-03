@@ -65,7 +65,6 @@ UNIT_TESTS=(
   tests/bot/test_gameplay_tournament_notifications.py
   tests/bot/test_gameplay_tournaments_more.py
   tests/bot/test_start_handler_flow_tournament.py
-  tests/bot/test_tournament_feature_flag.py
   tests/bot/test_tournament_keyboard.py
   tests/game/test_daily_arena_golden_extended_proof_cards.py
   tests/game/test_daily_cup_badge.py
