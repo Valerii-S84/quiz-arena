@@ -220,6 +220,21 @@ async def lock_arena_revanche_event_key(
     )
 
 
+async def lock_arena_revanche_sender_quota(
+    session: AsyncSession,
+    *,
+    user_id: int,
+) -> None:
+    dedupe_key = "|".join(("arena_revanche_sender_quota", str(user_id)))
+    digest = sha256(dedupe_key.encode("utf-8")).digest()
+    lock_key_1 = int.from_bytes(digest[:4], byteorder="big", signed=True)
+    lock_key_2 = int.from_bytes(digest[4:8], byteorder="big", signed=True)
+    await session.execute(
+        sa.text("SELECT pg_advisory_xact_lock(:lock_key_1, :lock_key_2)"),
+        {"lock_key_1": lock_key_1, "lock_key_2": lock_key_2},
+    )
+
+
 async def upsert_daily(session: AsyncSession, *, row: AnalyticsDailyUpsert) -> None:
     values = asdict(row)
     stmt = insert(AnalyticsDaily).values(**values)

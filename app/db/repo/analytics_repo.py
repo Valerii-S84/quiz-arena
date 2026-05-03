@@ -20,6 +20,7 @@ from app.db.repo.analytics_mutations import (  # noqa: F401
     delete_events_created_before,
     lock_arena_beaten_notification_event_key,
     lock_arena_revanche_event_key,
+    lock_arena_revanche_sender_quota,
     upsert_daily,
 )
 from app.db.repo.analytics_queries import (  # noqa: F401
@@ -43,6 +44,7 @@ class AnalyticsRepo:
         lock_arena_beaten_notification_event_key
     )
     lock_arena_revanche_event_key = staticmethod(lock_arena_revanche_event_key)
+    lock_arena_revanche_sender_quota = staticmethod(lock_arena_revanche_sender_quota)
     has_arena_beaten_notification_event = staticmethod(has_arena_beaten_notification_event)
     has_arena_revanche_event = staticmethod(has_arena_revanche_event)
     get_arena_revanche_event_payload = staticmethod(get_arena_revanche_event_payload)

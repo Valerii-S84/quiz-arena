@@ -74,6 +74,7 @@ async def prepare_arena_revanche_request(
         source_attempt_id=source_attempt_id,
     )
     payload = build_arena_revanche_payload(context=context)
+    await AnalyticsRepo.lock_arena_revanche_sender_quota(session, user_id=sender_user_id)
     await AnalyticsRepo.lock_arena_revanche_event_key(
         session,
         event_type=ARENA_REVANCHE_SENT_EVENT,
