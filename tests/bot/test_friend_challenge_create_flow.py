@@ -36,7 +36,7 @@ class _SessionLocal:
 @pytest.mark.asyncio
 async def test_handle_friend_challenge_create_selected_rejects_invalid_context() -> None:
     callback = DummyCallback(
-        data="friend:challenge:format:direct:7",
+        data="friend:challenge:format:direct:5",
         from_user=None,
         message=DummyMessage(),
     )
@@ -46,7 +46,7 @@ async def test_handle_friend_challenge_create_selected_rejects_invalid_context()
         session_local=SimpleNamespace(),
         user_onboarding_service=SimpleNamespace(),
         game_session_service=SimpleNamespace(),
-        parse_challenge_rounds=lambda _data: 7,
+        parse_challenge_rounds=lambda _data: 5,
         build_friend_invite_link=None,
         build_friend_plan_text=None,
         build_friend_ttl_text=None,
@@ -95,7 +95,7 @@ async def test_handle_friend_challenge_create_selected_shows_limit_keyboard_on_c
         raise exc_type
 
     callback = DummyCallback(
-        data="friend:challenge:format:direct:7",
+        data="friend:challenge:format:direct:5",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(),
     )
@@ -104,7 +104,7 @@ async def test_handle_friend_challenge_create_selected_shows_limit_keyboard_on_c
         session_local=_SessionLocal(object()),
         user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_fake_snapshot),
         game_session_service=SimpleNamespace(create_friend_challenge=_fake_create),
-        parse_challenge_rounds=lambda _data: 7,
+        parse_challenge_rounds=lambda _data: 5,
         build_friend_invite_link=None,
         build_friend_plan_text=None,
         build_friend_ttl_text=None,
@@ -141,7 +141,7 @@ async def test_handle_friend_challenge_create_selected_uses_fallback_text_withou
         return SimpleNamespace(
             challenge_id=challenge_id,
             invite_token="invite-token",
-            total_rounds=7,
+            total_rounds=12,
         )
 
     async def _fake_invite_link(callback, *, invite_token: str):
@@ -150,7 +150,7 @@ async def test_handle_friend_challenge_create_selected_uses_fallback_text_withou
         return None
 
     callback = DummyCallback(
-        data="friend:challenge:format:direct:7",
+        data="friend:challenge:format:direct:12",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(),
     )
@@ -159,7 +159,7 @@ async def test_handle_friend_challenge_create_selected_uses_fallback_text_withou
         session_local=_SessionLocal(session),
         user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_fake_snapshot),
         game_session_service=SimpleNamespace(create_friend_challenge=_fake_create),
-        parse_challenge_rounds=lambda data: 7 if data.endswith(":7") else None,
+        parse_challenge_rounds=lambda data: 12 if data.endswith(":12") else None,
         build_friend_invite_link=_fake_invite_link,
         build_friend_plan_text=lambda *, total_rounds: f"plan:{total_rounds}",
         build_friend_ttl_text=lambda *, challenge, now_utc: None,
@@ -169,13 +169,13 @@ async def test_handle_friend_challenge_create_selected_uses_fallback_text_withou
     assert captured == {
         "creator_user_id": 77,
         "mode_code": "QUICK_MIX_A1A2",
-        "total_rounds": 7,
+        "total_rounds": 12,
         "now_utc": captured["now_utc"],
     }
     assert TEXTS_DE["msg.friend.challenge.created.fallback"].format(
         invite_token="invite-token"
     ) in (answer.text or "")
-    assert "plan:7" in (answer.text or "")
+    assert "plan:12" in (answer.text or "")
     assert TEXTS_DE["msg.friend.challenge.created.short"] in (answer.text or "")
     callbacks = [
         button.callback_data

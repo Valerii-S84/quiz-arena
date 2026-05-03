@@ -74,11 +74,11 @@ async def test_friend_challenge_proof_cards_send_to_both_users_and_reuse_cache(
     ]
     assert [str(item["caption"]) for item in bot.send_photos[:2]] == [
         (
-            f"🏆 DUELL ERGEBNIS\nEndstand: Du 4 : Freund 2\nID: {challenge.challenge_id}\n"
+            f"🏆 DUELL ERGEBNIS\nScore: Du 4 : Gegner 2\nID: {challenge.challenge_id}\n"
             "📱 https://t.me/Deine_Deutsch_Quiz_bot"
         ),
         (
-            f"🏆 DUELL ERGEBNIS\nEndstand: Du 2 : Freund 4\nID: {challenge.challenge_id}\n"
+            f"🏆 DUELL ERGEBNIS\nScore: Du 2 : Gegner 4\nID: {challenge.challenge_id}\n"
             "📱 https://t.me/Deine_Deutsch_Quiz_bot"
         ),
     ]

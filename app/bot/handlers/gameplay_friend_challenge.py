@@ -4,6 +4,7 @@ from aiogram import F, Router
 
 from app.bot.handlers import gameplay_callbacks
 from app.bot.handlers.gameplay_friend_challenge_lobby import (
+    handle_create_tournament_start,
     handle_friend_challenge_copy_link,
     handle_friend_challenge_create,
     handle_friend_challenge_create_selected,
@@ -27,13 +28,10 @@ from app.bot.handlers.gameplay_friend_challenge_progress import (
 
 def register(router: Router) -> None:
     router.callback_query(F.data == "friend:challenge:create")(handle_friend_challenge_create)
-    # Keep old create/type buttons functional, but always redirect them into the
-    # canonical friend-duel entry.
+    router.callback_query(F.data == "create_tournament_start")(handle_create_tournament_start)
+    # HIDDEN: open challenge disabled for now.
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_CREATE_TYPE_RE))(
         handle_friend_challenge_type_selected
-    )
-    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_CREATE_LEGACY_RE))(
-        handle_friend_challenge_create_selected
     )
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_CREATE_FORMAT_RE))(
         handle_friend_challenge_create_selected

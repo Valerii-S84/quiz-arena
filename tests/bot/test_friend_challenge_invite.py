@@ -34,7 +34,7 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
             creator_user_id=17,
             opponent_user_id=None,
             current_round=1,
-            total_rounds=7,
+            total_rounds=5,
             creator_score=0,
             opponent_score=0,
             winner_user_id=None,
@@ -59,7 +59,7 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
     )
 
     callback = DummyCallback(
-        data="friend:challenge:format:direct:7",
+        data="friend:challenge:format:direct:5",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(bot=DummyBot()),
     )
@@ -78,7 +78,6 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
         "📤 Teilen ->",
         "✅ Einladung gesendet",
         "⚔️ Jetzt spielen",
-        "🏟 In der Arena veröffentlichen",
         "⏳ Auf Freund warten",
     ]
     assert not any(button.url and "duel_" in button.url for button in buttons)
@@ -89,6 +88,5 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
     assert callbacks == [
         "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "friend:invite:required:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        "arena:publish_friend:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "menu:main",
     ]

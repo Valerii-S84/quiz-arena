@@ -158,7 +158,7 @@ async def handle_start_friend_challenge_payload(
             OutgoingStartMessage(
                 text=(
                     f"⚔️ {opponent_label} fordert dich heraus!\n"
-                    f"{challenge_start.snapshot.total_rounds} Fragen • Deutsch lernen"
+                    f"Format: {challenge_start.snapshot.total_rounds} Fragen • Deutsch lernen"
                 ),
                 reply_markup=build_friend_challenge_next_keyboard(
                     challenge_id=str(challenge_start.snapshot.challenge_id)

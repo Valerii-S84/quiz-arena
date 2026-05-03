@@ -13,9 +13,10 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_share_confirmed_keyboard,
     build_friend_challenge_share_keyboard,
 )
+from app.bot.keyboards.tournament import build_tournament_format_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.core.config import get_settings
-from app.game.friend_challenges.constants import DUEL_TYPE_DIRECT
+from app.game.friend_challenges.constants import DUEL_TYPE_DIRECT, DUEL_TYPE_OPEN
 from app.game.sessions.errors import (
     FriendChallengeAccessError,
     FriendChallengeLimitExceededError,
@@ -38,10 +39,17 @@ async def handle_friend_challenge_type_selected(
     if matched is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
-    del matched
+    selected_type = matched.group(1)
+    if selected_type == "tournament":
+        await callback.message.answer(
+            TEXTS_DE["msg.friend.challenge.tournament.format"],
+            reply_markup=build_tournament_format_keyboard(),
+        )
+        await callback.answer()
+        return
     await callback.message.answer(
         TEXTS_DE["msg.duels.friend"],
-        reply_markup=build_friend_duel_keyboard(),
+        reply_markup=build_friend_duel_keyboard(challenge_type=selected_type),
     )
     await callback.answer()
 
@@ -64,7 +72,8 @@ async def handle_friend_challenge_create_selected(
     if parsed is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
-    _, selected_rounds = parsed
+    selected_type, selected_rounds = parsed
+    challenge_type = DUEL_TYPE_OPEN if selected_type == "open" else DUEL_TYPE_DIRECT
     now_utc = datetime.now(timezone.utc)
     async with session_local.begin() as session:
         onboarding = await user_onboarding_service.ensure_home_snapshot(
@@ -77,7 +86,7 @@ async def handle_friend_challenge_create_selected(
                 creator_user_id=onboarding.user_id,
                 mode_code="QUICK_MIX_A1A2",
                 now_utc=now_utc,
-                challenge_type=DUEL_TYPE_DIRECT,
+                challenge_type=challenge_type,
                 total_rounds=selected_rounds,
             )
         except (FriendChallengePaymentRequiredError, FriendChallengeLimitExceededError):
