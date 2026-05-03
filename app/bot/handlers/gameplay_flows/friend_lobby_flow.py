@@ -6,9 +6,9 @@ from typing import Any, cast
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery
 
+from app.bot.keyboards.duels import build_friend_duel_keyboard
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
-    build_friend_challenge_format_keyboard,
     build_friend_challenge_limit_keyboard,
     build_friend_challenge_share_confirmed_keyboard,
     build_friend_challenge_share_keyboard,
@@ -48,8 +48,8 @@ async def handle_friend_challenge_type_selected(
         await callback.answer()
         return
     await callback.message.answer(
-        TEXTS_DE["msg.friend.challenge.create.format"],
-        reply_markup=build_friend_challenge_format_keyboard(challenge_type=selected_type),
+        TEXTS_DE["msg.duels.friend"],
+        reply_markup=build_friend_duel_keyboard(challenge_type=selected_type),
     )
     await callback.answer()
 

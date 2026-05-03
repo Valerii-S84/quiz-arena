@@ -12,9 +12,7 @@ from app.bot.keyboards.duels import (
 )
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
-    build_friend_challenge_create_keyboard,
     build_friend_challenge_finished_keyboard,
-    build_friend_challenge_format_keyboard,
     build_friend_challenge_limit_keyboard,
     build_friend_challenge_next_keyboard,
     build_friend_challenge_result_share_keyboard,
@@ -49,8 +47,6 @@ __all__ = [
     "build_arena_result_keyboard",
     "build_duels_menu_keyboard",
     "build_friend_duel_keyboard",
-    "build_friend_challenge_create_keyboard",
-    "build_friend_challenge_format_keyboard",
     "build_friend_challenge_back_keyboard",
     "build_friend_challenge_finished_keyboard",
     "build_friend_challenge_limit_keyboard",

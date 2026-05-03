@@ -57,7 +57,7 @@ def test_build_friend_proof_card_text_includes_winner_score_and_signature() -> N
     )
     assert TEXTS_DE["msg.friend.challenge.proof.title"] in proof_text
     assert "Sieger: Du" in proof_text
-    assert "Score: Du 5 | Bob 4" in proof_text
+    assert "Ergebnis: Du 5 | Bob 4" in proof_text
     assert "Titel:" in proof_text
 
 
@@ -151,7 +151,7 @@ def test_build_question_text_uses_daily_arena_cup_header_override() -> None:
 def test_build_friend_plan_text_hides_level_mix() -> None:
     text = gameplay._build_friend_plan_text(total_rounds=12)
 
-    assert text == "12 Fragen Mix. Keine Energie-Kosten."
+    assert text == "12 Fragen. Keine Energie-Kosten."
     assert "A1" not in text
     assert "A2" not in text
     assert "B1" not in text

@@ -26,8 +26,7 @@ def _format_user_label(
 
 def _build_friend_plan_text(*, total_rounds: int) -> str:
     rounds = max(1, int(total_rounds))
-    mode_label = "Sprint" if rounds <= 5 else "Mix"
-    return f"{rounds} Fragen {mode_label}. Keine Energie-Kosten."
+    return f"{rounds} Fragen. Keine Energie-Kosten."
 
 
 def _build_friend_score_text(

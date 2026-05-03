@@ -109,7 +109,7 @@ async def _build_friend_challenge_result(*, session, user_id: int, challenge_id:
     return InlineQueryResultCachedPhoto(
         id=f"duel:{challenge_id.hex}",
         photo_file_id=file_id,
-        title="Duel Proof Card",
+        title="Duellkarte",
         description="Teile deine Duell-Karte als Bild.",
         caption=caption,
         reply_markup=_build_shared_result_keyboard(),
@@ -135,7 +135,7 @@ async def _build_friend_challenge_invite_result(*, session, user_id: int, challe
     return InlineQueryResultCachedPhoto(
         id=f"duel-invite:{challenge_id.hex}",
         photo_file_id=file_id,
-        title="Duell Einladung",
+        title="Duelleinladung",
         description="Teile deine Duell-Einladung als Bild.",
         caption=TEXTS_DE["msg.friend.challenge.invite.caption"],
         reply_markup=_build_friend_challenge_invite_keyboard(invite_link=invite_link),
