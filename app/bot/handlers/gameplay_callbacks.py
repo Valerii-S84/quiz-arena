@@ -23,6 +23,7 @@ FRIEND_COPY_LINK_RE = re.compile(r"^friend:copy:([0-9a-f\-]{36})$")
 FRIEND_OPEN_REPOST_RE = re.compile(r"^friend:open:repost:([0-9a-f\-]{36})$")
 FRIEND_DELETE_RE = re.compile(r"^friend:delete:([0-9a-f\-]{36})$")
 TOURNAMENT_FORMAT_RE = re.compile(r"^friend:tournament:format:(5|12)$")
+TOURNAMENT_CREATE_FOR_VIEW_RE = re.compile(r"^friend:tournament:create:([0-9a-f\-]{36})$")
 TOURNAMENT_JOIN_RE = re.compile(r"^friend:tournament:join:([a-f0-9]{12})$", re.IGNORECASE)
 TOURNAMENT_COPY_LINK_RE = re.compile(r"^friend:tournament:copy:([0-9a-f\-]{36})$")
 TOURNAMENT_START_RE = re.compile(r"^friend:tournament:start:([0-9a-f\-]{36})$")
@@ -68,12 +69,15 @@ def parse_stop_callback(callback_data: str) -> UUID | None:
 
 
 def parse_friend_create_format(callback_data: str) -> tuple[str, int] | None:
-    """Parses friend challenge format callback into type and canonical rounds."""
+    """Normalizes legacy friend create callbacks to the canonical duel contract."""
 
+    legacy_match = FRIEND_CREATE_LEGACY_RE.match(callback_data)
+    if legacy_match is not None:
+        return "direct", DUEL_QUESTION_COUNT
     matched = FRIEND_CREATE_FORMAT_RE.match(callback_data)
     if matched is None:
         return None
-    return matched.group(1), DUEL_QUESTION_COUNT
+    return "direct", DUEL_QUESTION_COUNT
 
 
 def parse_challenge_rounds(callback_data: str) -> int | None:
