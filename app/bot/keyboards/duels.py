@@ -15,6 +15,7 @@ from app.game.duels.constants import (
     DUEL_MENU_CALLBACK,
     DUEL_PAYWALL_CALLBACK_CONTEXT,
     DUEL_PAYWALL_PRODUCT_CODES,
+    FRIEND_DUEL_CREATE_CALLBACK,
 )
 
 ARENA_REVANCHE_CALLBACK_PREFIX = "arena:revanche:"
@@ -222,13 +223,13 @@ def build_duel_paywall_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def build_friend_duel_keyboard(*, challenge_type: str = "direct") -> InlineKeyboardMarkup:
+def build_friend_duel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
                     text="⚔️ Freundesduell erstellen",
-                    callback_data=f"friend:challenge:format:{challenge_type}:7",
+                    callback_data=FRIEND_DUEL_CREATE_CALLBACK,
                 )
             ],
             [InlineKeyboardButton(text="↩️ Zurück", callback_data=DUEL_MENU_CALLBACK)],
