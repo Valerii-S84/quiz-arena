@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.analytics_constants import (
     ARENA_BEATEN_NOTIFICATION_EVENT_TYPES_SQL,
+    ARENA_REVANCHE_EVENT_TYPES_SQL,
     DAILY_CUP_UNIQUE_PUSH_EVENT_TYPES_SQL,
 )
 from app.db.models.base import Base
@@ -54,6 +55,23 @@ class AnalyticsEvent(Base):
                 "AND payload ? 'notification_type' "
                 "AND event_type IN "
                 f"({ARENA_BEATEN_NOTIFICATION_EVENT_TYPES_SQL})"
+            ),
+        ),
+        Index(
+            "uq_analytics_events_arena_revanche_once",
+            "event_type",
+            "user_id",
+            text("(payload ->> 'revanche_receiver_id')"),
+            text("(payload ->> 'source_attempt_id')"),
+            text("(payload ->> 'notification_type')"),
+            unique=True,
+            postgresql_where=text(
+                "user_id IS NOT NULL "
+                "AND payload ? 'revanche_receiver_id' "
+                "AND payload ? 'source_attempt_id' "
+                "AND payload ? 'notification_type' "
+                "AND event_type IN "
+                f"({ARENA_REVANCHE_EVENT_TYPES_SQL})"
             ),
         ),
     )

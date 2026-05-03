@@ -76,3 +76,4 @@ class ArenaAttemptResultLine:
     score: int
     time_ms: int
     result: str | None
+    attempt_id: UUID | None = None

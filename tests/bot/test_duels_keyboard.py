@@ -8,6 +8,7 @@ from app.bot.keyboards.duels import (
     build_arena_list_keyboard,
     build_arena_published_keyboard,
     build_arena_result_keyboard,
+    build_arena_revanche_confirm_keyboard,
     build_duel_paywall_keyboard,
     build_duels_menu_keyboard,
     build_friend_duel_keyboard,
@@ -51,6 +52,9 @@ def test_duels_keyboards_do_not_offer_topic_level_or_format_selection() -> None:
         build_arena_guard_back_keyboard(),
         build_arena_published_keyboard(),
         build_arena_result_keyboard(user_won=True),
+        build_arena_revanche_confirm_keyboard(
+            source_attempt_id="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        ),
         build_duel_paywall_keyboard(),
         build_friend_duel_keyboard(),
     ]
@@ -107,3 +111,53 @@ def test_duel_paywall_keyboard_sells_only_ticket_and_premium_week() -> None:
         "arena:list",
     ]
     assert "buy:PREMIUM_3_DAYS" not in [button.callback_data for button in buttons]
+
+
+def test_arena_result_win_keyboard_includes_revanche_first() -> None:
+    buttons = _buttons(
+        build_arena_result_keyboard(
+            user_won=True,
+            revanche_attempt_id="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        )
+    )
+
+    assert [button.text for button in buttons] == [
+        "🔁 Revanche",
+        "🎯 Eigenes Arena-Duell erstellen",
+        "🏟 Zur Arena",
+    ]
+    assert [button.callback_data for button in buttons] == [
+        "arena:revanche:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        "arena:create",
+        "arena:list",
+    ]
+
+
+def test_arena_close_loss_keyboard_includes_revanche_and_arena_only() -> None:
+    buttons = _buttons(
+        build_arena_result_keyboard(
+            user_won=False,
+            close_loss=True,
+            revanche_attempt_id="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        )
+    )
+
+    assert [button.text for button in buttons] == ["🔁 Revanche", "🏟 Zur Arena"]
+    assert [button.callback_data for button in buttons] == [
+        "arena:revanche:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        "arena:list",
+    ]
+
+
+def test_arena_revanche_confirm_keyboard_uses_separate_send_callback() -> None:
+    buttons = _buttons(
+        build_arena_revanche_confirm_keyboard(
+            source_attempt_id="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        )
+    )
+
+    assert [button.text for button in buttons] == ["🔁 Revanche senden", "🏟 Zur Arena"]
+    assert [button.callback_data for button in buttons] == [
+        "arena:revanche_send:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        "arena:list",
+    ]

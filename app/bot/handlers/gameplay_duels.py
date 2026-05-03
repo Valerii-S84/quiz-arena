@@ -6,6 +6,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
 import app.bot.handlers.gameplay_flows.arena_duel_flow as arena_duel_flow
+import app.bot.handlers.gameplay_flows.arena_revanche_flow as arena_revanche_flow
 from app.bot.handlers import gameplay_callbacks
 from app.bot.handlers.gameplay_views import _build_question_text
 from app.bot.keyboards.duels import (
@@ -21,6 +22,11 @@ from app.game.arena_duels.analytics import (
     ARENA_EVENT_DUEL_MODE_SELECTED,
     build_arena_event_payload,
     emit_arena_analytics_event,
+)
+from app.game.arena_duels.revanche import (
+    load_arena_revanche_context,
+    prepare_arena_revanche_request,
+    record_arena_revanche_sent,
 )
 from app.game.arena_duels.service import create_arena_duel_baseline, list_active_arena_duels
 from app.game.duels.constants import (
@@ -125,6 +131,29 @@ async def handle_arena_publish_friend(callback: CallbackQuery) -> None:
     )
 
 
+async def handle_arena_revanche_confirm(callback: CallbackQuery) -> None:
+    await arena_revanche_flow.handle_arena_revanche_confirm(
+        callback,
+        arena_revanche_re=gameplay_callbacks.ARENA_REVANCHE_RE,
+        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
+        session_local=SessionLocal,
+        user_onboarding_service=UserOnboardingService,
+        load_arena_revanche_context=load_arena_revanche_context,
+    )
+
+
+async def handle_arena_revanche_send(callback: CallbackQuery) -> None:
+    await arena_revanche_flow.handle_arena_revanche_send(
+        callback,
+        arena_revanche_send_re=gameplay_callbacks.ARENA_REVANCHE_SEND_RE,
+        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
+        session_local=SessionLocal,
+        user_onboarding_service=UserOnboardingService,
+        prepare_arena_revanche_request=prepare_arena_revanche_request,
+        record_arena_revanche_sent=record_arena_revanche_sent,
+    )
+
+
 async def handle_friend_duel_open(callback: CallbackQuery, *, emit_event: bool = False) -> None:
     if callback.message is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
@@ -188,5 +217,11 @@ def register(router: Router) -> None:
     )
     router.callback_query(F.data.regexp(gameplay_callbacks.ARENA_PUBLISH_FRIEND_RE))(
         handle_arena_publish_friend
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.ARENA_REVANCHE_RE))(
+        handle_arena_revanche_confirm
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.ARENA_REVANCHE_SEND_RE))(
+        handle_arena_revanche_send
     )
     router.callback_query(F.data == DUEL_FRIEND_CALLBACK)(_handle_friend_duel_open_registered)

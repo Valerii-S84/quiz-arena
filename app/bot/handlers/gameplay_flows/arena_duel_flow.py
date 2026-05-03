@@ -386,7 +386,14 @@ async def send_arena_completion_result(
     await callback.message.answer(
         text,
         reply_markup=build_arena_result_keyboard(
-            user_won=completed_attempt.result == ARENA_ATTEMPT_RESULT_WIN
+            user_won=completed_attempt.result == ARENA_ATTEMPT_RESULT_WIN,
+            revanche_attempt_id=(
+                None if opponent_attempt.attempt_id is None else str(opponent_attempt.attempt_id)
+            ),
+            close_loss=_is_close_loss(
+                completed_attempt=completed_attempt,
+                opponent_attempt=opponent_attempt,
+            ),
         ),
     )
     await _emit_arena_result_shown(
@@ -573,6 +580,18 @@ def _build_arena_result_text(
         user_score_line=user_score_line,
         opponent_label=opponent_label,
         opponent_score_line=opponent_score_line,
+    )
+
+
+def _is_close_loss(
+    *,
+    completed_attempt: ArenaAttemptResultLine,
+    opponent_attempt: ArenaAttemptResultLine,
+) -> bool:
+    return (
+        completed_attempt.result != ARENA_ATTEMPT_RESULT_WIN
+        and completed_attempt.result != ARENA_ATTEMPT_RESULT_DRAW
+        and completed_attempt.score == opponent_attempt.score
     )
 
 

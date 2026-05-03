@@ -18,6 +18,9 @@ from app.game.duels.constants import (
     FRIEND_DUEL_CREATE_CALLBACK,
 )
 
+ARENA_REVANCHE_CALLBACK_PREFIX = "arena:revanche:"
+ARENA_REVANCHE_SEND_CALLBACK_PREFIX = "arena:revanche_send:"
+
 
 @dataclass(frozen=True, slots=True)
 class ArenaDuelButton:
@@ -145,8 +148,22 @@ def build_arena_published_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def build_arena_result_keyboard(*, user_won: bool) -> InlineKeyboardMarkup:
+def build_arena_result_keyboard(
+    *,
+    user_won: bool,
+    revanche_attempt_id: str | None = None,
+    close_loss: bool = False,
+) -> InlineKeyboardMarkup:
     rows = []
+    if revanche_attempt_id is not None and (user_won or close_loss):
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="🔁 Revanche",
+                    callback_data=f"{ARENA_REVANCHE_CALLBACK_PREFIX}{revanche_attempt_id}",
+                )
+            ]
+        )
     if user_won:
         rows.append(
             [
@@ -157,7 +174,7 @@ def build_arena_result_keyboard(*, user_won: bool) -> InlineKeyboardMarkup:
             ]
         )
     rows.append([InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)])
-    if not user_won:
+    if not user_won and not close_loss:
         rows.append(
             [
                 InlineKeyboardButton(
@@ -167,6 +184,20 @@ def build_arena_result_keyboard(*, user_won: bool) -> InlineKeyboardMarkup:
             ]
         )
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def build_arena_revanche_confirm_keyboard(*, source_attempt_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🔁 Revanche senden",
+                    callback_data=f"{ARENA_REVANCHE_SEND_CALLBACK_PREFIX}{source_attempt_id}",
+                )
+            ],
+            [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
+        ]
+    )
 
 
 def build_duel_paywall_keyboard() -> InlineKeyboardMarkup:

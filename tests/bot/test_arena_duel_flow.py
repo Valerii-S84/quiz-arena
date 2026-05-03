@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from typing import Any, cast
 from uuid import UUID
 
 import pytest
 
 from app.bot.handlers import gameplay_callbacks
-from app.bot.handlers.gameplay_flows import arena_duel_flow
+from app.bot.handlers.gameplay_flows import arena_duel_flow, arena_revanche_flow
 from app.game.arena_duels.constants import (
     ARENA_ATTEMPT_RESULT_LOSS,
     ARENA_ATTEMPT_RESULT_WIN,
@@ -35,6 +36,7 @@ from tests.type_helpers import AsyncBeginContext
 NOW_UTC = datetime(2026, 4, 30, 12, 0, tzinfo=UTC)
 DUEL_ID = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 ATTEMPT_ID = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+OPPONENT_ATTEMPT_ID = UUID("dddddddd-dddd-dddd-dddd-dddddddddddd")
 
 
 class _SessionLocal:
@@ -51,6 +53,30 @@ class _UserService:
     async def get_by_id(_session, user_id: int):
         if user_id == 11:
             return SimpleNamespace(username=None, first_name="Max")
+        return None
+
+
+class _UserServiceWithTelegram:
+    @staticmethod
+    async def ensure_home_snapshot(*_args, **_kwargs):
+        return SimpleNamespace(user_id=101, free_energy=8, paid_energy=2)
+
+    @staticmethod
+    async def get_by_id(_session, user_id: int):
+        if user_id == 11:
+            return SimpleNamespace(
+                id=11,
+                telegram_user_id=110_000_011,
+                username=None,
+                first_name="Max",
+            )
+        if user_id == 101:
+            return SimpleNamespace(
+                id=101,
+                telegram_user_id=101_000_101,
+                username="anna",
+                first_name="Anna",
+            )
         return None
 
 
@@ -399,6 +425,95 @@ async def test_arena_publish_friend_maps_invalid_state_to_clean_error(error) -> 
 
 
 @pytest.mark.asyncio
+async def test_arena_revanche_confirm_shows_confirmation_without_push() -> None:
+    async def _load_context(*_args, **_kwargs):
+        return SimpleNamespace(receiver_user_id=11)
+
+    callback = _callback(f"arena:revanche:{OPPONENT_ATTEMPT_ID}")
+    await arena_revanche_flow.handle_arena_revanche_confirm(
+        callback,
+        arena_revanche_re=gameplay_callbacks.ARENA_REVANCHE_RE,
+        parse_uuid_callback=lambda **_kwargs: OPPONENT_ATTEMPT_ID,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserServiceWithTelegram,
+        load_arena_revanche_context=_load_context,
+    )
+
+    response = callback.message.answers[0]
+    assert "Max erhält genau eine Nachricht." in _text(response.text)
+    assert _callbacks(response.kwargs["reply_markup"]) == [
+        f"arena:revanche_send:{OPPONENT_ATTEMPT_ID}",
+        "arena:list",
+    ]
+    assert callback.bot.sent_messages == []
+
+
+@pytest.mark.asyncio
+async def test_arena_revanche_send_creates_one_push_and_records_event() -> None:
+    challenge_id = UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
+    recorded: list[dict[str, object]] = []
+
+    async def _prepare(*_args, **_kwargs):
+        return SimpleNamespace(
+            already_sent=False,
+            context=SimpleNamespace(receiver_user_id=11),
+            challenge=SimpleNamespace(challenge_id=challenge_id),
+        )
+
+    async def _record(*_args, **kwargs):
+        recorded.append(kwargs)
+        return True
+
+    callback = _callback(f"arena:revanche_send:{OPPONENT_ATTEMPT_ID}")
+    await arena_revanche_flow.handle_arena_revanche_send(
+        callback,
+        arena_revanche_send_re=gameplay_callbacks.ARENA_REVANCHE_SEND_RE,
+        parse_uuid_callback=lambda **_kwargs: OPPONENT_ATTEMPT_ID,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserServiceWithTelegram,
+        prepare_arena_revanche_request=_prepare,
+        record_arena_revanche_sent=_record,
+    )
+
+    assert len(callback.bot.sent_messages) == 1
+    sent = callback.bot.sent_messages[0]
+    assert sent["chat_id"] == 110_000_011
+    assert "@anna fordert dich zur Revanche heraus." in str(sent["text"])
+    assert _callbacks(sent["reply_markup"]) == [f"friend:next:{challenge_id}", "home:open"]
+    recorded_request = cast(Any, recorded[0]["request"])
+    assert recorded_request.challenge.challenge_id == challenge_id
+    assert "Revanche gesendet." in _text(callback.message.answers[0].text)
+    assert _callbacks(callback.message.answers[0].kwargs["reply_markup"]) == ["arena:list"]
+
+
+@pytest.mark.asyncio
+async def test_arena_revanche_send_dedupes_existing_request_without_push() -> None:
+    async def _prepare(*_args, **_kwargs):
+        return SimpleNamespace(
+            already_sent=True,
+            context=SimpleNamespace(receiver_user_id=11),
+            challenge=None,
+        )
+
+    async def _unexpected_record(*_args, **_kwargs):
+        pytest.fail("duplicate Revanche tap must not record or push again")
+
+    callback = _callback(f"arena:revanche_send:{OPPONENT_ATTEMPT_ID}")
+    await arena_revanche_flow.handle_arena_revanche_send(
+        callback,
+        arena_revanche_send_re=gameplay_callbacks.ARENA_REVANCHE_SEND_RE,
+        parse_uuid_callback=lambda **_kwargs: OPPONENT_ATTEMPT_ID,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserServiceWithTelegram,
+        prepare_arena_revanche_request=_prepare,
+        record_arena_revanche_sent=_unexpected_record,
+    )
+
+    assert callback.bot.sent_messages == []
+    assert "Revanche gesendet." in _text(callback.message.answers[0].text)
+
+
+@pytest.mark.asyncio
 async def test_arena_completion_published_result_screen() -> None:
     callback = _callback("answer")
     completion = ArenaAttemptCompletionResult(
@@ -480,6 +595,40 @@ async def test_arena_completion_challenger_result_screen() -> None:
 
 
 @pytest.mark.asyncio
+async def test_arena_completion_challenger_win_result_has_revanche() -> None:
+    callback = _callback("answer")
+    completion = ArenaAttemptCompletionResult(
+        duel=_duel_snapshot(),
+        completed_attempt=ArenaAttemptResultLine(
+            user_id=101,
+            score=7,
+            time_ms=52_000,
+            result=ARENA_ATTEMPT_RESULT_WIN,
+        ),
+        opponent_attempt=ArenaAttemptResultLine(
+            user_id=11,
+            score=6,
+            time_ms=48_000,
+            result=ARENA_ATTEMPT_RESULT_LOSS,
+            attempt_id=OPPONENT_ATTEMPT_ID,
+        ),
+    )
+
+    await arena_duel_flow.send_arena_completion_result(
+        callback,
+        completion=completion,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserService,
+    )
+
+    assert _callbacks(callback.message.answers[0].kwargs["reply_markup"]) == [
+        f"arena:revanche:{OPPONENT_ATTEMPT_ID}",
+        "arena:create",
+        "arena:list",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_arena_completion_challenger_loss_result_has_next_actions() -> None:
     callback = _callback("answer")
     completion = ArenaAttemptCompletionResult(
@@ -508,3 +657,37 @@ async def test_arena_completion_challenger_loss_result_has_next_actions() -> Non
     response = callback.message.answers[0]
     assert "Max bleibt vorne." in _text(response.text)
     assert _callbacks(response.kwargs["reply_markup"]) == ["arena:list", "arena:create"]
+
+
+@pytest.mark.asyncio
+async def test_arena_completion_close_loss_result_has_revanche() -> None:
+    callback = _callback("answer")
+    completion = ArenaAttemptCompletionResult(
+        duel=_duel_snapshot(),
+        completed_attempt=ArenaAttemptResultLine(
+            user_id=101,
+            score=6,
+            time_ms=52_000,
+            result=ARENA_ATTEMPT_RESULT_LOSS,
+        ),
+        opponent_attempt=ArenaAttemptResultLine(
+            user_id=11,
+            score=6,
+            time_ms=48_000,
+            result=ARENA_ATTEMPT_RESULT_WIN,
+            attempt_id=OPPONENT_ATTEMPT_ID,
+        ),
+    )
+
+    await arena_duel_flow.send_arena_completion_result(
+        callback,
+        completion=completion,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserService,
+    )
+
+    assert "Knapp verloren." in _text(callback.message.answers[0].text)
+    assert _callbacks(callback.message.answers[0].kwargs["reply_markup"]) == [
+        f"arena:revanche:{OPPONENT_ATTEMPT_ID}",
+        "arena:list",
+    ]

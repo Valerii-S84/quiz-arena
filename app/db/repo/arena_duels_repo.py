@@ -353,6 +353,27 @@ class ArenaDuelsRepo:
         return list(result.scalars().all())
 
     @staticmethod
+    async def has_completed_attempt_for_user(
+        session: AsyncSession,
+        *,
+        duel_id: UUID,
+        user_id: int,
+    ) -> bool:
+        stmt = (
+            select(ArenaAttempt.id)
+            .where(
+                ArenaAttempt.arena_duel_id == duel_id,
+                ArenaAttempt.user_id == user_id,
+                ArenaAttempt.completed_at.is_not(None),
+                ArenaAttempt.score.is_not(None),
+                ArenaAttempt.time_ms.is_not(None),
+            )
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+    @staticmethod
     async def list_active_with_baseline(
         session: AsyncSession,
         *,

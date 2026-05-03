@@ -16,6 +16,7 @@ from app.game.duels.constants import (
     DUEL_LIMIT_ACTION_ARENA_ACCEPT,
     DUEL_LIMIT_ACTION_ARENA_CREATE,
     DUEL_LIMIT_ACTION_FRIEND_CREATE,
+    DUEL_LIMIT_ACTION_REVANCHE,
     DUEL_PAYWALL_PRODUCT_CODES,
     DUEL_TICKET_PRODUCT_CODE,
 )
@@ -248,6 +249,40 @@ class DuelLimitService:
             session,
             user_id=user_id,
             action=DUEL_LIMIT_ACTION_ARENA_ACCEPT,
+            free_used_today=free_used_today,
+            payment_required_error=ArenaDuelPaymentRequiredError,
+        )
+
+    @staticmethod
+    async def resolve_revanche_access_type(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        now_utc: datetime,
+    ) -> str:
+        from app.db.repo.analytics_repo import AnalyticsRepo
+        from app.game.arena_duels.constants import ARENA_REVANCHE_SENT_EVENT
+        from app.game.arena_duels.errors import ArenaDuelAccessError, ArenaDuelPaymentRequiredError
+
+        await DuelLimitService._ensure_user_exists(
+            session,
+            user_id=user_id,
+            access_error=ArenaDuelAccessError,
+        )
+        premium_active = await EntitlementsRepo.has_active_premium(session, user_id, now_utc)
+        if premium_active:
+            return DUEL_ACCESS_PREMIUM
+
+        free_used_today = await AnalyticsRepo.count_user_events_since(
+            session,
+            event_type=ARENA_REVANCHE_SENT_EVENT,
+            user_id=user_id,
+            since_utc=_berlin_day_start_utc(now_utc),
+        )
+        return await DuelLimitService._resolve_non_premium_access_type(
+            session,
+            user_id=user_id,
+            action=DUEL_LIMIT_ACTION_REVANCHE,
             free_used_today=free_used_today,
             payment_required_error=ArenaDuelPaymentRequiredError,
         )

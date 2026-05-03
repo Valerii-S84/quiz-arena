@@ -123,6 +123,22 @@ def test_arena_beaten_notification_dedupe_index_matches_migration() -> None:
     assert "arena_result_beaten_notification_sent" in migration
 
 
+def test_arena_revanche_dedupe_index_matches_migration() -> None:
+    analytics_table = cast(Table, AnalyticsEvent.__table__)
+    index = next(
+        db_index
+        for db_index in analytics_table.indexes
+        if db_index.name == "uq_analytics_events_arena_revanche_once"
+    )
+    migration = Path("alembic/versions/c0d1e2f3a4b5_m51_arena_revanche_dedupe.py").read_text()
+
+    assert index.unique is True
+    assert "payload ->> 'revanche_receiver_id'" in migration
+    assert "payload ->> 'source_attempt_id'" in migration
+    assert "payload ->> 'notification_type'" in migration
+    assert "arena_revanche_sent" in migration
+
+
 def test_arena_access_type_constraints_match_migration() -> None:
     migration = Path("alembic/versions/a9b0c1d2e3f4_m49_arena_duel_access_type.py").read_text()
 

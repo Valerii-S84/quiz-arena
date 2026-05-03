@@ -3,6 +3,8 @@ from __future__ import annotations
 import re
 from uuid import UUID
 
+_STRICT_UUID_RE = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+
 ANSWER_RE = re.compile(r"^answer:([0-9a-f\-]{36}):([0-3])$")
 STOP_RE = re.compile(r"^game:stop:([0-9a-f\-]{36})$")
 FRIEND_NEXT_RE = re.compile(r"^(?:friend:next|friend:challenge:round:start):([0-9a-f\-]{36})$")
@@ -32,7 +34,15 @@ DAILY_RESULT_RE = re.compile(r"^daily:result:([0-9a-f\-]{36})$")
 ARENA_ACCEPT_RE = re.compile(r"^arena:accept:([0-9a-f\-]{36})$")
 ARENA_START_ATTEMPT_RE = re.compile(r"^arena:start_attempt:([0-9a-f\-]{36})$")
 ARENA_PUBLISH_FRIEND_RE = re.compile(
-    r"^arena:publish_friend:" r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+    rf"^arena:publish_friend:({_STRICT_UUID_RE})$",
+    re.IGNORECASE,
+)
+ARENA_REVANCHE_RE = re.compile(
+    rf"^arena:revanche:({_STRICT_UUID_RE})$",
+    re.IGNORECASE,
+)
+ARENA_REVANCHE_SEND_RE = re.compile(
+    rf"^arena:revanche_send:({_STRICT_UUID_RE})$",
     re.IGNORECASE,
 )
 
