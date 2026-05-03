@@ -5,7 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.db.repo.analytics_repo import AnalyticsRepo
 from app.db.repo.arena_duels_repo import ArenaDuelsRepo
+from app.game.arena_duels.constants import ARENA_REVANCHE_SENT_EVENT
 from app.game.arena_duels.errors import ArenaDuelPaymentRequiredError
 from app.game.duels import limits as duel_limits
 from app.game.duels.limits import DUEL_ACCESS_FREE, DUEL_ACCESS_PAID_TICKET, DUEL_ACCESS_PREMIUM
@@ -107,12 +109,47 @@ async def test_premium_allows_arena_without_ticket_or_free_quota(
     assert access_type == DUEL_ACCESS_PREMIUM
 
 
+@pytest.mark.asyncio
+async def test_revanche_free_quota_counts_free_access_sends_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+    _patch_limit_dependencies(monkeypatch, revanche_free=0, captured=captured)
+
+    access_type = await duel_limits.DuelLimitService.resolve_revanche_access_type(
+        AsyncSessionStub(),
+        user_id=11,
+        now_utc=NOW_UTC,
+    )
+
+    assert access_type == DUEL_ACCESS_FREE
+    assert captured["revanche_event_type"] == ARENA_REVANCHE_SENT_EVENT
+    assert captured["revanche_since"] == BERLIN_DAY_START_UTC
+    assert captured["revanche_payload_key"] == "access_type"
+    assert captured["revanche_payload_value"] == DUEL_ACCESS_FREE
+
+
+@pytest.mark.asyncio
+async def test_revanche_free_limit_requires_payment_after_free_sends(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_limit_dependencies(monkeypatch, revanche_free=1)
+
+    with pytest.raises(ArenaDuelPaymentRequiredError):
+        await duel_limits.DuelLimitService.resolve_revanche_access_type(
+            AsyncSessionStub(),
+            user_id=11,
+            now_utc=NOW_UTC,
+        )
+
+
 def _patch_limit_dependencies(
     monkeypatch: pytest.MonkeyPatch,
     *,
     premium: bool = False,
     arena_create_free: int = 0,
     arena_accept_free: int = 0,
+    revanche_free: int = 0,
     arena_paid: int = 0,
     friend_paid: int = 0,
     tickets: int = 0,
@@ -133,6 +170,13 @@ def _patch_limit_dependencies(
     async def _count_challenger_attempts(*_args, **kwargs):
         capture["arena_accept_since"] = kwargs["since"]
         return arena_accept_free
+
+    async def _count_revanche_events(*_args, **kwargs):
+        capture["revanche_event_type"] = kwargs["event_type"]
+        capture["revanche_since"] = kwargs["since_utc"]
+        capture["revanche_payload_key"] = kwargs["payload_key"]
+        capture["revanche_payload_value"] = kwargs["payload_value"]
+        return revanche_free
 
     async def _count_arena_paid(*_args, **_kwargs):
         return arena_paid
@@ -156,6 +200,11 @@ def _patch_limit_dependencies(
         _count_challenger_attempts,
     )
     monkeypatch.setattr(ArenaDuelsRepo, "count_paid_ticket_usage", _count_arena_paid)
+    monkeypatch.setattr(
+        AnalyticsRepo,
+        "count_user_events_since_by_payload_value",
+        _count_revanche_events,
+    )
     monkeypatch.setattr(
         duel_limits.FriendChallengesRepo,
         "count_by_creator_access_type",

@@ -186,6 +186,7 @@ async def _record_arena_revanche_event(
     payload = build_arena_revanche_payload(
         context=request.context,
         challenge_id=None if request.challenge is None else request.challenge.challenge_id,
+        access_type=None if request.challenge is None else request.challenge.access_type,
     )
     return await AnalyticsRepo.create_arena_revanche_event_once(
         session,

@@ -123,3 +123,22 @@ async def count_user_events_since(
     )
     result = await session.execute(stmt)
     return int(result.scalar_one() or 0)
+
+
+async def count_user_events_since_by_payload_value(
+    session: AsyncSession,
+    *,
+    event_type: str,
+    user_id: int,
+    since_utc: datetime,
+    payload_key: str,
+    payload_value: object,
+) -> int:
+    stmt = select(func.count(AnalyticsEvent.id)).where(
+        AnalyticsEvent.event_type == event_type,
+        AnalyticsEvent.user_id == user_id,
+        AnalyticsEvent.happened_at >= since_utc,
+        AnalyticsEvent.payload[payload_key].astext == str(payload_value),
+    )
+    result = await session.execute(stmt)
+    return int(result.scalar_one() or 0)

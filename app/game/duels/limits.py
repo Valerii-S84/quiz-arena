@@ -273,11 +273,13 @@ class DuelLimitService:
         if premium_active:
             return DUEL_ACCESS_PREMIUM
 
-        free_used_today = await AnalyticsRepo.count_user_events_since(
+        free_used_today = await AnalyticsRepo.count_user_events_since_by_payload_value(
             session,
             event_type=ARENA_REVANCHE_SENT_EVENT,
             user_id=user_id,
             since_utc=_berlin_day_start_utc(now_utc),
+            payload_key="access_type",
+            payload_value=DUEL_ACCESS_FREE,
         )
         return await DuelLimitService._resolve_non_premium_access_type(
             session,

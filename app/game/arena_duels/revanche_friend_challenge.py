@@ -23,6 +23,7 @@ def build_arena_revanche_payload(
     *,
     context: ArenaRevancheContext,
     challenge_id: UUID | None = None,
+    access_type: str | None = None,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "arena_duel_id": str(context.arena_duel_id),
@@ -33,6 +34,8 @@ def build_arena_revanche_payload(
     }
     if challenge_id is not None:
         payload["challenge_id"] = str(challenge_id)
+    if access_type is not None:
+        payload["access_type"] = access_type
     return payload
 
 

@@ -140,7 +140,7 @@ async def test_new_revanche_records_requested_not_sent_before_delivery(
     monkeypatch.setattr(
         revanche,
         "create_revanche_friend_challenge",
-        _async_return(SimpleNamespace(challenge_id=CHALLENGE_ID)),
+        _async_return(SimpleNamespace(challenge_id=CHALLENGE_ID, access_type="FREE")),
     )
     monkeypatch.setattr(
         revanche.AnalyticsRepo,
@@ -153,6 +153,8 @@ async def test_new_revanche_records_requested_not_sent_before_delivery(
     assert request.challenge is not None
     assert event_calls[0]["event_type"] == ARENA_REVANCHE_REQUESTED_EVENT
     assert event_calls[0]["event_type"] != ARENA_REVANCHE_SENT_EVENT
+    payload = cast(dict[str, object], event_calls[0]["payload"])
+    assert payload["access_type"] == "FREE"
 
 
 @pytest.mark.asyncio
@@ -185,7 +187,7 @@ async def test_new_revanche_locks_sender_quota_before_access_resolution(
     monkeypatch.setattr(
         revanche,
         "create_revanche_friend_challenge",
-        _async_return(SimpleNamespace(challenge_id=CHALLENGE_ID)),
+        _async_return(SimpleNamespace(challenge_id=CHALLENGE_ID, access_type="FREE")),
     )
     monkeypatch.setattr(
         revanche.AnalyticsRepo,
