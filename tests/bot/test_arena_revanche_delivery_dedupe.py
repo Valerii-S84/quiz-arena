@@ -105,5 +105,5 @@ async def test_revanche_delivery_skips_push_when_sent_marker_exists(
     )
 
     assert opponent_label == "Max"
-    assert events == ["commit:0", "lock", "commit:1"]
+    assert events == ["lock", "commit:0"]
     assert bot.sent_messages == []

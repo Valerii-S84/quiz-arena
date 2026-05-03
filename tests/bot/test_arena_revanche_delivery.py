@@ -78,6 +78,7 @@ async def test_revanche_delivery_records_sent_after_successful_push(
     )
 
     async def _prepare(*_args, **_kwargs):
+        events.append("prepare")
         return SimpleNamespace(
             already_sent=False,
             context=SimpleNamespace(receiver_user_id=11),
@@ -85,7 +86,7 @@ async def test_revanche_delivery_records_sent_after_successful_push(
         )
 
     async def _lock(*_args, **_kwargs):
-        assert events == ["commit:0"]
+        assert events == ["prepare"]
         assert bot.sent_messages == []
         events.append("lock")
 
@@ -111,12 +112,12 @@ async def test_revanche_delivery_records_sent_after_successful_push(
     )
 
     assert opponent_label == "Max"
-    assert events == ["commit:0", "lock", "record_sent", "commit:1"]
+    assert events == ["prepare", "lock", "record_sent", "commit:0"]
     assert bot.sent_messages[0]["chat_id"] == 110_000_011
 
 
 @pytest.mark.asyncio
-async def test_revanche_delivery_does_not_record_sent_when_push_fails(
+async def test_revanche_delivery_rolls_back_request_when_push_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     events: list[str] = []
@@ -129,6 +130,7 @@ async def test_revanche_delivery_does_not_record_sent_when_push_fails(
     )
 
     async def _prepare(*_args, **_kwargs):
+        events.append("prepare")
         return SimpleNamespace(
             already_sent=False,
             context=SimpleNamespace(receiver_user_id=11),
@@ -158,5 +160,5 @@ async def test_revanche_delivery_does_not_record_sent_when_push_fails(
             now_utc=NOW_UTC,
         )
 
-    assert events == ["commit:0", "lock", "rollback:1"]
+    assert events == ["prepare", "lock", "rollback:0"]
     assert bot.sent_messages == []
