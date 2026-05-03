@@ -6,7 +6,6 @@ from app.bot.handlers import gameplay_callbacks
 from app.bot.handlers.gameplay_flows import friend_lobby_flow
 from app.bot.handlers.gameplay_friend_challenge_context import get_gameplay_module
 from app.bot.keyboards.duels import build_friend_duel_keyboard
-from app.bot.keyboards.tournament import build_tournament_format_keyboard
 from app.bot.texts.de import TEXTS_DE
 
 
@@ -17,17 +16,6 @@ async def handle_friend_challenge_create(callback: CallbackQuery) -> None:
     await callback.message.answer(
         TEXTS_DE["msg.duels.friend"],
         reply_markup=build_friend_duel_keyboard(),
-    )
-    await callback.answer()
-
-
-async def handle_create_tournament_start(callback: CallbackQuery) -> None:
-    if callback.message is None:
-        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
-        return
-    await callback.message.answer(
-        TEXTS_DE["msg.friend.challenge.tournament.format"],
-        reply_markup=build_tournament_format_keyboard(),
     )
     await callback.answer()
 
