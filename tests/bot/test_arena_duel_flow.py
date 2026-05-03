@@ -8,7 +8,11 @@ from uuid import UUID
 import pytest
 
 from app.bot.handlers import gameplay_callbacks
-from app.bot.handlers.gameplay_flows import arena_duel_flow, arena_revanche_flow
+from app.bot.handlers.gameplay_flows import (
+    arena_duel_flow,
+    arena_revanche_delivery,
+    arena_revanche_flow,
+)
 from app.game.arena_duels.constants import (
     ARENA_ATTEMPT_RESULT_LOSS,
     ARENA_ATTEMPT_RESULT_WIN,
@@ -449,7 +453,9 @@ async def test_arena_revanche_confirm_shows_confirmation_without_push() -> None:
 
 
 @pytest.mark.asyncio
-async def test_arena_revanche_send_creates_one_push_and_records_event() -> None:
+async def test_arena_revanche_send_creates_one_push_and_records_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     challenge_id = UUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
     recorded: list[dict[str, object]] = []
 
@@ -463,6 +469,15 @@ async def test_arena_revanche_send_creates_one_push_and_records_event() -> None:
     async def _record(*_args, **kwargs):
         recorded.append(kwargs)
         return True
+
+    async def _lock(*_args, **_kwargs):
+        return None
+
+    async def _is_sent(*_args, **_kwargs):
+        return False
+
+    monkeypatch.setattr(arena_revanche_delivery, "lock_arena_revanche_delivery", _lock)
+    monkeypatch.setattr(arena_revanche_delivery, "is_arena_revanche_sent", _is_sent)
 
     callback = _callback(f"arena:revanche_send:{OPPONENT_ATTEMPT_ID}")
     await arena_revanche_flow.handle_arena_revanche_send(
