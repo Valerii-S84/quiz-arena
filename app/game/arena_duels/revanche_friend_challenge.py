@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.game.arena_duels.constants import ARENA_REVANCHE_NOTIFICATION_TYPE
 from app.game.arena_duels.errors import ArenaDuelAccessError
 from app.game.arena_duels.revanche_types import ArenaRevancheContext
@@ -63,6 +64,25 @@ async def create_revanche_friend_challenge(
         question_ids=question_ids,
         status=DUEL_STATUS_ACCEPTED,
     )
+    return _build_friend_challenge_snapshot(challenge)
+
+
+async def load_revanche_friend_challenge(
+    session: AsyncSession,
+    *,
+    challenge_id: UUID,
+    context: ArenaRevancheContext,
+) -> FriendChallengeSnapshot:
+    challenge = await FriendChallengesRepo.get_by_id_for_update(session, challenge_id)
+    if challenge is None:
+        raise ArenaDuelAccessError
+    if (
+        challenge.creator_user_id != context.sender_user_id
+        or challenge.opponent_user_id != context.receiver_user_id
+        or challenge.challenge_type != DUEL_TYPE_DIRECT
+        or challenge.mode_code != context.mode_code
+    ):
+        raise ArenaDuelAccessError
     return _build_friend_challenge_snapshot(challenge)
 
 

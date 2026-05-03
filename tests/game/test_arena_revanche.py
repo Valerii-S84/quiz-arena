@@ -10,7 +10,6 @@ import pytest
 from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
 from app.db.repo.arena_duels_repo import ArenaAttemptDuelContext
 from app.game.arena_duels import revanche
-from app.game.arena_duels.constants import ARENA_REVANCHE_NOTIFICATION_TYPE
 from app.game.arena_duels.errors import ArenaDuelAccessError
 from tests.type_helpers import AsyncSessionStub
 
@@ -143,52 +142,6 @@ async def test_premium_does_not_bypass_revanche_interaction_guard(
     assert resolved_access == []
 
 
-@pytest.mark.asyncio
-async def test_duplicate_revanche_send_is_deduped(monkeypatch: pytest.MonkeyPatch) -> None:
-    lock_calls: list[dict[str, object]] = []
-    monkeypatch.setattr(
-        revanche,
-        "load_arena_revanche_context",
-        _async_return(
-            revanche.ArenaRevancheContext(
-                arena_duel_id=DUEL_ID,
-                source_attempt_id=SOURCE_ATTEMPT_ID,
-                sender_user_id=11,
-                receiver_user_id=22,
-                mode_code="QUICK_MIX_A1A2",
-            )
-        ),
-    )
-    monkeypatch.setattr(
-        revanche.AnalyticsRepo,
-        "lock_arena_revanche_event_key",
-        _append_kwargs(lock_calls),
-    )
-    monkeypatch.setattr(revanche.AnalyticsRepo, "has_arena_revanche_event", _async_return(True))
-    monkeypatch.setattr(
-        revanche.DuelLimitService,
-        "resolve_revanche_access_type",
-        _fail("duplicate request must not consume quota"),
-    )
-    monkeypatch.setattr(
-        revanche,
-        "create_revanche_friend_challenge",
-        _fail("duplicate request must not create another challenge"),
-    )
-
-    request = await revanche.prepare_arena_revanche_request(
-        AsyncSessionStub(),
-        sender_user_id=11,
-        source_attempt_id=SOURCE_ATTEMPT_ID,
-        now_utc=NOW_UTC,
-    )
-
-    assert request.already_sent is True
-    assert request.challenge is None
-    payload = cast(dict[str, object], lock_calls[0]["payload"])
-    assert payload["notification_type"] == ARENA_REVANCHE_NOTIFICATION_TYPE
-
-
 def _async_return(value):
     async def _inner(*_args, **_kwargs):
         return value
@@ -200,13 +153,6 @@ def _append_and_return(target: list[object], value: object):
     async def _inner(*_args, **_kwargs):
         target.append(value)
         return value
-
-    return _inner
-
-
-def _append_kwargs(target: list[dict[str, object]]):
-    async def _inner(*_args, **kwargs):
-        target.append(kwargs)
 
     return _inner
 

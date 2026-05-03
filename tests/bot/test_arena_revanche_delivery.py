@@ -15,16 +15,21 @@ NOW_UTC = datetime(2026, 4, 30, 12, 0, tzinfo=UTC)
 
 
 class _RecordingBegin:
-    def __init__(self, events: list[str], bot: DummyBot) -> None:
+    def __init__(self, events: list[str], bot: DummyBot, phase: int) -> None:
         self._events = events
         self._bot = bot
+        self._phase = phase
 
     async def __aenter__(self) -> object:
         return object()
 
     async def __aexit__(self, exc_type, exc, tb) -> bool:
-        assert self._bot.sent_messages == []
-        self._events.append("commit" if exc_type is None else "rollback")
+        if self._phase == 0:
+            assert self._bot.sent_messages == []
+        else:
+            assert self._bot.sent_messages != []
+        status = "commit" if exc_type is None else "rollback"
+        self._events.append(f"{status}:{self._phase}")
         return False
 
 
@@ -32,9 +37,12 @@ class _RecordingSessionLocal:
     def __init__(self, events: list[str], bot: DummyBot) -> None:
         self._events = events
         self._bot = bot
+        self._phase = 0
 
     def begin(self) -> _RecordingBegin:
-        return _RecordingBegin(self._events, self._bot)
+        phase = self._phase
+        self._phase += 1
+        return _RecordingBegin(self._events, self._bot, phase)
 
 
 class _UserService:
@@ -62,7 +70,7 @@ class _UserService:
 
 
 @pytest.mark.asyncio
-async def test_revanche_delivery_commits_before_push() -> None:
+async def test_revanche_delivery_records_sent_after_successful_push() -> None:
     events: list[str] = []
     bot = DummyBot()
     callback = DummyCallback(
@@ -79,8 +87,8 @@ async def test_revanche_delivery_commits_before_push() -> None:
         )
 
     async def _record(*_args, **_kwargs):
-        assert bot.sent_messages == []
-        events.append("record")
+        assert bot.sent_messages != []
+        events.append("record_sent")
         return True
 
     opponent_label = await create_and_send_revanche(
@@ -94,14 +102,15 @@ async def test_revanche_delivery_commits_before_push() -> None:
     )
 
     assert opponent_label == "Max"
-    assert events == ["record", "commit"]
+    assert events == ["commit:0", "record_sent", "commit:1"]
     assert bot.sent_messages[0]["chat_id"] == 110_000_011
 
 
 @pytest.mark.asyncio
-async def test_revanche_delivery_rolls_back_lost_dedupe_race() -> None:
+async def test_revanche_delivery_does_not_record_sent_when_push_fails() -> None:
     events: list[str] = []
     bot = DummyBot()
+    bot.raise_on_send_message = True
     callback = DummyCallback(
         data=f"arena:revanche_send:{SOURCE_ATTEMPT_ID}",
         from_user=SimpleNamespace(id=777),
@@ -116,19 +125,18 @@ async def test_revanche_delivery_rolls_back_lost_dedupe_race() -> None:
         )
 
     async def _record(*_args, **_kwargs):
-        events.append("record")
-        return False
+        pytest.fail("failed Telegram push must not record arena_revanche_sent")
 
-    opponent_label = await create_and_send_revanche(
-        callback,
-        session_local=_RecordingSessionLocal(events, bot),
-        user_onboarding_service=_UserService,
-        prepare_arena_revanche_request=_prepare,
-        record_arena_revanche_sent=_record,
-        source_attempt_id=SOURCE_ATTEMPT_ID,
-        now_utc=NOW_UTC,
-    )
+    with pytest.raises(RuntimeError):
+        await create_and_send_revanche(
+            callback,
+            session_local=_RecordingSessionLocal(events, bot),
+            user_onboarding_service=_UserService,
+            prepare_arena_revanche_request=_prepare,
+            record_arena_revanche_sent=_record,
+            source_attempt_id=SOURCE_ATTEMPT_ID,
+            now_utc=NOW_UTC,
+        )
 
-    assert opponent_label == "Max"
-    assert events == ["record", "rollback"]
+    assert events == ["commit:0"]
     assert bot.sent_messages == []

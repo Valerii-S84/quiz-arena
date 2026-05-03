@@ -9,12 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.analytics_events import BERLIN_TIMEZONE, EVENT_SOURCE_BOT
 from app.db.repo.analytics_repo import AnalyticsRepo
 from app.db.repo.arena_duels_repo import ArenaDuelsRepo
-from app.game.arena_duels.constants import ARENA_REVANCHE_SENT_EVENT
+from app.game.arena_duels.constants import ARENA_REVANCHE_REQUESTED_EVENT, ARENA_REVANCHE_SENT_EVENT
 from app.game.arena_duels.errors import ArenaDuelAccessError, ArenaDuelNotFoundError
 from app.game.arena_duels.revanche_friend_challenge import (
     build_arena_revanche_payload,
     create_revanche_friend_challenge,
     ensure_source_attempt_can_receive_revanche,
+    load_revanche_friend_challenge,
 )
 from app.game.arena_duels.revanche_types import ArenaRevancheContext, ArenaRevancheRequest
 from app.game.duels.limits import DuelLimitService
@@ -79,14 +80,30 @@ async def prepare_arena_revanche_request(
         user_id=sender_user_id,
         payload=payload,
     )
-    already_sent = await AnalyticsRepo.has_arena_revanche_event(
+    sent = await AnalyticsRepo.has_arena_revanche_event(
         session,
         event_type=ARENA_REVANCHE_SENT_EVENT,
         user_id=sender_user_id,
         payload=payload,
     )
-    if already_sent:
+    if sent:
         return ArenaRevancheRequest(context=context, challenge=None, already_sent=True)
+
+    pending_payload = await AnalyticsRepo.get_arena_revanche_event_payload(
+        session,
+        event_type=ARENA_REVANCHE_REQUESTED_EVENT,
+        user_id=sender_user_id,
+        payload=payload,
+    )
+    if pending_payload is not None:
+        return ArenaRevancheRequest(
+            context=context,
+            challenge=await load_revanche_friend_challenge(
+                session,
+                challenge_id=UUID(str(pending_payload["challenge_id"])),
+                context=context,
+            ),
+        )
 
     access_type = await DuelLimitService.resolve_revanche_access_type(
         session,
@@ -99,7 +116,25 @@ async def prepare_arena_revanche_request(
         access_type=access_type,
         now_utc=now_utc,
     )
-    return ArenaRevancheRequest(context=context, challenge=challenge)
+    request = ArenaRevancheRequest(context=context, challenge=challenge)
+    await record_arena_revanche_requested(session, request=request, happened_at=now_utc)
+    return request
+
+
+async def record_arena_revanche_requested(
+    session: AsyncSession,
+    *,
+    request: ArenaRevancheRequest,
+    happened_at: datetime,
+    source: str = EVENT_SOURCE_BOT,
+) -> bool:
+    return await _record_arena_revanche_event(
+        session,
+        event_type=ARENA_REVANCHE_REQUESTED_EVENT,
+        request=request,
+        happened_at=happened_at,
+        source=source,
+    )
 
 
 async def record_arena_revanche_sent(
@@ -109,13 +144,30 @@ async def record_arena_revanche_sent(
     happened_at: datetime,
     source: str = EVENT_SOURCE_BOT,
 ) -> bool:
+    return await _record_arena_revanche_event(
+        session,
+        event_type=ARENA_REVANCHE_SENT_EVENT,
+        request=request,
+        happened_at=happened_at,
+        source=source,
+    )
+
+
+async def _record_arena_revanche_event(
+    session: AsyncSession,
+    *,
+    event_type: str,
+    request: ArenaRevancheRequest,
+    happened_at: datetime,
+    source: str,
+) -> bool:
     payload = build_arena_revanche_payload(
         context=request.context,
         challenge_id=None if request.challenge is None else request.challenge.challenge_id,
     )
     return await AnalyticsRepo.create_arena_revanche_event_once(
         session,
-        event_type=ARENA_REVANCHE_SENT_EVENT,
+        event_type=event_type,
         source=source,
         user_id=request.context.sender_user_id,
         local_date_berlin=happened_at.astimezone(ZoneInfo(BERLIN_TIMEZONE)).date(),

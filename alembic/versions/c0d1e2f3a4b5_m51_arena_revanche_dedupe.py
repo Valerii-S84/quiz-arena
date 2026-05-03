@@ -34,7 +34,7 @@ def upgrade() -> None:
             "AND payload ? 'revanche_receiver_id' "
             "AND payload ? 'source_attempt_id' "
             "AND payload ? 'notification_type' "
-            "AND event_type IN ('arena_revanche_sent')"
+            "AND event_type IN ('arena_revanche_requested','arena_revanche_sent')"
         ),
     )
 

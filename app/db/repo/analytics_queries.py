@@ -86,6 +86,29 @@ async def has_arena_revanche_event(
     return result.scalar_one_or_none() is not None
 
 
+async def get_arena_revanche_event_payload(
+    session: AsyncSession,
+    *,
+    event_type: str,
+    user_id: int,
+    payload: dict[str, object],
+) -> dict[str, object] | None:
+    stmt = (
+        select(AnalyticsEvent.payload)
+        .where(
+            AnalyticsEvent.event_type == event_type,
+            AnalyticsEvent.user_id == user_id,
+            AnalyticsEvent.payload["revanche_receiver_id"].astext
+            == str(payload["revanche_receiver_id"]),
+            AnalyticsEvent.payload["source_attempt_id"].astext == str(payload["source_attempt_id"]),
+            AnalyticsEvent.payload["notification_type"].astext == str(payload["notification_type"]),
+        )
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
 async def count_user_events_since(
     session: AsyncSession,
     *,

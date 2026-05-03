@@ -14,7 +14,10 @@ ARENA_BEATEN_NOTIFICATION_EVENT_TYPES_SQL = ",".join(
     f"'{event_type}'" for event_type in ARENA_BEATEN_NOTIFICATION_EVENT_TYPES
 )
 
-ARENA_REVANCHE_EVENT_TYPES: tuple[str, ...] = ("arena_revanche_sent",)
+ARENA_REVANCHE_EVENT_TYPES: tuple[str, ...] = (
+    "arena_revanche_requested",
+    "arena_revanche_sent",
+)
 ARENA_REVANCHE_EVENT_TYPES_SQL = ",".join(
     f"'{event_type}'" for event_type in ARENA_REVANCHE_EVENT_TYPES
 )
