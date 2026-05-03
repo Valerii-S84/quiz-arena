@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.analytics_constants import ARENA_REVANCHE_EVENT_TYPES
+from app.db.models.analytics_events import AnalyticsEvent
 from app.db.models.friend_challenges import FriendChallenge
 
 _DUEL_LIVE_STATUSES = ("ACTIVE", "PENDING", "ACCEPTED", "CREATOR_DONE", "OPPONENT_DONE")
@@ -65,6 +67,34 @@ class FriendChallengesRepoCoreMixin:
             FriendChallenge.creator_user_id == creator_user_id,
             FriendChallenge.access_type == access_type,
             FriendChallenge.tournament_match_id.is_(None),
+        )
+        if since is not None:
+            stmt = stmt.where(FriendChallenge.created_at >= since)
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_by_creator_access_type_excluding_arena_revanche(
+        session: AsyncSession,
+        *,
+        creator_user_id: int,
+        access_type: str,
+        since: datetime | None = None,
+    ) -> int:
+        revanche_event_exists = (
+            select(AnalyticsEvent.id)
+            .where(
+                AnalyticsEvent.user_id == creator_user_id,
+                AnalyticsEvent.event_type.in_(ARENA_REVANCHE_EVENT_TYPES),
+                AnalyticsEvent.payload["challenge_id"].astext == cast(FriendChallenge.id, String),
+            )
+            .exists()
+        )
+        stmt = select(func.count(FriendChallenge.id)).where(
+            FriendChallenge.creator_user_id == creator_user_id,
+            FriendChallenge.access_type == access_type,
+            FriendChallenge.tournament_match_id.is_(None),
+            ~revanche_event_exists,
         )
         if since is not None:
             stmt = stmt.where(FriendChallenge.created_at >= since)

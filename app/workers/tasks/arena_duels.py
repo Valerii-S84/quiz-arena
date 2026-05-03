@@ -19,9 +19,18 @@ from app.workers.celery_app import celery_app
 from app.workers.tasks.arena_duels_schedule import configure_arena_duels_schedule
 
 
-def build_arena_beaten_notification_keyboard() -> InlineKeyboardMarkup:
+def build_arena_beaten_notification_keyboard(
+    *,
+    source_attempt_id: str,
+) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🔁 Revanche",
+                    callback_data=f"arena:revanche:{source_attempt_id}",
+                )
+            ],
             [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
         ]
     )
@@ -112,7 +121,9 @@ async def _send_arena_beaten_notification_with_bot(
                     notification=notification,
                     challenger_label=challenger_label,
                 ),
-                reply_markup=build_arena_beaten_notification_keyboard(),
+                reply_markup=build_arena_beaten_notification_keyboard(
+                    source_attempt_id=str(notification.new_best_attempt_id),
+                ),
             )
         except Exception:
             return {"sent_total": 0, "failed_total": 1, "skipped_total": 0}

@@ -121,9 +121,60 @@ async def test_arena_publish_friend_handler_delegates_to_flow(monkeypatch) -> No
     )
 
 
-def test_duels_register_includes_arena_publish_friend_callback() -> None:
+@pytest.mark.asyncio
+async def test_arena_revanche_handlers_delegate_to_flow(monkeypatch) -> None:
+    captured: list[dict[str, object]] = []
+
+    async def _fake_confirm_flow(callback, **kwargs):
+        captured.append({"callback": callback, **kwargs})
+
+    async def _fake_send_flow(callback, **kwargs):
+        captured.append({"callback": callback, **kwargs})
+
+    monkeypatch.setattr(
+        gameplay_duels.arena_revanche_flow,
+        "handle_arena_revanche_confirm",
+        _fake_confirm_flow,
+    )
+    monkeypatch.setattr(
+        gameplay_duels.arena_revanche_flow,
+        "handle_arena_revanche_send",
+        _fake_send_flow,
+    )
+
+    confirm_callback = DummyCallback(
+        data="arena:revanche:00000000-0000-0000-0000-000000000001",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+    send_callback = DummyCallback(
+        data="arena:revanche_send:00000000-0000-0000-0000-000000000001",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+
+    await gameplay_duels.handle_arena_revanche_confirm(confirm_callback)
+    await gameplay_duels.handle_arena_revanche_send(send_callback)
+
+    assert captured[0]["callback"] is confirm_callback
+    assert captured[0]["arena_revanche_re"] is gameplay_callbacks.ARENA_REVANCHE_RE
+    assert captured[0]["load_arena_revanche_context"] is gameplay_duels.load_arena_revanche_context
+    assert captured[1]["callback"] is send_callback
+    assert captured[1]["arena_revanche_send_re"] is gameplay_callbacks.ARENA_REVANCHE_SEND_RE
+    assert captured[1]["prepare_arena_revanche_request"] is (
+        gameplay_duels.prepare_arena_revanche_request
+    )
+    assert captured[1]["record_arena_revanche_sent"] is gameplay_duels.record_arena_revanche_sent
+    assert captured[1]["cleanup_arena_revanche_request"] is (
+        gameplay_duels.cleanup_arena_revanche_request
+    )
+
+
+def test_duels_register_includes_arena_callbacks() -> None:
     router = _RecordingRouter()
 
     gameplay_duels.register(cast(Any, router))
 
     assert gameplay_duels.handle_arena_publish_friend in router.handlers
+    assert gameplay_duels.handle_arena_revanche_confirm in router.handlers
+    assert gameplay_duels.handle_arena_revanche_send in router.handlers

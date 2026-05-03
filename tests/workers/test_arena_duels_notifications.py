@@ -6,6 +6,8 @@ from types import SimpleNamespace
 from typing import cast
 from uuid import UUID
 
+from aiogram.types import InlineKeyboardMarkup
+
 from app.game.arena_duels.constants import (
     ARENA_BEATEN_NOTIFICATION_EVENT,
     ARENA_BEATEN_NOTIFICATION_TYPE,
@@ -126,6 +128,17 @@ def test_send_arena_beaten_notification_records_key_after_successful_send(
     assert "@anna hat dein Ergebnis übertroffen" in str(bot.sent_messages[0]["text"])
     assert "Du:\n6/7 · 00:48" in str(bot.sent_messages[0]["text"])
     assert "@anna:\n7/7 · 00:52" in str(bot.sent_messages[0]["text"])
+    keyboard = cast(InlineKeyboardMarkup, bot.sent_messages[0]["reply_markup"])
+    callbacks = [
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+        if button.callback_data is not None
+    ]
+    assert callbacks == [
+        "arena:revanche:cccccccc-cccc-cccc-cccc-cccccccccccc",
+        "arena:list",
+    ]
 
 
 def test_send_arena_beaten_notification_skips_existing_sent_event(monkeypatch) -> None:
