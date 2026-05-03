@@ -14,6 +14,7 @@ from app.game.arena_duels.errors import ArenaDuelAccessError, ArenaDuelNotFoundE
 from app.game.arena_duels.revanche_friend_challenge import (
     build_arena_revanche_payload,
     create_revanche_friend_challenge,
+    delete_revanche_friend_challenge,
     ensure_source_attempt_can_receive_revanche,
     load_revanche_friend_challenge,
 )
@@ -151,6 +152,26 @@ async def record_arena_revanche_sent(
         request=request,
         happened_at=happened_at,
         source=source,
+    )
+
+
+async def cleanup_arena_revanche_request(
+    session: AsyncSession,
+    *,
+    request: ArenaRevancheRequest,
+) -> None:
+    if request.challenge is not None:
+        await delete_revanche_friend_challenge(
+            session,
+            challenge_id=request.challenge.challenge_id,
+            context=request.context,
+        )
+    payload = build_arena_revanche_payload(context=request.context)
+    await AnalyticsRepo.delete_arena_revanche_events(
+        session,
+        event_types=(ARENA_REVANCHE_REQUESTED_EVENT, ARENA_REVANCHE_SENT_EVENT),
+        user_id=request.context.sender_user_id,
+        payload=payload,
     )
 
 

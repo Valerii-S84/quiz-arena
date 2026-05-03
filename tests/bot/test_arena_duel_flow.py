@@ -470,6 +470,9 @@ async def test_arena_revanche_send_creates_one_push_and_records_event(
         recorded.append(kwargs)
         return True
 
+    async def _cleanup(*_args, **_kwargs):
+        pytest.fail("successful Revanche push must not cleanup")
+
     async def _lock(*_args, **_kwargs):
         return None
 
@@ -488,6 +491,7 @@ async def test_arena_revanche_send_creates_one_push_and_records_event(
         user_onboarding_service=_UserServiceWithTelegram,
         prepare_arena_revanche_request=_prepare,
         record_arena_revanche_sent=_record,
+        cleanup_arena_revanche_request=_cleanup,
     )
 
     assert len(callback.bot.sent_messages) == 1
@@ -513,6 +517,9 @@ async def test_arena_revanche_send_dedupes_existing_request_without_push() -> No
     async def _unexpected_record(*_args, **_kwargs):
         pytest.fail("duplicate Revanche tap must not record or push again")
 
+    async def _unexpected_cleanup(*_args, **_kwargs):
+        pytest.fail("duplicate Revanche tap must not cleanup")
+
     callback = _callback(f"arena:revanche_send:{OPPONENT_ATTEMPT_ID}")
     await arena_revanche_flow.handle_arena_revanche_send(
         callback,
@@ -522,6 +529,7 @@ async def test_arena_revanche_send_dedupes_existing_request_without_push() -> No
         user_onboarding_service=_UserServiceWithTelegram,
         prepare_arena_revanche_request=_prepare,
         record_arena_revanche_sent=_unexpected_record,
+        cleanup_arena_revanche_request=_unexpected_cleanup,
     )
 
     assert callback.bot.sent_messages == []

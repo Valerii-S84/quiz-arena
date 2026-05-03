@@ -169,6 +169,25 @@ async def create_arena_revanche_event_once(
     return result.scalar_one_or_none() is not None
 
 
+async def delete_arena_revanche_events(
+    session: AsyncSession,
+    *,
+    event_types: tuple[str, ...],
+    user_id: int,
+    payload: dict[str, object],
+) -> int:
+    stmt = delete(AnalyticsEvent).where(
+        AnalyticsEvent.event_type.in_(event_types),
+        AnalyticsEvent.user_id == user_id,
+        AnalyticsEvent.payload["revanche_receiver_id"].astext
+        == str(payload["revanche_receiver_id"]),
+        AnalyticsEvent.payload["source_attempt_id"].astext == str(payload["source_attempt_id"]),
+        AnalyticsEvent.payload["notification_type"].astext == str(payload["notification_type"]),
+    )
+    result = await session.execute(stmt)
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 async def lock_arena_beaten_notification_event_key(
     session: AsyncSession,
     *,

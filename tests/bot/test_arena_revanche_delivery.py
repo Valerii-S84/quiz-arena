@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Any
 from uuid import UUID
 
 import pytest
@@ -41,6 +42,16 @@ class _RecordingSessionLocal:
         return _RecordingBegin(self._events, self._bot, phase)
 
 
+class _RecordingBot(DummyBot):
+    def __init__(self, events: list[str]) -> None:
+        super().__init__()
+        self._events = events
+
+    async def send_message(self, **kwargs: Any) -> None:  # type: ignore[override]
+        self._events.append("send")
+        await super().send_message(**kwargs)
+
+
 class _UserService:
     @staticmethod
     async def ensure_home_snapshot(*_args, **_kwargs):
@@ -70,7 +81,7 @@ async def test_revanche_delivery_records_sent_after_successful_push(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     events: list[str] = []
-    bot = DummyBot()
+    bot = _RecordingBot(events)
     callback = DummyCallback(
         data=f"arena:revanche_send:{SOURCE_ATTEMPT_ID}",
         from_user=SimpleNamespace(id=777),
@@ -94,9 +105,12 @@ async def test_revanche_delivery_records_sent_after_successful_push(
         return False
 
     async def _record(*_args, **_kwargs):
-        assert bot.sent_messages != []
+        assert bot.sent_messages == []
         events.append("record_sent")
         return True
+
+    async def _cleanup(*_args, **_kwargs):
+        pytest.fail("successful Telegram push must not cleanup Revanche state")
 
     monkeypatch.setattr(arena_revanche_delivery, "lock_arena_revanche_delivery", _lock)
     monkeypatch.setattr(arena_revanche_delivery, "is_arena_revanche_sent", _is_sent)
@@ -107,21 +121,22 @@ async def test_revanche_delivery_records_sent_after_successful_push(
         user_onboarding_service=_UserService,
         prepare_arena_revanche_request=_prepare,
         record_arena_revanche_sent=_record,
+        cleanup_arena_revanche_request=_cleanup,
         source_attempt_id=SOURCE_ATTEMPT_ID,
         now_utc=NOW_UTC,
     )
 
     assert opponent_label == "Max"
-    assert events == ["prepare", "lock", "record_sent", "commit:0"]
+    assert events == ["prepare", "lock", "record_sent", "commit:0", "send"]
     assert bot.sent_messages[0]["chat_id"] == 110_000_011
 
 
 @pytest.mark.asyncio
-async def test_revanche_delivery_rolls_back_request_when_push_fails(
+async def test_revanche_delivery_cleans_up_committed_request_when_push_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     events: list[str] = []
-    bot = DummyBot()
+    bot = _RecordingBot(events)
     bot.raise_on_send_message = True
     callback = DummyCallback(
         data=f"arena:revanche_send:{SOURCE_ATTEMPT_ID}",
@@ -144,7 +159,12 @@ async def test_revanche_delivery_rolls_back_request_when_push_fails(
         return False
 
     async def _record(*_args, **_kwargs):
-        pytest.fail("failed Telegram push must not record arena_revanche_sent")
+        assert bot.sent_messages == []
+        events.append("record_sent")
+        return True
+
+    async def _cleanup(*_args, **_kwargs):
+        events.append("cleanup")
 
     monkeypatch.setattr(arena_revanche_delivery, "lock_arena_revanche_delivery", _lock)
     monkeypatch.setattr(arena_revanche_delivery, "is_arena_revanche_sent", _is_sent)
@@ -156,9 +176,18 @@ async def test_revanche_delivery_rolls_back_request_when_push_fails(
             user_onboarding_service=_UserService,
             prepare_arena_revanche_request=_prepare,
             record_arena_revanche_sent=_record,
+            cleanup_arena_revanche_request=_cleanup,
             source_attempt_id=SOURCE_ATTEMPT_ID,
             now_utc=NOW_UTC,
         )
 
-    assert events == ["prepare", "lock", "rollback:0"]
+    assert events == [
+        "prepare",
+        "lock",
+        "record_sent",
+        "commit:0",
+        "send",
+        "cleanup",
+        "commit:1",
+    ]
     assert bot.sent_messages == []

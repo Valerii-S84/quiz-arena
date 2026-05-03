@@ -34,34 +34,32 @@ async def create_and_send_revanche(
     user_onboarding_service,
     prepare_arena_revanche_request,
     record_arena_revanche_sent,
+    cleanup_arena_revanche_request,
     source_attempt_id: UUID,
     now_utc: datetime,
 ) -> str:
     bot = callback.bot
     assert bot is not None
+    delivery = await persist_revanche_delivery(
+        callback,
+        session_local=session_local,
+        user_onboarding_service=user_onboarding_service,
+        prepare_arena_revanche_request=prepare_arena_revanche_request,
+        record_arena_revanche_sent=record_arena_revanche_sent,
+        source_attempt_id=source_attempt_id,
+        now_utc=now_utc,
+    )
+    if delivery.already_sent:
+        return delivery.opponent_label
+    if (
+        delivery.sender_label is None
+        or delivery.opponent_chat_id is None
+        or delivery.challenge_id is None
+        or delivery.request is None
+    ):
+        raise ArenaDuelAccessError
 
-    async with session_local.begin() as session:
-        # Keep challenge creation and delivery atomic so failed pushes do not spend tickets.
-        delivery = await build_revanche_delivery(
-            callback,
-            session=session,
-            user_onboarding_service=user_onboarding_service,
-            prepare_arena_revanche_request=prepare_arena_revanche_request,
-            source_attempt_id=source_attempt_id,
-            now_utc=now_utc,
-        )
-        if delivery.already_sent:
-            return delivery.opponent_label
-        if (
-            delivery.sender_label is None
-            or delivery.opponent_chat_id is None
-            or delivery.challenge_id is None
-            or delivery.request is None
-        ):
-            raise ArenaDuelAccessError
-        await lock_arena_revanche_delivery(session, request=delivery.request)
-        if await is_arena_revanche_sent(session, request=delivery.request):
-            return delivery.opponent_label
+    try:
         await bot.send_message(
             chat_id=delivery.opponent_chat_id,
             text=TEXTS_DE["msg.duels.revanche.incoming"].format(
@@ -71,12 +69,52 @@ async def create_and_send_revanche(
                 challenge_id=str(delivery.challenge_id),
             ),
         )
-        await record_arena_revanche_sent(
+    except Exception:
+        async with session_local.begin() as session:
+            await cleanup_arena_revanche_request(session, request=delivery.request)
+        raise
+    return delivery.opponent_label
+
+
+async def persist_revanche_delivery(
+    callback: CallbackQuery,
+    *,
+    session_local,
+    user_onboarding_service,
+    prepare_arena_revanche_request,
+    record_arena_revanche_sent,
+    source_attempt_id: UUID,
+    now_utc: datetime,
+) -> RevancheDelivery:
+    async with session_local.begin() as session:
+        delivery = await build_revanche_delivery(
+            callback,
+            session=session,
+            user_onboarding_service=user_onboarding_service,
+            prepare_arena_revanche_request=prepare_arena_revanche_request,
+            source_attempt_id=source_attempt_id,
+            now_utc=now_utc,
+        )
+        if delivery.already_sent:
+            return delivery
+        if (
+            delivery.sender_label is None
+            or delivery.opponent_chat_id is None
+            or delivery.challenge_id is None
+            or delivery.request is None
+        ):
+            raise ArenaDuelAccessError
+        await lock_arena_revanche_delivery(session, request=delivery.request)
+        if await is_arena_revanche_sent(session, request=delivery.request):
+            return RevancheDelivery(opponent_label=delivery.opponent_label, already_sent=True)
+        recorded = await record_arena_revanche_sent(
             session,
             request=delivery.request,
             happened_at=now_utc,
         )
-    return delivery.opponent_label
+        if not recorded:
+            return RevancheDelivery(opponent_label=delivery.opponent_label, already_sent=True)
+        return delivery
 
 
 async def build_revanche_delivery(

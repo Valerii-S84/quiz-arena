@@ -24,6 +24,7 @@ from app.game.arena_duels.analytics import (
     emit_arena_analytics_event,
 )
 from app.game.arena_duels.revanche import (
+    cleanup_arena_revanche_request,
     load_arena_revanche_context,
     prepare_arena_revanche_request,
     record_arena_revanche_sent,
@@ -151,6 +152,7 @@ async def handle_arena_revanche_send(callback: CallbackQuery) -> None:
         user_onboarding_service=UserOnboardingService,
         prepare_arena_revanche_request=prepare_arena_revanche_request,
         record_arena_revanche_sent=record_arena_revanche_sent,
+        cleanup_arena_revanche_request=cleanup_arena_revanche_request,
     )
 
 

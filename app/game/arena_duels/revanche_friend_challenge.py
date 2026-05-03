@@ -86,6 +86,26 @@ async def load_revanche_friend_challenge(
     return _build_friend_challenge_snapshot(challenge)
 
 
+async def delete_revanche_friend_challenge(
+    session: AsyncSession,
+    *,
+    challenge_id: UUID,
+    context: ArenaRevancheContext,
+) -> None:
+    challenge = await FriendChallengesRepo.get_by_id_for_update(session, challenge_id)
+    if challenge is None:
+        return
+    if (
+        challenge.creator_user_id != context.sender_user_id
+        or challenge.opponent_user_id != context.receiver_user_id
+        or challenge.challenge_type != DUEL_TYPE_DIRECT
+        or challenge.mode_code != context.mode_code
+    ):
+        raise ArenaDuelAccessError
+    await session.delete(challenge)
+    await session.flush()
+
+
 def ensure_source_attempt_can_receive_revanche(
     *,
     sender_user_id: int,

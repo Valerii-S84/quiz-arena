@@ -91,6 +91,9 @@ async def test_revanche_delivery_skips_push_when_sent_marker_exists(
     async def _record(*_args, **_kwargs):
         pytest.fail("existing sent marker must skip duplicate push")
 
+    async def _cleanup(*_args, **_kwargs):
+        pytest.fail("existing sent marker must not cleanup Revanche state")
+
     monkeypatch.setattr(arena_revanche_delivery, "lock_arena_revanche_delivery", _lock)
     monkeypatch.setattr(arena_revanche_delivery, "is_arena_revanche_sent", _is_sent)
 
@@ -100,6 +103,7 @@ async def test_revanche_delivery_skips_push_when_sent_marker_exists(
         user_onboarding_service=_UserService,
         prepare_arena_revanche_request=_prepare,
         record_arena_revanche_sent=_record,
+        cleanup_arena_revanche_request=_cleanup,
         source_attempt_id=SOURCE_ATTEMPT_ID,
         now_utc=NOW_UTC,
     )

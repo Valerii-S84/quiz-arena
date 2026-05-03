@@ -165,6 +165,9 @@ async def test_arena_revanche_handlers_delegate_to_flow(monkeypatch) -> None:
         gameplay_duels.prepare_arena_revanche_request
     )
     assert captured[1]["record_arena_revanche_sent"] is gameplay_duels.record_arena_revanche_sent
+    assert captured[1]["cleanup_arena_revanche_request"] is (
+        gameplay_duels.cleanup_arena_revanche_request
+    )
 
 
 def test_duels_register_includes_arena_callbacks() -> None:

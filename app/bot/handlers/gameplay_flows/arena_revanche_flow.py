@@ -80,6 +80,7 @@ async def handle_arena_revanche_send(
     user_onboarding_service,
     prepare_arena_revanche_request,
     record_arena_revanche_sent,
+    cleanup_arena_revanche_request,
 ) -> None:
     source_attempt_id = _parse_source_attempt_id(
         callback,
@@ -100,6 +101,7 @@ async def handle_arena_revanche_send(
             user_onboarding_service=user_onboarding_service,
             prepare_arena_revanche_request=prepare_arena_revanche_request,
             record_arena_revanche_sent=record_arena_revanche_sent,
+            cleanup_arena_revanche_request=cleanup_arena_revanche_request,
             source_attempt_id=source_attempt_id,
             now_utc=datetime.now(timezone.utc),
         )

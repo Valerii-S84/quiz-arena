@@ -13,6 +13,7 @@ from app.game.arena_duels.constants import (
     ARENA_REVANCHE_REQUESTED_EVENT,
     ARENA_REVANCHE_SENT_EVENT,
 )
+from app.game.sessions.types import FriendChallengeSnapshot
 from tests.type_helpers import AsyncSessionStub
 
 NOW_UTC = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
@@ -196,6 +197,43 @@ async def test_new_revanche_locks_sender_quota_before_access_resolution(
 
     assert request.challenge is not None
     assert calls == ["sender_quota_lock", "event_lock", "resolve_access"]
+
+
+@pytest.mark.asyncio
+async def test_cleanup_revanche_request_deletes_challenge_and_quota_events(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    challenge = cast(FriendChallengeSnapshot, SimpleNamespace(challenge_id=CHALLENGE_ID))
+    request = revanche.ArenaRevancheRequest(context=_context(), challenge=challenge)
+    challenge_deletes: list[dict[str, object]] = []
+    event_deletes: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        revanche,
+        "delete_revanche_friend_challenge",
+        _append_kwargs(challenge_deletes),
+    )
+    monkeypatch.setattr(
+        revanche.AnalyticsRepo,
+        "delete_arena_revanche_events",
+        _append_kwargs_and_return(event_deletes, 2),
+    )
+
+    await revanche.cleanup_arena_revanche_request(AsyncSessionStub(), request=request)
+
+    assert challenge_deletes == [
+        {
+            "challenge_id": CHALLENGE_ID,
+            "context": request.context,
+        }
+    ]
+    assert event_deletes[0]["event_types"] == (
+        ARENA_REVANCHE_REQUESTED_EVENT,
+        ARENA_REVANCHE_SENT_EVENT,
+    )
+    assert event_deletes[0]["user_id"] == 11
+    payload = cast(dict[str, object], event_deletes[0]["payload"])
+    assert payload["source_attempt_id"] == str(SOURCE_ATTEMPT_ID)
+    assert payload["revanche_receiver_id"] == 22
 
 
 async def _prepare_request():

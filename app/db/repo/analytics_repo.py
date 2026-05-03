@@ -17,6 +17,7 @@ from app.db.repo.analytics_mutations import (  # noqa: F401
     create_arena_revanche_event_once,
     create_daily_cup_push_event_once,
     create_event,
+    delete_arena_revanche_events,
     delete_events_created_before,
     lock_arena_beaten_notification_event_key,
     lock_arena_revanche_event_key,
@@ -40,6 +41,7 @@ class AnalyticsRepo:
         create_arena_beaten_notification_event_once
     )
     create_arena_revanche_event_once = staticmethod(create_arena_revanche_event_once)
+    delete_arena_revanche_events = staticmethod(delete_arena_revanche_events)
     lock_arena_beaten_notification_event_key = staticmethod(
         lock_arena_beaten_notification_event_key
     )
