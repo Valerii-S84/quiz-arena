@@ -6,7 +6,7 @@ from typing import Any
 from uuid import UUID
 
 import pytest
-from aiogram.exceptions import TelegramForbiddenError
+from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
 from aiogram.methods import SendMessage
 
 from app.bot.handlers.gameplay_flows import arena_revanche_delivery
@@ -187,6 +187,73 @@ async def test_revanche_delivery_cleans_up_committed_request_when_telegram_rejec
     monkeypatch.setattr(arena_revanche_delivery, "is_arena_revanche_sent", _is_sent)
 
     with pytest.raises(TelegramForbiddenError):
+        await arena_revanche_delivery.create_and_send_revanche(
+            callback,
+            session_local=_RecordingSessionLocal(events, bot),
+            user_onboarding_service=_UserService,
+            prepare_arena_revanche_request=_prepare,
+            record_arena_revanche_sent=_record,
+            cleanup_arena_revanche_request=_cleanup,
+            source_attempt_id=SOURCE_ATTEMPT_ID,
+            now_utc=NOW_UTC,
+        )
+
+    assert events == [
+        "prepare",
+        "lock",
+        "record_sent",
+        "commit:0",
+        "send",
+        "cleanup",
+        "commit:1",
+    ]
+    assert bot.sent_messages == []
+
+
+@pytest.mark.asyncio
+async def test_revanche_delivery_cleans_up_committed_request_when_telegram_rate_limits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+    bot = _FailingRecordingBot(
+        events,
+        TelegramRetryAfter(
+            method=SendMessage(chat_id=110_000_011, text="x"),
+            message="retry after",
+            retry_after=3,
+        ),
+    )
+    callback = DummyCallback(
+        data=f"arena:revanche_send:{SOURCE_ATTEMPT_ID}",
+        from_user=SimpleNamespace(id=777),
+        message=DummyMessage(bot=bot),
+    )
+
+    async def _prepare(*_args, **_kwargs):
+        events.append("prepare")
+        return SimpleNamespace(
+            already_sent=False,
+            context=SimpleNamespace(receiver_user_id=11),
+            challenge=SimpleNamespace(challenge_id=CHALLENGE_ID),
+        )
+
+    async def _lock(*_args, **_kwargs):
+        events.append("lock")
+
+    async def _is_sent(*_args, **_kwargs):
+        return False
+
+    async def _record(*_args, **_kwargs):
+        events.append("record_sent")
+        return True
+
+    async def _cleanup(*_args, **_kwargs):
+        events.append("cleanup")
+
+    monkeypatch.setattr(arena_revanche_delivery, "lock_arena_revanche_delivery", _lock)
+    monkeypatch.setattr(arena_revanche_delivery, "is_arena_revanche_sent", _is_sent)
+
+    with pytest.raises(TelegramRetryAfter):
         await arena_revanche_delivery.create_and_send_revanche(
             callback,
             session_local=_RecordingSessionLocal(events, bot),

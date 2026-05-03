@@ -8,6 +8,7 @@ from aiogram.exceptions import (
     TelegramBadRequest,
     TelegramForbiddenError,
     TelegramNotFound,
+    TelegramRetryAfter,
     TelegramUnauthorizedError,
 )
 from aiogram.types import CallbackQuery
@@ -26,6 +27,7 @@ _NON_DELIVERY_TELEGRAM_ERRORS = (
     TelegramBadRequest,
     TelegramForbiddenError,
     TelegramNotFound,
+    TelegramRetryAfter,
     TelegramUnauthorizedError,
 )
 
