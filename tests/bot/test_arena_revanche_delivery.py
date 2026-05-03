@@ -6,6 +6,8 @@ from typing import Any
 from uuid import UUID
 
 import pytest
+from aiogram.exceptions import TelegramForbiddenError
+from aiogram.methods import SendMessage
 
 from app.bot.handlers.gameplay_flows import arena_revanche_delivery
 from tests.bot.helpers import DummyBot, DummyCallback, DummyMessage
@@ -50,6 +52,16 @@ class _RecordingBot(DummyBot):
     async def send_message(self, **kwargs: Any) -> None:  # type: ignore[override]
         self._events.append("send")
         await super().send_message(**kwargs)
+
+
+class _FailingRecordingBot(_RecordingBot):
+    def __init__(self, events: list[str], error: Exception) -> None:
+        super().__init__(events)
+        self._error = error
+
+    async def send_message(self, **_kwargs: Any) -> None:  # type: ignore[override]
+        self._events.append("send")
+        raise self._error
 
 
 class _UserService:
@@ -132,12 +144,17 @@ async def test_revanche_delivery_records_sent_after_successful_push(
 
 
 @pytest.mark.asyncio
-async def test_revanche_delivery_cleans_up_committed_request_when_push_fails(
+async def test_revanche_delivery_cleans_up_committed_request_when_telegram_rejects_push(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     events: list[str] = []
-    bot = _RecordingBot(events)
-    bot.raise_on_send_message = True
+    bot = _FailingRecordingBot(
+        events,
+        TelegramForbiddenError(
+            method=SendMessage(chat_id=110_000_011, text="x"),
+            message="forbidden",
+        ),
+    )
     callback = DummyCallback(
         data=f"arena:revanche_send:{SOURCE_ATTEMPT_ID}",
         from_user=SimpleNamespace(id=777),
@@ -169,7 +186,7 @@ async def test_revanche_delivery_cleans_up_committed_request_when_push_fails(
     monkeypatch.setattr(arena_revanche_delivery, "lock_arena_revanche_delivery", _lock)
     monkeypatch.setattr(arena_revanche_delivery, "is_arena_revanche_sent", _is_sent)
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(TelegramForbiddenError):
         await arena_revanche_delivery.create_and_send_revanche(
             callback,
             session_local=_RecordingSessionLocal(events, bot),
@@ -190,4 +207,56 @@ async def test_revanche_delivery_cleans_up_committed_request_when_push_fails(
         "cleanup",
         "commit:1",
     ]
+    assert bot.sent_messages == []
+
+
+@pytest.mark.asyncio
+async def test_revanche_delivery_keeps_committed_request_when_push_failure_is_ambiguous(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+    bot = _FailingRecordingBot(events, RuntimeError("send_message failed"))
+    callback = DummyCallback(
+        data=f"arena:revanche_send:{SOURCE_ATTEMPT_ID}",
+        from_user=SimpleNamespace(id=777),
+        message=DummyMessage(bot=bot),
+    )
+
+    async def _prepare(*_args, **_kwargs):
+        events.append("prepare")
+        return SimpleNamespace(
+            already_sent=False,
+            context=SimpleNamespace(receiver_user_id=11),
+            challenge=SimpleNamespace(challenge_id=CHALLENGE_ID),
+        )
+
+    async def _lock(*_args, **_kwargs):
+        events.append("lock")
+
+    async def _is_sent(*_args, **_kwargs):
+        return False
+
+    async def _record(*_args, **_kwargs):
+        events.append("record_sent")
+        return True
+
+    async def _cleanup(*_args, **_kwargs):
+        pytest.fail("ambiguous send failures must keep committed Revanche state")
+
+    monkeypatch.setattr(arena_revanche_delivery, "lock_arena_revanche_delivery", _lock)
+    monkeypatch.setattr(arena_revanche_delivery, "is_arena_revanche_sent", _is_sent)
+
+    with pytest.raises(RuntimeError):
+        await arena_revanche_delivery.create_and_send_revanche(
+            callback,
+            session_local=_RecordingSessionLocal(events, bot),
+            user_onboarding_service=_UserService,
+            prepare_arena_revanche_request=_prepare,
+            record_arena_revanche_sent=_record,
+            cleanup_arena_revanche_request=_cleanup,
+            source_attempt_id=SOURCE_ATTEMPT_ID,
+            now_utc=NOW_UTC,
+        )
+
+    assert events == ["prepare", "lock", "record_sent", "commit:0", "send"]
     assert bot.sent_messages == []

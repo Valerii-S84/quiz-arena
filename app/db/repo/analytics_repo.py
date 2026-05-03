@@ -25,6 +25,7 @@ from app.db.repo.analytics_mutations import (  # noqa: F401
     upsert_daily,
 )
 from app.db.repo.analytics_queries import (  # noqa: F401
+    count_user_events_by_payload_value,
     count_user_events_since,
     count_user_events_since_by_payload_value,
     get_arena_revanche_event_payload,
@@ -51,6 +52,7 @@ class AnalyticsRepo:
     has_arena_beaten_notification_event = staticmethod(has_arena_beaten_notification_event)
     has_arena_revanche_event = staticmethod(has_arena_revanche_event)
     get_arena_revanche_event_payload = staticmethod(get_arena_revanche_event_payload)
+    count_user_events_by_payload_value = staticmethod(count_user_events_by_payload_value)
     count_user_events_since = staticmethod(count_user_events_since)
     count_user_events_since_by_payload_value = staticmethod(
         count_user_events_since_by_payload_value

@@ -154,11 +154,15 @@ class DuelLimitService:
             return DUEL_ACCESS_PREMIUM
 
         day_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
-        free_used_today = await FriendChallengesRepo.count_by_creator_access_type(
-            session,
-            creator_user_id=creator_user_id,
-            access_type=DUEL_ACCESS_FREE,
-            since=day_start,
+        free_used_today = (
+            await (
+                FriendChallengesRepo.count_by_creator_access_type_excluding_arena_revanche(
+                    session,
+                    creator_user_id=creator_user_id,
+                    access_type=DUEL_ACCESS_FREE,
+                    since=day_start,
+                )
+            )
         )
         if free_used_today < DuelLimitService.free_limit_for_action(
             DUEL_LIMIT_ACTION_FRIEND_CREATE
@@ -320,15 +324,28 @@ class DuelLimitService:
 
     @staticmethod
     async def _count_paid_ticket_uses(session: AsyncSession, *, user_id: int) -> int:
+        from app.db.repo.analytics_repo import AnalyticsRepo
         from app.db.repo.arena_duels_repo import ArenaDuelsRepo
+        from app.game.arena_duels.constants import ARENA_REVANCHE_SENT_EVENT
 
-        friend_uses = await FriendChallengesRepo.count_by_creator_access_type(
-            session,
-            creator_user_id=user_id,
-            access_type=DUEL_ACCESS_PAID_TICKET,
+        friend_uses = (
+            await (
+                FriendChallengesRepo.count_by_creator_access_type_excluding_arena_revanche(
+                    session,
+                    creator_user_id=user_id,
+                    access_type=DUEL_ACCESS_PAID_TICKET,
+                )
+            )
         )
         arena_uses = await ArenaDuelsRepo.count_paid_ticket_usage(session, user_id=user_id)
-        return friend_uses + arena_uses
+        revanche_uses = await AnalyticsRepo.count_user_events_by_payload_value(
+            session,
+            event_type=ARENA_REVANCHE_SENT_EVENT,
+            user_id=user_id,
+            payload_key="access_type",
+            payload_value=DUEL_ACCESS_PAID_TICKET,
+        )
+        return friend_uses + arena_uses + revanche_uses
 
     @staticmethod
     async def _ensure_user_exists(

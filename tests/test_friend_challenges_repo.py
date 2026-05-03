@@ -74,6 +74,30 @@ async def test_count_by_creator_access_type_ignores_tournament_duels() -> None:
     assert "friend_challenges.tournament_match_id IS NULL" in sql
 
 
+async def test_count_by_creator_access_type_excluding_arena_revanche_uses_event_guard() -> None:
+    session = _RecordingSession(scalar_value=1)
+
+    count = await FriendChallengesRepo.count_by_creator_access_type_excluding_arena_revanche(
+        session,
+        creator_user_id=7,
+        access_type="PAID_TICKET",
+    )
+
+    assert count == 1
+    assert session.statement is not None
+
+    sql = _compile_sql(session.statement)
+
+    assert "friend_challenges.creator_user_id = 7" in sql
+    assert "friend_challenges.access_type = 'PAID_TICKET'" in sql
+    assert "friend_challenges.tournament_match_id IS NULL" in sql
+    assert "NOT (EXISTS" in sql
+    assert "analytics_events.event_type IN" in sql
+    assert "arena_revanche_requested" in sql
+    assert "arena_revanche_sent" in sql
+    assert "analytics_events.payload ->> 'challenge_id'" in sql
+
+
 async def test_count_live_for_user_ignores_tournament_duels() -> None:
     session = _RecordingSession(scalar_value=4)
 

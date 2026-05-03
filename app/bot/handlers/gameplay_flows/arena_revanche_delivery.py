@@ -4,6 +4,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+from aiogram.exceptions import (
+    TelegramBadRequest,
+    TelegramForbiddenError,
+    TelegramNotFound,
+    TelegramUnauthorizedError,
+)
 from aiogram.types import CallbackQuery
 
 from app.bot.handlers.gameplay_views import _format_user_label
@@ -15,6 +21,13 @@ from app.game.arena_duels.revanche_delivery_guard import (
     lock_arena_revanche_delivery,
 )
 from app.game.arena_duels.revanche_types import ArenaRevancheRequest
+
+_NON_DELIVERY_TELEGRAM_ERRORS = (
+    TelegramBadRequest,
+    TelegramForbiddenError,
+    TelegramNotFound,
+    TelegramUnauthorizedError,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,7 +82,9 @@ async def create_and_send_revanche(
                 challenge_id=str(delivery.challenge_id),
             ),
         )
-    except Exception:
+    except _NON_DELIVERY_TELEGRAM_ERRORS:
+        # Network/server errors are ambiguous: Telegram may have accepted the message.
+        # Only clean up state when Telegram rejected delivery before creating a message.
         async with session_local.begin() as session:
             await cleanup_arena_revanche_request(session, request=delivery.request)
         raise
