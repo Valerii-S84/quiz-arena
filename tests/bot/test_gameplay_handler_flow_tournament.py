@@ -36,7 +36,32 @@ async def test_handle_tournament_create_start_shows_format_picker(callback_data:
     assert callbacks == [
         "friend:tournament:format:5",
         "friend:tournament:format:12",
-        TOURNAMENT_CREATE_CALLBACK,
+        "home:open",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_handle_tournament_create_from_view_shows_format_picker_with_view_back() -> None:
+    callback = DummyCallback(
+        data="friend:tournament:create:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+
+    await gameplay_tournaments.handle_tournament_create_from_view(callback)
+
+    response = callback.message.answers[0]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert response.text == TEXTS_DE["msg.friend.challenge.tournament.format"]
+    assert callbacks == [
+        "friend:tournament:format:5",
+        "friend:tournament:format:12",
+        "friend:tournament:view:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     ]
 
 

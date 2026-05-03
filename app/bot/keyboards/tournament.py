@@ -13,7 +13,9 @@ def build_tournament_share_url(*, base_link: str, share_text: str) -> str:
     )
 
 
-def build_tournament_format_keyboard() -> InlineKeyboardMarkup:
+def build_tournament_format_keyboard(
+    *, back_callback_data: str = "home:open"
+) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="⚡ 5 Fragen", callback_data="friend:tournament:format:5")],
@@ -22,7 +24,7 @@ def build_tournament_format_keyboard() -> InlineKeyboardMarkup:
                     text="🧠 12 Fragen", callback_data="friend:tournament:format:12"
                 )
             ],
-            [InlineKeyboardButton(text="↩️ Zurück", callback_data=TOURNAMENT_CREATE_CALLBACK)],
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data=back_callback_data)],
         ]
     )
 
@@ -120,7 +122,7 @@ def build_tournament_lobby_keyboard(
             [
                 InlineKeyboardButton(
                     text="🔄 Neues Turnier erstellen",
-                    callback_data=TOURNAMENT_CREATE_CALLBACK,
+                    callback_data=f"{TOURNAMENT_CREATE_CALLBACK}:{tournament_id}",
                 )
             ]
         )

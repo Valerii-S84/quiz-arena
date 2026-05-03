@@ -33,6 +33,9 @@ def _gameplay():
 def register(router: Router) -> None:
     router.callback_query(F.data == "friend:tournament:create")(handle_tournament_create_start)
     router.callback_query(F.data == "create_tournament_start")(handle_tournament_create_start)
+    router.callback_query(F.data.regexp(gameplay_callbacks.TOURNAMENT_CREATE_FOR_VIEW_RE))(
+        handle_tournament_create_from_view
+    )
     router.callback_query(F.data.regexp(gameplay_callbacks.TOURNAMENT_FORMAT_RE))(
         handle_tournament_create_from_format
     )
@@ -71,7 +74,27 @@ async def handle_tournament_create_start(callback: CallbackQuery) -> None:
         return
     await callback.message.answer(
         TEXTS_DE["msg.friend.challenge.tournament.format"],
-        reply_markup=build_tournament_format_keyboard(),
+        reply_markup=build_tournament_format_keyboard(back_callback_data="home:open"),
+    )
+    await callback.answer()
+
+
+async def handle_tournament_create_from_view(callback: CallbackQuery) -> None:
+    if callback.message is None or callback.data is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    tournament_id = gameplay_callbacks.parse_uuid_callback(
+        pattern=gameplay_callbacks.TOURNAMENT_CREATE_FOR_VIEW_RE,
+        callback_data=callback.data,
+    )
+    if tournament_id is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    await callback.message.answer(
+        TEXTS_DE["msg.friend.challenge.tournament.format"],
+        reply_markup=build_tournament_format_keyboard(
+            back_callback_data=f"friend:tournament:view:{tournament_id}"
+        ),
     )
     await callback.answer()
 
