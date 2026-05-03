@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.bot.keyboards import duels_access
 from app.game.duels.constants import (
     ARENA_ACCEPT_CALLBACK_PREFIX,
     ARENA_CREATE_CALLBACK,
@@ -13,8 +14,6 @@ from app.game.duels.constants import (
     DUEL_ARENA_CALLBACK,
     DUEL_FRIEND_CALLBACK,
     DUEL_MENU_CALLBACK,
-    DUEL_PAYWALL_CALLBACK_CONTEXT,
-    DUEL_PAYWALL_PRODUCT_CODES,
 )
 
 ARENA_REVANCHE_CALLBACK_PREFIX = "arena:revanche:"
@@ -26,6 +25,10 @@ class ArenaDuelButton:
     duel_id: str
     label: str
     marker: str
+
+
+build_duel_paywall_keyboard = duels_access.build_duel_paywall_keyboard
+build_friend_duel_keyboard = duels_access.build_friend_duel_keyboard
 
 
 def build_duels_menu_keyboard() -> InlineKeyboardMarkup:
@@ -195,42 +198,5 @@ def build_arena_revanche_confirm_keyboard(*, source_attempt_id: str) -> InlineKe
                 )
             ],
             [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
-        ]
-    )
-
-
-def build_duel_paywall_keyboard() -> InlineKeyboardMarkup:
-    ticket_product_code, premium_week_product_code = DUEL_PAYWALL_PRODUCT_CODES
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="🎟 Duell-Ticket – 5⭐",
-                    callback_data=f"buy:{ticket_product_code}:{DUEL_PAYWALL_CALLBACK_CONTEXT}",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="👑 Premium-Woche – 29⭐",
-                    callback_data=(
-                        f"buy:{premium_week_product_code}:{DUEL_PAYWALL_CALLBACK_CONTEXT}"
-                    ),
-                )
-            ],
-            [InlineKeyboardButton(text="↩️ Später", callback_data=ARENA_LIST_CALLBACK)],
-        ]
-    )
-
-
-def build_friend_duel_keyboard(*, challenge_type: str = "direct") -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="⚔️ Freundesduell erstellen",
-                    callback_data=f"friend:challenge:format:{challenge_type}:7",
-                )
-            ],
-            [InlineKeyboardButton(text="↩️ Zurück", callback_data=DUEL_MENU_CALLBACK)],
         ]
     )

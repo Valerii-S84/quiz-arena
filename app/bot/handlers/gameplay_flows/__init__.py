@@ -3,13 +3,15 @@ from app.bot.handlers.gameplay_flows.friend_answer_flow import handle_friend_ans
 from app.bot.handlers.gameplay_flows.friend_challenge_flow import handle_friend_challenge_rematch
 from app.bot.handlers.gameplay_flows.friend_lobby_flow import (
     handle_friend_challenge_create_selected,
-    handle_friend_challenge_type_selected,
     handle_friend_copy_link,
     handle_friend_my_duels,
 )
 from app.bot.handlers.gameplay_flows.friend_lobby_manage_flow import (
     handle_friend_delete,
     handle_friend_open_repost,
+)
+from app.bot.handlers.gameplay_flows.friend_lobby_type_flow import (
+    handle_friend_challenge_type_selected,
 )
 from app.bot.handlers.gameplay_flows.friend_next_flow import handle_friend_challenge_next
 from app.bot.handlers.gameplay_flows.friend_series_flow import (
