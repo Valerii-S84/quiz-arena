@@ -28,14 +28,14 @@ def build_caption(
         my_score = opponent_score
         other_score = creator_score
     if status == "WALKOVER":
-        prefix = "⌛ DUELL WALKOVER"
+        prefix = "⌛ DUELL KAMPFLOS BEENDET"
     elif status == "EXPIRED":
         prefix = "⌛ DUELL ABGELAUFEN"
     else:
         prefix = "🏆 DUELL ERGEBNIS"
     return (
         f"{prefix}\n"
-        f"Score: Du {my_score} : Gegner {other_score}\n"
+        f"Endstand: Du {my_score} : Freund {other_score}\n"
         f"ID: {challenge_id}\n"
         f"📱 {public_bot_link()}"
     )

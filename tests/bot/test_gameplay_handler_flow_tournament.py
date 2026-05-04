@@ -8,9 +8,61 @@ import pytest
 
 from app.bot.handlers import gameplay, gameplay_tournaments, gameplay_tournaments_more
 from app.bot.handlers.gameplay_flows import tournament_lobby_flow
+from app.bot.keyboards.tournament import TOURNAMENT_CREATE_CALLBACK
 from app.bot.texts.de import TEXTS_DE
 from app.workers.tasks import tournaments_proof_cards
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("callback_data", [TOURNAMENT_CREATE_CALLBACK, "create_tournament_start"])
+async def test_handle_tournament_create_start_shows_format_picker(callback_data: str) -> None:
+    callback = DummyCallback(
+        data=callback_data,
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+
+    await gameplay_tournaments.handle_tournament_create_start(callback)
+
+    response = callback.message.answers[0]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert response.text == TEXTS_DE["msg.friend.challenge.tournament.format"]
+    assert callbacks == [
+        "friend:tournament:format:5",
+        "friend:tournament:format:12",
+        "home:open",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_handle_tournament_create_from_view_shows_format_picker_with_view_back() -> None:
+    callback = DummyCallback(
+        data="friend:tournament:create:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+
+    await gameplay_tournaments.handle_tournament_create_from_view(callback)
+
+    response = callback.message.answers[0]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert response.text == TEXTS_DE["msg.friend.challenge.tournament.format"]
+    assert callbacks == [
+        "friend:tournament:format:5",
+        "friend:tournament:format:12",
+        "friend:tournament:view:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    ]
 
 
 @pytest.mark.asyncio
