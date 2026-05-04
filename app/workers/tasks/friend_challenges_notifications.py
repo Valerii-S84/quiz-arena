@@ -83,7 +83,9 @@ async def _send_last_chance_reminders(
             bot=bot,
             chat_id=telegram_targets.get(target_user_id),
             text=f"⏳ Dein Freund hat gespielt. Jetzt bist du dran! ({hours:02d}:{minutes:02d}h)",
-            reply_markup=build_friend_challenge_next_keyboard(challenge_id=str(item["challenge_id"])),
+            reply_markup=build_friend_challenge_next_keyboard(
+                challenge_id=str(item["challenge_id"])
+            ),
         )
         reminders_sent += int(sent)
         reminders_failed += int(not sent)
@@ -136,7 +138,9 @@ async def _send_expired_notice(
 
     sent_to = 0
     failed_to = 0
-    creator_chat = telegram_targets.get(creator_user_id) if isinstance(creator_user_id, int) else None
+    creator_chat = (
+        telegram_targets.get(creator_user_id) if isinstance(creator_user_id, int) else None
+    )
     opponent_chat = (
         telegram_targets.get(opponent_user_id) if isinstance(opponent_user_id, int) else None
     )

@@ -12,9 +12,7 @@ from app.bot.handlers.gameplay_friend_challenge_lobby import (
     handle_friend_challenge_type_selected,
     handle_friend_my_duels,
 )
-from app.bot.handlers.gameplay_friend_challenge_manage import (
-    handle_friend_delete,
-)
+from app.bot.handlers.gameplay_friend_challenge_manage import handle_friend_delete
 from app.bot.handlers.gameplay_friend_challenge_progress import (
     handle_friend_challenge_next,
     handle_friend_challenge_rematch,

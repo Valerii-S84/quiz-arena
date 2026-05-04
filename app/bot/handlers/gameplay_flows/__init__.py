@@ -7,9 +7,7 @@ from app.bot.handlers.gameplay_flows.friend_lobby_flow import (
     handle_friend_copy_link,
     handle_friend_my_duels,
 )
-from app.bot.handlers.gameplay_flows.friend_lobby_manage_flow import (
-    handle_friend_delete,
-)
+from app.bot.handlers.gameplay_flows.friend_lobby_manage_flow import handle_friend_delete
 from app.bot.handlers.gameplay_flows.friend_next_flow import handle_friend_challenge_next
 from app.bot.handlers.gameplay_flows.friend_series_flow import (
     handle_friend_challenge_series_best3,

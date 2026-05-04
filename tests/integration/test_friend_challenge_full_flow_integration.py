@@ -259,14 +259,11 @@ async def test_ttl_pending_expired_worker_sets_status_and_pushes_creator(
         for item in bot.sent_messages
     )
     reminder = next(item for item in bot.sent_messages if item["chat_id"] == creator_chat_id)
-    buttons = [
-        button
-        for row in reminder["reply_markup"].inline_keyboard
-        for button in row
-    ]
+    buttons = [button for row in reminder["reply_markup"].inline_keyboard for button in row]
     assert [button.text for button in buttons] == ["⏳ Weiter warten", "❌ Schließen"]
     assert not any(
-        isinstance(button.callback_data, str) and button.callback_data.startswith("friend:open:repost:")
+        isinstance(button.callback_data, str)
+        and button.callback_data.startswith("friend:open:repost:")
         for button in buttons
     )
 

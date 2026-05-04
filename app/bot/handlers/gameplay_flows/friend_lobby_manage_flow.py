@@ -4,14 +4,9 @@ from datetime import datetime, timezone
 
 from aiogram.types import CallbackQuery
 
-from app.bot.keyboards.friend_challenge import (
-    build_friend_challenge_back_keyboard,
-)
+from app.bot.keyboards.friend_challenge import build_friend_challenge_back_keyboard
 from app.bot.texts.de import TEXTS_DE
-from app.game.sessions.errors import (
-    FriendChallengeAccessError,
-    FriendChallengeNotFoundError,
-)
+from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 
 
 async def handle_friend_delete(

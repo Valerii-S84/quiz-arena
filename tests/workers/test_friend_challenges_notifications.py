@@ -119,11 +119,7 @@ async def test_send_deadline_notifications_pending_expired_uses_canonical_close_
             TEXTS_DE["msg.friend.challenge.reminder.wait_or_close_hint"],
         ]
     )
-    buttons = [
-        button
-        for row in message["reply_markup"].inline_keyboard
-        for button in row
-    ]
+    buttons = [button for row in message["reply_markup"].inline_keyboard for button in row]
     assert [button.text for button in buttons] == ["⏳ Weiter warten", "❌ Schließen"]
     assert [button.callback_data for button in buttons] == [
         "home:open",
