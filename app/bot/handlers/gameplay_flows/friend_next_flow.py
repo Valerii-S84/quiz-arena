@@ -102,7 +102,10 @@ async def handle_friend_challenge_next(
         )
         await callback.message.answer(
             "\n".join(summary_lines),
-            reply_markup=build_friend_challenge_back_keyboard(),
+            reply_markup=build_friend_challenge_back_keyboard(
+                challenge=round_start.snapshot,
+                user_id=snapshot.user_id,
+            ),
         )
         await callback.answer()
         return

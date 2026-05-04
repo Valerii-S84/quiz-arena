@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -254,3 +254,91 @@ async def test_friend_answer_branch_skips_repo_lookup_when_creator_answers(
         build_series_progress_text=lambda **kwargs: "series",
         send_friend_round_question=lambda **kwargs: None,
     )
+
+
+@pytest.mark.asyncio
+async def test_friend_answer_branch_shows_arena_publish_after_creator_baseline(
+    monkeypatch,
+) -> None:
+    async def _fake_home_snapshot(session, *, telegram_user):
+        del session, telegram_user
+        return SimpleNamespace(user_id=10, free_energy=10, paid_energy=0)
+
+    async def _fake_resolve_label(**kwargs):
+        del kwargs
+        return "Freund"
+
+    creator_done_snapshot = FriendChallengeSnapshot(
+        challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        invite_token="token",
+        challenge_type="DIRECT",
+        mode_code="QUICK_MIX_A1A2",
+        access_type="FREE",
+        status="CREATOR_DONE",
+        creator_user_id=10,
+        opponent_user_id=None,
+        current_round=7,
+        total_rounds=7,
+        creator_score=6,
+        opponent_score=0,
+        creator_finished_at=datetime(2026, 5, 4, 12, 0, tzinfo=timezone.utc),
+        winner_user_id=None,
+    )
+
+    async def _fake_start_round(*args, **kwargs):
+        del args, kwargs
+        return SimpleNamespace(
+            snapshot=creator_done_snapshot,
+            start_result=None,
+            already_answered_current_round=True,
+        )
+
+    callback = DummyCallback(
+        data="answer:123e4567-e89b-12d3-a456-426614174000:0",
+        from_user=SimpleNamespace(id=10),
+        message=DummyMessage(),
+    )
+    await friend_answer_flow.handle_friend_answer_branch(
+        callback,
+        result=AnswerSessionResult(
+            session_id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+            question_id="q-friend",
+            is_correct=True,
+            current_streak=1,
+            best_streak=1,
+            idempotent_replay=False,
+            mode_code="QUICK_MIX_A1A2",
+            source="FRIEND_CHALLENGE",
+            friend_challenge=creator_done_snapshot,
+            friend_challenge_answered_round=7,
+            friend_challenge_round_completed=True,
+            friend_challenge_waiting_for_opponent=True,
+        ),
+        now_utc=datetime(2026, 5, 4, 12, 0, 0),
+        session_local=DummySessionLocal(),
+        user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_fake_home_snapshot),
+        game_session_service=SimpleNamespace(start_friend_challenge_round=_fake_start_round),
+        resolve_opponent_label=_fake_resolve_label,
+        notify_opponent=lambda **kwargs: None,
+        friend_opponent_user_id=lambda **kwargs: None,
+        build_friend_score_text=lambda **kwargs: "score",
+        build_friend_ttl_text=lambda **kwargs: None,
+        build_friend_finish_text=lambda **kwargs: "finish",
+        build_public_badge_label=lambda **kwargs: "badge",
+        build_friend_proof_card_text=lambda **kwargs: "proof",
+        enqueue_friend_challenge_proof_cards=lambda **kwargs: None,
+        build_series_progress_text=lambda **kwargs: "series",
+        send_friend_round_question=lambda **kwargs: None,
+    )
+
+    waiting_call = callback.message.answers[-1]
+    callbacks = [
+        button.callback_data
+        for row in waiting_call.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert callbacks == [
+        "arena:publish_friend:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "home:open",
+    ]

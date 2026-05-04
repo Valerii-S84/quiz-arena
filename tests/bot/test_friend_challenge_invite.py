@@ -78,7 +78,6 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
         "📤 Teilen ->",
         "✅ Einladung gesendet",
         "⚔️ Jetzt spielen",
-        "🏟 In der Arena veröffentlichen",
         "⏳ Auf Freund warten",
     ]
     assert not any(button.url and "duel_" in button.url for button in buttons)
@@ -89,6 +88,5 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
     assert callbacks == [
         "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "friend:invite:required:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        "arena:publish_friend:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         "menu:main",
     ]

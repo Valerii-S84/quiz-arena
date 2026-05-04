@@ -169,7 +169,10 @@ async def handle_start_friend_challenge_payload(
     outgoing_messages.append(
         OutgoingStartMessage(
             text="\n".join(summary_lines),
-            reply_markup=build_friend_challenge_back_keyboard(),
+            reply_markup=build_friend_challenge_back_keyboard(
+                challenge=challenge_start.snapshot,
+                user_id=snapshot.user_id,
+            ),
         )
     )
     if challenge_start.start_result is not None:

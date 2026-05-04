@@ -1,7 +1,14 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.keyboards import friend_challenge_share
-from app.game.duels.constants import DUEL_PAYWALL_PRODUCT_CODES, FRIEND_DUEL_CREATE_CALLBACK
+from app.game.duels.constants import (
+    ARENA_PUBLISH_FRIEND_CALLBACK_PREFIX,
+    DUEL_PAYWALL_PRODUCT_CODES,
+    DUEL_QUESTION_COUNT,
+    FRIEND_DUEL_CREATE_CALLBACK,
+)
+from app.game.friend_challenges.constants import DUEL_STATUS_CREATOR_DONE, DUEL_TYPE_DIRECT
+from app.game.sessions.types import FriendChallengeSnapshot
 
 build_friend_challenge_share_url = friend_challenge_share.build_friend_challenge_share_url
 build_friend_challenge_share_keyboard = friend_challenge_share.build_friend_challenge_share_keyboard
@@ -39,12 +46,42 @@ def build_friend_challenge_start_keyboard(*, challenge_id: str) -> InlineKeyboar
     )
 
 
-def build_friend_challenge_back_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
-        ]
+def _can_publish_friend_challenge_to_arena(
+    *,
+    challenge: FriendChallengeSnapshot | None,
+    user_id: int | None,
+) -> bool:
+    if challenge is None or user_id is None:
+        return False
+    return (
+        challenge.creator_user_id == user_id
+        and challenge.opponent_user_id is None
+        and challenge.challenge_type == DUEL_TYPE_DIRECT
+        and challenge.status == DUEL_STATUS_CREATOR_DONE
+        and int(challenge.total_rounds) == DUEL_QUESTION_COUNT
+        and challenge.creator_finished_at is not None
+        and challenge.tournament_match_id is None
     )
+
+
+def build_friend_challenge_back_keyboard(
+    *,
+    challenge: FriendChallengeSnapshot | None = None,
+    user_id: int | None = None,
+) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if _can_publish_friend_challenge_to_arena(challenge=challenge, user_id=user_id):
+        assert challenge is not None
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="🏟 In der Arena veröffentlichen",
+                    callback_data=f"{ARENA_PUBLISH_FRIEND_CALLBACK_PREFIX}{challenge.challenge_id}",
+                )
+            ]
+        )
+    rows.append([InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def build_friend_challenge_finished_keyboard(

@@ -105,7 +105,6 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
         "📤 Teilen ->",
         "✅ Einladung gesendet",
         "⚔️ Jetzt spielen",
-        "🏟 In der Arena veröffentlichen",
         "⏳ Auf Freund warten",
     ]
     assert not any(button.url and "duel_" in button.url for button in invite_buttons)
