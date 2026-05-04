@@ -405,6 +405,55 @@ async def test_arena_publish_friend_publishes_through_service() -> None:
 
 
 @pytest.mark.asyncio
+async def test_arena_publish_friend_emits_canonical_friend_publish_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted: list[dict[str, object]] = []
+
+    async def _publish_friend(*_args, **_kwargs):
+        return SimpleNamespace(
+            duel_id=DUEL_ID,
+            baseline_score=6,
+            baseline_time_ms=48_000,
+        )
+
+    async def _fake_emit(_session, **kwargs) -> None:
+        emitted.append(kwargs)
+
+    monkeypatch.setattr(arena_duel_flow, "emit_arena_analytics_event", _fake_emit)
+
+    callback = _callback(f"arena:publish_friend:{DUEL_ID}")
+    await arena_duel_flow.handle_arena_publish_friend(
+        callback,
+        arena_publish_friend_re=gameplay_callbacks.ARENA_PUBLISH_FRIEND_RE,
+        parse_uuid_callback=lambda **_kwargs: DUEL_ID,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserService,
+        publish_friend_challenge_to_arena=_publish_friend,
+    )
+
+    assert [event["event_type"] for event in emitted] == [
+        arena_duel_flow.ARENA_EVENT_ARENA_DUEL_PUBLISHED,
+        arena_duel_flow.ARENA_EVENT_FRIEND_DUEL_PUBLISHED_TO_ARENA,
+    ]
+    assert emitted[0]["payload"] == {
+        "user_id": 101,
+        "friend_challenge_id": str(DUEL_ID),
+        "arena_duel_id": str(DUEL_ID),
+        "action": "publish_friend",
+        "score": 6,
+        "time_ms": 48_000,
+    }
+    assert emitted[1]["payload"] == {
+        "user_id": 101,
+        "friend_challenge_id": str(DUEL_ID),
+        "arena_duel_id": str(DUEL_ID),
+        "score": 6,
+        "time_ms": 48_000,
+    }
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("error", [FriendChallengeAccessError, FriendChallengeNotFoundError])
 async def test_arena_publish_friend_maps_invalid_state_to_clean_error(error) -> None:
     async def _publish_friend(*_args, **_kwargs):

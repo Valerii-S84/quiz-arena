@@ -123,8 +123,10 @@ async def test_send_deadline_notifications_pending_expired_uses_canonical_close_
     reply_markup = message["reply_markup"]
     assert isinstance(reply_markup, InlineKeyboardMarkup)
     buttons = [button for row in reply_markup.inline_keyboard for button in row]
+    callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert [button.text for button in buttons] == ["⏳ Weiter warten", "❌ Schließen"]
-    assert [button.callback_data for button in buttons] == [
+    assert callbacks == [
         "home:open",
         "friend:delete:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     ]
+    assert "friend:open:repost:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" not in callbacks

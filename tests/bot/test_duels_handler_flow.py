@@ -8,7 +8,7 @@ import pytest
 
 from app.bot.handlers import gameplay_callbacks, gameplay_duels
 from app.bot.texts.de import TEXTS_DE
-from tests.bot.helpers import DummyCallback, DummyMessage
+from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
 
 def _callback_payloads(reply_markup) -> list[str]:
@@ -76,6 +76,43 @@ async def test_friend_duel_handler_uses_direct_seven_question_create_callback() 
     assert "create_tournament_start" not in callbacks
     assert "friend:tournament:format:5" not in callbacks
     assert "friend:tournament:format:12" not in callbacks
+
+
+@pytest.mark.asyncio
+async def test_friend_duel_handler_emits_canonical_open_event_without_replacing_mode_selected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitted: list[dict[str, object]] = []
+
+    async def _fake_home_snapshot(_session, *, telegram_user):
+        assert telegram_user.id == 17
+        return SimpleNamespace(user_id=101)
+
+    async def _fake_emit(_session, **kwargs) -> None:
+        emitted.append(kwargs)
+
+    monkeypatch.setattr(gameplay_duels, "SessionLocal", DummySessionLocal())
+    monkeypatch.setattr(
+        gameplay_duels.UserOnboardingService,
+        "ensure_home_snapshot",
+        _fake_home_snapshot,
+    )
+    monkeypatch.setattr(gameplay_duels, "emit_arena_analytics_event", _fake_emit)
+
+    callback = DummyCallback(
+        data="duels:friend",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+
+    await gameplay_duels.handle_friend_duel_open(callback, emit_event=True)
+
+    assert [event["event_type"] for event in emitted] == [
+        gameplay_duels.ARENA_EVENT_DUEL_MODE_SELECTED,
+        gameplay_duels.ARENA_EVENT_FRIEND_DUEL_OPENED,
+    ]
+    assert emitted[0]["payload"] == {"user_id": 101, "action": "friend"}
+    assert emitted[1]["payload"] == {"user_id": 101}
 
 
 @pytest.mark.asyncio

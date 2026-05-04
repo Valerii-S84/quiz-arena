@@ -28,6 +28,7 @@ from app.game.arena_duels.analytics import (
     ARENA_EVENT_ARENA_RESULT_SHOWN,
     ARENA_EVENT_DUEL_LIMIT_HIT,
     ARENA_EVENT_DUEL_PAYWALL_SHOWN,
+    ARENA_EVENT_FRIEND_DUEL_PUBLISHED_TO_ARENA,
     build_arena_event_payload,
     emit_arena_analytics_event,
 )
@@ -307,8 +308,22 @@ async def handle_arena_publish_friend(
                 user_id=snapshot.user_id,
                 payload=build_arena_event_payload(
                     user_id=snapshot.user_id,
+                    friend_challenge_id=friend_challenge_id,
                     arena_duel_id=getattr(published_duel, "duel_id", None),
                     action="publish_friend",
+                    score=published_score if isinstance(published_score, int) else None,
+                    time_ms=published_time_ms if isinstance(published_time_ms, int) else None,
+                ),
+            )
+            await emit_arena_analytics_event(
+                session,
+                event_type=ARENA_EVENT_FRIEND_DUEL_PUBLISHED_TO_ARENA,
+                happened_at=now_utc,
+                user_id=snapshot.user_id,
+                payload=build_arena_event_payload(
+                    user_id=snapshot.user_id,
+                    friend_challenge_id=friend_challenge_id,
+                    arena_duel_id=getattr(published_duel, "duel_id", None),
                     score=published_score if isinstance(published_score, int) else None,
                     time_ms=published_time_ms if isinstance(published_time_ms, int) else None,
                 ),

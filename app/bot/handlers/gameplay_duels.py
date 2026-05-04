@@ -20,6 +20,7 @@ from app.game.arena_duels.accept import accept_arena_duel, get_arena_duel_accept
 from app.game.arena_duels.analytics import (
     ARENA_EVENT_DUEL_MENU_OPENED,
     ARENA_EVENT_DUEL_MODE_SELECTED,
+    ARENA_EVENT_FRIEND_DUEL_OPENED,
     build_arena_event_payload,
     emit_arena_analytics_event,
 )
@@ -48,10 +49,9 @@ async def handle_duels_menu(callback: CallbackQuery, *, emit_event: bool = False
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
     if emit_event:
-        await _emit_duel_callback_event(
+        await _emit_duel_callback_events(
             callback,
-            event_type=ARENA_EVENT_DUEL_MENU_OPENED,
-            action="menu",
+            events=((ARENA_EVENT_DUEL_MENU_OPENED, "menu"),),
         )
     await callback.message.answer(
         TEXTS_DE["msg.duels.menu"],
@@ -62,10 +62,9 @@ async def handle_duels_menu(callback: CallbackQuery, *, emit_event: bool = False
 
 async def handle_arena_open(callback: CallbackQuery) -> None:
     if callback.data == DUEL_ARENA_CALLBACK:
-        await _emit_duel_callback_event(
+        await _emit_duel_callback_events(
             callback,
-            event_type=ARENA_EVENT_DUEL_MODE_SELECTED,
-            action="arena",
+            events=((ARENA_EVENT_DUEL_MODE_SELECTED, "arena"),),
         )
     await arena_duel_flow.handle_arena_open(
         callback,
@@ -161,10 +160,12 @@ async def handle_friend_duel_open(callback: CallbackQuery, *, emit_event: bool =
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
     if emit_event:
-        await _emit_duel_callback_event(
+        await _emit_duel_callback_events(
             callback,
-            event_type=ARENA_EVENT_DUEL_MODE_SELECTED,
-            action="friend",
+            events=(
+                (ARENA_EVENT_DUEL_MODE_SELECTED, "friend"),
+                (ARENA_EVENT_FRIEND_DUEL_OPENED, None),
+            ),
         )
     await callback.message.answer(
         TEXTS_DE["msg.duels.friend"],
@@ -181,11 +182,10 @@ async def _handle_friend_duel_open_registered(callback: CallbackQuery) -> None:
     await handle_friend_duel_open(callback, emit_event=True)
 
 
-async def _emit_duel_callback_event(
+async def _emit_duel_callback_events(
     callback: CallbackQuery,
     *,
-    event_type: str,
-    action: str,
+    events: tuple[tuple[str, str | None], ...],
 ) -> None:
     if callback.from_user is None:
         return
@@ -195,13 +195,14 @@ async def _emit_duel_callback_event(
             session,
             telegram_user=callback.from_user,
         )
-        await emit_arena_analytics_event(
-            session,
-            event_type=event_type,
-            happened_at=now_utc,
-            user_id=snapshot.user_id,
-            payload=build_arena_event_payload(user_id=snapshot.user_id, action=action),
-        )
+        for event_type, action in events:
+            await emit_arena_analytics_event(
+                session,
+                event_type=event_type,
+                happened_at=now_utc,
+                user_id=snapshot.user_id,
+                payload=build_arena_event_payload(user_id=snapshot.user_id, action=action),
+            )
 
 
 def register(router: Router) -> None:
