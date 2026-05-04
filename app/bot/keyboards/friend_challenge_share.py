@@ -8,7 +8,6 @@ from app.bot.keyboards.proof_card_share import (
     build_friend_challenge_inline_share_query,
     build_friend_challenge_invite_inline_share_query,
 )
-from app.game.duels.constants import ARENA_PUBLISH_FRIEND_CALLBACK_PREFIX
 
 
 def _build_share_url(*, invite_link: str, share_text: str) -> str:
@@ -25,8 +24,6 @@ def build_friend_challenge_share_keyboard(
     *,
     invite_link: str | None,
     challenge_id: str | None,
-    total_rounds: int = 12,
-    allow_arena_publish: bool = False,
 ) -> InlineKeyboardMarkup:
     if not invite_link or not challenge_id:
         return InlineKeyboardMarkup(
@@ -57,15 +54,6 @@ def build_friend_challenge_share_keyboard(
             )
         ],
     ]
-    if allow_arena_publish and int(total_rounds) == 7:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text="🏟 In der Arena veröffentlichen",
-                    callback_data=f"{ARENA_PUBLISH_FRIEND_CALLBACK_PREFIX}{challenge_id}",
-                )
-            ]
-        )
     rows.append([InlineKeyboardButton(text="⏳ Auf Freund warten", callback_data="menu:main")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

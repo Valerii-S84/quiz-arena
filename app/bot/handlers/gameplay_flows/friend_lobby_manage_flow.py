@@ -83,7 +83,6 @@ async def handle_friend_open_repost(
         reply_markup=build_friend_challenge_share_keyboard(
             invite_link=invite_link,
             challenge_id=str(repost.challenge_id),
-            total_rounds=repost.total_rounds,
         ),
     )
     await callback.answer()
