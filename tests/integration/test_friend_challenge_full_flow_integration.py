@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
+from aiogram.types import InlineKeyboardMarkup
 
 from app.bot.handlers import gameplay, gameplay_friend_challenge, start_parsing
 from app.bot.texts.de import TEXTS_DE
@@ -254,8 +255,19 @@ async def test_ttl_pending_expired_worker_sets_status_and_pushes_creator(
         assert row.status == "EXPIRED"
 
     assert any(
-        item["chat_id"] == creator_chat_id and "Niemand hat angenommen" in str(item["text"])
+        item["chat_id"] == creator_chat_id
+        and TEXTS_DE["msg.friend.challenge.reminder.unplayed"] in str(item["text"])
         for item in bot.sent_messages
+    )
+    reminder = next(item for item in bot.sent_messages if item["chat_id"] == creator_chat_id)
+    reply_markup = reminder["reply_markup"]
+    assert isinstance(reply_markup, InlineKeyboardMarkup)
+    buttons = [button for row in reply_markup.inline_keyboard for button in row]
+    assert [button.text for button in buttons] == ["⏳ Weiter warten", "❌ Schließen"]
+    assert not any(
+        isinstance(button.callback_data, str)
+        and button.callback_data.startswith("friend:open:repost:")
+        for button in buttons
     )
 
 

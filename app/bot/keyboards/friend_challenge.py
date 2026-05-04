@@ -145,20 +145,28 @@ def build_friend_open_taken_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def build_friend_pending_expired_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+def build_friend_pending_expired_keyboard(
+    *,
+    challenge_id: str,
+    can_publish_to_arena: bool = False,
+) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if can_publish_to_arena:
+        rows.append(
             [
                 InlineKeyboardButton(
-                    text="🌍 Als offene Herausforderung posten",
-                    callback_data=f"friend:open:repost:{challenge_id}",
+                    text="🏟 In der Arena veröffentlichen",
+                    callback_data=f"{ARENA_PUBLISH_FRIEND_CALLBACK_PREFIX}{challenge_id}",
                 )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="❌ Löschen",
-                    callback_data=f"friend:delete:{challenge_id}",
-                )
-            ],
+            ]
+        )
+    rows.append([InlineKeyboardButton(text="⏳ Weiter warten", callback_data="home:open")])
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text="❌ Schließen",
+                callback_data=f"friend:delete:{challenge_id}",
+            )
         ]
     )
+    return InlineKeyboardMarkup(inline_keyboard=rows)

@@ -12,6 +12,7 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_share_url,
     build_friend_challenge_start_keyboard,
     build_friend_open_taken_keyboard,
+    build_friend_pending_expired_keyboard,
 )
 from app.game.sessions.types import FriendChallengeSnapshot
 
@@ -113,6 +114,40 @@ def test_friend_open_taken_keyboard_redirects_to_canonical_friend_duel_create() 
     assert [button.callback_data for button in buttons] == [
         "friend:challenge:format:direct:7",
         "home:open",
+    ]
+
+
+def test_friend_pending_expired_keyboard_omits_publish_without_baseline() -> None:
+    keyboard = build_friend_pending_expired_keyboard(
+        challenge_id="00000000-0000-0000-0000-000000000001",
+        can_publish_to_arena=False,
+    )
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    assert [button.text for button in buttons] == [
+        "⏳ Weiter warten",
+        "❌ Schließen",
+    ]
+    assert [button.callback_data for button in buttons] == [
+        "home:open",
+        "friend:delete:00000000-0000-0000-0000-000000000001",
+    ]
+
+
+def test_friend_pending_expired_keyboard_shows_publish_for_canonical_arena_path() -> None:
+    keyboard = build_friend_pending_expired_keyboard(
+        challenge_id="00000000-0000-0000-0000-000000000001",
+        can_publish_to_arena=True,
+    )
+    buttons = [button for row in keyboard.inline_keyboard for button in row]
+    assert [button.text for button in buttons] == [
+        "🏟 In der Arena veröffentlichen",
+        "⏳ Weiter warten",
+        "❌ Schließen",
+    ]
+    assert [button.callback_data for button in buttons] == [
+        "arena:publish_friend:00000000-0000-0000-0000-000000000001",
+        "home:open",
+        "friend:delete:00000000-0000-0000-0000-000000000001",
     ]
 
 

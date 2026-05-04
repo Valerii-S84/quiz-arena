@@ -41,6 +41,7 @@ def register(router: Router) -> None:
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_COPY_LINK_RE))(
         handle_friend_challenge_copy_link
     )
+    # Compatibility only for already delivered legacy reminder messages.
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_OPEN_REPOST_RE))(
         handle_friend_open_repost
     )
