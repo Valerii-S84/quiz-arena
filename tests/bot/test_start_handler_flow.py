@@ -9,6 +9,7 @@ import pytest
 from app.bot.handlers import start
 from app.bot.texts.de import TEXTS_DE
 from app.economy.offers.types import OfferSelection
+from app.game.duels import rollout as duel_rollout
 from app.game.sessions.errors import FriendChallengeExpiredError, FriendChallengeNotFoundError
 from app.game.sessions.types import (
     FriendChallengeJoinResult,
@@ -169,6 +170,32 @@ async def test_handle_start_friend_token_expired(monkeypatch) -> None:
     await start.handle_start(message)
 
     assert message.answers[0].text == TEXTS_DE["msg.friend.challenge.expired"]
+
+
+@pytest.mark.asyncio
+async def test_handle_start_friend_payload_returns_disabled_guard_when_rollout_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
+    monkeypatch.setattr(
+        duel_rollout,
+        "is_canonical_duels_enabled",
+        lambda: False,
+    )
+
+    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
+        assert start_payload == "fc_0123456789abcdef0123456789abcdef"
+        return SimpleNamespace(user_id=9, free_energy=10, paid_energy=0, current_streak=1)
+
+    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+
+    message = _StartMessage(
+        text="/start fc_0123456789abcdef0123456789abcdef",
+        from_user=SimpleNamespace(id=1, username="alice", first_name="Alice", language_code="de"),
+    )
+    await start.handle_start(message)
+
+    assert message.answers[0].text == TEXTS_DE["msg.duels.disabled"]
 
 
 @pytest.mark.asyncio

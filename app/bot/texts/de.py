@@ -49,6 +49,7 @@ TEXTS_DE: dict[str, str] = {
     "msg.friend.challenge.invite.caption": "Du wurdest zu einem Freundesduell herausgefordert! Kannst du gewinnen?",
     "msg.friend.challenge.invite.waiting": "🎯 Einladung gesendet! Starte jetzt oder warte auf deinen Freund.",
     "msg.friend.challenge.invite.confirm.first": "Bestätige zuerst mit '✅ Einladung gesendet'.",
+    "msg.duels.disabled": "⚔️ Duelle sind gerade nicht verfügbar.\n\nBitte versuche es später erneut.",
     "msg.duels.menu": "⚔️ Duelle\n\nWähle deinen Duellmodus.\n\n🏟 Offene Arena\nSpiele gegen Ergebnisse anderer Spieler im Bot.\n\n👤 Freundesduell\nErstelle ein Duell und teile den Link mit einem Freund.",
     "msg.duels.arena.empty": "🏟 Offene Arena\n\nNoch gibt es keine aktiven Arena-Duelle.\n\nStarte das erste Duell und setze ein Ergebnis, das andere Spieler schlagen können.",
     "msg.duels.arena.list": "🏟 Offene Arena\n\nSchlage Ergebnisse anderer Spieler.\nGleiche Fragen. Gleiche Regeln.\n\nDer bessere Score gewinnt.\nBei Gleichstand zählt die Zeit.\n\nAktive Duelle:\n\n{duels}",

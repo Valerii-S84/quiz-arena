@@ -5,7 +5,7 @@ from uuid import UUID
 
 import pytest
 
-from app.bot.handlers import gameplay
+from app.bot.handlers import gameplay, gameplay_friend_challenge_lobby
 from app.bot.handlers.gameplay_flows import friend_lobby_flow
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.types import FriendChallengeSnapshot
@@ -34,6 +34,39 @@ async def test_handle_friend_challenge_create_opens_canonical_friend_duel_entry(
         if button.callback_data
     ]
     assert callbacks == ["friend:challenge:format:direct:7", "duels:menu"]
+
+
+@pytest.mark.asyncio
+async def test_handle_friend_challenge_create_selected_blocks_legacy_callback_when_flag_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        gameplay_friend_challenge_lobby.duel_rollout,
+        "is_canonical_duels_enabled",
+        lambda: False,
+    )
+    callback = DummyCallback(
+        data="friend:challenge:format:direct:7",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+
+    await gameplay.handle_friend_challenge_create_selected(callback)
+
+    assert callback.message.answers[0].text == TEXTS_DE["msg.duels.disabled"]
+    callbacks = [
+        button.callback_data
+        for row in callback.message.answers[0].kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert callbacks == [
+        "daily_challenge",
+        "duels:menu",
+        "play",
+        "mode:ARTIKEL_SPRINT",
+        "shop:open",
+    ]
 
 
 @pytest.mark.asyncio

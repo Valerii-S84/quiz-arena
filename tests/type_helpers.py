@@ -92,6 +92,7 @@ def build_settings(**overrides: object) -> Settings:
         "admin_login_rate_limit_window_minutes": 5,
         "telegram_bot_token": "test-token",
         "telegram_webhook_secret": "secret-token",
+        "duels_rollout_enabled": True,
         "bonus_channel_id": "",
         "bonus_check_bot_token": "",
         "internal_api_token": "internal-token",

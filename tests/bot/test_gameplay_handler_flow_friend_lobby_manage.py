@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from aiogram.types import InlineKeyboardMarkup
 
-from app.bot.handlers import gameplay, gameplay_friend_challenge
+from app.bot.handlers import gameplay, gameplay_friend_challenge, gameplay_friend_challenge_manage
 from app.bot.texts.de import TEXTS_DE
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
@@ -37,6 +37,26 @@ async def test_handle_friend_open_repost_shows_canonical_wait_close_guidance() -
         "friend:delete:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     ]
     assert "friend:open:repost:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" not in callbacks
+
+
+@pytest.mark.asyncio
+async def test_handle_friend_open_repost_blocks_rollout_when_flag_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        gameplay_friend_challenge_manage.duel_rollout,
+        "is_canonical_duels_enabled",
+        lambda: False,
+    )
+    callback = DummyCallback(
+        data="friend:open:repost:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+
+    await gameplay_friend_challenge.handle_friend_open_repost(callback)
+
+    assert callback.message.answers[0].text == TEXTS_DE["msg.duels.disabled"]
 
 
 @pytest.mark.asyncio

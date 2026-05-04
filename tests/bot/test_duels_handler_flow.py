@@ -55,6 +55,31 @@ async def test_duels_menu_handler_shows_only_clean_mode_choices() -> None:
 
 
 @pytest.mark.asyncio
+async def test_duels_menu_handler_blocks_canonical_rollout_when_flag_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(gameplay_duels.duel_rollout, "is_canonical_duels_enabled", lambda: False)
+    callback = DummyCallback(
+        data="duels:menu",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+
+    await gameplay_duels.handle_duels_menu(callback)
+
+    response = callback.message.answers[0]
+    assert response.text == TEXTS_DE["msg.duels.disabled"]
+    assert _callback_payloads(response.kwargs["reply_markup"]) == [
+        "daily_challenge",
+        "duels:menu",
+        "play",
+        "mode:ARTIKEL_SPRINT",
+        "shop:open",
+    ]
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
+
+
+@pytest.mark.asyncio
 async def test_friend_duel_handler_uses_direct_seven_question_create_callback() -> None:
     callback = DummyCallback(
         data="duels:friend",
@@ -160,6 +185,35 @@ async def test_arena_publish_friend_handler_delegates_to_flow(monkeypatch) -> No
     assert captured["publish_friend_challenge_to_arena"] is (
         gameplay_duels.publish_friend_challenge_to_arena
     )
+
+
+@pytest.mark.asyncio
+async def test_arena_publish_friend_handler_blocks_rollout_when_flag_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    called = False
+
+    async def _fake_publish_flow(callback, **kwargs):
+        del callback, kwargs
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(gameplay_duels.duel_rollout, "is_canonical_duels_enabled", lambda: False)
+    monkeypatch.setattr(
+        gameplay_duels.arena_duel_flow,
+        "handle_arena_publish_friend",
+        _fake_publish_flow,
+    )
+    callback = DummyCallback(
+        data="arena:publish_friend:00000000-0000-0000-0000-000000000001",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+
+    await gameplay_duels.handle_arena_publish_friend(callback)
+
+    assert called is False
+    assert callback.message.answers[0].text == TEXTS_DE["msg.duels.disabled"]
 
 
 @pytest.mark.asyncio

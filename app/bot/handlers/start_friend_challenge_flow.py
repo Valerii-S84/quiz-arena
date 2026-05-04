@@ -15,6 +15,7 @@ from app.bot.keyboards.home import build_home_keyboard
 from app.bot.keyboards.quiz import build_quiz_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.core.config import get_settings
+from app.game.duels import rollout as duel_rollout
 from app.game.sessions.errors import (
     FriendChallengeAccessError,
     FriendChallengeCompletedError,
@@ -59,6 +60,16 @@ async def handle_start_friend_challenge_payload(
 ) -> StartFriendChallengeHandlingResult | None:
     if friend_invite_token is None and duel_challenge_id is None:
         return None
+    if not duel_rollout.is_canonical_duels_enabled():
+        return StartFriendChallengeHandlingResult(
+            handled=True,
+            messages=[
+                OutgoingStartMessage(
+                    text=TEXTS_DE["msg.duels.disabled"],
+                    reply_markup=build_home_keyboard(),
+                )
+            ],
+        )
 
     challenge_start = None
     challenge_joined_now = False

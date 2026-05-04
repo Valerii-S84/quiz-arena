@@ -9,6 +9,7 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_pending_expired_keyboard,
 )
 from app.bot.texts.de import TEXTS_DE
+from app.game.duels import rollout as duel_rollout
 from app.workers.tasks.friend_challenges_utils import (
     format_remaining_hhmm,
     resolve_telegram_targets,
@@ -30,6 +31,7 @@ async def _send_message(*, bot, chat_id: int | None, text: str, reply_markup=Non
 
 
 def _build_unplayed_friend_challenge_text(*, can_publish_to_arena: bool) -> str:
+    can_publish_to_arena = can_publish_to_arena and duel_rollout.is_canonical_duels_enabled()
     hint_key = (
         "msg.friend.challenge.reminder.publish_hint"
         if can_publish_to_arena
