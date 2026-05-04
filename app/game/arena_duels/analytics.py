@@ -14,6 +14,8 @@ ARENA_EVENT_ARENA_DUEL_COMPLETED = "arena_duel_completed"
 ARENA_EVENT_ARENA_DUEL_PUBLISHED = "arena_duel_published"
 ARENA_EVENT_ARENA_DUEL_ACCEPTED = "arena_duel_accepted"
 ARENA_EVENT_ARENA_RESULT_SHOWN = "arena_result_shown"
+ARENA_EVENT_FRIEND_DUEL_OPENED = "friend_duel_opened"
+ARENA_EVENT_FRIEND_DUEL_PUBLISHED_TO_ARENA = "friend_duel_published_to_arena"
 ARENA_EVENT_DUEL_LIMIT_HIT = "duel_limit_hit"
 ARENA_EVENT_DUEL_PAYWALL_SHOWN = "duel_paywall_shown"
 ARENA_EVENT_DUEL_TICKET_CLICKED = "duel_ticket_clicked"
@@ -23,6 +25,7 @@ ARENA_EVENT_PREMIUM_WEEK_CLICKED = "premium_week_clicked"
 def build_arena_event_payload(
     *,
     user_id: int | None = None,
+    friend_challenge_id: UUID | str | None = None,
     arena_duel_id: UUID | str | None = None,
     attempt_id: UUID | str | None = None,
     action: str | None = None,
@@ -34,6 +37,8 @@ def build_arena_event_payload(
     payload: dict[str, object] = {}
     if user_id is not None:
         payload["user_id"] = int(user_id)
+    if friend_challenge_id is not None:
+        payload["friend_challenge_id"] = str(friend_challenge_id)
     if arena_duel_id is not None:
         payload["arena_duel_id"] = str(arena_duel_id)
     if attempt_id is not None:
@@ -86,6 +91,8 @@ __all__ = [
     "ARENA_EVENT_DUEL_MODE_SELECTED",
     "ARENA_EVENT_DUEL_PAYWALL_SHOWN",
     "ARENA_EVENT_DUEL_TICKET_CLICKED",
+    "ARENA_EVENT_FRIEND_DUEL_OPENED",
+    "ARENA_EVENT_FRIEND_DUEL_PUBLISHED_TO_ARENA",
     "ARENA_EVENT_PREMIUM_WEEK_CLICKED",
     "build_arena_event_payload",
     "emit_arena_analytics_event",

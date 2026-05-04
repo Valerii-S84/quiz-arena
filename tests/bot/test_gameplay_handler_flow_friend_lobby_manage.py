@@ -30,11 +30,13 @@ async def test_handle_friend_open_repost_shows_canonical_wait_close_guidance() -
     reply_markup = callback.message.answers[0].kwargs["reply_markup"]
     assert isinstance(reply_markup, InlineKeyboardMarkup)
     buttons = [button for row in reply_markup.inline_keyboard for button in row]
+    callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert [button.text for button in buttons] == ["⏳ Weiter warten", "❌ Schließen"]
-    assert [button.callback_data for button in buttons] == [
+    assert callbacks == [
         "home:open",
         "friend:delete:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     ]
+    assert "friend:open:repost:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" not in callbacks
 
 
 @pytest.mark.asyncio

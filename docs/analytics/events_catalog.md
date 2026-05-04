@@ -71,6 +71,7 @@ Catalog of runtime product/operational events as implemented in code.
 | `duel_share_clicked` | `app/bot/handlers/gameplay_flows/proof_card_flow.py` | internal analytics dashboards |
 | `duel_menu_opened` | `app/bot/handlers/gameplay_duels.py` | internal analytics dashboards |
 | `duel_mode_selected` | `app/bot/handlers/gameplay_duels.py` | internal analytics dashboards |
+| `friend_duel_opened` | `app/bot/handlers/gameplay_duels.py` | internal analytics dashboards |
 | `arena_opened` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
 | `arena_duel_created` | `app/game/arena_duels/service.py` | internal analytics dashboards |
 | `arena_duel_started` | `app/game/arena_duels/service.py`, `app/game/arena_duels/accept.py` | internal analytics dashboards |
@@ -79,6 +80,7 @@ Catalog of runtime product/operational events as implemented in code.
 | `arena_duel_accepted` | `app/game/arena_duels/accept.py` | internal analytics dashboards |
 | `arena_result_shown` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
 | `arena_result_beaten_notification_sent` | `app/workers/tasks/arena_duels.py` | internal analytics dashboards |
+| `friend_duel_published_to_arena` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
 | `duel_limit_hit` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
 | `duel_paywall_shown` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
 | `duel_ticket_clicked` | `app/bot/handlers/payments.py` | internal analytics dashboards |
@@ -86,6 +88,7 @@ Catalog of runtime product/operational events as implemented in code.
 
 Arena/Duelle payload contract:
 - `user_id`: app user id when the event is user-scoped.
+- `friend_challenge_id`: Freundesduell UUID when the event is tied to a friend duel.
 - `arena_duel_id`: Arena duel UUID when the event is tied to one duel.
 - `attempt_id`: Arena attempt UUID for start/completion/accept events.
 - `action`: compact action label such as `menu`, `arena`, `friend`, `create`, `accept`, `creator_baseline`, `challenger`, `publish_friend`, or `buy`.
@@ -93,6 +96,9 @@ Arena/Duelle payload contract:
 - `result`: Arena result code when a result exists.
 - `score`: completed score when known.
 - `time_ms`: completed time in milliseconds when known.
+
+Friend duel funnel rule:
+- Use `friend_duel_opened` and `friend_duel_published_to_arena` as canonical friend-mode events; do not infer them from `duel_mode_selected` or `arena_duel_published` payload actions.
 
 ### 2.5 Private tournaments
 

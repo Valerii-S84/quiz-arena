@@ -105,6 +105,67 @@ async def test_handle_friend_challenge_next_shows_publish_after_creator_baseline
 
 
 @pytest.mark.asyncio
+async def test_handle_friend_challenge_next_keeps_prebaseline_wait_screen_free_of_arena_publish(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        del session, telegram_user
+        return SimpleNamespace(user_id=17, free_energy=10, paid_energy=0, current_streak=0)
+
+    async def _fake_start_round(*args, **kwargs):
+        del args, kwargs
+        return SimpleNamespace(
+            snapshot=FriendChallengeSnapshot(
+                challenge_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                invite_token="token",
+                challenge_type="DIRECT",
+                mode_code="QUICK_MIX_A1A2",
+                access_type="FREE",
+                status="ACTIVE",
+                creator_user_id=17,
+                opponent_user_id=None,
+                current_round=3,
+                total_rounds=7,
+                creator_score=2,
+                opponent_score=0,
+                creator_finished_at=None,
+                winner_user_id=None,
+            ),
+            start_result=None,
+            already_answered_current_round=True,
+        )
+
+    async def _fake_resolve_label(*, challenge, user_id):
+        del challenge, user_id
+        return "Freund"
+
+    monkeypatch.setattr(gameplay.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(
+        gameplay.GameSessionService, "start_friend_challenge_round", _fake_start_round
+    )
+    monkeypatch.setattr(gameplay, "_resolve_opponent_label", _fake_resolve_label)
+
+    callback = DummyCallback(
+        data="friend:next:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+    await gameplay.handle_friend_challenge_next(callback)
+
+    response = callback.message.answers[0]
+    callbacks = [
+        button.callback_data
+        for row in response.kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert callbacks == ["home:open"]
+    assert "arena:publish_friend:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" not in callbacks
+
+
+@pytest.mark.asyncio
 async def test_handle_friend_challenge_share_result_sends_inline_share_and_emits_event(
     monkeypatch,
 ) -> None:

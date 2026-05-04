@@ -123,14 +123,16 @@ def test_friend_pending_expired_keyboard_omits_publish_without_baseline() -> Non
         can_publish_to_arena=False,
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
+    callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert [button.text for button in buttons] == [
         "⏳ Weiter warten",
         "❌ Schließen",
     ]
-    assert [button.callback_data for button in buttons] == [
+    assert callbacks == [
         "home:open",
         "friend:delete:00000000-0000-0000-0000-000000000001",
     ]
+    assert "friend:open:repost:00000000-0000-0000-0000-000000000001" not in callbacks
 
 
 def test_friend_pending_expired_keyboard_shows_publish_for_canonical_arena_path() -> None:
@@ -139,16 +141,18 @@ def test_friend_pending_expired_keyboard_shows_publish_for_canonical_arena_path(
         can_publish_to_arena=True,
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
+    callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert [button.text for button in buttons] == [
         "🏟 In der Arena veröffentlichen",
         "⏳ Weiter warten",
         "❌ Schließen",
     ]
-    assert [button.callback_data for button in buttons] == [
+    assert callbacks == [
         "arena:publish_friend:00000000-0000-0000-0000-000000000001",
         "home:open",
         "friend:delete:00000000-0000-0000-0000-000000000001",
     ]
+    assert "friend:open:repost:00000000-0000-0000-0000-000000000001" not in callbacks
 
 
 def test_friend_challenge_share_keyboard_omits_accept_url_for_creator() -> None:
