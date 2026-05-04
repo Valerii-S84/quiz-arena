@@ -9,7 +9,6 @@ from app.bot.handlers.gameplay_flows.friend_lobby_flow import (
 )
 from app.bot.handlers.gameplay_flows.friend_lobby_manage_flow import (
     handle_friend_delete,
-    handle_friend_open_repost,
 )
 from app.bot.handlers.gameplay_flows.friend_next_flow import handle_friend_challenge_next
 from app.bot.handlers.gameplay_flows.friend_series_flow import (
@@ -31,7 +30,6 @@ __all__ = [
     "handle_friend_challenge_type_selected",
     "handle_friend_copy_link",
     "handle_friend_my_duels",
-    "handle_friend_open_repost",
     "handle_friend_delete",
     "handle_friend_challenge_next",
     "handle_friend_challenge_rematch",
