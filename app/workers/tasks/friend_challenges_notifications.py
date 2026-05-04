@@ -131,8 +131,12 @@ async def _send_expired_notice(
     challenge_id = str(item["challenge_id"])
     creator_user_id = item["creator_user_id"]
     opponent_user_id = item["opponent_user_id"]
-    creator_score = int(item["creator_score"])
-    opponent_score = int(item["opponent_score"])
+    creator_score_raw = item["creator_score"]
+    opponent_score_raw = item["opponent_score"]
+    if not isinstance(creator_score_raw, int) or not isinstance(opponent_score_raw, int):
+        return 0, 0
+    creator_score = creator_score_raw
+    opponent_score = opponent_score_raw
     status = str(item.get("status") or "")
     previous_status = str(item.get("previous_status") or "")
 

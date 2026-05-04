@@ -12,7 +12,10 @@ from app.bot.handlers.gameplay_friend_challenge_lobby import (
     handle_friend_challenge_type_selected,
     handle_friend_my_duels,
 )
-from app.bot.handlers.gameplay_friend_challenge_manage import handle_friend_delete
+from app.bot.handlers.gameplay_friend_challenge_manage import (
+    handle_friend_delete,
+    handle_friend_open_repost,
+)
 from app.bot.handlers.gameplay_friend_challenge_progress import (
     handle_friend_challenge_next,
     handle_friend_challenge_rematch,
@@ -37,6 +40,10 @@ def register(router: Router) -> None:
     )
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_COPY_LINK_RE))(
         handle_friend_challenge_copy_link
+    )
+    # Compatibility only for already delivered legacy reminder messages.
+    router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_OPEN_REPOST_RE))(
+        handle_friend_open_repost
     )
     router.callback_query(F.data.regexp(gameplay_callbacks.FRIEND_DELETE_RE))(handle_friend_delete)
     router.callback_query(F.data == "friend:my:duels")(handle_friend_my_duels)

@@ -4,9 +4,45 @@ from datetime import datetime, timezone
 
 from aiogram.types import CallbackQuery
 
-from app.bot.keyboards.friend_challenge import build_friend_challenge_back_keyboard
+from app.bot.keyboards.friend_challenge import (
+    build_friend_challenge_back_keyboard,
+    build_friend_pending_expired_keyboard,
+)
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
+
+
+def _build_legacy_repost_guidance_text() -> str:
+    return "\n\n".join(
+        [
+            TEXTS_DE["msg.friend.challenge.reminder.unplayed"],
+            TEXTS_DE["msg.friend.challenge.reminder.wait_or_close_hint"],
+        ]
+    )
+
+
+async def handle_friend_open_repost(
+    callback: CallbackQuery,
+    *,
+    friend_open_repost_re,
+    parse_uuid_callback,
+) -> None:
+    if callback.from_user is None or callback.message is None or callback.data is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    challenge_id = parse_uuid_callback(pattern=friend_open_repost_re, callback_data=callback.data)
+    if challenge_id is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
+    await callback.message.answer(
+        _build_legacy_repost_guidance_text(),
+        reply_markup=build_friend_pending_expired_keyboard(
+            challenge_id=str(challenge_id),
+            can_publish_to_arena=False,
+        ),
+    )
+    await callback.answer()
 
 
 async def handle_friend_delete(

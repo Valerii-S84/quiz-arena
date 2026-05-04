@@ -20,6 +20,7 @@ FRIEND_INVITE_REQUIRED_RE = re.compile(r"^friend:invite:required:([0-9a-f\-]{36}
 FRIEND_SERIES_BEST3_RE = re.compile(r"^friend:series:best3:([0-9a-f\-]{36})$")
 FRIEND_SERIES_NEXT_RE = re.compile(r"^friend:series:next:([0-9a-f\-]{36})$")
 FRIEND_COPY_LINK_RE = re.compile(r"^friend:copy:([0-9a-f\-]{36})$")
+FRIEND_OPEN_REPOST_RE = re.compile(r"^friend:open:repost:([0-9a-f\-]{36})$")
 FRIEND_DELETE_RE = re.compile(r"^friend:delete:([0-9a-f\-]{36})$")
 TOURNAMENT_FORMAT_RE = re.compile(r"^friend:tournament:format:(5|12)$")
 TOURNAMENT_CREATE_FOR_VIEW_RE = re.compile(r"^friend:tournament:create:([0-9a-f\-]{36})$")

@@ -3,10 +3,38 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from aiogram.types import InlineKeyboardMarkup
 
 from app.bot.handlers import gameplay, gameplay_friend_challenge
 from app.bot.texts.de import TEXTS_DE
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
+
+
+@pytest.mark.asyncio
+async def test_handle_friend_open_repost_shows_canonical_wait_close_guidance() -> None:
+    callback = DummyCallback(
+        data="friend:open:repost:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        from_user=SimpleNamespace(id=17),
+        message=DummyMessage(),
+    )
+
+    await gameplay_friend_challenge.handle_friend_open_repost(callback)
+
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
+    assert callback.message.answers[0].text == "\n\n".join(
+        [
+            TEXTS_DE["msg.friend.challenge.reminder.unplayed"],
+            TEXTS_DE["msg.friend.challenge.reminder.wait_or_close_hint"],
+        ]
+    )
+    reply_markup = callback.message.answers[0].kwargs["reply_markup"]
+    assert isinstance(reply_markup, InlineKeyboardMarkup)
+    buttons = [button for row in reply_markup.inline_keyboard for button in row]
+    assert [button.text for button in buttons] == ["⏳ Weiter warten", "❌ Schließen"]
+    assert [button.callback_data for button in buttons] == [
+        "home:open",
+        "friend:delete:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    ]
 
 
 @pytest.mark.asyncio
