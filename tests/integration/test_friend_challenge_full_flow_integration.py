@@ -13,6 +13,7 @@ from app.bot.texts.de import TEXTS_DE
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
+from app.game.duels import rollout as duel_rollout
 from app.game.friend_challenges.constants import DUEL_TYPE_OPEN
 from app.game.sessions.errors import FriendChallengeFullError
 from app.game.sessions.service import GameSessionService
@@ -272,7 +273,10 @@ async def test_ttl_pending_expired_worker_sets_status_and_pushes_creator(
 
 
 @pytest.mark.asyncio
-async def test_meine_duelle_prioritizes_my_turn_before_waiting_and_open() -> None:
+async def test_meine_duelle_prioritizes_my_turn_before_waiting_and_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(duel_rollout, "is_canonical_duels_enabled", lambda: True)
     now_utc = datetime.now(UTC)
     creator_user_id = await _create_user("fc_my_duels_creator")
     my_turn_opponent_user_id = await _create_user("fc_my_duels_my_turn")

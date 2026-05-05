@@ -105,9 +105,15 @@ def build_friend_challenge_finished_keyboard(
                 )
             ]
         )
-    rows.append(
-        [InlineKeyboardButton(text="🔄 Revanche", callback_data=f"friend:rematch:{challenge_id}")]
-    )
+    if duel_rollout.is_canonical_duels_enabled():
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="🔄 Revanche",
+                    callback_data=f"friend:rematch:{challenge_id}",
+                )
+            ]
+        )
     rows.append([InlineKeyboardButton(text="🏠 Menü", callback_data="home:open")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

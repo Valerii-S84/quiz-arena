@@ -7,8 +7,43 @@ import pytest
 
 from app.bot.handlers import gameplay
 from app.bot.texts.de import TEXTS_DE
+from app.game.duels import rollout as duel_rollout
 from app.game.sessions.types import FriendChallengeSnapshot
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("handler_name", "callback_data"),
+    [
+        ("handle_friend_challenge_rematch", "friend:rematch:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        (
+            "handle_friend_challenge_series_best3",
+            "friend:series:best3:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        ),
+        (
+            "handle_friend_challenge_series_next",
+            "friend:series:next:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        ),
+    ],
+)
+async def test_follow_up_friend_duel_callbacks_are_blocked_when_rollout_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+    handler_name: str,
+    callback_data: str,
+) -> None:
+    monkeypatch.setattr(duel_rollout, "is_canonical_duels_enabled", lambda: False)
+    callback = DummyCallback(
+        data=callback_data,
+        from_user=SimpleNamespace(id=10),
+        message=DummyMessage(),
+    )
+
+    await getattr(gameplay, handler_name)(callback)
+
+    assert callback.message.answers[0].text == TEXTS_DE["msg.duels.disabled"]
+    assert callback.message.answers[0].kwargs["reply_markup"] is not None
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 
 @pytest.mark.asyncio

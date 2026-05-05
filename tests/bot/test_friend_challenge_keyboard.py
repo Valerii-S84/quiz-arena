@@ -125,6 +125,20 @@ def test_friend_challenge_finished_keyboard_ignores_direct_share_url() -> None:
     assert share_button.callback_data == "friend:share:result:00000000-0000-0000-0000-000000000001"
 
 
+def test_friend_challenge_finished_keyboard_hides_rematch_when_rollout_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(duel_rollout, "is_canonical_duels_enabled", lambda: False)
+    keyboard = build_friend_challenge_finished_keyboard(
+        challenge_id="00000000-0000-0000-0000-000000000001"
+    )
+    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert callbacks == [
+        "friend:share:result:00000000-0000-0000-0000-000000000001",
+        "home:open",
+    ]
+
+
 def test_friend_challenge_limit_keyboard_contains_buy_options_and_back() -> None:
     keyboard = build_friend_challenge_limit_keyboard()
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
@@ -312,3 +326,20 @@ def test_friend_challenge_result_share_keyboard_contains_share_and_navigation() 
     assert "friend:rematch:00000000-0000-0000-0000-000000000001" in callbacks
     assert "home:open" in callbacks
     assert "arena:publish_friend:00000000-0000-0000-0000-000000000001" not in callbacks
+
+
+def test_friend_challenge_result_share_keyboard_hides_rematch_when_rollout_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(duel_rollout, "is_canonical_duels_enabled", lambda: False)
+    keyboard = build_friend_challenge_result_share_keyboard(
+        share_url="https://t.me/share/url?url=https%3A%2F%2Ft.me%2Fquizarena_bot&text=proof",
+        challenge_id="00000000-0000-0000-0000-000000000001",
+    )
+    callbacks = [
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert callbacks == ["home:open"]
