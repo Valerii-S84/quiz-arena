@@ -46,6 +46,7 @@ from app.game.duels.constants import (
     DUEL_MENU_CALLBACK,
 )
 from app.game.duels.limits import DuelLimitService
+from app.game.sessions.service import GameSessionService
 from app.game.sessions.service.friend_challenges_manage import publish_friend_challenge_to_arena
 from app.services.user_onboarding import UserOnboardingService
 
@@ -166,6 +167,8 @@ async def handle_arena_publish_friend(callback: CallbackQuery) -> None:
         session_local=SessionLocal,
         user_onboarding_service=UserOnboardingService,
         publish_friend_challenge_to_arena=publish_friend_challenge_to_arena,
+        start_friend_challenge_round=GameSessionService.start_friend_challenge_round,
+        build_question_text=_build_question_text,
     )
 
 

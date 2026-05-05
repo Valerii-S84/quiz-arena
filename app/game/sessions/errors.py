@@ -30,6 +30,10 @@ class FriendChallengeAccessError(GameSessionError):
     pass
 
 
+class FriendChallengeArenaPublishBaselineRequiredError(GameSessionError):
+    pass
+
+
 class FriendChallengeFullError(GameSessionError):
     pass
 

@@ -91,17 +91,18 @@ def test_friend_challenge_back_keyboard_hides_publish_when_rollout_is_off(
     assert callbacks == ["home:open"]
 
 
-def test_friend_challenge_finished_keyboard_contains_rematch_and_back() -> None:
+def test_friend_challenge_finished_keyboard_contains_rematch_and_arena() -> None:
     keyboard = build_friend_challenge_finished_keyboard(
         challenge_id="00000000-0000-0000-0000-000000000001"
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     labels = [button.text for button in buttons]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
-    assert labels == ["📤 Ergebnis teilen", "🔄 Revanche", "🏠 Menü"]
-    assert "friend:share:result:00000000-0000-0000-0000-000000000001" in callbacks
-    assert "friend:rematch:00000000-0000-0000-0000-000000000001" in callbacks
-    assert "home:open" in callbacks
+    assert labels == ["🔁 Revanche", "🏟 Offene Arena"]
+    assert callbacks == [
+        "friend:rematch:00000000-0000-0000-0000-000000000001",
+        "arena:list",
+    ]
 
 
 def test_friend_challenge_finished_keyboard_can_hide_share() -> None:
@@ -112,7 +113,7 @@ def test_friend_challenge_finished_keyboard_can_hide_share() -> None:
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
     assert "friend:rematch:00000000-0000-0000-0000-000000000001" in callbacks
     assert "friend:share:result:00000000-0000-0000-0000-000000000001" not in callbacks
-    assert "home:open" in callbacks
+    assert "arena:list" in callbacks
 
 
 def test_friend_challenge_finished_keyboard_ignores_direct_share_url() -> None:
@@ -122,7 +123,7 @@ def test_friend_challenge_finished_keyboard_ignores_direct_share_url() -> None:
     )
     share_button = keyboard.inline_keyboard[0][0]
     assert share_button.url is None
-    assert share_button.callback_data == "friend:share:result:00000000-0000-0000-0000-000000000001"
+    assert share_button.callback_data == "friend:rematch:00000000-0000-0000-0000-000000000001"
 
 
 def test_friend_challenge_finished_keyboard_hides_rematch_when_rollout_is_off(
@@ -142,8 +143,8 @@ def test_friend_challenge_finished_keyboard_hides_rematch_when_rollout_is_off(
 def test_friend_challenge_limit_keyboard_contains_buy_options_and_back() -> None:
     keyboard = build_friend_challenge_limit_keyboard()
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
-    assert "buy:FRIEND_CHALLENGE_5" in callbacks
-    assert "buy:PREMIUM_WEEK" in callbacks
+    assert "buy:FRIEND_CHALLENGE_5:duel" in callbacks
+    assert "buy:PREMIUM_WEEK:duel" in callbacks
     assert "home:open" in callbacks
 
 
@@ -220,45 +221,42 @@ def test_friend_challenge_share_keyboard_omits_accept_url_for_creator() -> None:
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == [
-        "📤 Teilen ->",
-        "✅ Einladung gesendet",
-        "⚔️ Jetzt spielen",
-        "⏳ Auf Freund warten",
+        "📤 Link teilen",
+        "🏟 In der Arena veröffentlichen",
+        "❌ Duell abbrechen",
+        "↩️ Zurück",
     ]
     assert not any(button.url and "duel_" in button.url for button in buttons)
     inline_queries = [
         button.switch_inline_query for button in buttons if button.switch_inline_query
     ]
     assert inline_queries == ["invite:duel:00000000-0000-0000-0000-000000000001"]
-    assert any(
-        button.callback_data == "friend:invite:sent:00000000-0000-0000-0000-000000000001"
-        for button in buttons
-    )
-    assert any(
-        button.callback_data == "friend:invite:required:00000000-0000-0000-0000-000000000001"
-        for button in buttons
-    )
-    assert not any(
-        button.callback_data == "arena:publish_friend:00000000-0000-0000-0000-000000000001"
-        for button in buttons
-    )
-    assert any(button.callback_data == "menu:main" for button in buttons)
+    assert [button.callback_data for button in buttons if button.callback_data] == [
+        "arena:publish_friend:00000000-0000-0000-0000-000000000001",
+        "friend:delete:00000000-0000-0000-0000-000000000001",
+        "duels:friend",
+    ]
 
 
-def test_friend_challenge_share_keyboard_never_includes_arena_publish_pre_baseline() -> None:
+def test_friend_challenge_share_keyboard_has_canonical_actions_without_setup_choices() -> None:
     keyboard = build_friend_challenge_share_keyboard(
         invite_link="https://t.me/quizarena_bot?start=fc_token",
         challenge_id="00000000-0000-0000-0000-000000000001",
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == [
-        "📤 Teilen ->",
-        "✅ Einladung gesendet",
-        "⚔️ Jetzt spielen",
-        "⏳ Auf Freund warten",
+        "📤 Link teilen",
+        "🏟 In der Arena veröffentlichen",
+        "❌ Duell abbrechen",
+        "↩️ Zurück",
     ]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
-    assert "arena:publish_friend:00000000-0000-0000-0000-000000000001" not in callbacks
+    assert callbacks == [
+        "arena:publish_friend:00000000-0000-0000-0000-000000000001",
+        "friend:delete:00000000-0000-0000-0000-000000000001",
+        "duels:friend",
+    ]
+    assert not any("topic" in callback or "level" in callback for callback in callbacks)
 
 
 def test_friend_challenge_share_keyboard_without_link_contains_back_only() -> None:
@@ -289,16 +287,16 @@ def test_friend_challenge_share_confirmed_keyboard_contains_unlocked_choices() -
     )
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == [
-        "📤 Teilen ->",
-        "✅ Einladung gesendet",
-        "⚔️ Jetzt spielen",
-        "⏳ Auf Freund warten",
+        "📤 Link teilen",
+        "🏟 In der Arena veröffentlichen",
+        "❌ Duell abbrechen",
+        "↩️ Zurück",
     ]
     assert not any(button.url and "duel_" in button.url for button in buttons)
     assert [button.callback_data for button in buttons if button.callback_data] == [
-        "friend:invite:sent:00000000-0000-0000-0000-000000000001",
-        "friend:next:00000000-0000-0000-0000-000000000001",
-        "menu:main",
+        "arena:publish_friend:00000000-0000-0000-0000-000000000001",
+        "friend:delete:00000000-0000-0000-0000-000000000001",
+        "duels:friend",
     ]
 
 
@@ -324,7 +322,7 @@ def test_friend_challenge_result_share_keyboard_contains_share_and_navigation() 
     assert inline_queries == ["proof:duel:00000000-0000-0000-0000-000000000001"]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert "friend:rematch:00000000-0000-0000-0000-000000000001" in callbacks
-    assert "home:open" in callbacks
+    assert "arena:list" in callbacks
     assert "arena:publish_friend:00000000-0000-0000-0000-000000000001" not in callbacks
 
 

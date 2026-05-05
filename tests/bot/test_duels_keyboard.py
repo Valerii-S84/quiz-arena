@@ -146,7 +146,7 @@ def test_arena_result_win_keyboard_includes_revanche_first() -> None:
     ]
 
 
-def test_arena_close_loss_keyboard_includes_revanche_and_arena_only() -> None:
+def test_arena_close_loss_keyboard_includes_revanche_paywall_and_arena() -> None:
     buttons = _buttons(
         build_arena_result_keyboard(
             user_won=False,
@@ -155,9 +155,16 @@ def test_arena_close_loss_keyboard_includes_revanche_and_arena_only() -> None:
         )
     )
 
-    assert [button.text for button in buttons] == ["🔁 Revanche", "🏟 Zur Arena"]
+    assert [button.text for button in buttons] == [
+        "🔁 Revanche",
+        "🎟 Duell-Ticket – 5⭐",
+        "👑 Premium-Woche – 29⭐",
+        "🏟 Zur Arena",
+    ]
     assert [button.callback_data for button in buttons] == [
         "arena:revanche:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        "buy:FRIEND_CHALLENGE_5:duel",
+        "buy:PREMIUM_WEEK:duel",
         "arena:list",
     ]
 

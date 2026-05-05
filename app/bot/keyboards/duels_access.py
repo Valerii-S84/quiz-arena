@@ -11,24 +11,28 @@ from app.game.duels.constants import (
 )
 
 
-def build_duel_paywall_keyboard() -> InlineKeyboardMarkup:
+def build_duel_monetization_rows() -> list[list[InlineKeyboardButton]]:
     ticket_product_code, premium_week_product_code = DUEL_PAYWALL_PRODUCT_CODES
+    return [
+        [
+            InlineKeyboardButton(
+                text="🎟 Duell-Ticket – 5⭐",
+                callback_data=f"buy:{ticket_product_code}:{DUEL_PAYWALL_CALLBACK_CONTEXT}",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="👑 Premium-Woche – 29⭐",
+                callback_data=f"buy:{premium_week_product_code}:{DUEL_PAYWALL_CALLBACK_CONTEXT}",
+            )
+        ],
+    ]
+
+
+def build_duel_paywall_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="🎟 Duell-Ticket – 5⭐",
-                    callback_data=f"buy:{ticket_product_code}:{DUEL_PAYWALL_CALLBACK_CONTEXT}",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="👑 Premium-Woche – 29⭐",
-                    callback_data=(
-                        f"buy:{premium_week_product_code}:{DUEL_PAYWALL_CALLBACK_CONTEXT}"
-                    ),
-                )
-            ],
+            *build_duel_monetization_rows(),
             [InlineKeyboardButton(text="↩️ Später", callback_data=ARENA_LIST_CALLBACK)],
         ]
     )

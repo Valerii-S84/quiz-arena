@@ -129,12 +129,8 @@ async def build_opponent_completion_message(
         share_url=share_url,
         show_next_series_game=series_context.show_next_series_game,
     )
+    del build_friend_score_text
     lines = [
-        build_friend_score_text(
-            challenge=challenge,
-            user_id=opponent_user_id,
-            opponent_label=opponent_label_for_opponent,
-        ),
         build_friend_finish_text(
             challenge=challenge,
             user_id=opponent_user_id,

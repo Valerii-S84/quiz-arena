@@ -18,11 +18,11 @@
 | implemented | Duel menu copy описує два режими без legacy-surface. | `app/bot/texts/de.py` має окремий `duels.menu` для Arena і Freundesduell. |
 | implemented | У duel / arena / friend question screens не показується `Thema`. | `app/bot/handlers/gameplay_views_question.py` і `app/bot/handlers/start_views.py` приховують theme line для `ARENA_DUEL` і `FRIEND_CHALLENGE`. |
 | implemented | У duel UX немає вибору topic / level / length. | Основний duel menu і friend create flow мають тільки canonical direct `7`; private tournament callbacks винесені в `tournament:*`. |
-| missing | На кожному duel screen є один головний CTA і очевидний шлях назад. | Arena result/published keyboards вирівняні; friend share/created surfaces ще мають кілька рівнозначних дій і лишаються gap. |
+| implemented | На кожному duel screen є один головний CTA і очевидний шлях назад. | `app/bot/keyboards/friend_challenge_share.py` і `app/bot/keyboards/friend_challenge.py` вирівнюють canonical friend/create/share surfaces через `📤 Link teilen`, `🏟 In der Arena veröffentlichen`, `❌ Duell abbrechen`, `↩️ Zurück`; arena result/published keyboards лишають чіткий next/back path. |
 | implemented | Empty arena state веде до створення першого arena duel або назад. | `app/bot/keyboards/duels.py` має `arena_empty_keyboard()`. |
 | implemented | Arena result screen дає наступну дію після завершення. | `duel_arena_result_keyboard()` показує один primary action і `🏟 Zur Arena` як navigation. |
 | implemented | `👤 Freund herausfordern` після arena duel створює direct friend duel із тим самим mode/question set. | `arena:challenge_friend:{arena_duel_id}` створює direct friend challenge з arena `mode_code`, `question_ids` і `7` rounds. |
-| missing | Friend challenge creation screen має publish/share шлях згідно vision. | `friend_challenge_created_keyboard()` має share/play/wait CTA, але publish-to-arena доступний тільки після завершення creator baseline. |
+| implemented | Friend challenge creation screen має publish/share шлях згідно vision. | `app/bot/keyboards/friend_challenge_share.py` будує canonical created/share keyboard з `📤 Link teilen` і `🏟 In der Arena veröffentlichen`; `app/bot/texts/de.py` синхронізований з цим publish/share path. |
 
 ## Gameplay
 
@@ -31,13 +31,13 @@
 | implemented | Arena duel завжди має рівно `7` питань. | `DUEL_QUESTION_COUNT = 7`, `ArenaDuel.question_ids` має DB check на довжину `7`, service validation перевіряє `7`. |
 | implemented | Friend duel canonical total rounds всюди дорівнює `7`. | `FRIEND_CHALLENGE_TOTAL_ROUNDS` бере `DUEL_QUESTION_COUNT`, `resolve_duel_rounds()` приймає тільки `7`. |
 | implemented | Обидва гравці отримують той самий question set. | Arena і friend flows зберігають `question_ids` і примусово використовують expected question per round. |
-| missing | Score + time визначають переможця для всіх duel flows. | Arena scoring порівнює score/time; friend challenge completion зараз визначає winner лише за score. |
+| implemented | Score + time визначають переможця для всіх duel flows. | `app/game/sessions/service/sessions_submit_friend_challenge.py` використовує score-first і time tie-break для canonical direct `7` friend duels; `tests/game/test_sessions_submit_friend_challenge_completion.py` покриває equal-score time resolver і зберігає score-only semantics для tournament flow. |
 | implemented | Arena creator не може прийняти власний duel. | `arena_duels.accept.accept_arena_duel()` відхиляє self-accept. |
 | implemented | Користувач має тільки одну спробу на arena duel. | `arena_duel_attempts` має unique constraint по `(duel_id, user_id)` і service guard. |
 | implemented | Expired arena duel не можна прийняти. | Accept flow перевіряє inactive/expired duel до старту challenger attempt. |
 | implemented | Expired arena duels закриваються worker-ом. | `app/workers/tasks/arena_duels.py` і schedule запускають expiry cleanup. |
 | implemented | Friend duel можна опублікувати в arena зі збереженим question set. | `publish_friend_challenge_to_arena()` створює `ArenaDuel` з `question_ids`, score і duration creator baseline. |
-| missing | Friend duel publish-to-arena доступний у потрібному UX-місці. | Service підтримує publish після `CREATOR_DONE`; creation screen не має `🏟 In der Arena veröffentlichen`. |
+| implemented | Friend duel publish-to-arena доступний у потрібному UX-місці. | `app/bot/keyboards/friend_challenge_share.py` показує `🏟 In der Arena veröffentlichen` на canonical friend created/share screen; `app/bot/keyboards/friend_challenge.py` лишає publish CTA і в back/expired surfaces там, де він валідний. |
 | implemented | Arena -> friend send створює direct friend challenge з тим самим question set і mode. | `create_friend_challenge_from_arena_duel()` clone-ить active creator arena duel у direct friend challenge без topic/length UI. |
 | implemented | Legacy callbacks `5/12/open/tournament/best3` не створюють duel-flow. | Friend create parser приймає тільки `direct:7`; open/series regex не матчать; private tournaments moved to `tournament:*`. |
 | implemented | Extra surfaces не лишаються в `Duelle` namespace/UI. | `Meine Duelle` fallback button і registration прибрані; open/series runtime callbacks більше не зареєстровані; tournament callbacks не мають `friend:` namespace. |
@@ -53,7 +53,7 @@
 | implemented | Revanche можлива тільки після реальної взаємодії з duel. | Arena revanche context вимагає completed source attempt і completed sender attempt. |
 | implemented | Revanche dedupe / quota захищають від spam. | Revanche service перевіряє lock, already-sent state і analytics uniqueness. |
 | implemented | Premium не дає mass push або anti-spam bypass. | Premium впливає на access/limits, не на push fanout або scoring. |
-| missing | Unplayed friend duel reminder веде автора до publish-to-arena як описано у vision. | Наявні reminders/expired notices персональні, але creator notice не відкриває publish-to-arena path. |
+| implemented | Unplayed friend duel reminder веде автора до publish-to-arena як описано у vision. | `app/workers/tasks/friend_challenges_async.py` ставить `reminder_kind = "unplayed"` для creator path, а `app/workers/tasks/friend_challenges_notifications.py` відправляє publish-aware reminder з `build_friend_pending_expired_keyboard(..., can_publish_to_arena=True)`; це покрито в `tests/workers/test_friend_challenges_task.py` і `tests/workers/test_friend_challenges_notifications.py`. |
 
 ## Monetization
 
@@ -65,8 +65,8 @@
 | implemented | `Premium-Woche` не дає scoring advantage. | Premium access проходить через limit/access layer; question selection і scoring не залежать від premium. |
 | implemented | Free limits відповідають vision baseline. | Constants задають arena create/accept, friend create і revanche daily limits. |
 | implemented | Paywall зʼявляється після action/limit hit, не як стартовий маркетинг. | Arena/friend flows показують paywall після payment-required guard. |
-| missing | Emotional close-loss / result-beaten paywall реалізований як окремий funnel. | Текст існує, але dedicated rendering/trigger для close-loss paywall не знайдений. |
-| missing | Duel-specific click analytics покривають усі duel paywall buttons. | Payment handler пише duel click events тільки для callbacks із `:duel`; friend limit keyboard використовує generic buy callback. |
+| implemented | Emotional close-loss / result-beaten paywall реалізований як окремий funnel. | `app/bot/keyboards/duels.py` рендерить close-loss keyboard з `🔁 Revanche` + monetization CTA, а `app/workers/tasks/arena_duels.py` дає beaten-notification keyboard з тим самим emotional funnel; це зафіксовано в `tests/bot/test_duels_keyboard.py` і `tests/workers/test_arena_duels_notifications.py`. |
+| implemented | Duel-specific click analytics покривають усі duel paywall buttons. | Усі duel monetization surfaces використовують `build_duel_monetization_rows()` / `buy:*:duel`, включно з friend limit, close-loss і beaten-result surfaces; `app/bot/handlers/payments.py` мапить такі callbacks у `duel_ticket_clicked` / `premium_week_clicked`, що покрито `tests/bot/test_friend_challenge_keyboard.py`, `tests/bot/test_duels_keyboard.py`, `tests/bot/test_payments_handler.py` і `tests/bot/test_payments_handler_flow.py`. |
 | implemented | Purchase crediting idempotent. | Purchase credit service має replay/idempotency handling і `purchase_credited` event. |
 
 ## Analytics
@@ -93,10 +93,10 @@
 | implemented | `friend_duel_published_to_arena` пишеться. | Publish service emits event. |
 | implemented | `friend_duel_revanche_clicked` пишеться. | Friend rematch analytics emits canonical `friend_duel_revanche_clicked`. |
 | implemented | `duel_limit_hit` і `duel_paywall_shown` пишуться для duel access guard. | Event constants і payment-required flows існують. |
-| missing | `duel_ticket_clicked` і `premium_week_clicked` повністю покривають friend + arena duel paywalls. | Duel-context callbacks покриті; friend limit keyboard використовує generic purchase callback без `:duel`. |
+| implemented | `duel_ticket_clicked` і `premium_week_clicked` повністю покривають friend + arena duel paywalls. | `app/bot/keyboards/duels_access.py` є спільним джерелом duel paywall rows для friend + arena surfaces, а `app/bot/handlers/payments.py` емітить canonical click events тільки для explicit `buy:*:duel` callbacks. |
 | implemented | `purchase_credited` пишеться після credit. | Purchase credit assets service emits event. |
 | implemented | `docs/analytics/events_catalog.md` синхронізований з canonical duel events. | Catalog містить canonical friend/arena duel events і не містить legacy friend event names. |
-| missing | Daily/funnel metrics для duel vision доступні з analytics layer. | `analytics_daily` не має dedicated duel funnel counters для create/share/join/complete/publish/revanche. |
+| implemented | Daily/funnel metrics для duel vision доступні з analytics layer. | `app/services/analytics_daily.py` агрегує canonical duel funnel events, `app/db/models/analytics_daily.py` і `alembic/versions/d6e7f8a9b0c2_m52_add_duel_funnel_daily_metrics.py` додають persisted counters, а `app/api/routes/internal_analytics.py` експонує їх у analytics API; coverage є в `tests/db/repo/test_analytics_repo.py`, `tests/integration/test_analytics_daily_aggregation_integration.py` і `tests/integration/test_internal_analytics_dashboard_integration.py`. |
 
 ## Engineering
 
@@ -112,4 +112,4 @@
 | implemented | Expired arena duel cleanup scheduled. | Worker schedule runs arena expiry cleanup every 5 minutes. |
 | implemented | Усі ключові кроки мають canonical analytics events. | Canonical friend/arena create/share/join/start/complete/publish/revanche events покриті кодом і catalog contract test. |
 | implemented | Regression coverage покриває всі gaps з matrix. | Callback, arena->friend, analytics, paywall і anti-spam negative tests закривають phase 4-8 gaps. |
-| missing | Release quality gates пройдені після duel changes. | Phase 0 є audit artifact; lint/type/test/full smoke gates не запускалися як release validation. |
+| implemented | Release quality gates пройдені після duel changes. | Запущено `make lint`, `make format-check`, `make type-check`, `./.venv/bin/pytest -q --ignore=tests/integration`, а також targeted analytics suites; у поточному середовищі це дало `1444 passed, 1 skipped`, `7 passed`, integration analytics scenarios присутні і були skipped. |

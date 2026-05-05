@@ -32,7 +32,11 @@ from app.game.arena_duels.types import (
     ArenaBaselineStartResult,
     ArenaDuelSnapshot,
 )
-from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
+from app.game.sessions.errors import (
+    FriendChallengeAccessError,
+    FriendChallengeArenaPublishBaselineRequiredError,
+    FriendChallengeNotFoundError,
+)
 from app.game.sessions.types import SessionQuestionView, StartSessionResult
 from tests.bot.helpers import DummyCallback, DummyMessage
 from tests.type_helpers import AsyncBeginContext
@@ -401,6 +405,45 @@ async def test_arena_publish_friend_publishes_through_service() -> None:
         f"arena:challenge_friend:{DUEL_ID}",
         "arena:list",
     ]
+
+
+@pytest.mark.asyncio
+async def test_arena_publish_friend_starts_friend_baseline_when_score_is_missing() -> None:
+    captured: dict[str, object] = {}
+
+    async def _publish_friend(*_args, **kwargs):
+        captured["publish"] = kwargs
+        raise FriendChallengeArenaPublishBaselineRequiredError
+
+    async def _start_friend_round(*_args, **kwargs):
+        captured["start"] = kwargs
+        return SimpleNamespace(start_result=_start_result())
+
+    def _build_question_text(**kwargs):
+        captured["question"] = kwargs
+        return "friend baseline question"
+
+    callback = _callback(f"arena:publish_friend:{DUEL_ID}")
+    await arena_duel_flow.handle_arena_publish_friend(
+        callback,
+        arena_publish_friend_re=gameplay_callbacks.ARENA_PUBLISH_FRIEND_RE,
+        parse_uuid_callback=lambda **_kwargs: DUEL_ID,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserService,
+        publish_friend_challenge_to_arena=_publish_friend,
+        start_friend_challenge_round=_start_friend_round,
+        build_question_text=_build_question_text,
+    )
+
+    publish_call = cast(dict[str, object], captured["publish"])
+    start_call = cast(dict[str, object], captured["start"])
+    question_call = cast(dict[str, object], captured["question"])
+    assert publish_call["user_id"] == 101
+    assert start_call["user_id"] == 101
+    assert start_call["challenge_id"] == DUEL_ID
+    assert question_call["source"] == "FRIEND_CHALLENGE"
+    assert callback.message.answers[0].text == "friend baseline question"
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 
 @pytest.mark.asyncio
@@ -783,5 +826,7 @@ async def test_arena_completion_close_loss_result_has_revanche() -> None:
     assert "Knapp verloren." in _text(callback.message.answers[0].text)
     assert _callbacks(callback.message.answers[0].kwargs["reply_markup"]) == [
         f"arena:revanche:{OPPONENT_ATTEMPT_ID}",
+        "buy:FRIEND_CHALLENGE_5:duel",
+        "buy:PREMIUM_WEEK:duel",
         "arena:list",
     ]

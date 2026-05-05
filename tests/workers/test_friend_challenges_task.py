@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.game.friend_challenges.constants import DUEL_STATUS_CREATOR_DONE
+from app.game.friend_challenges.constants import DUEL_STATUS_CREATOR_DONE, DUEL_STATUS_PENDING
 from app.game.sessions.service.constants import DUEL_MAX_PUSH_PER_USER
 from app.workers.tasks import friend_challenges, friend_challenges_async
 from tests.type_helpers import AsyncBeginContext, build_friend_challenge
@@ -125,6 +125,7 @@ async def test_run_friend_challenge_deadlines_async_queues_only_eligible_last_ch
             "opponent_user_id": 22,
             "status": DUEL_STATUS_CREATOR_DONE,
             "expires_at": eligible.expires_at,
+            "reminder_kind": "turn",
         }
     ]
     assert eligible.opponent_push_count == 1
@@ -132,3 +133,70 @@ async def test_run_friend_challenge_deadlines_async_queues_only_eligible_last_ch
     assert eligible.updated_at == captured_now
     assert capped.opponent_push_count == DUEL_MAX_PUSH_PER_USER
     assert capped.expires_last_chance_notified_at is None
+
+
+@pytest.mark.asyncio
+async def test_run_friend_challenge_deadlines_async_queues_unplayed_publish_reminder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pending = build_friend_challenge(
+        status=DUEL_STATUS_PENDING,
+        creator_user_id=11,
+        opponent_user_id=None,
+        creator_push_count=0,
+        expires_last_chance_notified_at=None,
+        expires_at=NOW_UTC + timedelta(minutes=20),
+    )
+    captured: dict[str, object] = {}
+
+    async def _fake_last_chance(*_args, **_kwargs):
+        return [pending]
+
+    async def _fake_none(*_args, **_kwargs):
+        return []
+
+    async def _fake_send_deadline_notifications(*, now_utc, reminder_items, expired_items):
+        captured["now_utc"] = now_utc
+        captured["reminder_items"] = reminder_items
+        captured["expired_items"] = expired_items
+        return (len(reminder_items), 0, 0, 0, [], [])
+
+    monkeypatch.setattr(friend_challenges_async, "SessionLocal", _SessionLocal(object()))
+    monkeypatch.setattr(
+        friend_challenges_async.FriendChallengesRepo,
+        "list_active_due_for_last_chance_for_update",
+        _fake_last_chance,
+    )
+    monkeypatch.setattr(
+        friend_challenges_async.FriendChallengesRepo,
+        "list_pending_due_for_expire_for_update",
+        _fake_none,
+    )
+    monkeypatch.setattr(
+        friend_challenges_async.FriendChallengesRepo,
+        "list_joined_due_for_walkover_for_update",
+        _fake_none,
+    )
+    monkeypatch.setattr(
+        friend_challenges_async,
+        "send_deadline_notifications",
+        _fake_send_deadline_notifications,
+    )
+
+    result = await friend_challenges_async.run_friend_challenge_deadlines_async(batch_size=5)
+
+    assert result["last_chance_queued_total"] == 1
+    assert captured["reminder_items"] == [
+        {
+            "challenge_id": str(pending.id),
+            "target_user_id": 11,
+            "creator_user_id": 11,
+            "opponent_user_id": None,
+            "status": DUEL_STATUS_PENDING,
+            "expires_at": pending.expires_at,
+            "reminder_kind": "unplayed",
+        }
+    ]
+    assert captured["expired_items"] == []
+    assert pending.creator_push_count == 1
+    assert pending.expires_last_chance_notified_at == captured["now_utc"]

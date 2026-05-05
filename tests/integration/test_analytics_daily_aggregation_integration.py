@@ -20,6 +20,35 @@ from tests.integration.analytics_daily_fixtures import (
     _day_bounds_utc,
 )
 
+DUEL_FUNNEL_EVENTS = (
+    ("duel_menu_opened", "duel_menu_opened_events_total"),
+    ("duel_mode_selected", "duel_mode_selected_events_total"),
+    ("arena_opened", "arena_opened_events_total"),
+    ("arena_duel_created", "arena_duel_created_events_total"),
+    ("arena_duel_started", "arena_duel_started_events_total"),
+    ("arena_duel_completed", "arena_duel_completed_events_total"),
+    ("arena_duel_published", "arena_duel_published_events_total"),
+    ("arena_duel_accepted", "arena_duel_accepted_events_total"),
+    ("arena_result_shown", "arena_result_shown_events_total"),
+    (
+        "arena_result_beaten_notification_sent",
+        "arena_result_beaten_notification_sent_events_total",
+    ),
+    ("arena_revanche_clicked", "arena_revanche_clicked_events_total"),
+    ("friend_duel_opened", "friend_duel_opened_events_total"),
+    ("friend_duel_created", "friend_duel_created_events_total"),
+    ("friend_duel_share_clicked", "friend_duel_share_clicked_events_total"),
+    ("friend_duel_joined", "friend_duel_joined_events_total"),
+    ("friend_duel_started", "friend_duel_started_events_total"),
+    ("friend_duel_completed", "friend_duel_completed_events_total"),
+    ("friend_duel_published_to_arena", "friend_duel_published_to_arena_events_total"),
+    ("friend_duel_revanche_clicked", "friend_duel_revanche_clicked_events_total"),
+    ("duel_limit_hit", "duel_limit_hit_events_total"),
+    ("duel_paywall_shown", "duel_paywall_shown_events_total"),
+    ("duel_ticket_clicked", "duel_ticket_clicked_events_total"),
+    ("premium_week_clicked", "premium_week_clicked_events_total"),
+)
+
 
 @pytest.mark.asyncio
 async def test_analytics_daily_aggregation_builds_expected_daily_kpis() -> None:
@@ -262,6 +291,17 @@ async def test_analytics_daily_aggregation_builds_expected_daily_kpis() -> None:
                     payload={},
                     happened_at=day_start_utc + timedelta(hours=7, minutes=14),
                 ),
+                *[
+                    AnalyticsEvent(
+                        event_type=event_type,
+                        source="BOT",
+                        user_id=user_1,
+                        local_date_berlin=local_day,
+                        payload={},
+                        happened_at=day_start_utc + timedelta(hours=8, minutes=offset),
+                    )
+                    for offset, (event_type, _field_name) in enumerate(DUEL_FUNNEL_EVENTS)
+                ],
             ]
         )
 
@@ -294,3 +334,5 @@ async def test_analytics_daily_aggregation_builds_expected_daily_kpis() -> None:
     assert row.purchase_precheckout_ok_events_total == 1
     assert row.purchase_paid_uncredited_events_total == 1
     assert row.purchase_credited_events_total == 1
+    for _event_type, field_name in DUEL_FUNNEL_EVENTS:
+        assert getattr(row, field_name) == 1

@@ -183,5 +183,9 @@ async def test_handle_friend_challenge_create_selected_uses_fallback_text_withou
         for button in row
         if button.callback_data
     ]
-    assert callbacks == ["home:open"]
+    assert callbacks == [
+        "arena:publish_friend:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "friend:delete:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "duels:friend",
+    ]
     assert callback.answer_calls == [{"text": None, "show_alert": False}]

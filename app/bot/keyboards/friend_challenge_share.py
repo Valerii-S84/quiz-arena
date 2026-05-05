@@ -9,6 +9,11 @@ from app.bot.keyboards.proof_card_share import (
     build_friend_challenge_invite_inline_share_query,
 )
 from app.game.duels import rollout as duel_rollout
+from app.game.duels.constants import (
+    ARENA_LIST_CALLBACK,
+    ARENA_PUBLISH_FRIEND_CALLBACK_PREFIX,
+    DUEL_FRIEND_CALLBACK,
+)
 
 
 def _build_share_url(*, invite_link: str, share_text: str) -> str:
@@ -26,64 +31,57 @@ def build_friend_challenge_share_keyboard(
     invite_link: str | None,
     challenge_id: str | None,
 ) -> InlineKeyboardMarkup:
-    if not invite_link or not challenge_id:
+    if not challenge_id:
         return InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
             ]
         )
-    rows = [
-        [
-            InlineKeyboardButton(
-                text="📤 Teilen ->",
-                switch_inline_query=build_friend_challenge_invite_inline_share_query(
-                    challenge_id=challenge_id
-                ),
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="✅ Einladung gesendet",
-                callback_data=f"friend:invite:sent:{challenge_id}",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                text="⚔️ Jetzt spielen",
-                callback_data=f"friend:invite:required:{challenge_id}",
-            )
-        ],
-    ]
-    rows.append([InlineKeyboardButton(text="⏳ Auf Freund warten", callback_data="menu:main")])
+    rows = _build_friend_created_rows(challenge_id=challenge_id, include_share=bool(invite_link))
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def build_friend_challenge_share_confirmed_keyboard(*, challenge_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        inline_keyboard=[
+        inline_keyboard=_build_friend_created_rows(challenge_id=challenge_id, include_share=True)
+    )
+
+
+def _build_friend_created_rows(
+    *,
+    challenge_id: str,
+    include_share: bool,
+) -> list[list[InlineKeyboardButton]]:
+    rows: list[list[InlineKeyboardButton]] = []
+    if include_share:
+        rows.append(
             [
                 InlineKeyboardButton(
-                    text="📤 Teilen ->",
+                    text="📤 Link teilen",
                     switch_inline_query=build_friend_challenge_invite_inline_share_query(
                         challenge_id=challenge_id
                     ),
                 )
-            ],
+            ]
+        )
+    rows.extend(
+        [
             [
                 InlineKeyboardButton(
-                    text="✅ Einladung gesendet",
-                    callback_data=f"friend:invite:sent:{challenge_id}",
+                    text="🏟 In der Arena veröffentlichen",
+                    callback_data=f"{ARENA_PUBLISH_FRIEND_CALLBACK_PREFIX}{challenge_id}",
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="⚔️ Jetzt spielen",
-                    callback_data=f"friend:next:{challenge_id}",
+                    text="❌ Duell abbrechen",
+                    callback_data=f"friend:delete:{challenge_id}",
                 )
             ],
-            [InlineKeyboardButton(text="⏳ Auf Freund warten", callback_data="menu:main")],
+            [InlineKeyboardButton(text="↩️ Zurück", callback_data=DUEL_FRIEND_CALLBACK)],
         ]
     )
+    return rows
 
 
 def build_friend_challenge_result_share_keyboard(
@@ -104,10 +102,14 @@ def build_friend_challenge_result_share_keyboard(
         rows.append(
             [
                 InlineKeyboardButton(
-                    text="🔁 REVANCHE",
+                    text="🔁 Revanche",
                     callback_data=f"friend:rematch:{challenge_id}",
                 )
             ]
         )
-    rows.append([InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")])
+        rows.append(
+            [InlineKeyboardButton(text="🏟 Offene Arena", callback_data=ARENA_LIST_CALLBACK)]
+        )
+    else:
+        rows.append([InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

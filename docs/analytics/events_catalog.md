@@ -61,29 +61,29 @@ Catalog of runtime product/operational events as implemented in code.
 | `friend_challenge_expired_notice_sent` | `app/workers/tasks/friend_challenges_async.py` | internal analytics dashboards |
 | `duel_expired` | duel analytics service + worker expiry path | internal analytics dashboards |
 | `duel_canceled_by_creator` | `app/game/sessions/service/friend_challenges_manage.py` | internal analytics dashboards |
-| `duel_menu_opened` | `app/bot/handlers/gameplay_duels.py` | internal analytics dashboards |
-| `duel_mode_selected` | `app/bot/handlers/gameplay_duels.py` | internal analytics dashboards |
-| `friend_duel_opened` | `app/bot/handlers/gameplay_duels.py` | internal analytics dashboards |
-| `friend_duel_created` | `app/game/sessions/service/friend_challenges_analytics.py`, `app/game/arena_duels/service.py` | internal analytics dashboards |
-| `friend_duel_share_clicked` | `app/bot/handlers/gameplay_flows/proof_card_flow.py` | internal analytics dashboards |
-| `friend_duel_joined` | `app/game/sessions/service/friend_challenges_join.py` | internal analytics dashboards |
-| `friend_duel_started` | `app/game/sessions/service/friend_challenges_rounds.py` | internal analytics dashboards |
-| `friend_duel_completed` | `app/game/sessions/service/sessions_submit_friend_challenge.py` | internal analytics dashboards |
-| `friend_duel_revanche_clicked` | `app/game/sessions/service/friend_challenges_analytics.py` | internal analytics dashboards |
-| `arena_opened` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
-| `arena_duel_created` | `app/game/arena_duels/service.py` | internal analytics dashboards |
-| `arena_duel_started` | `app/game/arena_duels/service.py`, `app/game/arena_duels/accept.py` | internal analytics dashboards |
-| `arena_duel_completed` | `app/game/arena_duels/service.py` | internal analytics dashboards |
-| `arena_duel_published` | `app/game/arena_duels/service.py`, `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
-| `arena_duel_accepted` | `app/game/arena_duels/accept.py` | internal analytics dashboards |
-| `arena_result_shown` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
-| `arena_result_beaten_notification_sent` | `app/workers/tasks/arena_duels.py` | internal analytics dashboards |
-| `arena_revanche_clicked` | `app/bot/handlers/gameplay_flows/arena_revanche_flow.py` | internal analytics dashboards |
-| `friend_duel_published_to_arena` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
-| `duel_limit_hit` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
-| `duel_paywall_shown` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
-| `duel_ticket_clicked` | `app/bot/handlers/payments.py` | internal analytics dashboards |
-| `premium_week_clicked` | `app/bot/handlers/payments.py` | internal analytics dashboards |
+| `duel_menu_opened` | `app/bot/handlers/gameplay_duels.py` | `analytics_daily` aggregation + dashboards |
+| `duel_mode_selected` | `app/bot/handlers/gameplay_duels.py` | `analytics_daily` aggregation + dashboards |
+| `friend_duel_opened` | `app/bot/handlers/gameplay_duels.py` | `analytics_daily` aggregation + dashboards |
+| `friend_duel_created` | `app/game/sessions/service/friend_challenges_analytics.py`, `app/game/arena_duels/service.py` | `analytics_daily` aggregation + dashboards |
+| `friend_duel_share_clicked` | `app/bot/handlers/gameplay_flows/proof_card_flow.py` | `analytics_daily` aggregation + dashboards |
+| `friend_duel_joined` | `app/game/sessions/service/friend_challenges_join.py` | `analytics_daily` aggregation + dashboards |
+| `friend_duel_started` | `app/game/sessions/service/friend_challenges_rounds.py` | `analytics_daily` aggregation + dashboards |
+| `friend_duel_completed` | `app/game/sessions/service/sessions_submit_friend_challenge.py` | `analytics_daily` aggregation + dashboards |
+| `friend_duel_revanche_clicked` | `app/game/sessions/service/friend_challenges_analytics.py` | `analytics_daily` aggregation + dashboards |
+| `arena_opened` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | `analytics_daily` aggregation + dashboards |
+| `arena_duel_created` | `app/game/arena_duels/service.py` | `analytics_daily` aggregation + dashboards |
+| `arena_duel_started` | `app/game/arena_duels/service.py`, `app/game/arena_duels/accept.py` | `analytics_daily` aggregation + dashboards |
+| `arena_duel_completed` | `app/game/arena_duels/service.py` | `analytics_daily` aggregation + dashboards |
+| `arena_duel_published` | `app/game/arena_duels/service.py`, `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | `analytics_daily` aggregation + dashboards |
+| `arena_duel_accepted` | `app/game/arena_duels/accept.py` | `analytics_daily` aggregation + dashboards |
+| `arena_result_shown` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | `analytics_daily` aggregation + dashboards |
+| `arena_result_beaten_notification_sent` | `app/workers/tasks/arena_duels.py` | `analytics_daily` aggregation + dashboards |
+| `arena_revanche_clicked` | `app/bot/handlers/gameplay_flows/arena_revanche_flow.py` | `analytics_daily` aggregation + dashboards |
+| `friend_duel_published_to_arena` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | `analytics_daily` aggregation + dashboards |
+| `duel_limit_hit` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | `analytics_daily` aggregation + dashboards |
+| `duel_paywall_shown` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | `analytics_daily` aggregation + dashboards |
+| `duel_ticket_clicked` | `app/bot/handlers/payments.py` | `analytics_daily` aggregation + dashboards |
+| `premium_week_clicked` | `app/bot/handlers/payments.py` | `analytics_daily` aggregation + dashboards |
 
 Arena/Duelle payload contract:
 - `user_id`: app user id when the event is user-scoped.
@@ -138,6 +138,32 @@ The hourly daily aggregator (`app/workers/tasks/analytics_daily.py`) currently c
 - `purchase_precheckout_ok`
 - `purchase_paid_uncredited`
 - `purchase_credited`
+- `duel_menu_opened`
+- `duel_mode_selected`
+- `arena_opened`
+- `arena_duel_created`
+- `arena_duel_started`
+- `arena_duel_completed`
+- `arena_duel_published`
+- `arena_duel_accepted`
+- `arena_result_shown`
+- `arena_result_beaten_notification_sent`
+- `arena_revanche_clicked`
+- `friend_duel_opened`
+- `friend_duel_created`
+- `friend_duel_share_clicked`
+- `friend_duel_joined`
+- `friend_duel_started`
+- `friend_duel_completed`
+- `friend_duel_published_to_arena`
+- `friend_duel_revanche_clicked`
+- `duel_limit_hit`
+- `duel_paywall_shown`
+- `duel_ticket_clicked`
+- `premium_week_clicked`
+
+These counters are persisted in `analytics_daily`, surfaced by `app/api/routes/internal_analytics.py`,
+and covered by repo/integration tests for the duel funnel aggregation path.
 
 ## 3) `outbox_events` Catalog
 

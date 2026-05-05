@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.application import build_bot
+from app.bot.keyboards.duels_access import build_duel_monetization_rows
 from app.core.analytics_events import BERLIN_TIMEZONE, EVENT_SOURCE_WORKER
 from app.db.repo.analytics_repo import AnalyticsRepo
 from app.db.repo.arena_duels_repo import ArenaDuelsRepo
@@ -31,6 +32,7 @@ def build_arena_beaten_notification_keyboard(
                     callback_data=f"arena:revanche:{source_attempt_id}",
                 )
             ],
+            *build_duel_monetization_rows(),
             [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
         ]
     )

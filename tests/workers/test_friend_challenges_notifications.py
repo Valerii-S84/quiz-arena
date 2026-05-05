@@ -130,3 +130,58 @@ async def test_send_deadline_notifications_pending_expired_uses_canonical_close_
         "friend:delete:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     ]
     assert "friend:open:repost:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" not in callbacks
+
+
+@pytest.mark.asyncio
+async def test_send_deadline_notifications_unplayed_reminder_offers_arena_publish(
+    monkeypatch,
+) -> None:
+    bot = _RecordingBot()
+
+    async def _fake_resolve_targets(user_ids):
+        return {user_id: user_id for user_id in user_ids}
+
+    monkeypatch.setattr(friend_challenges_notifications, "build_bot", lambda: bot)
+    monkeypatch.setattr(
+        friend_challenges_notifications,
+        "resolve_telegram_targets",
+        _fake_resolve_targets,
+    )
+
+    await friend_challenges_notifications.send_deadline_notifications(
+        now_utc=datetime.now(timezone.utc),
+        reminder_items=[
+            {
+                "challenge_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                "target_user_id": 10,
+                "creator_user_id": 10,
+                "opponent_user_id": None,
+                "status": "PENDING",
+                "expires_at": datetime(2026, 5, 5, 13, 0, tzinfo=timezone.utc),
+                "reminder_kind": "unplayed",
+            }
+        ],
+        expired_items=[],
+    )
+
+    assert len(bot.sent_messages) == 1
+    message = bot.sent_messages[0]
+    assert message["text"] == "\n\n".join(
+        [
+            TEXTS_DE["msg.friend.challenge.reminder.unplayed"],
+            TEXTS_DE["msg.friend.challenge.reminder.publish_hint"],
+        ]
+    )
+    reply_markup = message["reply_markup"]
+    assert isinstance(reply_markup, InlineKeyboardMarkup)
+    buttons = [button for row in reply_markup.inline_keyboard for button in row]
+    assert [button.text for button in buttons] == [
+        "🏟 In der Arena veröffentlichen",
+        "⏳ Weiter warten",
+        "❌ Schließen",
+    ]
+    assert [button.callback_data for button in buttons if button.callback_data] == [
+        "arena:publish_friend:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "home:open",
+        "friend:delete:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    ]

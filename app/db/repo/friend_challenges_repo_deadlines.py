@@ -25,7 +25,9 @@ class FriendChallengesRepoDeadlineMixin:
             select(FriendChallenge)
             .where(
                 FriendChallenge.tournament_match_id.is_(None),
-                FriendChallenge.status.in_(("ACCEPTED", "CREATOR_DONE", "OPPONENT_DONE", "ACTIVE")),
+                FriendChallenge.status.in_(
+                    ("PENDING", "ACCEPTED", "CREATOR_DONE", "OPPONENT_DONE", "ACTIVE")
+                ),
                 FriendChallenge.expires_at > now_utc,
                 FriendChallenge.expires_at <= expires_before_utc,
                 FriendChallenge.expires_last_chance_notified_at.is_(None),

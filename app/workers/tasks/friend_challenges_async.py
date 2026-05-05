@@ -7,7 +7,11 @@ import structlog
 from app.core.analytics_events import EVENT_SOURCE_WORKER, emit_analytics_event
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.session import SessionLocal
-from app.game.friend_challenges.constants import DUEL_STATUS_CREATOR_DONE, DUEL_STATUS_OPPONENT_DONE
+from app.game.friend_challenges.constants import (
+    DUEL_STATUS_CREATOR_DONE,
+    DUEL_STATUS_OPPONENT_DONE,
+    DUEL_STATUS_PENDING,
+)
 from app.game.sessions.service.constants import DUEL_MAX_PUSH_PER_USER
 from app.game.sessions.service.friend_challenges_internal import _expire_friend_challenge_if_due
 from app.workers.tasks.friend_challenges_config import DEADLINE_BATCH_SIZE, LAST_CHANCE_SECONDS
@@ -35,7 +39,16 @@ async def run_friend_challenge_deadlines_async(
         )
         for challenge in due_last_chance:
             reminder_user_id: int | None = None
+            reminder_kind = "turn"
             if (
+                challenge.status == DUEL_STATUS_PENDING
+                and challenge.opponent_user_id is None
+                and challenge.creator_push_count < DUEL_MAX_PUSH_PER_USER
+            ):
+                challenge.creator_push_count += 1
+                reminder_user_id = int(challenge.creator_user_id)
+                reminder_kind = "unplayed"
+            elif (
                 challenge.status == DUEL_STATUS_CREATOR_DONE
                 and challenge.opponent_user_id is not None
                 and challenge.opponent_push_count < DUEL_MAX_PUSH_PER_USER
@@ -64,6 +77,7 @@ async def run_friend_challenge_deadlines_async(
                     ),
                     "status": challenge.status,
                     "expires_at": challenge.expires_at,
+                    "reminder_kind": reminder_kind,
                 }
             )
 

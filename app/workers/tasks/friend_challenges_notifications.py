@@ -81,13 +81,25 @@ async def _send_last_chance_reminders(
         if not isinstance(expires_at, datetime) or not isinstance(target_user_id, int):
             continue
         hours, minutes = format_remaining_hhmm(now_utc=now_utc, expires_at=expires_at)
+        is_unplayed = item.get("reminder_kind") == "unplayed"
+        text = (
+            _build_unplayed_friend_challenge_text(can_publish_to_arena=True)
+            if is_unplayed
+            else f"⏳ Dein Freund hat gespielt. Jetzt bist du dran! ({hours:02d}:{minutes:02d}h)"
+        )
+        reply_markup = (
+            build_friend_pending_expired_keyboard(
+                challenge_id=str(item["challenge_id"]),
+                can_publish_to_arena=True,
+            )
+            if is_unplayed
+            else build_friend_challenge_next_keyboard(challenge_id=str(item["challenge_id"]))
+        )
         sent = await _send_message(
             bot=bot,
             chat_id=telegram_targets.get(target_user_id),
-            text=f"⏳ Dein Freund hat gespielt. Jetzt bist du dran! ({hours:02d}:{minutes:02d}h)",
-            reply_markup=build_friend_challenge_next_keyboard(
-                challenge_id=str(item["challenge_id"])
-            ),
+            text=text,
+            reply_markup=reply_markup,
         )
         reminders_sent += int(sent)
         reminders_failed += int(not sent)
@@ -98,6 +110,7 @@ async def _send_last_chance_reminders(
                 "sent_to": int(sent),
                 "failed_to": int(not sent),
                 "expires_at": expires_at.isoformat(),
+                "reminder_kind": str(item.get("reminder_kind") or "turn"),
             }
         )
     return reminders_sent, reminders_failed, reminder_events
