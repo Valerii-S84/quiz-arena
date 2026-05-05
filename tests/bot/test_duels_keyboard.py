@@ -50,7 +50,7 @@ def test_duels_keyboards_do_not_offer_topic_level_or_format_selection() -> None:
         build_arena_create_keyboard(),
         build_arena_expired_guard_keyboard(),
         build_arena_guard_back_keyboard(),
-        build_arena_published_keyboard(),
+        build_arena_published_keyboard(duel_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
         build_arena_result_keyboard(user_won=True),
         build_arena_revanche_confirm_keyboard(
             source_attempt_id="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
@@ -77,12 +77,27 @@ def test_arena_guard_keyboards_match_vision() -> None:
     single_back_buttons = _buttons(build_arena_guard_back_keyboard())
 
     assert [button.text for button in expired_buttons] == [
-        "🏟 Zur Arena",
         "🎯 Eigenes Arena-Duell erstellen",
+        "🏟 Zur Arena",
     ]
-    assert [button.callback_data for button in expired_buttons] == ["arena:list", "arena:create"]
+    assert [button.callback_data for button in expired_buttons] == ["arena:create", "arena:list"]
     assert [button.text for button in single_back_buttons] == ["🏟 Zur Arena"]
     assert [button.callback_data for button in single_back_buttons] == ["arena:list"]
+
+
+def test_arena_published_keyboard_has_one_action_and_arena_back() -> None:
+    buttons = _buttons(
+        build_arena_published_keyboard(duel_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    )
+
+    assert [button.text for button in buttons] == [
+        "👤 Freund herausfordern",
+        "🏟 Zur Arena",
+    ]
+    assert [button.callback_data for button in buttons] == [
+        "arena:challenge_friend:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "arena:list",
+    ]
 
 
 def test_friend_duel_clean_entry_uses_single_default_create_callback() -> None:
@@ -123,12 +138,10 @@ def test_arena_result_win_keyboard_includes_revanche_first() -> None:
 
     assert [button.text for button in buttons] == [
         "🔁 Revanche",
-        "🎯 Eigenes Arena-Duell erstellen",
         "🏟 Zur Arena",
     ]
     assert [button.callback_data for button in buttons] == [
         "arena:revanche:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-        "arena:create",
         "arena:list",
     ]
 

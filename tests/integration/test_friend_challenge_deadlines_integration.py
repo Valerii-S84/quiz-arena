@@ -41,7 +41,7 @@ async def test_deadline_worker_marks_pending_as_expired_and_collects_push_payloa
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=5,
+            total_rounds=7,
         )
         row = await FriendChallengesRepo.get_by_id_for_update(session, challenge.challenge_id)
         assert row is not None
@@ -76,7 +76,7 @@ async def test_deadline_worker_sets_walkover_with_technical_win_or_draw(
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=5,
+            total_rounds=7,
         )
         await GameSessionService.join_friend_challenge_by_id(
             session,
@@ -100,7 +100,7 @@ async def test_deadline_worker_sets_walkover_with_technical_win_or_draw(
             creator_user_id=creator_user_id_2,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=5,
+            total_rounds=7,
         )
         await GameSessionService.join_friend_challenge_by_id(
             session,
@@ -154,7 +154,7 @@ async def test_deadline_worker_skips_tournament_duels(
             creator_user_id=creator_user_id,
             opponent_user_id=opponent_user_id,
             mode_code="QUICK_MIX_A1A2",
-            total_rounds=5,
+            total_rounds=7,
             tournament_match_id=uuid4(),
             now_utc=now_utc,
             expires_at=now_utc - timedelta(minutes=1),

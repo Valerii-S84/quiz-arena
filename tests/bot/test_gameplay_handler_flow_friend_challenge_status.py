@@ -230,5 +230,5 @@ async def test_handle_friend_challenge_share_result_sends_inline_share_and_emits
         if button.switch_inline_query
     ]
     assert inline_queries == ["proof:duel:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
-    assert emitted == ["duel_share_clicked"]
+    assert emitted == ["friend_duel_share_clicked"]
     assert enqueued == [("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", 10)]

@@ -10,11 +10,6 @@ FRIEND_CHALLENGE_LEVEL_SEQUENCE: tuple[str, ...] = (
     "A2",
     "A2",
     "A2",
-    "A2",
-    "A2",
-    "B1",
-    "B1",
-    "B1",
 )
 
 

@@ -269,7 +269,7 @@ def test_friend_challenge_share_keyboard_without_link_contains_back_only() -> No
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert all(button.url is None for button in buttons)
     callbacks = [button.callback_data for button in buttons]
-    assert callbacks == ["friend:my:duels", "home:open"]
+    assert callbacks == ["home:open"]
 
 
 def test_friend_challenge_start_keyboard_contains_single_cta() -> None:

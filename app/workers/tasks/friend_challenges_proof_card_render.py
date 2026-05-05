@@ -77,7 +77,7 @@ if __name__ == "__main__":
         opponent_name="AnnaSchmidt",
         creator_score=10,
         opponent_score=8,
-        total_rounds=12,
+        total_rounds=7,
         completed_at=datetime.now(timezone.utc),
     )
     output = Path(__file__).resolve().parents[3] / "proof_card_preview.png"

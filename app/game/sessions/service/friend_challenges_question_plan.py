@@ -9,16 +9,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.economy.streak.constants import BERLIN_TIMEZONE
 from app.economy.streak.time import berlin_local_date
+from app.game.duels.constants import DUEL_QUESTION_COUNT
 from app.game.sessions.errors import FriendChallengeAccessError
 
 from .levels import _friend_challenge_level_for_round
 
-_DUEL_FORMAT_ROUNDS: frozenset[int] = frozenset({5, 7, 12})
+_DUEL_FORMAT_ROUNDS: frozenset[int] = frozenset({DUEL_QUESTION_COUNT})
+_TOURNAMENT_FORMAT_ROUNDS: frozenset[int] = frozenset({5, 12, DUEL_QUESTION_COUNT})
 
 
 def resolve_duel_rounds(*, total_rounds: int) -> int:
     resolved_rounds = int(total_rounds)
     if resolved_rounds not in _DUEL_FORMAT_ROUNDS:
+        raise FriendChallengeAccessError
+    return resolved_rounds
+
+
+def resolve_tournament_rounds(*, total_rounds: int) -> int:
+    resolved_rounds = int(total_rounds)
+    if resolved_rounds not in _TOURNAMENT_FORMAT_ROUNDS:
         raise FriendChallengeAccessError
     return resolved_rounds
 

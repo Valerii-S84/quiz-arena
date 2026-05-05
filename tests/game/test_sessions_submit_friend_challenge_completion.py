@@ -88,7 +88,7 @@ async def test_creator_win_completes_duel_and_emits_analytics(
     assert snapshot.winner_user_id == 11
     assert round_completed is True
     assert waiting is False
-    assert analytics_events[0]["event_type"] == "duel_completed"
+    assert analytics_events[0]["event_type"] == "friend_duel_completed"
     payload = analytics_events[0]["payload"]
     assert isinstance(payload, dict)
     assert payload["winner_user_id"] == 11
@@ -137,7 +137,7 @@ async def test_opponent_final_answer_resolves_winner(
 async def test_creator_done_status_is_set_before_opponent_finishes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    row = challenge(total_rounds=5, creator_answered_round=4, opponent_answered_round=3)
+    row = challenge(total_rounds=7, creator_answered_round=6, opponent_answered_round=3)
     monkeypatch.setattr(
         sessions_submit_friend_challenge.FriendChallengesRepo,
         "get_by_id_for_update",
@@ -147,7 +147,7 @@ async def test_creator_done_status_is_set_before_opponent_finishes(
     snapshot, round_completed, waiting = (
         await sessions_submit_friend_challenge._apply_friend_challenge_answer(
             Session(),
-            quiz_session=quiz_session(challenge_id=row.id, user_id=11, round_no=5),
+            quiz_session=quiz_session(challenge_id=row.id, user_id=11, round_no=7),
             user_id=11,
             is_correct=True,
             now_utc=NOW_UTC,

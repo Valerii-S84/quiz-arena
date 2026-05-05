@@ -36,6 +36,7 @@ ARENA_START_CREATE_CALLBACK = "arena:start_create"
 ARENA_ACCEPT_CALLBACK_PREFIX = "arena:accept:"
 ARENA_START_ATTEMPT_CALLBACK_PREFIX = "arena:start_attempt:"
 ARENA_PUBLISH_FRIEND_CALLBACK_PREFIX = "arena:publish_friend:"
+ARENA_CHALLENGE_FRIEND_CALLBACK_PREFIX = "arena:challenge_friend:"
 
 FRIEND_DUEL_CREATE_CALLBACK = "friend:challenge:format:direct:7"
 

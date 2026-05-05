@@ -32,7 +32,7 @@ async def test_completed_tournament_match_uses_tournament_keyboard_without_remat
         tournament_match_id,
     ):
         del session_local, tournament_match_id
-        return f"friend:tournament:view:{tournament_id}"
+        return f"tournament:view:{tournament_id}"
 
     def _fake_enqueue_tournament_post_match_updates(*, tournament_id: str) -> None:
         enqueued.append(tournament_id)
@@ -109,7 +109,7 @@ async def test_completed_tournament_match_uses_tournament_keyboard_without_remat
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert "📊 Turnier-Tabelle" in labels
     assert "🔄 Revanche" not in labels
-    assert f"friend:tournament:view:{tournament_id}" in callbacks
+    assert f"tournament:view:{tournament_id}" in callbacks
     assert enqueued == [tournament_id]
 
 
@@ -193,7 +193,7 @@ async def test_completed_daily_cup_match_uses_daily_cup_view_callback(monkeypatc
     buttons = [button for row in response.kwargs["reply_markup"].inline_keyboard for button in row]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert f"daily:cup:view:{tournament_id}" in callbacks
-    assert f"friend:tournament:view:{tournament_id}" not in callbacks
+    assert f"tournament:view:{tournament_id}" not in callbacks
 
 
 def test_enqueue_tournament_post_match_updates_does_not_enqueue_daily_cup_proof_cards(

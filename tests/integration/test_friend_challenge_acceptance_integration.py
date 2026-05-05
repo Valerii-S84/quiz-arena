@@ -32,7 +32,7 @@ async def test_open_challenge_concurrent_accept_allows_only_one_opponent() -> No
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
             challenge_type=DUEL_TYPE_OPEN,
-            total_rounds=5,
+            total_rounds=7,
         )
 
     async def _join(user_id: int):
@@ -79,7 +79,7 @@ async def test_join_after_expired_returns_expired_error() -> None:
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
             challenge_type=DUEL_TYPE_OPEN,
-            total_rounds=5,
+            total_rounds=7,
         )
         row = await FriendChallengesRepo.get_by_id_for_update(session, challenge.challenge_id)
         assert row is not None
@@ -109,7 +109,7 @@ async def test_join_after_completed_returns_completed_error() -> None:
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
             challenge_type=DUEL_TYPE_OPEN,
-            total_rounds=5,
+            total_rounds=7,
         )
         await GameSessionService.join_friend_challenge_by_id(
             session,

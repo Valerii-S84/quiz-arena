@@ -73,18 +73,6 @@ async def repost_friend_challenge_as_open(
         challenge_type=DUEL_TYPE_OPEN,
         total_rounds=challenge.total_rounds,
     )
-    await emit_analytics_event(
-        session,
-        event_type="duel_reposted_as_open",
-        source=EVENT_SOURCE_BOT,
-        happened_at=now_utc,
-        user_id=user_id,
-        payload={
-            "source_challenge_id": str(challenge.id),
-            "repost_challenge_id": str(repost.challenge_id),
-            "format": repost.total_rounds,
-        },
-    )
     return repost
 
 

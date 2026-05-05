@@ -10,6 +10,7 @@ from app.bot.keyboards.friend_challenge import (
 )
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.game.arena_duels.analytics import ARENA_EVENT_FRIEND_DUEL_SHARE_CLICKED
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 
 
@@ -87,7 +88,7 @@ async def handle_friend_challenge_share_result(
 
         await emit_analytics_event(
             session,
-            event_type="duel_share_clicked",
+            event_type=ARENA_EVENT_FRIEND_DUEL_SHARE_CLICKED,
             source=event_source_bot,
             happened_at=now_utc,
             user_id=snapshot.user_id,

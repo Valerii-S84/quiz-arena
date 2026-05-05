@@ -13,7 +13,7 @@ from .friend_challenges_internal import (
     _build_friend_challenge_snapshot,
     _create_friend_challenge_row,
 )
-from .friend_challenges_question_plan import resolve_duel_rounds, select_duel_question_ids
+from .friend_challenges_question_plan import resolve_tournament_rounds, select_duel_question_ids
 
 
 async def create_tournament_match_friend_challenge(
@@ -30,7 +30,7 @@ async def create_tournament_match_friend_challenge(
     expires_at: datetime | None = None,
     preferred_levels_by_round: Sequence[str] | None = None,
 ) -> FriendChallengeSnapshot:
-    resolved_rounds = resolve_duel_rounds(total_rounds=total_rounds)
+    resolved_rounds = resolve_tournament_rounds(total_rounds=total_rounds)
     challenge_id = uuid4()
     question_ids = await select_duel_question_ids(
         session,

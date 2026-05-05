@@ -23,7 +23,7 @@ async def test_friend_challenge_rematch_creates_bound_opponent_duel() -> None:
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=5,
+            total_rounds=7,
         )
         await GameSessionService.join_friend_challenge_by_token(
             session,
@@ -32,7 +32,7 @@ async def test_friend_challenge_rematch_creates_bound_opponent_duel() -> None:
             now_utc=now_utc,
         )
         final_answer = None
-        for round_no in range(1, 6):
+        for round_no in range(1, 8):
             creator_round = await GameSessionService.start_friend_challenge_round(
                 session,
                 user_id=creator_user_id,
@@ -90,7 +90,7 @@ async def test_friend_challenge_rematch_creates_bound_opponent_duel() -> None:
         )
         assert rematch.creator_user_id == creator_user_id
         assert rematch.opponent_user_id == opponent_user_id
-        assert rematch.total_rounds == 5
+        assert rematch.total_rounds == 7
 
         rematch_creator_round = await GameSessionService.start_friend_challenge_round(
             session,

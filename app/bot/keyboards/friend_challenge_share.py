@@ -29,7 +29,6 @@ def build_friend_challenge_share_keyboard(
     if not invite_link or not challenge_id:
         return InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="⚔️ Meine Duelle", callback_data="friend:my:duels")],
                 [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
             ]
         )

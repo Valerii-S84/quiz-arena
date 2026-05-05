@@ -6,7 +6,7 @@ from uuid import UUID
 
 import pytest
 
-from app.bot.handlers import gameplay, gameplay_friend_challenge
+from app.bot.handlers import gameplay, gameplay_friend_challenge, gameplay_friend_challenge_lobby
 from app.bot.handlers.gameplay_flows import friend_lobby_flow
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.types import FriendChallengeSnapshot
@@ -14,25 +14,16 @@ from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
 
 @pytest.mark.asyncio
-async def test_handle_friend_challenge_type_legacy_callback_redirects_to_canonical_duel_entry() -> (
-    None
-):
+async def test_handle_friend_challenge_type_legacy_callback_returns_clean_error() -> None:
     callback = DummyCallback(
         data="friend:challenge:type:direct",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(),
     )
-    await gameplay_friend_challenge.handle_friend_challenge_type_selected(callback)
+    await gameplay_friend_challenge_lobby.handle_friend_challenge_type_selected(callback)
 
-    response = callback.message.answers[0]
-    assert response.text == TEXTS_DE["msg.duels.friend"]
-    callbacks = [
-        button.callback_data
-        for row in response.kwargs["reply_markup"].inline_keyboard
-        for button in row
-        if button.callback_data
-    ]
-    assert callbacks == ["friend:challenge:format:direct:7", "duels:menu"]
+    assert callback.message.answers == []
+    assert callback.answer_calls == [{"text": TEXTS_DE["msg.system.error"], "show_alert": True}]
 
 
 @pytest.mark.asyncio

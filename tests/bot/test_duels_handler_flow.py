@@ -97,10 +97,10 @@ async def test_friend_duel_handler_uses_direct_seven_question_create_callback() 
     assert "friend:challenge:type:direct" not in callbacks
     assert "friend:challenge:format:direct:5" not in callbacks
     assert "friend:challenge:format:direct:12" not in callbacks
-    assert "friend:tournament:create" not in callbacks
+    assert "tournament:create" not in callbacks
     assert "create_tournament_start" not in callbacks
-    assert "friend:tournament:format:5" not in callbacks
-    assert "friend:tournament:format:12" not in callbacks
+    assert "tournament:format:5" not in callbacks
+    assert "tournament:format:12" not in callbacks
 
 
 @pytest.mark.asyncio

@@ -42,7 +42,7 @@ async def test_handle_tournament_copy_link_rejects_missing_data() -> None:
 @pytest.mark.asyncio
 async def test_handle_tournament_copy_link_rejects_invalid_uuid() -> None:
     callback = DummyCallback(
-        data="friend:tournament:copy:not-a-uuid",
+        data="tournament:copy:not-a-uuid",
         from_user=SimpleNamespace(id=7),
         message=DummyMessage(),
     )
@@ -65,7 +65,7 @@ async def test_handle_tournament_copy_link_passes_expected_dependencies(monkeypa
     monkeypatch.setattr(tournament_lobby_flow, "handle_tournament_copy_link", _fake_handle)
 
     callback = DummyCallback(
-        data=f"friend:tournament:copy:{tournament_id}",
+        data=f"tournament:copy:{tournament_id}",
         from_user=SimpleNamespace(id=7),
         message=DummyMessage(),
     )
@@ -95,7 +95,7 @@ async def test_handle_tournament_view_passes_expected_dependencies(monkeypatch) 
     monkeypatch.setattr(tournament_lobby_flow, "handle_tournament_view", _fake_handle)
 
     callback = DummyCallback(
-        data=f"friend:tournament:view:{tournament_id}",
+        data=f"tournament:view:{tournament_id}",
         from_user=SimpleNamespace(id=7),
         message=DummyMessage(),
     )
@@ -122,7 +122,7 @@ async def test_handle_tournament_share_passes_expected_dependencies(monkeypatch)
     monkeypatch.setattr(tournament_flow, "handle_tournament_share_result", _fake_handle)
 
     callback = DummyCallback(
-        data=f"friend:tournament:share:{tournament_id}",
+        data=f"tournament:share:{tournament_id}",
         from_user=SimpleNamespace(id=7),
         message=DummyMessage(),
     )
@@ -168,7 +168,7 @@ async def test_handle_tournament_copy_link_maps_exceptions_to_user_facing_alerts
     monkeypatch.setattr(tournament_lobby_flow, "handle_tournament_copy_link", _fake_handle)
 
     callback = DummyCallback(
-        data="friend:tournament:copy:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        data="tournament:copy:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         from_user=SimpleNamespace(id=7),
         message=DummyMessage(),
     )

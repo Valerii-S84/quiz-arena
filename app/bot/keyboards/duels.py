@@ -7,6 +7,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from app.bot.keyboards import duels_access
 from app.game.duels.constants import (
     ARENA_ACCEPT_CALLBACK_PREFIX,
+    ARENA_CHALLENGE_FRIEND_CALLBACK_PREFIX,
     ARENA_CREATE_CALLBACK,
     ARENA_LIST_CALLBACK,
     ARENA_START_ATTEMPT_CALLBACK_PREFIX,
@@ -89,13 +90,13 @@ def build_arena_back_keyboard() -> InlineKeyboardMarkup:
 def build_arena_expired_guard_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
             [
                 InlineKeyboardButton(
                     text="🎯 Eigenes Arena-Duell erstellen",
                     callback_data=ARENA_CREATE_CALLBACK,
                 )
             ],
+            [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
         ]
     )
 
@@ -131,21 +132,16 @@ def build_arena_create_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def build_arena_published_keyboard() -> InlineKeyboardMarkup:
+def build_arena_published_keyboard(*, duel_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="👤 Freund herausfordern",
+                    callback_data=f"{ARENA_CHALLENGE_FRIEND_CALLBACK_PREFIX}{duel_id}",
+                )
+            ],
             [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
-            [
-                InlineKeyboardButton(
-                    text="👤 Freund herausfordern", callback_data=DUEL_FRIEND_CALLBACK
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="🎯 Neues Arena-Duell erstellen",
-                    callback_data=ARENA_CREATE_CALLBACK,
-                )
-            ],
         ]
     )
 
@@ -166,7 +162,7 @@ def build_arena_result_keyboard(
                 )
             ]
         )
-    if user_won:
+    else:
         rows.append(
             [
                 InlineKeyboardButton(
@@ -176,15 +172,6 @@ def build_arena_result_keyboard(
             ]
         )
     rows.append([InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)])
-    if not user_won and not close_loss:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text="🎯 Eigenes Arena-Duell erstellen",
-                    callback_data=ARENA_CREATE_CALLBACK,
-                )
-            ]
-        )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

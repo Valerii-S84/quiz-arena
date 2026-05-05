@@ -14,7 +14,7 @@ from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standin
 def _build_view_callback_data(*, tournament_id: str, tournament_type: str) -> str:
     if tournament_type in DAILY_CUP_TOURNAMENT_TYPES:
         return f"daily:cup:view:{tournament_id}"
-    return f"friend:tournament:view:{tournament_id}"
+    return f"tournament:view:{tournament_id}"
 
 
 def build_tournament_post_match_text(
@@ -57,7 +57,7 @@ def build_tournament_post_match_keyboard(
     rows: list[list[InlineKeyboardButton]] = []
     callback_data = tournament_view_callback_data
     if callback_data is None and tournament_id is not None:
-        callback_data = f"friend:tournament:view:{tournament_id}"
+        callback_data = f"tournament:view:{tournament_id}"
     if callback_data is not None:
         rows.append(
             [

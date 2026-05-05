@@ -34,6 +34,8 @@ async def test_duel_question_plan_avoids_repeating_source_file_between_rounds(
         "round_3_source_c": _fake_record("round_3_source_c", source_file="source_c.csv"),
         "round_4_source_d": _fake_record("round_4_source_d", source_file="source_d.csv"),
         "round_5_source_e": _fake_record("round_5_source_e", source_file="source_e.csv"),
+        "round_6_source_f": _fake_record("round_6_source_f", source_file="source_f.csv"),
+        "round_7_source_g": _fake_record("round_7_source_g", source_file="source_g.csv"),
     }
 
     async def fake_list_question_ids_all_active(  # noqa: ANN001
@@ -50,7 +52,13 @@ async def test_duel_question_plan_avoids_repeating_source_file_between_rounds(
             return ["round_2_same_source", "round_2_new_source"]
         return [
             question_id
-            for question_id in ("round_3_source_c", "round_4_source_d", "round_5_source_e")
+            for question_id in (
+                "round_3_source_c",
+                "round_4_source_d",
+                "round_5_source_e",
+                "round_6_source_f",
+                "round_7_source_g",
+            )
             if question_id not in selected
         ]
 
@@ -82,12 +90,12 @@ async def test_duel_question_plan_avoids_repeating_source_file_between_rounds(
     selected = await select_duel_question_ids(
         _Session(),
         mode_code="QUICK_MIX_A1A2",
-        total_rounds=5,
+        total_rounds=7,
         now_utc=datetime(2026, 5, 7, 10, 0, tzinfo=UTC),
         challenge_seed="duel-source-diversity",
-        preferred_levels_by_round=("A1", "A1", "A1", "A1", "A1"),
+        preferred_levels_by_round=("A1", "A1", "A1", "A1", "A1", "A2", "A2"),
     )
 
     assert selected[0] == "round_1_source_a"
     assert selected[1] == "round_2_new_source"
-    assert len(selected) == 5
+    assert len(selected) == 7

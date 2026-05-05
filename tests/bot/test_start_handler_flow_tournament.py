@@ -100,7 +100,7 @@ async def test_handle_start_tournament_payload_shows_lobby_and_join_button(monke
         for button in row
         if button.callback_data
     ]
-    assert "friend:tournament:join:abcdefabcdef" in callbacks
+    assert "tournament:join:abcdefabcdef" in callbacks
 
 
 @pytest.mark.asyncio

@@ -20,8 +20,8 @@ def test_tournament_share_url_encodes_base_and_text() -> None:
 def test_tournament_format_keyboard_contains_5_12_and_back() -> None:
     keyboard = build_tournament_format_keyboard()
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
-    assert "friend:tournament:format:5" in callbacks
-    assert "friend:tournament:format:12" in callbacks
+    assert "tournament:format:5" in callbacks
+    assert "tournament:format:12" in callbacks
     assert "home:open" in callbacks
     assert "friend:challenge:create" not in callbacks
     assert "friend:challenge:format:direct:7" not in callbacks
@@ -37,9 +37,9 @@ def test_tournament_created_keyboard_contains_share_copy_and_optional_start() ->
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert any(button.url and "https://t.me/share/url" in button.url for button in buttons)
     callbacks = [button.callback_data for button in buttons if button.callback_data]
-    assert "friend:tournament:copy:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
-    assert "friend:tournament:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
-    assert "friend:tournament:view:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
+    assert "tournament:copy:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
+    assert "tournament:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
+    assert "tournament:view:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
 
 
 def test_tournament_lobby_keyboard_contains_join_play_and_share_when_enabled() -> None:
@@ -57,11 +57,11 @@ def test_tournament_lobby_keyboard_contains_join_play_and_share_when_enabled() -
         for button in row
         if button.callback_data
     ]
-    assert "friend:tournament:join:abcdefabcdef" in callbacks
-    assert "friend:tournament:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
+    assert "tournament:join:abcdefabcdef" in callbacks
+    assert "tournament:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
     assert "friend:next:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" in callbacks
-    assert "friend:tournament:share:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
-    assert "friend:tournament:create:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
+    assert "tournament:share:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
+    assert "tournament:create:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
     assert "create_tournament_start" not in callbacks
     assert "friend:challenge:create" not in callbacks
     assert "friend:challenge:format:direct:7" not in callbacks
@@ -76,5 +76,5 @@ def test_tournament_share_keyboard_contains_url_and_refresh() -> None:
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert any(button.url and "https://t.me/share/url" in button.url for button in buttons)
     callbacks = [button.callback_data for button in buttons if button.callback_data]
-    assert "friend:tournament:view:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
+    assert "tournament:view:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
     assert "home:open" in callbacks

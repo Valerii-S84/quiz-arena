@@ -67,7 +67,7 @@ async def test_friend_challenge_opponent_finish_sends_exactly_one_push_if_creato
     opponent_telegram_user_id = await telegram_user_id(opponent_user_id)
 
     notifications: list[tuple[int, str, str | None]] = []
-    for round_no in range(1, 6):
+    for round_no in range(1, 8):
         result = await submit_friend_round_answer(
             user_id=opponent_user_id,
             challenge_id=challenge_id,
@@ -107,7 +107,7 @@ async def test_friend_challenge_opponent_finish_skips_push_if_creator_already_st
     )
 
     notifications: list[tuple[int, str, str | None]] = []
-    for round_no in range(1, 6):
+    for round_no in range(1, 8):
         result = await submit_friend_round_answer(
             user_id=opponent_user_id,
             challenge_id=challenge_id,

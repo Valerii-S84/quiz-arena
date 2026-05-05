@@ -169,7 +169,7 @@ async def test_friend_challenge_flow_emits_created_joined_completed_and_rematch_
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=5,
+            total_rounds=7,
         )
         await GameSessionService.join_friend_challenge_by_token(
             session,
@@ -177,7 +177,7 @@ async def test_friend_challenge_flow_emits_created_joined_completed_and_rematch_
             invite_token=challenge.invite_token,
             now_utc=now_utc + timedelta(seconds=1),
         )
-        for round_no in range(1, 6):
+        for round_no in range(1, 8):
             creator_round = await GameSessionService.start_friend_challenge_round(
                 session,
                 user_id=creator_user_id,
@@ -230,14 +230,14 @@ async def test_friend_challenge_flow_emits_created_joined_completed_and_rematch_
             now_utc=now_utc + timedelta(seconds=20),
         )
 
-    creator_created = await _list_user_events(
-        creator_user_id, event_type="friend_challenge_created"
+    creator_created = await _list_user_events(creator_user_id, event_type="friend_duel_created")
+    opponent_joined = await _list_user_events(opponent_user_id, event_type="friend_duel_joined")
+    opponent_completed = await _list_user_events(
+        opponent_user_id, event_type="friend_duel_completed"
     )
-    opponent_joined = await _list_user_events(
-        opponent_user_id, event_type="friend_challenge_joined"
+    creator_rematch = await _list_user_events(
+        creator_user_id, event_type="friend_duel_revanche_clicked"
     )
-    opponent_completed = await _list_user_events(opponent_user_id, event_type="duel_completed")
-    creator_rematch = await _list_user_events(creator_user_id, event_type="duel_revanche_created")
 
     assert len(creator_created) >= 2
     assert len(opponent_joined) == 1

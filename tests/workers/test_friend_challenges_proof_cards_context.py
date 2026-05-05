@@ -50,7 +50,7 @@ def _challenge(
         opponent_user_id=20,
         creator_score=4,
         opponent_score=2,
-        total_rounds=5,
+        total_rounds=7,
         completed_at=datetime(2026, 3, 1, 18, 0, tzinfo=timezone.utc),
         creator_proof_card_file_id=creator_file_id,
         opponent_proof_card_file_id=opponent_file_id,

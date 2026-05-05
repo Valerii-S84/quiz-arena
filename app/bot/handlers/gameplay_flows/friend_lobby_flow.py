@@ -22,6 +22,7 @@ from app.game.sessions.errors import (
     FriendChallengeNotFoundError,
     FriendChallengePaymentRequiredError,
 )
+from app.game.sessions.types import FriendChallengeSnapshot
 
 from . import friend_my_duels_flow
 
@@ -87,6 +88,23 @@ async def handle_friend_challenge_create_selected(
             )
             await callback.answer()
             return
+    await send_friend_challenge_invite(
+        callback,
+        challenge=challenge,
+        build_friend_invite_link=build_friend_invite_link,
+    )
+    await callback.answer()
+
+
+async def send_friend_challenge_invite(
+    callback: CallbackQuery,
+    *,
+    challenge: FriendChallengeSnapshot,
+    build_friend_invite_link,
+) -> None:
+    if callback.from_user is None or callback.message is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
     invite_link = await build_friend_invite_link(callback, challenge_id=str(challenge.challenge_id))
     if invite_link is None:
         await callback.message.answer(
@@ -95,7 +113,6 @@ async def handle_friend_challenge_create_selected(
             ),
             reply_markup=build_friend_challenge_back_keyboard(),
         )
-        await callback.answer()
         return
     welcome_image_file_id = get_settings().resolved_welcome_image_file_id
     photo_sent = False
@@ -130,7 +147,6 @@ async def handle_friend_challenge_create_selected(
             parse_mode="HTML",
             reply_markup=share_keyboard,
         )
-    await callback.answer()
 
 
 async def handle_friend_challenge_invite_sent(

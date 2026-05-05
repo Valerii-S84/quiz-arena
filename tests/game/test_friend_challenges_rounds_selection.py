@@ -34,7 +34,7 @@ async def test_round_start_selects_question_when_plan_is_missing(
 async def test_round_start_falls_back_when_plan_has_no_next_question(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    row = challenge(creator_answered_round=4, question_ids=["q-1"], total_rounds=5)
+    row = challenge(creator_answered_round=4, question_ids=["q-1"], total_rounds=7)
     selection_calls: list[dict[str, object]] = []
     start_calls: list[dict[str, object]] = []
 
