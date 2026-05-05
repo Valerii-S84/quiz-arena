@@ -231,7 +231,7 @@ async def test_arena_accept_preview_shows_start_screen() -> None:
             "Du hast dieses Arena-Duell bereits gespielt.",
             ["arena:list"],
         ),
-        (ArenaDuelExpiredError, "Dieses Duell ist abgelaufen.", ["arena:list", "arena:create"]),
+        (ArenaDuelExpiredError, "Dieses Duell ist abgelaufen.", ["arena:create", "arena:list"]),
     ],
 )
 async def test_arena_accept_preview_maps_guards_to_clean_messages(
@@ -341,7 +341,7 @@ async def test_arena_start_attempt_maps_session_access_error_to_guard() -> None:
 
     response = callback.message.answers[0]
     assert "Dieses Duell ist abgelaufen." in _text(response.text)
-    assert _callbacks(response.kwargs["reply_markup"]) == ["arena:list", "arena:create"]
+    assert _callbacks(response.kwargs["reply_markup"]) == ["arena:create", "arena:list"]
     assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 
@@ -380,7 +380,7 @@ async def test_arena_publish_friend_publishes_through_service() -> None:
 
     async def _publish_friend(*_args, **kwargs):
         captured.update(kwargs)
-        return SimpleNamespace(baseline_score=6, baseline_time_ms=48_000)
+        return SimpleNamespace(duel_id=DUEL_ID, baseline_score=6, baseline_time_ms=48_000)
 
     callback = _callback(f"arena:publish_friend:{DUEL_ID}")
     await arena_duel_flow.handle_arena_publish_friend(
@@ -398,9 +398,8 @@ async def test_arena_publish_friend_publishes_through_service() -> None:
     assert "🏟 In der Arena veröffentlicht!" in _text(response.text)
     assert "6/7 · 00:48" in _text(response.text)
     assert _callbacks(response.kwargs["reply_markup"]) == [
+        f"arena:challenge_friend:{DUEL_ID}",
         "arena:list",
-        "duels:friend",
-        "arena:create",
     ]
 
 
@@ -610,10 +609,34 @@ async def test_arena_completion_published_result_screen() -> None:
     assert "Dein Arena-Duell ist aktiv!" in text
     assert "6/7 · 00:48" in text
     assert _callbacks(response.kwargs["reply_markup"]) == [
+        f"arena:challenge_friend:{DUEL_ID}",
         "arena:list",
-        "duels:friend",
-        "arena:create",
     ]
+
+
+@pytest.mark.asyncio
+async def test_arena_completion_published_result_offers_same_duel_friend_challenge() -> None:
+    callback = _callback("answer")
+    completion = ArenaAttemptCompletionResult(
+        duel=_duel_snapshot(),
+        completed_attempt=ArenaAttemptResultLine(
+            user_id=101,
+            score=6,
+            time_ms=48_000,
+            result="BASELINE",
+        ),
+    )
+
+    await arena_duel_flow.send_arena_completion_result(
+        callback,
+        completion=completion,
+        session_local=_SessionLocal(),
+        user_onboarding_service=_UserService,
+    )
+
+    callbacks = _callbacks(callback.message.answers[0].kwargs["reply_markup"])
+    assert f"arena:challenge_friend:{DUEL_ID}" in callbacks
+    assert "duels:friend" not in callbacks
 
 
 @pytest.mark.asyncio
@@ -695,7 +718,6 @@ async def test_arena_completion_challenger_win_result_has_revanche() -> None:
 
     assert _callbacks(callback.message.answers[0].kwargs["reply_markup"]) == [
         f"arena:revanche:{OPPONENT_ATTEMPT_ID}",
-        "arena:create",
         "arena:list",
     ]
 
@@ -728,7 +750,7 @@ async def test_arena_completion_challenger_loss_result_has_next_actions() -> Non
 
     response = callback.message.answers[0]
     assert "Max bleibt vorne." in _text(response.text)
-    assert _callbacks(response.kwargs["reply_markup"]) == ["arena:list", "arena:create"]
+    assert _callbacks(response.kwargs["reply_markup"]) == ["arena:create", "arena:list"]
 
 
 @pytest.mark.asyncio

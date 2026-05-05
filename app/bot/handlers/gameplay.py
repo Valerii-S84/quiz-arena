@@ -30,8 +30,6 @@ from app.bot.handlers.gameplay_friend_challenge import (  # noqa: F401
     handle_friend_challenge_create_selected,
     handle_friend_challenge_next,
     handle_friend_challenge_rematch,
-    handle_friend_challenge_series_best3,
-    handle_friend_challenge_series_next,
     handle_friend_challenge_share_result,
 )
 from app.bot.handlers.start_flow import _send_home_message

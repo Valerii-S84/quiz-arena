@@ -39,25 +39,25 @@ async def build_feature_usage_payload(
 ) -> dict[str, dict[str, float]]:
     duel_created_now = await _count_event_users(
         session,
-        event_type="duel_created",
+        event_type="friend_duel_created",
         from_utc=range_start,
         to_utc=range_end,
     )
     duel_created_prev = await _count_event_users(
         session,
-        event_type="duel_created",
+        event_type="friend_duel_created",
         from_utc=prev_start,
         to_utc=prev_end,
     )
     duel_completed_now = await _count_event_users(
         session,
-        event_type="duel_completed",
+        event_type="friend_duel_completed",
         from_utc=range_start,
         to_utc=range_end,
     )
     duel_completed_prev = await _count_event_users(
         session,
-        event_type="duel_completed",
+        event_type="friend_duel_completed",
         from_utc=prev_start,
         to_utc=prev_end,
     )

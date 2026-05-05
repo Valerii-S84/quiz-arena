@@ -126,10 +126,12 @@ async def test_duel_question_plan_keeps_sources_unique_when_pool_allows_it() -> 
     source_files = (
         "duel_a.csv",
         "duel_a.csv",
+        "duel_b.csv",
         "duel_c.csv",
         "duel_d.csv",
         "duel_e.csv",
         "duel_f.csv",
+        "duel_g.csv",
     )
     records = [
         _question(
@@ -146,11 +148,11 @@ async def test_duel_question_plan_keeps_sources_unique_when_pool_allows_it() -> 
         selected = await select_duel_question_ids(
             session,
             mode_code="QUICK_MIX_A1A2",
-            total_rounds=5,
+            total_rounds=7,
             now_utc=now_utc,
             challenge_seed="integration-source-diversity",
-            preferred_levels_by_round=("A1", "A1", "A1", "A1", "A1"),
+            preferred_levels_by_round=("A1", "A1", "A1", "A1", "A1", "A2", "A2"),
         )
 
-    assert len(selected) == 5
-    assert len(set(await _load_sources(selected))) == 5
+    assert len(selected) == 7
+    assert len(set(await _load_sources(selected))) == 7

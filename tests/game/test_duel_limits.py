@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from app.economy.purchases.catalog import is_product_available_for_sale
 from app.game.duels.constants import (
     DUEL_FREE_LIMITS_PER_DAY,
     DUEL_LIMIT_ACTION_ARENA_ACCEPT,
@@ -35,6 +36,7 @@ def test_duel_paywall_products_are_only_ticket_and_premium_week() -> None:
     assert tuple(product.product_code for product in products) == DUEL_PAYWALL_PRODUCT_CODES
     assert DUEL_PAYWALL_PRODUCT_CODES == ("FRIEND_CHALLENGE_5", "PREMIUM_WEEK")
     assert DUEL_PREMIUM_REWARD_ONLY_PRODUCT_CODE not in DUEL_PAYWALL_PRODUCT_CODES
+    assert not is_product_available_for_sale(DUEL_PREMIUM_REWARD_ONLY_PRODUCT_CODE)
 
 
 @pytest.mark.parametrize(

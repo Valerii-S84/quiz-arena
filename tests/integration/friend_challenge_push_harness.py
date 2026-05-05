@@ -121,7 +121,7 @@ async def create_joined_duel(now_utc: datetime):
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=5,
+            total_rounds=7,
         )
         await GameSessionService.join_friend_challenge_by_token(
             session,

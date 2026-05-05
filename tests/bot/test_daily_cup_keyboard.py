@@ -126,7 +126,7 @@ def test_daily_cup_keyboards_do_not_route_into_duel_or_tournament_create_surface
     assert "friend:next:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" in callbacks
     assert "friend:challenge:format:direct:7" not in callbacks
     assert "friend:challenge:create" not in callbacks
-    assert "friend:tournament:create" not in callbacks
+    assert "tournament:create" not in callbacks
     assert "create_tournament_start" not in callbacks
     assert "duels:friend" not in callbacks
 

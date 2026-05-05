@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
+from app.game.arena_duels.analytics import ARENA_EVENT_FRIEND_DUEL_COMPLETED
 from app.game.friend_challenges.constants import (
     DUEL_STATUS_ACCEPTED,
     DUEL_STATUS_COMPLETED,
@@ -149,7 +150,7 @@ async def _apply_friend_challenge_answer(
         if challenge.status == DUEL_STATUS_COMPLETED and challenge.completed_at == now_utc:
             await emit_analytics_event(
                 session,
-                event_type="duel_completed",
+                event_type=ARENA_EVENT_FRIEND_DUEL_COMPLETED,
                 source=EVENT_SOURCE_BOT,
                 happened_at=now_utc,
                 user_id=user_id,

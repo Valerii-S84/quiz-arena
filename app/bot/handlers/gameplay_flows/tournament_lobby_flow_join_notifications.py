@@ -10,7 +10,7 @@ def _build_creator_start_markup(*, tournament_id: str) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="▶️ Turnier starten",
-                    callback_data=f"friend:tournament:start:{tournament_id}",
+                    callback_data=f"tournament:start:{tournament_id}",
                 )
             ]
         ]

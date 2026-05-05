@@ -10,25 +10,25 @@ _STRICT_UUID_RE = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 ANSWER_RE = re.compile(r"^answer:([0-9a-f\-]{36}):([0-3])$")
 STOP_RE = re.compile(r"^game:stop:([0-9a-f\-]{36})$")
 FRIEND_NEXT_RE = re.compile(r"^(?:friend:next|friend:challenge:round:start):([0-9a-f\-]{36})$")
-FRIEND_CREATE_TYPE_RE = re.compile(r"^friend:challenge:type:(direct|open|tournament)$")
-FRIEND_CREATE_FORMAT_RE = re.compile(r"^friend:challenge:format:(direct|open):(5|7|12)$")
-FRIEND_CREATE_LEGACY_RE = re.compile(r"^friend:challenge:create:(5|12)$")
+FRIEND_CREATE_TYPE_RE = re.compile(r"(?!)")
+FRIEND_CREATE_FORMAT_RE = re.compile(r"^friend:challenge:format:direct:7$")
+FRIEND_CREATE_LEGACY_RE = re.compile(r"(?!)")
 FRIEND_REMATCH_RE = re.compile(r"^friend:rematch:([0-9a-f\-]{36})$")
 FRIEND_SHARE_RESULT_RE = re.compile(r"^friend:share:result:([0-9a-f\-]{36})$")
 FRIEND_INVITE_SENT_RE = re.compile(r"^friend:invite:sent:([0-9a-f\-]{36})$")
 FRIEND_INVITE_REQUIRED_RE = re.compile(r"^friend:invite:required:([0-9a-f\-]{36})$")
-FRIEND_SERIES_BEST3_RE = re.compile(r"^friend:series:best3:([0-9a-f\-]{36})$")
-FRIEND_SERIES_NEXT_RE = re.compile(r"^friend:series:next:([0-9a-f\-]{36})$")
+FRIEND_SERIES_BEST3_RE = re.compile(r"(?!)")
+FRIEND_SERIES_NEXT_RE = re.compile(r"(?!)")
 FRIEND_COPY_LINK_RE = re.compile(r"^friend:copy:([0-9a-f\-]{36})$")
-FRIEND_OPEN_REPOST_RE = re.compile(r"^friend:open:repost:([0-9a-f\-]{36})$")
+FRIEND_OPEN_REPOST_RE = re.compile(r"(?!)")
 FRIEND_DELETE_RE = re.compile(r"^friend:delete:([0-9a-f\-]{36})$")
-TOURNAMENT_FORMAT_RE = re.compile(r"^friend:tournament:format:(5|12)$")
-TOURNAMENT_CREATE_FOR_VIEW_RE = re.compile(r"^friend:tournament:create:([0-9a-f\-]{36})$")
-TOURNAMENT_JOIN_RE = re.compile(r"^friend:tournament:join:([a-f0-9]{12})$", re.IGNORECASE)
-TOURNAMENT_COPY_LINK_RE = re.compile(r"^friend:tournament:copy:([0-9a-f\-]{36})$")
-TOURNAMENT_START_RE = re.compile(r"^friend:tournament:start:([0-9a-f\-]{36})$")
-TOURNAMENT_VIEW_RE = re.compile(r"^friend:tournament:view:([0-9a-f\-]{36})$")
-TOURNAMENT_SHARE_RE = re.compile(r"^friend:tournament:share:([0-9a-f\-]{36})$")
+TOURNAMENT_FORMAT_RE = re.compile(r"^tournament:format:(5|12)$")
+TOURNAMENT_CREATE_FOR_VIEW_RE = re.compile(r"^tournament:create:([0-9a-f\-]{36})$")
+TOURNAMENT_JOIN_RE = re.compile(r"^tournament:join:([a-f0-9]{12})$", re.IGNORECASE)
+TOURNAMENT_COPY_LINK_RE = re.compile(r"^tournament:copy:([0-9a-f\-]{36})$")
+TOURNAMENT_START_RE = re.compile(r"^tournament:start:([0-9a-f\-]{36})$")
+TOURNAMENT_VIEW_RE = re.compile(r"^tournament:view:([0-9a-f\-]{36})$")
+TOURNAMENT_SHARE_RE = re.compile(r"^tournament:share:([0-9a-f\-]{36})$")
 DAILY_CUP_JOIN_RE = re.compile(r"^daily:cup:join:([0-9a-f\-]{36})$")
 DAILY_CUP_VIEW_RE = re.compile(r"^daily:cup:view:([0-9a-f\-]{36})$")
 DAILY_CUP_SHARE_RE = re.compile(r"^daily:cup:share:([0-9a-f\-]{36})$")
@@ -46,6 +46,10 @@ ARENA_REVANCHE_RE = re.compile(
 )
 ARENA_REVANCHE_SEND_RE = re.compile(
     rf"^arena:revanche_send:({_STRICT_UUID_RE})$",
+    re.IGNORECASE,
+)
+ARENA_CHALLENGE_FRIEND_RE = re.compile(
+    rf"^arena:challenge_friend:({_STRICT_UUID_RE})$",
     re.IGNORECASE,
 )
 
@@ -69,11 +73,8 @@ def parse_stop_callback(callback_data: str) -> UUID | None:
 
 
 def parse_friend_create_format(callback_data: str) -> tuple[str, int] | None:
-    """Normalizes legacy friend create callbacks to the canonical duel contract."""
+    """Parses the canonical direct friend-duel create callback."""
 
-    legacy_match = FRIEND_CREATE_LEGACY_RE.match(callback_data)
-    if legacy_match is not None:
-        return "direct", DUEL_QUESTION_COUNT
     matched = FRIEND_CREATE_FORMAT_RE.match(callback_data)
     if matched is None:
         return None
@@ -81,11 +82,8 @@ def parse_friend_create_format(callback_data: str) -> tuple[str, int] | None:
 
 
 def parse_challenge_rounds(callback_data: str) -> int | None:
-    """Legacy parser kept for backward compatibility with older callbacks/tests."""
+    """Returns the canonical friend-duel question count for valid create callbacks."""
 
-    legacy_match = FRIEND_CREATE_LEGACY_RE.match(callback_data)
-    if legacy_match is not None:
-        return DUEL_QUESTION_COUNT
     parsed = parse_friend_create_format(callback_data)
     if parsed is None:
         return None

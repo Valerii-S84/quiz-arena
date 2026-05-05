@@ -14,7 +14,7 @@ def test_render_duel_proof_card_png_has_expected_canvas_and_format() -> None:
         opponent_name="Anna",
         creator_score=10,
         opponent_score=8,
-        total_rounds=12,
+        total_rounds=7,
         completed_at=datetime(2026, 2, 27, 18, 0, tzinfo=timezone.utc),
     )
 

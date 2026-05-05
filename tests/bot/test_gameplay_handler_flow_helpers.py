@@ -77,6 +77,24 @@ def test_build_question_text_contains_theme_counter_and_energy() -> None:
     assert "A1" not in text
 
 
+@pytest.mark.parametrize("source", ["ARENA_DUEL", "FRIEND_CHALLENGE"])
+def test_build_question_text_hides_theme_for_duel_sources(source: str) -> None:
+    start_result = _start_result()
+    start_result.session.category = "Artikel - Nominativ"
+    start_result.session.total_questions = 7
+
+    text = gameplay._build_question_text(
+        source=source,
+        snapshot_free_energy=18,
+        snapshot_paid_energy=2,
+        start_result=start_result,
+    )
+
+    assert "📚 Thema:" not in text
+    assert "Artikel - Nominativ" not in text
+    assert "❓ Frage 3/7" in text
+
+
 @pytest.mark.parametrize(
     ("mode_code", "expected_label", "legacy_labels"),
     [

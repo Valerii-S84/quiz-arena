@@ -34,8 +34,8 @@ async def test_handle_tournament_create_start_shows_format_picker(callback_data:
     ]
     assert response.text == TEXTS_DE["msg.friend.challenge.tournament.format"]
     assert callbacks == [
-        "friend:tournament:format:5",
-        "friend:tournament:format:12",
+        "tournament:format:5",
+        "tournament:format:12",
         "home:open",
     ]
 
@@ -43,7 +43,7 @@ async def test_handle_tournament_create_start_shows_format_picker(callback_data:
 @pytest.mark.asyncio
 async def test_handle_tournament_create_from_view_shows_format_picker_with_view_back() -> None:
     callback = DummyCallback(
-        data="friend:tournament:create:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        data="tournament:create:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(),
     )
@@ -59,9 +59,9 @@ async def test_handle_tournament_create_from_view_shows_format_picker_with_view_
     ]
     assert response.text == TEXTS_DE["msg.friend.challenge.tournament.format"]
     assert callbacks == [
-        "friend:tournament:format:5",
-        "friend:tournament:format:12",
-        "friend:tournament:view:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "tournament:format:5",
+        "tournament:format:12",
+        "tournament:view:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     ]
 
 
@@ -104,7 +104,7 @@ async def test_handle_tournament_create_from_format_sends_share_lobby(monkeypatc
     monkeypatch.setattr(gameplay, "emit_analytics_event", _fake_emit)
 
     callback = DummyCallback(
-        data="friend:tournament:format:5",
+        data="tournament:format:5",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(),
     )
@@ -175,7 +175,7 @@ async def test_handle_tournament_share_result_sends_share_keyboard_and_emits_eve
     )
 
     callback = DummyCallback(
-        data="friend:tournament:share:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        data="tournament:share:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(),
     )
@@ -260,7 +260,7 @@ async def test_handle_tournament_start_enqueues_round_messaging(monkeypatch) -> 
     )
 
     callback = DummyCallback(
-        data="friend:tournament:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        data="tournament:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
         from_user=SimpleNamespace(id=17),
         message=DummyMessage(),
     )
@@ -340,7 +340,7 @@ async def test_handle_tournament_join_notifies_creator_about_new_participant(mon
     monkeypatch.setattr(gameplay, "emit_analytics_event", _fake_emit)
 
     callback = DummyCallback(
-        data="friend:tournament:join:abcdefabcdef",
+        data="tournament:join:abcdefabcdef",
         from_user=SimpleNamespace(id=77, first_name="Tom"),
         message=DummyMessage(),
     )
@@ -353,4 +353,4 @@ async def test_handle_tournament_join_notifies_creator_about_new_participant(mon
     markup = creator_notice.get("reply_markup")
     assert markup is not None
     callbacks = [button.callback_data for row in markup.inline_keyboard for button in row]
-    assert "friend:tournament:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
+    assert "tournament:start:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks

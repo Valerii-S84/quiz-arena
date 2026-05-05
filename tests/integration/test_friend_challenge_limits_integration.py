@@ -116,7 +116,7 @@ async def test_tournament_duels_do_not_consume_free_friend_challenge_quota() -> 
             creator_user_id=creator_user_id,
             opponent_user_id=opponent_user_id,
             mode_code="QUICK_MIX_A1A2",
-            total_rounds=12,
+            total_rounds=7,
             tournament_match_id=uuid4(),
             now_utc=now_utc,
         )
@@ -125,7 +125,7 @@ async def test_tournament_duels_do_not_consume_free_friend_challenge_quota() -> 
             creator_user_id=creator_user_id,
             opponent_user_id=opponent_user_id,
             mode_code="QUICK_MIX_A1A2",
-            total_rounds=12,
+            total_rounds=7,
             tournament_match_id=uuid4(),
             now_utc=now_utc + timedelta(minutes=1),
         )

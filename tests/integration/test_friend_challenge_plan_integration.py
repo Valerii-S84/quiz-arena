@@ -16,7 +16,7 @@ from tests.integration.friend_challenge_fixtures import (
 
 
 @pytest.mark.asyncio
-async def test_friend_challenge_default_uses_12_round_plan_with_level_mix_and_free_energy() -> None:
+async def test_friend_challenge_default_uses_7_round_plan_with_level_mix_and_free_energy() -> None:
     now_utc = datetime(2026, 2, 19, 19, 0, tzinfo=UTC)
     await _seed_friend_challenge_questions(now_utc)
     creator_user_id = await _create_user("fc_plan_creator")
@@ -40,7 +40,7 @@ async def test_friend_challenge_default_uses_12_round_plan_with_level_mix_and_fr
     categories: list[str] = []
     final_answer = None
 
-    for round_no in range(1, 13):
+    for round_no in range(1, 8):
         async with SessionLocal.begin() as session:
             creator_round = await GameSessionService.start_friend_challenge_round(
                 session,
@@ -100,8 +100,8 @@ async def test_friend_challenge_default_uses_12_round_plan_with_level_mix_and_fr
     assert final_answer is not None
     assert final_answer.friend_challenge is not None
     assert final_answer.friend_challenge.status == "COMPLETED"
-    assert len(levels) == 12
+    assert len(levels) == 7
     assert levels.count("A1") == 3
-    assert levels.count("A2") == 6
-    assert levels.count("B1") == 3
+    assert levels.count("A2") == 4
+    assert levels.count("B1") == 0
     assert len({category for category in categories if category}) >= 3

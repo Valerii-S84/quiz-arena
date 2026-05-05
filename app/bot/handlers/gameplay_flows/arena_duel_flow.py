@@ -7,6 +7,7 @@ from uuid import UUID
 
 from aiogram.types import CallbackQuery
 
+from app.bot.handlers.gameplay_flows.friend_lobby_flow import send_friend_challenge_invite
 from app.bot.handlers.gameplay_views import _format_user_label
 from app.bot.keyboards.duels import (
     ArenaDuelButton,
@@ -20,6 +21,7 @@ from app.bot.keyboards.duels import (
     build_arena_result_keyboard,
     build_duel_paywall_keyboard,
 )
+from app.bot.keyboards.friend_challenge import build_friend_challenge_limit_keyboard
 from app.bot.keyboards.quiz import build_quiz_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.game.arena_duels.analytics import (
@@ -50,7 +52,12 @@ from app.game.arena_duels.types import (
     ArenaChallengerStartResult,
 )
 from app.game.questions.catalog import QUICK_MIX_MODE_CODE
-from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
+from app.game.sessions.errors import (
+    FriendChallengeAccessError,
+    FriendChallengeLimitExceededError,
+    FriendChallengeNotFoundError,
+    FriendChallengePaymentRequiredError,
+)
 from app.game.sessions.types import StartSessionResult
 
 _ARENA_MARKERS = ("🔥", "👑", "⚡")
@@ -344,13 +351,17 @@ async def handle_arena_publish_friend(
         await callback.answer()
         return
 
+    if published_duel is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
     score_line = _format_published_duel_score_line(published_duel)
     if score_line is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
     await callback.message.answer(
         TEXTS_DE["msg.duels.arena.friend_published"].format(score_line=score_line),
-        reply_markup=build_arena_published_keyboard(),
+        reply_markup=build_arena_published_keyboard(duel_id=str(published_duel.duel_id)),
     )
     await callback.answer()
 
@@ -377,7 +388,7 @@ async def send_arena_completion_result(
                     time_ms=completed_attempt.time_ms,
                 )
             ),
-            reply_markup=build_arena_published_keyboard(),
+            reply_markup=build_arena_published_keyboard(duel_id=str(completion.duel.duel_id)),
         )
         await _emit_arena_result_shown(
             session_local=session_local,
@@ -417,6 +428,64 @@ async def send_arena_completion_result(
         completed_attempt=completed_attempt,
         action="challenger",
     )
+
+
+async def handle_arena_challenge_friend(
+    callback: CallbackQuery,
+    *,
+    arena_challenge_friend_re,
+    parse_uuid_callback,
+    session_local,
+    user_onboarding_service,
+    create_friend_challenge_from_arena_duel,
+    build_friend_invite_link,
+) -> None:
+    arena_duel_id = _parse_arena_duel_id(
+        callback,
+        pattern=arena_challenge_friend_re,
+        parse_uuid_callback=parse_uuid_callback,
+    )
+    if arena_duel_id is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+    if callback.from_user is None or callback.message is None:
+        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+        return
+
+    now_utc = datetime.now(timezone.utc)
+    async with session_local.begin() as session:
+        snapshot = await user_onboarding_service.ensure_home_snapshot(
+            session,
+            telegram_user=callback.from_user,
+        )
+        try:
+            challenge = await create_friend_challenge_from_arena_duel(
+                session,
+                creator_user_id=snapshot.user_id,
+                arena_duel_id=arena_duel_id,
+                now_utc=now_utc,
+            )
+        except (FriendChallengePaymentRequiredError, FriendChallengeLimitExceededError):
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.limit.reached"],
+                reply_markup=build_friend_challenge_limit_keyboard(),
+            )
+            await callback.answer()
+            return
+        except FriendChallengeAccessError:
+            await callback.message.answer(
+                TEXTS_DE["msg.friend.challenge.invalid"],
+                reply_markup=build_arena_back_keyboard(),
+            )
+            await callback.answer()
+            return
+
+    await send_friend_challenge_invite(
+        callback,
+        challenge=challenge,
+        build_friend_invite_link=build_friend_invite_link,
+    )
+    await callback.answer()
 
 
 async def _start_arena_round(

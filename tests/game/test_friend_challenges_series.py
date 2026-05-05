@@ -197,7 +197,7 @@ async def test_create_friend_challenge_best_of_three_creates_series_duel_and_emi
         }
     ]
     assert [event["event_type"] for event in analytics_events] == [
-        "friend_challenge_created",
+        "friend_duel_created",
         "friend_challenge_series_started",
     ]
     assert analytics_events[0]["payload"]["entrypoint"] == "best_of_series"
@@ -384,7 +384,7 @@ async def test_create_friend_challenge_series_next_game_creates_followup_duel_an
         }
     ]
     assert [event["event_type"] for event in analytics_events] == [
-        "friend_challenge_created",
+        "friend_duel_created",
         "friend_challenge_series_game_created",
     ]
     assert analytics_events[0]["payload"]["entrypoint"] == "best_of_series_next_game"

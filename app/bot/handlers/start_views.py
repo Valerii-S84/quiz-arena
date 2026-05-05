@@ -11,6 +11,8 @@ from app.game.modes.presentation import display_mode_label
 from app.game.modes.rules import is_zero_cost_source
 from app.game.sessions.types import FriendChallengeSnapshot, StartSessionResult
 
+_DUEL_THEMELESS_SOURCES = frozenset({"ARENA_DUEL", "FRIEND_CHALLENGE"})
+
 
 def _build_friend_plan_text(*, total_rounds: int) -> str:
     rounds = max(1, int(total_rounds))
@@ -76,24 +78,27 @@ def _build_question_text(
             snapshot_paid_energy if is_zero_cost_source(source) else start_result.energy_paid
         ),
     )
-    theme_line = TEXTS_DE["msg.game.theme"].format(theme=theme_label)
     counter_line = TEXTS_DE["msg.game.question.counter"].format(
         current=question_number,
         total=total_questions,
     )
-    return "\n".join(
+    lines = [
+        f"<b>{html.escape(mode_line)}</b>",
+        html.escape(energy_line),
+        "",
+    ]
+    if source not in _DUEL_THEMELESS_SOURCES:
+        theme_line = TEXTS_DE["msg.game.theme"].format(theme=theme_label)
+        lines.extend([html.escape(theme_line), ""])
+    lines.extend(
         [
-            f"<b>{html.escape(mode_line)}</b>",
-            html.escape(energy_line),
-            "",
-            html.escape(theme_line),
-            "",
             html.escape(counter_line),
             f"<b>{html.escape(start_result.session.text)}</b>",
             "",
             html.escape(TEXTS_DE["msg.game.choose_option"]),
         ]
     )
+    return "\n".join(lines)
 
 
 def _build_friend_score_text(

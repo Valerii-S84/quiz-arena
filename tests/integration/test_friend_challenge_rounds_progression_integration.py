@@ -24,7 +24,7 @@ async def _create_joined_challenge(
         creator_user_id=creator_user_id,
         mode_code="QUICK_MIX_A1A2",
         now_utc=now_utc,
-        total_rounds=5,
+        total_rounds=7,
     )
     await GameSessionService.join_friend_challenge_by_token(
         session,
@@ -133,7 +133,7 @@ async def test_friend_challenge_completes_and_sets_winner() -> None:
             now_utc=now_utc,
         )
         final_answer = None
-        for round_no in range(1, 6):
+        for round_no in range(1, 8):
             creator_round = await GameSessionService.start_friend_challenge_round(
                 session,
                 user_id=creator_user_id,
@@ -238,7 +238,7 @@ async def test_friend_challenge_creator_can_start_and_progress_before_opponent_j
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=5,
+            total_rounds=7,
         )
         round_one = await GameSessionService.start_friend_challenge_round(
             session,

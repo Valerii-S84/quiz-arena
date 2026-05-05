@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
+from app.game.arena_duels.analytics import ARENA_EVENT_FRIEND_DUEL_JOINED
 from app.game.friend_challenges.constants import (
     DUEL_STATUS_ACCEPTED,
     DUEL_STATUS_CREATOR_DONE,
@@ -99,7 +100,7 @@ async def _join_friend_challenge_locked(
         challenge.updated_at = now_utc
         await emit_analytics_event(
             session,
-            event_type="friend_challenge_joined",
+            event_type=ARENA_EVENT_FRIEND_DUEL_JOINED,
             source=EVENT_SOURCE_BOT,
             happened_at=now_utc,
             user_id=user_id,
@@ -112,18 +113,6 @@ async def _join_friend_challenge_locked(
                 "series_id": str(challenge.series_id) if challenge.series_id is not None else None,
                 "series_game_number": challenge.series_game_number,
                 "series_best_of": challenge.series_best_of,
-            },
-        )
-        await emit_analytics_event(
-            session,
-            event_type="duel_accepted",
-            source=EVENT_SOURCE_BOT,
-            happened_at=now_utc,
-            user_id=user_id,
-            payload={
-                "challenge_id": str(challenge.id),
-                "challenge_type": challenge.challenge_type,
-                "format": challenge.total_rounds,
             },
         )
         return FriendChallengeJoinResult(

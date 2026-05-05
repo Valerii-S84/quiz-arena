@@ -4,7 +4,7 @@ from urllib.parse import quote_plus
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-TOURNAMENT_CREATE_CALLBACK = "friend:tournament:create"
+TOURNAMENT_CREATE_CALLBACK = "tournament:create"
 
 
 def build_tournament_share_url(*, base_link: str, share_text: str) -> str:
@@ -18,12 +18,8 @@ def build_tournament_format_keyboard(
 ) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="⚡ 5 Fragen", callback_data="friend:tournament:format:5")],
-            [
-                InlineKeyboardButton(
-                    text="🧠 12 Fragen", callback_data="friend:tournament:format:12"
-                )
-            ],
+            [InlineKeyboardButton(text="⚡ 5 Fragen", callback_data="tournament:format:5")],
+            [InlineKeyboardButton(text="🧠 12 Fragen", callback_data="tournament:format:12")],
             [InlineKeyboardButton(text="↩️ Zurück", callback_data=back_callback_data)],
         ]
     )
@@ -48,7 +44,7 @@ def build_tournament_created_keyboard(
         [
             InlineKeyboardButton(
                 text="📋 Link kopieren",
-                callback_data=f"friend:tournament:copy:{tournament_id}",
+                callback_data=f"tournament:copy:{tournament_id}",
             )
         ],
     ]
@@ -57,14 +53,14 @@ def build_tournament_created_keyboard(
             [
                 InlineKeyboardButton(
                     text="▶️ Turnier starten",
-                    callback_data=f"friend:tournament:start:{tournament_id}",
+                    callback_data=f"tournament:start:{tournament_id}",
                 )
             ]
         )
     rows.append(
         [
             InlineKeyboardButton(
-                text="🔄 Aktualisieren", callback_data=f"friend:tournament:view:{tournament_id}"
+                text="🔄 Aktualisieren", callback_data=f"tournament:view:{tournament_id}"
             )
         ]
     )
@@ -87,7 +83,7 @@ def build_tournament_lobby_keyboard(
             [
                 InlineKeyboardButton(
                     text="✅ Beitreten",
-                    callback_data=f"friend:tournament:join:{invite_code}",
+                    callback_data=f"tournament:join:{invite_code}",
                 )
             ]
         )
@@ -96,7 +92,7 @@ def build_tournament_lobby_keyboard(
             [
                 InlineKeyboardButton(
                     text="▶️ Turnier starten",
-                    callback_data=f"friend:tournament:start:{tournament_id}",
+                    callback_data=f"tournament:start:{tournament_id}",
                 )
             ]
         )
@@ -114,7 +110,7 @@ def build_tournament_lobby_keyboard(
             [
                 InlineKeyboardButton(
                     text="📤 Ergebnis teilen",
-                    callback_data=f"friend:tournament:share:{tournament_id}",
+                    callback_data=f"tournament:share:{tournament_id}",
                 )
             ]
         )
@@ -129,7 +125,7 @@ def build_tournament_lobby_keyboard(
     rows.append(
         [
             InlineKeyboardButton(
-                text="🔄 Aktualisieren", callback_data=f"friend:tournament:view:{tournament_id}"
+                text="🔄 Aktualisieren", callback_data=f"tournament:view:{tournament_id}"
             )
         ]
     )
@@ -144,7 +140,7 @@ def build_tournament_share_keyboard(*, share_url: str, tournament_id: str) -> In
             [
                 InlineKeyboardButton(
                     text="🔄 Aktualisieren",
-                    callback_data=f"friend:tournament:view:{tournament_id}",
+                    callback_data=f"tournament:view:{tournament_id}",
                 )
             ],
             [InlineKeyboardButton(text="🏠 Menü", callback_data="home:open")],

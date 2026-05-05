@@ -36,7 +36,7 @@ async def test_friend_challenge_proof_cards_send_to_both_users_and_reuse_cache(
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=5,
+            total_rounds=7,
         )
         await GameSessionService.join_friend_challenge_by_id(
             session,

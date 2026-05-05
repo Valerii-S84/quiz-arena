@@ -31,7 +31,7 @@ def _gameplay():
 
 
 def register(router: Router) -> None:
-    router.callback_query(F.data == "friend:tournament:create")(handle_tournament_create_start)
+    router.callback_query(F.data == "tournament:create")(handle_tournament_create_start)
     router.callback_query(F.data == "create_tournament_start")(handle_tournament_create_start)
     router.callback_query(F.data.regexp(gameplay_callbacks.TOURNAMENT_CREATE_FOR_VIEW_RE))(
         handle_tournament_create_from_view
@@ -93,7 +93,7 @@ async def handle_tournament_create_from_view(callback: CallbackQuery) -> None:
     await callback.message.answer(
         TEXTS_DE["msg.friend.challenge.tournament.format"],
         reply_markup=build_tournament_format_keyboard(
-            back_callback_data=f"friend:tournament:view:{tournament_id}"
+            back_callback_data=f"tournament:view:{tournament_id}"
         ),
     )
     await callback.answer()

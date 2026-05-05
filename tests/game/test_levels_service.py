@@ -53,4 +53,4 @@ def test_friend_challenge_level_for_round_handles_bounds() -> None:
     assert levels._friend_challenge_level_for_round(round_number=0) is None
     assert levels._friend_challenge_level_for_round(round_number=1) == "A1"
     assert levels._friend_challenge_level_for_round(round_number=4) == "A2"
-    assert levels._friend_challenge_level_for_round(round_number=99) == "B1"
+    assert levels._friend_challenge_level_for_round(round_number=99) == "A2"

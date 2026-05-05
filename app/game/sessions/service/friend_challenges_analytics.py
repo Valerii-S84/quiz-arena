@@ -7,6 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.analytics_events import emit_analytics_event
 from app.db.models.friend_challenges import FriendChallenge
+from app.game.arena_duels.analytics import (
+    ARENA_EVENT_FRIEND_DUEL_CREATED,
+    ARENA_EVENT_FRIEND_DUEL_REVANCHE_CLICKED,
+)
 
 
 async def _emit_friend_challenge_expired_event(
@@ -41,37 +45,30 @@ async def emit_standard_duel_created_events(
     happened_at: datetime,
     source: str,
     creator_user_id: int,
+    entrypoint: str = "standard",
+    arena_duel_id: UUID | None = None,
 ) -> None:
+    payload = {
+        "challenge_id": str(challenge.id),
+        "mode_code": challenge.mode_code,
+        "challenge_type": challenge.challenge_type,
+        "access_type": challenge.access_type,
+        "total_rounds": challenge.total_rounds,
+        "entrypoint": entrypoint,
+        "expires_at": challenge.expires_at.isoformat(),
+        "series_id": None,
+        "series_game_number": challenge.series_game_number,
+        "series_best_of": challenge.series_best_of,
+    }
+    if arena_duel_id is not None:
+        payload["arena_duel_id"] = str(arena_duel_id)
     await emit_analytics_event(
         session,
-        event_type="friend_challenge_created",
+        event_type=ARENA_EVENT_FRIEND_DUEL_CREATED,
         source=source,
         happened_at=happened_at,
         user_id=creator_user_id,
-        payload={
-            "challenge_id": str(challenge.id),
-            "mode_code": challenge.mode_code,
-            "challenge_type": challenge.challenge_type,
-            "access_type": challenge.access_type,
-            "total_rounds": challenge.total_rounds,
-            "entrypoint": "standard",
-            "expires_at": challenge.expires_at.isoformat(),
-            "series_id": None,
-            "series_game_number": challenge.series_game_number,
-            "series_best_of": challenge.series_best_of,
-        },
-    )
-    await emit_analytics_event(
-        session,
-        event_type="duel_created",
-        source=source,
-        happened_at=happened_at,
-        user_id=creator_user_id,
-        payload={
-            "challenge_id": str(challenge.id),
-            "type": challenge.challenge_type,
-            "format": challenge.total_rounds,
-        },
+        payload=payload,
     )
 
 
@@ -87,7 +84,7 @@ async def emit_rematch_duel_created_events(
 ) -> None:
     await emit_analytics_event(
         session,
-        event_type="friend_challenge_created",
+        event_type=ARENA_EVENT_FRIEND_DUEL_CREATED,
         source=source,
         happened_at=happened_at,
         user_id=initiator_user_id,
@@ -107,7 +104,7 @@ async def emit_rematch_duel_created_events(
     )
     await emit_analytics_event(
         session,
-        event_type="duel_revanche_created",
+        event_type=ARENA_EVENT_FRIEND_DUEL_REVANCHE_CLICKED,
         source=source,
         happened_at=happened_at,
         user_id=initiator_user_id,

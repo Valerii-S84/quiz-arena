@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from app.game.duels.constants import DUEL_QUESTION_COUNT
 from app.game.friend_challenges.constants import DUEL_TYPE_DIRECT, DUEL_TYPE_OPEN
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeLimitExceededError
 from app.game.sessions.service import friend_challenges_create
@@ -43,11 +44,11 @@ async def test_create_friend_challenge_success(
         mode_code="QUICK_MIX_A1A2",
         now_utc=NOW_UTC,
         challenge_type=challenge_type,
-        total_rounds=5,
+        total_rounds=DUEL_QUESTION_COUNT,
     )
 
     assert result.challenge_id == FIXED_CHALLENGE_ID
-    assert result.question_ids == ("q-1", "q-2", "q-3", "q-4", "q-5")
+    assert result.question_ids == ("q-1", "q-2", "q-3", "q-4", "q-5", "q-6", "q-7")
     assert create_calls[0]["challenge_type"] == challenge_type
     assert create_calls[0]["access_type"] == "FREE"
 
@@ -72,7 +73,7 @@ async def test_create_rejects_invalid_type_before_limit_queries(
             mode_code="QUICK_MIX_A1A2",
             now_utc=NOW_UTC,
             challenge_type="INVALID",
-            total_rounds=5,
+            total_rounds=DUEL_QUESTION_COUNT,
         )
 
 
@@ -90,7 +91,7 @@ async def test_create_rejects_live_limit(monkeypatch: pytest.MonkeyPatch) -> Non
             creator_user_id=11,
             mode_code="QUICK_MIX_A1A2",
             now_utc=NOW_UTC,
-            total_rounds=5,
+            total_rounds=DUEL_QUESTION_COUNT,
         )
 
 
@@ -114,7 +115,7 @@ async def test_create_rejects_duplicate_open_duel(monkeypatch: pytest.MonkeyPatc
             mode_code="QUICK_MIX_A1A2",
             now_utc=NOW_UTC,
             challenge_type=DUEL_TYPE_OPEN,
-            total_rounds=5,
+            total_rounds=DUEL_QUESTION_COUNT,
         )
 
 
@@ -137,7 +138,7 @@ async def test_create_rejects_daily_create_limit(monkeypatch: pytest.MonkeyPatch
             creator_user_id=11,
             mode_code="QUICK_MIX_A1A2",
             now_utc=NOW_UTC,
-            total_rounds=5,
+            total_rounds=DUEL_QUESTION_COUNT,
         )
 
 
@@ -165,5 +166,5 @@ def _patch_create_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         friend_challenges_create,
         "select_duel_question_ids",
-        async_return(["q-1", "q-2", "q-3", "q-4", "q-5"]),
+        async_return(["q-1", "q-2", "q-3", "q-4", "q-5", "q-6", "q-7"]),
     )

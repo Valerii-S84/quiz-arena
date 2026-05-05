@@ -6,10 +6,11 @@ from app.core.config import get_settings
 from app.game.duels.constants import (
     DUEL_FREE_LIMITS_PER_DAY,
     DUEL_LIMIT_ACTION_FRIEND_CREATE,
+    DUEL_QUESTION_COUNT,
     DUEL_TICKET_PRODUCT_CODE,
 )
 
-FRIEND_CHALLENGE_TOTAL_ROUNDS = 12
+FRIEND_CHALLENGE_TOTAL_ROUNDS = DUEL_QUESTION_COUNT
 FRIEND_CHALLENGE_FREE_CREATES = DUEL_FREE_LIMITS_PER_DAY[DUEL_LIMIT_ACTION_FRIEND_CREATE]
 FRIEND_CHALLENGE_TICKET_PRODUCT_CODE = DUEL_TICKET_PRODUCT_CODE
 DUEL_PENDING_TTL_SECONDS = max(60, int(get_settings().duel_pending_ttl_hours) * 3600)
@@ -28,11 +29,6 @@ FRIEND_CHALLENGE_LEVEL_SEQUENCE: tuple[str, ...] = (
     "A2",
     "A2",
     "A2",
-    "A2",
-    "A2",
-    "B1",
-    "B1",
-    "B1",
 )
 LEVEL_ORDER: tuple[str, ...] = ("A1", "A2", "B1", "B2", "C1", "C2")
 PERSISTENT_ADAPTIVE_MODE_BOUNDS: dict[str, tuple[str, str]] = {

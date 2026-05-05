@@ -42,7 +42,7 @@ def _context(*, recipients: list[FriendChallengeProofCardRecipient]):
         status="COMPLETED",
         creator_score=4,
         opponent_score=2,
-        total_rounds=5,
+        total_rounds=7,
         completed_at=None,
         creator_name="Max",
         opponent_name="Anna",

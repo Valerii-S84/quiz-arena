@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+
 import pytest
 
 from app.game.arena_duels.constants import (
@@ -120,6 +122,12 @@ def test_score_priority_ignores_extreme_baseline_speed() -> None:
     assert outcome.winner_user_id == 22
     assert outcome.challenger_result == ARENA_ATTEMPT_RESULT_WIN
     assert outcome.reason == ARENA_RESULT_REASON_SCORE
+
+
+def test_scoring_contract_has_no_premium_or_access_input() -> None:
+    params = set(inspect.signature(decide_arena_scoring_outcome).parameters)
+
+    assert params == {"baseline", "challenger"}
 
 
 def test_invalid_baseline_score_line_is_rejected() -> None:

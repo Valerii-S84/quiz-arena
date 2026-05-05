@@ -133,7 +133,7 @@ async def _create_joined_duel(now_utc: datetime) -> tuple[int, int, object]:
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=5,
+            total_rounds=7,
         )
         await GameSessionService.join_friend_challenge_by_token(
             session,
@@ -200,7 +200,7 @@ async def test_friend_challenge_opponent_finish_sends_exactly_one_push_if_creato
     opponent_telegram_user_id = await _telegram_user_id(opponent_user_id)
 
     notifications: list[tuple[int, str, str | None]] = []
-    for round_no in range(1, 6):
+    for round_no in range(1, 8):
         result = await _submit_friend_round_answer(
             user_id=opponent_user_id,
             challenge_id=challenge_id,
@@ -240,7 +240,7 @@ async def test_friend_challenge_opponent_finish_skips_push_if_creator_already_st
     )
 
     notifications: list[tuple[int, str, str | None]] = []
-    for round_no in range(1, 6):
+    for round_no in range(1, 8):
         result = await _submit_friend_round_answer(
             user_id=opponent_user_id,
             challenge_id=challenge_id,

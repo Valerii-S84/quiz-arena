@@ -14,6 +14,11 @@ from app.bot.keyboards.duels import (
     build_duel_paywall_keyboard,
 )
 from app.bot.texts.de import TEXTS_DE
+from app.game.arena_duels.analytics import (
+    ARENA_EVENT_ARENA_REVANCHE_CLICKED,
+    build_arena_event_payload,
+    emit_arena_analytics_event,
+)
 from app.game.arena_duels.errors import (
     ArenaDuelAccessError,
     ArenaDuelNotFoundError,
@@ -42,6 +47,7 @@ async def handle_arena_revanche_confirm(
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
 
+    now_utc = datetime.now(timezone.utc)
     async with session_local.begin() as session:
         snapshot = await user_onboarding_service.ensure_home_snapshot(
             session,
@@ -60,6 +66,17 @@ async def handle_arena_revanche_confirm(
             session=session,
             user_onboarding_service=user_onboarding_service,
             user_id=context.receiver_user_id,
+        )
+        await emit_arena_analytics_event(
+            session,
+            event_type=ARENA_EVENT_ARENA_REVANCHE_CLICKED,
+            happened_at=now_utc,
+            user_id=snapshot.user_id,
+            payload=build_arena_event_payload(
+                user_id=snapshot.user_id,
+                arena_duel_id=getattr(context, "arena_duel_id", None),
+                attempt_id=source_attempt_id,
+            ),
         )
 
     await callback.message.answer(

@@ -56,7 +56,7 @@ def _context(*, cached_file_ids: tuple[str | None, str | None]):
         status="COMPLETED",
         creator_score=4,
         opponent_score=2,
-        total_rounds=5,
+        total_rounds=7,
         completed_at=datetime(2026, 3, 1, 18, 0, tzinfo=timezone.utc),
         creator_name="Max",
         opponent_name="Anna",

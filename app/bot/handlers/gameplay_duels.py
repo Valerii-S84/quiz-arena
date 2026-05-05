@@ -7,7 +7,7 @@ from aiogram.types import CallbackQuery
 
 import app.bot.handlers.gameplay_flows.arena_duel_flow as arena_duel_flow
 import app.bot.handlers.gameplay_flows.arena_revanche_flow as arena_revanche_flow
-from app.bot.handlers import gameplay_callbacks
+from app.bot.handlers import gameplay_callbacks, gameplay_helpers
 from app.bot.handlers.gameplay_views import _build_question_text
 from app.bot.keyboards.duels import (
     build_arena_create_keyboard,
@@ -31,7 +31,11 @@ from app.game.arena_duels.revanche import (
     prepare_arena_revanche_request,
     record_arena_revanche_sent,
 )
-from app.game.arena_duels.service import create_arena_duel_baseline, list_active_arena_duels
+from app.game.arena_duels.service import (
+    create_arena_duel_baseline,
+    create_friend_challenge_from_arena_duel,
+    list_active_arena_duels,
+)
 from app.game.duels import rollout as duel_rollout
 from app.game.duels.constants import (
     ARENA_CREATE_CALLBACK,
@@ -165,6 +169,21 @@ async def handle_arena_publish_friend(callback: CallbackQuery) -> None:
     )
 
 
+async def handle_arena_challenge_friend(callback: CallbackQuery) -> None:
+    if not duel_rollout.is_canonical_duels_enabled():
+        await _answer_duels_disabled(callback)
+        return
+    await arena_duel_flow.handle_arena_challenge_friend(
+        callback,
+        arena_challenge_friend_re=gameplay_callbacks.ARENA_CHALLENGE_FRIEND_RE,
+        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
+        session_local=SessionLocal,
+        user_onboarding_service=UserOnboardingService,
+        create_friend_challenge_from_arena_duel=create_friend_challenge_from_arena_duel,
+        build_friend_invite_link=gameplay_helpers._build_friend_invite_link,
+    )
+
+
 async def handle_arena_revanche_confirm(callback: CallbackQuery) -> None:
     if not duel_rollout.is_canonical_duels_enabled():
         await _answer_duels_disabled(callback)
@@ -263,6 +282,9 @@ def register(router: Router) -> None:
     )
     router.callback_query(F.data.regexp(gameplay_callbacks.ARENA_PUBLISH_FRIEND_RE))(
         handle_arena_publish_friend
+    )
+    router.callback_query(F.data.regexp(gameplay_callbacks.ARENA_CHALLENGE_FRIEND_RE))(
+        handle_arena_challenge_friend
     )
     router.callback_query(F.data.regexp(gameplay_callbacks.ARENA_REVANCHE_RE))(
         handle_arena_revanche_confirm

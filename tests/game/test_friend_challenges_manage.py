@@ -135,7 +135,7 @@ async def test_manage_friend_challenge_rejects_access_checks(
 
 
 @pytest.mark.asyncio
-async def test_repost_friend_challenge_as_open_creates_repost_and_emits_events(
+async def test_repost_friend_challenge_as_open_creates_repost_without_legacy_event(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     challenge = _challenge(status="ACTIVE", creator_user_id=11, opponent_user_id=None)
@@ -209,19 +209,7 @@ async def test_repost_friend_challenge_as_open_creates_repost_and_emits_events(
             "total_rounds": challenge.total_rounds,
         }
     ]
-    assert analytics_events == [
-        {
-            "event_type": "duel_reposted_as_open",
-            "source": friend_challenges_manage.EVENT_SOURCE_BOT,
-            "happened_at": NOW_UTC,
-            "user_id": 11,
-            "payload": {
-                "source_challenge_id": str(challenge.id),
-                "repost_challenge_id": str(repost.challenge_id),
-                "format": repost.total_rounds,
-            },
-        }
-    ]
+    assert analytics_events == []
 
 
 @pytest.mark.asyncio

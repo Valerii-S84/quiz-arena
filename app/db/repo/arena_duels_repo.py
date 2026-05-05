@@ -250,6 +250,14 @@ class ArenaDuelsRepo:
         return duel_result.scalar_one_or_none()
 
     @staticmethod
+    async def get_duel_for_update(
+        session: AsyncSession,
+        *,
+        duel_id: UUID,
+    ) -> ArenaDuel | None:
+        return await ArenaDuelsRepo._get_duel_for_update(session, duel_id=duel_id)
+
+    @staticmethod
     async def _get_existing_attempt(
         session: AsyncSession,
         *,

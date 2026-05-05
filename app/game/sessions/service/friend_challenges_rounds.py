@@ -5,12 +5,13 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.analytics_events import EVENT_SOURCE_BOT
+from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.economy.streak.time import berlin_local_date
+from app.game.arena_duels.analytics import ARENA_EVENT_FRIEND_DUEL_STARTED
 from app.game.friend_challenges.constants import is_duel_playable_for_user, normalize_duel_status
 from app.game.sessions.errors import (
     FriendChallengeAccessError,
@@ -179,9 +180,42 @@ async def start_friend_challenge_round(
         session,
         tournament_match_id=challenge.tournament_match_id,
     )
+    await _emit_friend_duel_started_event(
+        session,
+        user_id=user_id,
+        challenge_id=challenge.id,
+        round_number=next_round,
+        total_rounds=challenge.total_rounds,
+        happened_at=now_utc,
+    )
     return FriendChallengeRoundStartResult(
         snapshot=_build_friend_challenge_snapshot(challenge),
         start_result=start_result,
         waiting_for_opponent=False,
         already_answered_current_round=False,
+    )
+
+
+async def _emit_friend_duel_started_event(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    challenge_id: UUID,
+    round_number: int,
+    total_rounds: int,
+    happened_at: datetime,
+) -> None:
+    if not callable(getattr(session, "add", None)):
+        return
+    await emit_analytics_event(
+        session,
+        event_type=ARENA_EVENT_FRIEND_DUEL_STARTED,
+        source=EVENT_SOURCE_BOT,
+        happened_at=happened_at,
+        user_id=user_id,
+        payload={
+            "challenge_id": str(challenge_id),
+            "round": round_number,
+            "total_rounds": total_rounds,
+        },
     )

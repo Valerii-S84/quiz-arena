@@ -54,7 +54,7 @@ async def _telegram_chat_id(user_id: int) -> int:
 
 
 @pytest.mark.asyncio
-async def test_direct_duel_end_to_end_12_rounds_completes_and_enqueues_proof_card(
+async def test_direct_duel_end_to_end_7_rounds_completes_and_enqueues_proof_card(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now_utc = datetime.now(UTC)
@@ -67,7 +67,7 @@ async def test_direct_duel_end_to_end_12_rounds_completes_and_enqueues_proof_car
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=12,
+            total_rounds=7,
         )
         challenge_id = challenge.challenge_id
 
@@ -83,7 +83,7 @@ async def test_direct_duel_end_to_end_12_rounds_completes_and_enqueues_proof_car
         )
         assert joined.joined_now is True
 
-        for round_no in range(1, 12):
+        for round_no in range(1, 7):
             creator_round = await GameSessionService.start_friend_challenge_round(
                 session,
                 user_id=creator_user_id,
@@ -117,30 +117,30 @@ async def test_direct_duel_end_to_end_12_rounds_completes_and_enqueues_proof_car
                 now_utc=now_utc,
             )
 
-        creator_round_12 = await GameSessionService.start_friend_challenge_round(
+        creator_round_7 = await GameSessionService.start_friend_challenge_round(
             session,
             user_id=creator_user_id,
             challenge_id=challenge_id,
-            idempotency_key="fc:e2e:creator:start:12",
+            idempotency_key="fc:e2e:creator:start:7",
             now_utc=now_utc,
         )
-        opponent_round_12 = await GameSessionService.start_friend_challenge_round(
+        opponent_round_7 = await GameSessionService.start_friend_challenge_round(
             session,
             user_id=opponent_user_id,
             challenge_id=challenge_id,
-            idempotency_key="fc:e2e:opponent:start:12",
+            idempotency_key="fc:e2e:opponent:start:7",
             now_utc=now_utc,
         )
-        assert creator_round_12.start_result is not None
-        assert opponent_round_12.start_result is not None
-        opponent_final_session_id = opponent_round_12.start_result.session.session_id
+        assert creator_round_7.start_result is not None
+        assert opponent_round_7.start_result is not None
+        opponent_final_session_id = opponent_round_7.start_result.session.session_id
 
         await GameSessionService.submit_answer(
             session,
             user_id=creator_user_id,
-            session_id=creator_round_12.start_result.session.session_id,
+            session_id=creator_round_7.start_result.session.session_id,
             selected_option=0,
-            idempotency_key="fc:e2e:creator:answer:12",
+            idempotency_key="fc:e2e:creator:answer:7",
             now_utc=now_utc,
         )
 
@@ -190,7 +190,7 @@ async def test_open_duel_race_condition_allows_only_one_accept() -> None:
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
             challenge_type=DUEL_TYPE_OPEN,
-            total_rounds=5,
+            total_rounds=7,
         )
 
     async def _accept(user_id: int):
@@ -238,7 +238,7 @@ async def test_ttl_pending_expired_worker_sets_status_and_pushes_creator(
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=5,
+            total_rounds=7,
         )
         row = await FriendChallengesRepo.get_by_id_for_update(session, challenge.challenge_id)
         assert row is not None
@@ -288,7 +288,7 @@ async def test_meine_duelle_prioritizes_my_turn_before_waiting_and_open(
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=12,
+            total_rounds=7,
         )
         await GameSessionService.join_friend_challenge_by_id(
             session,
@@ -302,7 +302,7 @@ async def test_meine_duelle_prioritizes_my_turn_before_waiting_and_open(
             creator_user_id=creator_user_id,
             mode_code="QUICK_MIX_A1A2",
             now_utc=now_utc,
-            total_rounds=5,
+            total_rounds=7,
         )
         await GameSessionService.join_friend_challenge_by_id(
             session,
@@ -323,7 +323,7 @@ async def test_meine_duelle_prioritizes_my_turn_before_waiting_and_open(
             challenge_type=DUEL_TYPE_OPEN,
             mode_code="QUICK_MIX_A1A2",
             access_type="FREE",
-            total_rounds=5,
+            total_rounds=7,
             now_utc=now_utc,
         )
 

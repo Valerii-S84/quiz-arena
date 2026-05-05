@@ -16,11 +16,11 @@ def test_user_did_not_finish_challenge_flags_incomplete_creator() -> None:
         id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
         creator_user_id=101,
         opponent_user_id=202,
-        total_rounds=5,
+        total_rounds=7,
         creator_finished_at=None,
         opponent_finished_at=datetime.now(timezone.utc),
         creator_answered_round=2,
-        opponent_answered_round=5,
+        opponent_answered_round=7,
     )
     assert _user_did_not_finish_challenge(challenge=challenge, user_id=101) is True
     assert _user_did_not_finish_challenge(challenge=challenge, user_id=202) is False
@@ -45,11 +45,11 @@ def test_collect_nonfinishers_skips_bye_and_keeps_only_incomplete_users() -> Non
             id=challenge_id,
             creator_user_id=101,
             opponent_user_id=202,
-            total_rounds=5,
+            total_rounds=7,
             creator_finished_at=None,
             opponent_finished_at=datetime.now(timezone.utc),
             creator_answered_round=3,
-            opponent_answered_round=5,
+            opponent_answered_round=7,
         )
     }
     nonfinishers = _collect_nonfinishers(matches=matches, challenges_by_id=challenges_by_id)
@@ -70,7 +70,7 @@ def test_collect_nonfinishers_includes_incomplete_self_bot_match() -> None:
             id=challenge_id,
             creator_user_id=101,
             opponent_user_id=101,
-            total_rounds=5,
+            total_rounds=7,
             creator_finished_at=None,
             opponent_finished_at=None,
             creator_answered_round=2,
