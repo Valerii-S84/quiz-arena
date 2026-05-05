@@ -148,16 +148,19 @@ def test_arena_access_type_constraints_match_migration() -> None:
     assert 'server_default="FREE"' in migration
 
 
-def test_arena_source_friend_unique_index_matches_migration() -> None:
+def test_arena_source_friend_unique_migration_is_fail_fast_and_non_destructive() -> None:
     migration = Path("alembic/versions/b0c1d2e3f4a5_m50_arena_source_friend_unique.py").read_text()
 
     assert "uq_arena_duels_source_friend_once" in migration
-    assert "ranked_source_duels" in migration
-    assert "row_number() OVER" in migration
-    assert "PARTITION BY source_friend_challenge_id" in migration
-    assert "source_friend_challenge_id = NULL" in migration
+    assert "GROUP BY source_friend_challenge_id" in migration
+    assert "HAVING COUNT(*) > 1" in migration
+    assert "RAISE EXCEPTION" in migration
+    assert "approved maintenance flow" in migration
     assert "source_friend_challenge_id IS NOT NULL" in migration
     assert "unique=True" in migration
+    assert "row_number() OVER" not in migration
+    assert "PARTITION BY source_friend_challenge_id" not in migration
+    assert "source_friend_challenge_id = NULL" not in migration
 
 
 @pytest.mark.asyncio

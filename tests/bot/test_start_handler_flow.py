@@ -288,6 +288,67 @@ async def test_handle_start_duel_payload_joins_and_shows_challenge_immediately(m
 
 
 @pytest.mark.asyncio
+async def test_handle_start_duel_payload_expired_returns_expired_message(monkeypatch) -> None:
+    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
+        assert start_payload == "duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        return SimpleNamespace(user_id=9, free_energy=10, paid_energy=0, current_streak=1)
+
+    async def _fake_join_by_id(*args, **kwargs):
+        del args, kwargs
+        raise FriendChallengeExpiredError()
+
+    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(start.GameSessionService, "join_friend_challenge_by_id", _fake_join_by_id)
+
+    message = _StartMessage(
+        text="/start duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        from_user=SimpleNamespace(id=1, username="alice", first_name="Alice", language_code="de"),
+    )
+    await start.handle_start(message)
+
+    assert message.answers[0].text == TEXTS_DE["msg.friend.challenge.expired"]
+
+
+@pytest.mark.asyncio
+async def test_handle_start_invalid_legacy_duel_payload_falls_back_to_home(monkeypatch) -> None:
+    monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
+
+    async def _fake_home_snapshot(session, *, telegram_user, start_payload=None):
+        assert start_payload == "duel_bad"
+        return SimpleNamespace(
+            user_id=8,
+            free_energy=8,
+            paid_energy=3,
+            current_streak=4,
+            best_streak=9,
+            global_best_streak=27,
+        )
+
+    async def _fake_offer(*args, **kwargs):
+        del args, kwargs
+        return None
+
+    async def _unexpected_join(*args, **kwargs):
+        del args, kwargs
+        pytest.fail("invalid legacy duel payload must not attempt to join a challenge")
+
+    monkeypatch.setattr(start.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
+    monkeypatch.setattr(start.OfferService, "evaluate_and_log_offer", _fake_offer)
+    monkeypatch.setattr(start.GameSessionService, "join_friend_challenge_by_id", _unexpected_join)
+
+    message = _StartMessage(
+        text="/start duel_bad",
+        from_user=SimpleNamespace(id=2, username="bob", first_name="Bob", language_code="de"),
+    )
+    await start.handle_start(message)
+
+    assert len(message.answers) == 1
+    assert "Serie: 4 | Beste: 9 | 🏆 Rekord: 27" in (message.answers[0].text or "")
+
+
+@pytest.mark.asyncio
 async def test_handle_start_sends_home_and_offer_when_available(monkeypatch) -> None:
     monkeypatch.setattr(start, "SessionLocal", DummySessionLocal())
 
