@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import pytest
 
+from app.game.duels import rollout as duel_rollout
 from app.services.channel_bonus import ChannelBonusService
+
+
+@pytest.fixture(autouse=True)
+def _enable_duels_rollout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(duel_rollout, "is_canonical_duels_enabled", lambda: True)
 
 
 @pytest.fixture(autouse=True)

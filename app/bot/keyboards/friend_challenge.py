@@ -1,6 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.keyboards import friend_challenge_share
+from app.game.duels import rollout as duel_rollout
 from app.game.duels.constants import (
     ARENA_PUBLISH_FRIEND_CALLBACK_PREFIX,
     DUEL_PAYWALL_PRODUCT_CODES,
@@ -54,7 +55,8 @@ def _can_publish_friend_challenge_to_arena(
     if challenge is None or user_id is None:
         return False
     return (
-        challenge.creator_user_id == user_id
+        duel_rollout.is_canonical_duels_enabled()
+        and challenge.creator_user_id == user_id
         and challenge.opponent_user_id is None
         and challenge.challenge_type == DUEL_TYPE_DIRECT
         and challenge.status == DUEL_STATUS_CREATOR_DONE
@@ -103,9 +105,15 @@ def build_friend_challenge_finished_keyboard(
                 )
             ]
         )
-    rows.append(
-        [InlineKeyboardButton(text="🔄 Revanche", callback_data=f"friend:rematch:{challenge_id}")]
-    )
+    if duel_rollout.is_canonical_duels_enabled():
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="🔄 Revanche",
+                    callback_data=f"friend:rematch:{challenge_id}",
+                )
+            ]
+        )
     rows.append([InlineKeyboardButton(text="🏠 Menü", callback_data="home:open")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -151,7 +159,7 @@ def build_friend_pending_expired_keyboard(
     can_publish_to_arena: bool = False,
 ) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
-    if can_publish_to_arena:
+    if can_publish_to_arena and duel_rollout.is_canonical_duels_enabled():
         rows.append(
             [
                 InlineKeyboardButton(

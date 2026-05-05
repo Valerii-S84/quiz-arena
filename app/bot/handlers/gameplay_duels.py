@@ -14,6 +14,7 @@ from app.bot.keyboards.duels import (
     build_duels_menu_keyboard,
     build_friend_duel_keyboard,
 )
+from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
 from app.game.arena_duels.accept import accept_arena_duel, get_arena_duel_accept_preview
@@ -31,6 +32,7 @@ from app.game.arena_duels.revanche import (
     record_arena_revanche_sent,
 )
 from app.game.arena_duels.service import create_arena_duel_baseline, list_active_arena_duels
+from app.game.duels import rollout as duel_rollout
 from app.game.duels.constants import (
     ARENA_CREATE_CALLBACK,
     ARENA_LIST_CALLBACK,
@@ -44,7 +46,21 @@ from app.game.sessions.service.friend_challenges_manage import publish_friend_ch
 from app.services.user_onboarding import UserOnboardingService
 
 
+async def _answer_duels_disabled(callback: CallbackQuery) -> None:
+    if callback.message is None:
+        await callback.answer(TEXTS_DE["msg.duels.disabled"], show_alert=True)
+        return
+    await callback.message.answer(
+        TEXTS_DE["msg.duels.disabled"],
+        reply_markup=build_home_keyboard(),
+    )
+    await callback.answer()
+
+
 async def handle_duels_menu(callback: CallbackQuery, *, emit_event: bool = False) -> None:
+    if not duel_rollout.is_canonical_duels_enabled():
+        await _answer_duels_disabled(callback)
+        return
     if callback.message is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
@@ -61,6 +77,9 @@ async def handle_duels_menu(callback: CallbackQuery, *, emit_event: bool = False
 
 
 async def handle_arena_open(callback: CallbackQuery) -> None:
+    if not duel_rollout.is_canonical_duels_enabled():
+        await _answer_duels_disabled(callback)
+        return
     if callback.data == DUEL_ARENA_CALLBACK:
         await _emit_duel_callback_events(
             callback,
@@ -75,6 +94,9 @@ async def handle_arena_open(callback: CallbackQuery) -> None:
 
 
 async def handle_arena_create(callback: CallbackQuery) -> None:
+    if not duel_rollout.is_canonical_duels_enabled():
+        await _answer_duels_disabled(callback)
+        return
     if callback.message is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
@@ -86,6 +108,9 @@ async def handle_arena_create(callback: CallbackQuery) -> None:
 
 
 async def handle_arena_start_create(callback: CallbackQuery) -> None:
+    if not duel_rollout.is_canonical_duels_enabled():
+        await _answer_duels_disabled(callback)
+        return
     await arena_duel_flow.handle_arena_start_create(
         callback,
         session_local=SessionLocal,
@@ -97,6 +122,9 @@ async def handle_arena_start_create(callback: CallbackQuery) -> None:
 
 
 async def handle_arena_accept_preview(callback: CallbackQuery) -> None:
+    if not duel_rollout.is_canonical_duels_enabled():
+        await _answer_duels_disabled(callback)
+        return
     await arena_duel_flow.handle_arena_accept_preview(
         callback,
         arena_accept_re=gameplay_callbacks.ARENA_ACCEPT_RE,
@@ -108,6 +136,9 @@ async def handle_arena_accept_preview(callback: CallbackQuery) -> None:
 
 
 async def handle_arena_start_attempt(callback: CallbackQuery) -> None:
+    if not duel_rollout.is_canonical_duels_enabled():
+        await _answer_duels_disabled(callback)
+        return
     await arena_duel_flow.handle_arena_start_attempt(
         callback,
         arena_start_attempt_re=gameplay_callbacks.ARENA_START_ATTEMPT_RE,
@@ -121,6 +152,9 @@ async def handle_arena_start_attempt(callback: CallbackQuery) -> None:
 
 
 async def handle_arena_publish_friend(callback: CallbackQuery) -> None:
+    if not duel_rollout.is_canonical_duels_enabled():
+        await _answer_duels_disabled(callback)
+        return
     await arena_duel_flow.handle_arena_publish_friend(
         callback,
         arena_publish_friend_re=gameplay_callbacks.ARENA_PUBLISH_FRIEND_RE,
@@ -132,6 +166,9 @@ async def handle_arena_publish_friend(callback: CallbackQuery) -> None:
 
 
 async def handle_arena_revanche_confirm(callback: CallbackQuery) -> None:
+    if not duel_rollout.is_canonical_duels_enabled():
+        await _answer_duels_disabled(callback)
+        return
     await arena_revanche_flow.handle_arena_revanche_confirm(
         callback,
         arena_revanche_re=gameplay_callbacks.ARENA_REVANCHE_RE,
@@ -143,6 +180,9 @@ async def handle_arena_revanche_confirm(callback: CallbackQuery) -> None:
 
 
 async def handle_arena_revanche_send(callback: CallbackQuery) -> None:
+    if not duel_rollout.is_canonical_duels_enabled():
+        await _answer_duels_disabled(callback)
+        return
     await arena_revanche_flow.handle_arena_revanche_send(
         callback,
         arena_revanche_send_re=gameplay_callbacks.ARENA_REVANCHE_SEND_RE,
@@ -156,6 +196,9 @@ async def handle_arena_revanche_send(callback: CallbackQuery) -> None:
 
 
 async def handle_friend_duel_open(callback: CallbackQuery, *, emit_event: bool = False) -> None:
+    if not duel_rollout.is_canonical_duels_enabled():
+        await _answer_duels_disabled(callback)
+        return
     if callback.message is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return

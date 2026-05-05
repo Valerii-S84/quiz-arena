@@ -8,6 +8,7 @@ from app.bot.keyboards.proof_card_share import (
     build_friend_challenge_inline_share_query,
     build_friend_challenge_invite_inline_share_query,
 )
+from app.game.duels import rollout as duel_rollout
 
 
 def _build_share_url(*, invite_link: str, share_text: str) -> str:
@@ -90,21 +91,24 @@ def build_friend_challenge_result_share_keyboard(
     *, share_url: str, challenge_id: str
 ) -> InlineKeyboardMarkup:
     del share_url
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="📤 KARTE TEILEN",
-                    switch_inline_query=build_friend_challenge_inline_share_query(
-                        challenge_id=challenge_id
-                    ),
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="🔁 REVANCHE", callback_data=f"friend:rematch:{challenge_id}"
-                )
-            ],
-            [InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")],
+    rows = [
+        [
+            InlineKeyboardButton(
+                text="📤 KARTE TEILEN",
+                switch_inline_query=build_friend_challenge_inline_share_query(
+                    challenge_id=challenge_id
+                ),
+            )
         ]
-    )
+    ]
+    if duel_rollout.is_canonical_duels_enabled():
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="🔁 REVANCHE",
+                    callback_data=f"friend:rematch:{challenge_id}",
+                )
+            ]
+        )
+    rows.append([InlineKeyboardButton(text="↩️ Zurück", callback_data="home:open")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)

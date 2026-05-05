@@ -51,3 +51,8 @@ def test_settings_reject_invalid_promo_encryption_key() -> None:
         Settings(
             **_settings_kwargs(PROMO_ENCRYPTION_KEY="not-a-valid-key"),
         )
+
+
+def test_settings_enable_duels_rollout_by_default() -> None:
+    settings = Settings(**_settings_kwargs())
+    assert settings.duels_rollout_enabled is True

@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
+import pytest
+
 from app.bot.keyboards.friend_challenge import (
     build_friend_challenge_back_keyboard,
     build_friend_challenge_finished_keyboard,
@@ -14,6 +16,7 @@ from app.bot.keyboards.friend_challenge import (
     build_friend_open_taken_keyboard,
     build_friend_pending_expired_keyboard,
 )
+from app.game.duels import rollout as duel_rollout
 from app.game.sessions.types import FriendChallengeSnapshot
 
 
@@ -62,6 +65,32 @@ def test_friend_challenge_back_keyboard_shows_publish_only_for_creator_baseline(
     ]
 
 
+def test_friend_challenge_back_keyboard_hides_publish_when_rollout_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(duel_rollout, "is_canonical_duels_enabled", lambda: False)
+    keyboard = build_friend_challenge_back_keyboard(
+        challenge=FriendChallengeSnapshot(
+            challenge_id=UUID("00000000-0000-0000-0000-000000000001"),
+            invite_token="token",
+            challenge_type="DIRECT",
+            mode_code="QUICK_MIX_A1A2",
+            access_type="FREE",
+            status="CREATOR_DONE",
+            creator_user_id=17,
+            opponent_user_id=None,
+            current_round=7,
+            total_rounds=7,
+            creator_score=6,
+            opponent_score=0,
+            creator_finished_at=datetime(2026, 5, 4, 12, 0, tzinfo=timezone.utc),
+        ),
+        user_id=17,
+    )
+    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert callbacks == ["home:open"]
+
+
 def test_friend_challenge_finished_keyboard_contains_rematch_and_back() -> None:
     keyboard = build_friend_challenge_finished_keyboard(
         challenge_id="00000000-0000-0000-0000-000000000001"
@@ -94,6 +123,20 @@ def test_friend_challenge_finished_keyboard_ignores_direct_share_url() -> None:
     share_button = keyboard.inline_keyboard[0][0]
     assert share_button.url is None
     assert share_button.callback_data == "friend:share:result:00000000-0000-0000-0000-000000000001"
+
+
+def test_friend_challenge_finished_keyboard_hides_rematch_when_rollout_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(duel_rollout, "is_canonical_duels_enabled", lambda: False)
+    keyboard = build_friend_challenge_finished_keyboard(
+        challenge_id="00000000-0000-0000-0000-000000000001"
+    )
+    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert callbacks == [
+        "friend:share:result:00000000-0000-0000-0000-000000000001",
+        "home:open",
+    ]
 
 
 def test_friend_challenge_limit_keyboard_contains_buy_options_and_back() -> None:
@@ -153,6 +196,21 @@ def test_friend_pending_expired_keyboard_shows_publish_for_canonical_arena_path(
         "friend:delete:00000000-0000-0000-0000-000000000001",
     ]
     assert "friend:open:repost:00000000-0000-0000-0000-000000000001" not in callbacks
+
+
+def test_friend_pending_expired_keyboard_hides_publish_when_rollout_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(duel_rollout, "is_canonical_duels_enabled", lambda: False)
+    keyboard = build_friend_pending_expired_keyboard(
+        challenge_id="00000000-0000-0000-0000-000000000001",
+        can_publish_to_arena=True,
+    )
+    callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
+    assert callbacks == [
+        "home:open",
+        "friend:delete:00000000-0000-0000-0000-000000000001",
+    ]
 
 
 def test_friend_challenge_share_keyboard_omits_accept_url_for_creator() -> None:
@@ -268,3 +326,20 @@ def test_friend_challenge_result_share_keyboard_contains_share_and_navigation() 
     assert "friend:rematch:00000000-0000-0000-0000-000000000001" in callbacks
     assert "home:open" in callbacks
     assert "arena:publish_friend:00000000-0000-0000-0000-000000000001" not in callbacks
+
+
+def test_friend_challenge_result_share_keyboard_hides_rematch_when_rollout_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(duel_rollout, "is_canonical_duels_enabled", lambda: False)
+    keyboard = build_friend_challenge_result_share_keyboard(
+        share_url="https://t.me/share/url?url=https%3A%2F%2Ft.me%2Fquizarena_bot&text=proof",
+        challenge_id="00000000-0000-0000-0000-000000000001",
+    )
+    callbacks = [
+        button.callback_data
+        for row in keyboard.inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert callbacks == ["home:open"]
