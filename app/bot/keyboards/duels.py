@@ -89,13 +89,13 @@ def build_arena_back_keyboard() -> InlineKeyboardMarkup:
 def build_arena_expired_guard_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
             [
                 InlineKeyboardButton(
                     text="🎯 Eigenes Arena-Duell erstellen",
                     callback_data=ARENA_CREATE_CALLBACK,
                 )
             ],
+            [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
         ]
     )
 
@@ -134,18 +134,12 @@ def build_arena_create_keyboard() -> InlineKeyboardMarkup:
 def build_arena_published_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
             [
                 InlineKeyboardButton(
                     text="👤 Freund herausfordern", callback_data=DUEL_FRIEND_CALLBACK
                 )
             ],
-            [
-                InlineKeyboardButton(
-                    text="🎯 Neues Arena-Duell erstellen",
-                    callback_data=ARENA_CREATE_CALLBACK,
-                )
-            ],
+            [InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)],
         ]
     )
 
@@ -166,7 +160,7 @@ def build_arena_result_keyboard(
                 )
             ]
         )
-    if user_won:
+    else:
         rows.append(
             [
                 InlineKeyboardButton(
@@ -176,15 +170,6 @@ def build_arena_result_keyboard(
             ]
         )
     rows.append([InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)])
-    if not user_won and not close_loss:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text="🎯 Eigenes Arena-Duell erstellen",
-                    callback_data=ARENA_CREATE_CALLBACK,
-                )
-            ]
-        )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 

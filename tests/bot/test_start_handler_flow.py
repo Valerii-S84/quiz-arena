@@ -111,6 +111,37 @@ def test_build_question_text_contains_theme_counter_and_energy() -> None:
     assert "B2" not in text
 
 
+@pytest.mark.parametrize("source", ["ARENA_DUEL", "FRIEND_CHALLENGE"])
+def test_start_question_text_hides_theme_for_duel_sources(source: str) -> None:
+    start_result = StartSessionResult(
+        session=SessionQuestionView(
+            session_id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+            question_id="q-1",
+            text="Was passt?",
+            options=("A", "B", "C", "D"),
+            mode_code="QUICK_MIX_A1A2",
+            source=source,
+            category="Artikel - Nominativ",
+            question_number=1,
+            total_questions=7,
+        ),
+        energy_free=10,
+        energy_paid=0,
+        idempotent_replay=False,
+    )
+
+    text = start._build_question_text(
+        source=source,
+        snapshot_free_energy=10,
+        snapshot_paid_energy=0,
+        start_result=start_result,
+    )
+
+    assert "📚 Thema:" not in text
+    assert "Artikel - Nominativ" not in text
+    assert "❓ Frage 1/7" in text
+
+
 @pytest.mark.asyncio
 async def test_handle_start_rejects_missing_user() -> None:
     message = _StartMessage(text="/start", from_user=None)

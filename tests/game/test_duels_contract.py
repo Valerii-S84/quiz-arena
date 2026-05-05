@@ -1,3 +1,5 @@
+import pytest
+
 from app.game.duels.constants import (
     DUEL_CAN_SELECT_LEVEL,
     DUEL_CAN_SELECT_QUESTION_COUNT,
@@ -15,14 +17,26 @@ from app.game.duels.constants import (
     DUEL_QUESTION_COUNT,
     DUEL_TICKET_PRODUCT_CODE,
 )
+from app.game.sessions.errors import FriendChallengeAccessError
+from app.game.sessions.service.constants import FRIEND_CHALLENGE_TOTAL_ROUNDS
+from app.game.sessions.service.friend_challenges_question_plan import resolve_duel_rounds
 
 
 def test_duels_product_contract_has_two_modes_and_fixed_question_count() -> None:
     assert (DUEL_MODE_ARENA, DUEL_MODE_FRIEND) == ("OFFENE_ARENA", "FREUNDESDUELL")
     assert DUEL_QUESTION_COUNT == 7
+    assert FRIEND_CHALLENGE_TOTAL_ROUNDS == DUEL_QUESTION_COUNT
     assert DUEL_CAN_SELECT_TOPIC is False
     assert DUEL_CAN_SELECT_LEVEL is False
     assert DUEL_CAN_SELECT_QUESTION_COUNT is False
+
+
+def test_duels_friend_round_contract_accepts_only_seven_questions() -> None:
+    assert resolve_duel_rounds(total_rounds=7) == DUEL_QUESTION_COUNT
+
+    for legacy_rounds in (5, 12):
+        with pytest.raises(FriendChallengeAccessError):
+            resolve_duel_rounds(total_rounds=legacy_rounds)
 
 
 def test_duels_paywall_contract_excludes_premium_three_days() -> None:
