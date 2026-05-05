@@ -55,23 +55,21 @@ Catalog of runtime product/operational events as implemented in code.
 
 | Event | Producer(s) | Primary consumer(s) |
 |---|---|---|
-| `friend_challenge_created` | duel create/series analytics services | internal analytics dashboards |
-| `friend_challenge_joined` | `app/game/sessions/service/friend_challenges_join.py` | internal analytics dashboards |
 | `friend_challenge_series_started` | `app/game/sessions/service/friend_challenges_series.py` | internal analytics dashboards |
 | `friend_challenge_series_game_created` | `app/game/sessions/service/friend_challenges_series.py` | internal analytics dashboards |
 | `friend_challenge_last_chance_sent` | `app/workers/tasks/friend_challenges_async.py` | internal analytics dashboards |
 | `friend_challenge_expired_notice_sent` | `app/workers/tasks/friend_challenges_async.py` | internal analytics dashboards |
-| `duel_created` | duel analytics service | internal analytics dashboards |
-| `duel_accepted` | `app/game/sessions/service/friend_challenges_join.py` | internal analytics dashboards |
-| `duel_completed` | `app/game/sessions/service/sessions_submit_friend_challenge.py` | internal analytics dashboards |
 | `duel_expired` | duel analytics service + worker expiry path | internal analytics dashboards |
-| `duel_revanche_created` | duel analytics service | internal analytics dashboards |
-| `duel_reposted_as_open` | `app/game/sessions/service/friend_challenges_manage.py` | internal analytics dashboards |
 | `duel_canceled_by_creator` | `app/game/sessions/service/friend_challenges_manage.py` | internal analytics dashboards |
-| `duel_share_clicked` | `app/bot/handlers/gameplay_flows/proof_card_flow.py` | internal analytics dashboards |
 | `duel_menu_opened` | `app/bot/handlers/gameplay_duels.py` | internal analytics dashboards |
 | `duel_mode_selected` | `app/bot/handlers/gameplay_duels.py` | internal analytics dashboards |
 | `friend_duel_opened` | `app/bot/handlers/gameplay_duels.py` | internal analytics dashboards |
+| `friend_duel_created` | `app/game/sessions/service/friend_challenges_analytics.py`, `app/game/arena_duels/service.py` | internal analytics dashboards |
+| `friend_duel_share_clicked` | `app/bot/handlers/gameplay_flows/proof_card_flow.py` | internal analytics dashboards |
+| `friend_duel_joined` | `app/game/sessions/service/friend_challenges_join.py` | internal analytics dashboards |
+| `friend_duel_started` | `app/game/sessions/service/friend_challenges_rounds.py` | internal analytics dashboards |
+| `friend_duel_completed` | `app/game/sessions/service/sessions_submit_friend_challenge.py` | internal analytics dashboards |
+| `friend_duel_revanche_clicked` | `app/game/sessions/service/friend_challenges_analytics.py` | internal analytics dashboards |
 | `arena_opened` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
 | `arena_duel_created` | `app/game/arena_duels/service.py` | internal analytics dashboards |
 | `arena_duel_started` | `app/game/arena_duels/service.py`, `app/game/arena_duels/accept.py` | internal analytics dashboards |
@@ -80,6 +78,7 @@ Catalog of runtime product/operational events as implemented in code.
 | `arena_duel_accepted` | `app/game/arena_duels/accept.py` | internal analytics dashboards |
 | `arena_result_shown` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
 | `arena_result_beaten_notification_sent` | `app/workers/tasks/arena_duels.py` | internal analytics dashboards |
+| `arena_revanche_clicked` | `app/bot/handlers/gameplay_flows/arena_revanche_flow.py` | internal analytics dashboards |
 | `friend_duel_published_to_arena` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
 | `duel_limit_hit` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
 | `duel_paywall_shown` | `app/bot/handlers/gameplay_flows/arena_duel_flow.py` | internal analytics dashboards |
@@ -98,7 +97,7 @@ Arena/Duelle payload contract:
 - `time_ms`: completed time in milliseconds when known.
 
 Friend duel funnel rule:
-- Use `friend_duel_opened` and `friend_duel_published_to_arena` as canonical friend-mode events; do not infer them from `duel_mode_selected` or `arena_duel_published` payload actions.
+- Use `friend_duel_opened`, `friend_duel_created`, `friend_duel_joined`, `friend_duel_started`, `friend_duel_completed`, `friend_duel_share_clicked`, `friend_duel_revanche_clicked`, and `friend_duel_published_to_arena` as canonical friend-mode events; do not infer them from `duel_mode_selected` or `arena_duel_published` payload actions.
 
 ### 2.5 Private tournaments
 

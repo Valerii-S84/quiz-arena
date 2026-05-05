@@ -9,20 +9,20 @@ with daily as (
         count(*) as total
     from analytics_events
     where event_type in (
-        'friend_challenge_created',
-        'friend_challenge_joined',
-        'friend_challenge_completed',
-        'friend_challenge_rematch_created'
+        'friend_duel_created',
+        'friend_duel_joined',
+        'friend_duel_completed',
+        'friend_duel_revanche_clicked'
     )
       and local_date_berlin >= (current_date - interval '30 day')
     group by local_date_berlin, event_type
 )
 select
     local_date_berlin,
-    coalesce(max(total) filter (where event_type = 'friend_challenge_created'), 0) as created_total,
-    coalesce(max(total) filter (where event_type = 'friend_challenge_joined'), 0) as joined_total,
-    coalesce(max(total) filter (where event_type = 'friend_challenge_completed'), 0) as completed_total,
-    coalesce(max(total) filter (where event_type = 'friend_challenge_rematch_created'), 0) as rematch_total
+    coalesce(max(total) filter (where event_type = 'friend_duel_created'), 0) as created_total,
+    coalesce(max(total) filter (where event_type = 'friend_duel_joined'), 0) as joined_total,
+    coalesce(max(total) filter (where event_type = 'friend_duel_completed'), 0) as completed_total,
+    coalesce(max(total) filter (where event_type = 'friend_duel_revanche_clicked'), 0) as rematch_total
 from daily
 group by local_date_berlin
 order by local_date_berlin desc;
@@ -31,16 +31,16 @@ order by local_date_berlin desc;
 with daily as (
     select
         local_date_berlin,
-        count(*) filter (where event_type = 'friend_challenge_created') as created_total,
-        count(*) filter (where event_type = 'friend_challenge_joined') as joined_total,
-        count(*) filter (where event_type = 'friend_challenge_completed') as completed_total,
-        count(*) filter (where event_type = 'friend_challenge_rematch_created') as rematch_total
+        count(*) filter (where event_type = 'friend_duel_created') as created_total,
+        count(*) filter (where event_type = 'friend_duel_joined') as joined_total,
+        count(*) filter (where event_type = 'friend_duel_completed') as completed_total,
+        count(*) filter (where event_type = 'friend_duel_revanche_clicked') as rematch_total
     from analytics_events
     where event_type in (
-        'friend_challenge_created',
-        'friend_challenge_joined',
-        'friend_challenge_completed',
-        'friend_challenge_rematch_created'
+        'friend_duel_created',
+        'friend_duel_joined',
+        'friend_duel_completed',
+        'friend_duel_revanche_clicked'
     )
       and local_date_berlin >= (current_date - interval '30 day')
     group by local_date_berlin
@@ -60,19 +60,19 @@ order by local_date_berlin desc;
 -- 3) TTL outcomes for last 30 days (expired vs completed)
 select
     local_date_berlin,
-    count(*) filter (where event_type = 'friend_challenge_completed') as completed_total,
-    count(*) filter (where event_type = 'friend_challenge_expired') as expired_total,
+    count(*) filter (where event_type = 'friend_duel_completed') as completed_total,
+    count(*) filter (where event_type = 'duel_expired') as expired_total,
     case
-        when count(*) filter (where event_type in ('friend_challenge_completed', 'friend_challenge_expired')) > 0
+        when count(*) filter (where event_type in ('friend_duel_completed', 'duel_expired')) > 0
         then round(
-            (count(*) filter (where event_type = 'friend_challenge_expired'))::numeric
-            / (count(*) filter (where event_type in ('friend_challenge_completed', 'friend_challenge_expired'))),
+            (count(*) filter (where event_type = 'duel_expired'))::numeric
+            / (count(*) filter (where event_type in ('friend_duel_completed', 'duel_expired'))),
             4
         )
         else 0
     end as expired_share
 from analytics_events
-where event_type in ('friend_challenge_completed', 'friend_challenge_expired')
+where event_type in ('friend_duel_completed', 'duel_expired')
   and local_date_berlin >= (current_date - interval '30 day')
 group by local_date_berlin
 order by local_date_berlin desc;
@@ -101,12 +101,12 @@ order by 1 desc;
 with daily as (
     select
         local_date_berlin,
-        count(*) filter (where event_type = 'friend_challenge_completed') as completed_total,
-        count(*) filter (where event_type = 'friend_challenge_proof_card_share_clicked') as share_clicked_total
+        count(*) filter (where event_type = 'friend_duel_completed') as completed_total,
+        count(*) filter (where event_type = 'friend_duel_share_clicked') as share_clicked_total
     from analytics_events
     where event_type in (
-        'friend_challenge_completed',
-        'friend_challenge_proof_card_share_clicked'
+        'friend_duel_completed',
+        'friend_duel_share_clicked'
     )
       and local_date_berlin >= (current_date - interval '30 day')
     group by local_date_berlin
