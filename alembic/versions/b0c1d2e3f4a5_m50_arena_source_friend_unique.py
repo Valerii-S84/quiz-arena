@@ -21,29 +21,21 @@ def upgrade() -> None:
     op.execute(
         sa.text(
             """
-            WITH ranked_source_duels AS (
-                SELECT
-                    id,
-                    row_number() OVER (
-                        PARTITION BY source_friend_challenge_id
-                        ORDER BY
-                            CASE
-                                WHEN status = 'ACTIVE' AND expires_at > now() THEN 0
-                                ELSE 1
-                            END,
-                            created_at DESC,
-                            id DESC
-                    ) AS source_rank
-                FROM arena_duels
-                WHERE source_friend_challenge_id IS NOT NULL
-            )
-            UPDATE arena_duels
-            SET
-                source_friend_challenge_id = NULL,
-                updated_at = now()
-            FROM ranked_source_duels
-            WHERE arena_duels.id = ranked_source_duels.id
-              AND ranked_source_duels.source_rank > 1
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM arena_duels
+                    WHERE source_friend_challenge_id IS NOT NULL
+                    GROUP BY source_friend_challenge_id
+                    HAVING COUNT(*) > 1
+                ) THEN
+                    RAISE EXCEPTION
+                        'Cannot enforce uq_arena_duels_source_friend_once: duplicate source_friend_challenge_id rows exist'
+                        USING HINT = 'Resolve duplicates with an approved maintenance flow before rerunning m50_arena_source_friend_unique.';
+                END IF;
+            END
+            $$;
             """
         )
     )
