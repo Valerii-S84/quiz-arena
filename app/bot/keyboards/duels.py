@@ -28,6 +28,7 @@ class ArenaDuelButton:
     marker: str
 
 
+build_duel_monetization_rows = duels_access.build_duel_monetization_rows
 build_duel_paywall_keyboard = duels_access.build_duel_paywall_keyboard
 build_friend_duel_keyboard = duels_access.build_friend_duel_keyboard
 
@@ -162,6 +163,8 @@ def build_arena_result_keyboard(
                 )
             ]
         )
+        if close_loss and not user_won:
+            rows.extend(build_duel_monetization_rows())
     else:
         rows.append(
             [

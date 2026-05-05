@@ -105,8 +105,8 @@ async def test_friend_challenge_recent_and_deadline_queries_are_ordered_and_lock
     assert "FOR UPDATE SKIP LOCKED" in last_chance_sql
     assert "friend_challenges.expires_last_chance_notified_at IS NULL" in last_chance_sql
     assert (
-        "friend_challenges.status IN ('ACCEPTED', 'CREATOR_DONE', 'OPPONENT_DONE', 'ACTIVE')"
-        in last_chance_sql
+        "friend_challenges.status IN "
+        "('PENDING', 'ACCEPTED', 'CREATOR_DONE', 'OPPONENT_DONE', 'ACTIVE')" in last_chance_sql
     )
 
     active_expire_session = RecordingSession(_ScalarsResult([challenge]))

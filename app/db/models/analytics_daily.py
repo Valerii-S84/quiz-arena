@@ -76,6 +76,98 @@ class AnalyticsDaily(Base):
             name="ck_analytics_daily_purchase_credited_events_non_negative",
         ),
         CheckConstraint(
+            "duel_menu_opened_events_total >= 0",
+            name="ck_analytics_daily_duel_menu_opened_non_negative",
+        ),
+        CheckConstraint(
+            "duel_mode_selected_events_total >= 0",
+            name="ck_analytics_daily_duel_mode_selected_non_negative",
+        ),
+        CheckConstraint(
+            "arena_opened_events_total >= 0",
+            name="ck_analytics_daily_arena_opened_non_negative",
+        ),
+        CheckConstraint(
+            "arena_duel_created_events_total >= 0",
+            name="ck_analytics_daily_arena_duel_created_non_negative",
+        ),
+        CheckConstraint(
+            "arena_duel_started_events_total >= 0",
+            name="ck_analytics_daily_arena_duel_started_non_negative",
+        ),
+        CheckConstraint(
+            "arena_duel_completed_events_total >= 0",
+            name="ck_analytics_daily_arena_duel_completed_non_negative",
+        ),
+        CheckConstraint(
+            "arena_duel_published_events_total >= 0",
+            name="ck_analytics_daily_arena_duel_published_non_negative",
+        ),
+        CheckConstraint(
+            "arena_duel_accepted_events_total >= 0",
+            name="ck_analytics_daily_arena_duel_accepted_non_negative",
+        ),
+        CheckConstraint(
+            "arena_result_shown_events_total >= 0",
+            name="ck_analytics_daily_arena_result_shown_non_negative",
+        ),
+        CheckConstraint(
+            "arena_result_beaten_notification_sent_events_total >= 0",
+            name="ck_analytics_daily_arena_beaten_notice_non_negative",
+        ),
+        CheckConstraint(
+            "arena_revanche_clicked_events_total >= 0",
+            name="ck_analytics_daily_arena_revanche_clicked_non_negative",
+        ),
+        CheckConstraint(
+            "friend_duel_opened_events_total >= 0",
+            name="ck_analytics_daily_friend_duel_opened_non_negative",
+        ),
+        CheckConstraint(
+            "friend_duel_created_events_total >= 0",
+            name="ck_analytics_daily_friend_duel_created_non_negative",
+        ),
+        CheckConstraint(
+            "friend_duel_share_clicked_events_total >= 0",
+            name="ck_analytics_daily_friend_share_clicked_non_negative",
+        ),
+        CheckConstraint(
+            "friend_duel_joined_events_total >= 0",
+            name="ck_analytics_daily_friend_duel_joined_non_negative",
+        ),
+        CheckConstraint(
+            "friend_duel_started_events_total >= 0",
+            name="ck_analytics_daily_friend_duel_started_non_negative",
+        ),
+        CheckConstraint(
+            "friend_duel_completed_events_total >= 0",
+            name="ck_analytics_daily_friend_duel_completed_non_negative",
+        ),
+        CheckConstraint(
+            "friend_duel_published_to_arena_events_total >= 0",
+            name="ck_analytics_daily_friend_publish_arena_non_negative",
+        ),
+        CheckConstraint(
+            "friend_duel_revanche_clicked_events_total >= 0",
+            name="ck_analytics_daily_friend_revanche_clicked_non_negative",
+        ),
+        CheckConstraint(
+            "duel_limit_hit_events_total >= 0",
+            name="ck_analytics_daily_duel_limit_hit_non_negative",
+        ),
+        CheckConstraint(
+            "duel_paywall_shown_events_total >= 0",
+            name="ck_analytics_daily_duel_paywall_shown_non_negative",
+        ),
+        CheckConstraint(
+            "duel_ticket_clicked_events_total >= 0",
+            name="ck_analytics_daily_duel_ticket_clicked_non_negative",
+        ),
+        CheckConstraint(
+            "premium_week_clicked_events_total >= 0",
+            name="ck_analytics_daily_premium_week_clicked_non_negative",
+        ),
+        CheckConstraint(
             "purchase_rate >= 0 AND purchase_rate <= 1",
             name="ck_analytics_daily_purchase_rate",
         ),
@@ -168,5 +260,74 @@ class AnalyticsDaily(Base):
         Integer,
         nullable=False,
         server_default=text("0"),
+    )
+    duel_menu_opened_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    duel_mode_selected_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    arena_opened_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    arena_duel_created_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    arena_duel_started_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    arena_duel_completed_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    arena_duel_published_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    arena_duel_accepted_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    arena_result_shown_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    arena_result_beaten_notification_sent_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    arena_revanche_clicked_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    friend_duel_opened_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    friend_duel_created_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    friend_duel_share_clicked_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    friend_duel_joined_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    friend_duel_started_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    friend_duel_completed_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    friend_duel_published_to_arena_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    friend_duel_revanche_clicked_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    duel_limit_hit_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    duel_paywall_shown_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    duel_ticket_clicked_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    premium_week_clicked_events_total: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
     )
     calculated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

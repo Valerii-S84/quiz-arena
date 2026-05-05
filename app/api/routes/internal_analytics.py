@@ -46,6 +46,29 @@ class AnalyticsDailyKpiResponse(BaseModel):
     purchase_precheckout_ok_events_total: int = Field(ge=0)
     purchase_paid_uncredited_events_total: int = Field(ge=0)
     purchase_credited_events_total: int = Field(ge=0)
+    duel_menu_opened_events_total: int = Field(ge=0)
+    duel_mode_selected_events_total: int = Field(ge=0)
+    arena_opened_events_total: int = Field(ge=0)
+    arena_duel_created_events_total: int = Field(ge=0)
+    arena_duel_started_events_total: int = Field(ge=0)
+    arena_duel_completed_events_total: int = Field(ge=0)
+    arena_duel_published_events_total: int = Field(ge=0)
+    arena_duel_accepted_events_total: int = Field(ge=0)
+    arena_result_shown_events_total: int = Field(ge=0)
+    arena_result_beaten_notification_sent_events_total: int = Field(ge=0)
+    arena_revanche_clicked_events_total: int = Field(ge=0)
+    friend_duel_opened_events_total: int = Field(ge=0)
+    friend_duel_created_events_total: int = Field(ge=0)
+    friend_duel_share_clicked_events_total: int = Field(ge=0)
+    friend_duel_joined_events_total: int = Field(ge=0)
+    friend_duel_started_events_total: int = Field(ge=0)
+    friend_duel_completed_events_total: int = Field(ge=0)
+    friend_duel_published_to_arena_events_total: int = Field(ge=0)
+    friend_duel_revanche_clicked_events_total: int = Field(ge=0)
+    duel_limit_hit_events_total: int = Field(ge=0)
+    duel_paywall_shown_events_total: int = Field(ge=0)
+    duel_ticket_clicked_events_total: int = Field(ge=0)
+    premium_week_clicked_events_total: int = Field(ge=0)
     calculated_at: datetime
 
 
@@ -115,6 +138,39 @@ def _as_row(item: object) -> AnalyticsDailyKpiResponse:
             getattr(item, "purchase_paid_uncredited_events_total")
         ),
         purchase_credited_events_total=int(getattr(item, "purchase_credited_events_total")),
+        duel_menu_opened_events_total=int(getattr(item, "duel_menu_opened_events_total")),
+        duel_mode_selected_events_total=int(getattr(item, "duel_mode_selected_events_total")),
+        arena_opened_events_total=int(getattr(item, "arena_opened_events_total")),
+        arena_duel_created_events_total=int(getattr(item, "arena_duel_created_events_total")),
+        arena_duel_started_events_total=int(getattr(item, "arena_duel_started_events_total")),
+        arena_duel_completed_events_total=int(getattr(item, "arena_duel_completed_events_total")),
+        arena_duel_published_events_total=int(getattr(item, "arena_duel_published_events_total")),
+        arena_duel_accepted_events_total=int(getattr(item, "arena_duel_accepted_events_total")),
+        arena_result_shown_events_total=int(getattr(item, "arena_result_shown_events_total")),
+        arena_result_beaten_notification_sent_events_total=int(
+            getattr(item, "arena_result_beaten_notification_sent_events_total")
+        ),
+        arena_revanche_clicked_events_total=int(
+            getattr(item, "arena_revanche_clicked_events_total")
+        ),
+        friend_duel_opened_events_total=int(getattr(item, "friend_duel_opened_events_total")),
+        friend_duel_created_events_total=int(getattr(item, "friend_duel_created_events_total")),
+        friend_duel_share_clicked_events_total=int(
+            getattr(item, "friend_duel_share_clicked_events_total")
+        ),
+        friend_duel_joined_events_total=int(getattr(item, "friend_duel_joined_events_total")),
+        friend_duel_started_events_total=int(getattr(item, "friend_duel_started_events_total")),
+        friend_duel_completed_events_total=int(getattr(item, "friend_duel_completed_events_total")),
+        friend_duel_published_to_arena_events_total=int(
+            getattr(item, "friend_duel_published_to_arena_events_total")
+        ),
+        friend_duel_revanche_clicked_events_total=int(
+            getattr(item, "friend_duel_revanche_clicked_events_total")
+        ),
+        duel_limit_hit_events_total=int(getattr(item, "duel_limit_hit_events_total")),
+        duel_paywall_shown_events_total=int(getattr(item, "duel_paywall_shown_events_total")),
+        duel_ticket_clicked_events_total=int(getattr(item, "duel_ticket_clicked_events_total")),
+        premium_week_clicked_events_total=int(getattr(item, "premium_week_clicked_events_total")),
         calculated_at=getattr(item, "calculated_at"),
     )
 

@@ -1,10 +1,11 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.keyboards import friend_challenge_share
+from app.bot.keyboards.duels_access import build_duel_monetization_rows
 from app.game.duels import rollout as duel_rollout
 from app.game.duels.constants import (
+    ARENA_LIST_CALLBACK,
     ARENA_PUBLISH_FRIEND_CALLBACK_PREFIX,
-    DUEL_PAYWALL_PRODUCT_CODES,
     DUEL_QUESTION_COUNT,
     FRIEND_DUEL_CREATE_CALLBACK,
 )
@@ -96,6 +97,19 @@ def build_friend_challenge_finished_keyboard(
 ) -> InlineKeyboardMarkup:
     del share_url, show_best_of_three, show_next_series_game
     rows: list[list[InlineKeyboardButton]] = []
+    if duel_rollout.is_canonical_duels_enabled():
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="🔁 Revanche",
+                    callback_data=f"friend:rematch:{challenge_id}",
+                )
+            ]
+        )
+        rows.append(
+            [InlineKeyboardButton(text="🏟 Offene Arena", callback_data=ARENA_LIST_CALLBACK)]
+        )
+        return InlineKeyboardMarkup(inline_keyboard=rows)
     if include_share:
         rows.append(
             [
@@ -119,21 +133,9 @@ def build_friend_challenge_finished_keyboard(
 
 
 def build_friend_challenge_limit_keyboard() -> InlineKeyboardMarkup:
-    ticket_product_code, premium_week_product_code = DUEL_PAYWALL_PRODUCT_CODES
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="🎟 Duell-Ticket – 5⭐",
-                    callback_data=f"buy:{ticket_product_code}",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="👑 Premium-Woche – 29⭐",
-                    callback_data=f"buy:{premium_week_product_code}",
-                )
-            ],
+            *build_duel_monetization_rows(),
             [InlineKeyboardButton(text="↩️ Später", callback_data="home:open")],
         ]
     )

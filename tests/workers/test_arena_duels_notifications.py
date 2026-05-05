@@ -137,6 +137,8 @@ def test_send_arena_beaten_notification_records_key_after_successful_send(
     ]
     assert callbacks == [
         "arena:revanche:cccccccc-cccc-cccc-cccc-cccccccccccc",
+        "buy:FRIEND_CHALLENGE_5:duel",
+        "buy:PREMIUM_WEEK:duel",
         "arena:list",
     ]
 

@@ -25,7 +25,11 @@ from app.game.friend_challenges.constants import (
     DUEL_TYPE_DIRECT,
     DUEL_TYPE_OPEN,
 )
-from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
+from app.game.sessions.errors import (
+    FriendChallengeAccessError,
+    FriendChallengeArenaPublishBaselineRequiredError,
+    FriendChallengeNotFoundError,
+)
 from app.game.sessions.service import friend_challenges_manage
 from tests.type_helpers import AsyncSessionStub
 
@@ -296,6 +300,49 @@ async def test_cancel_friend_challenge_by_creator_marks_canceled_and_returns_sna
 
 
 @pytest.mark.asyncio
+async def test_cancel_friend_challenge_by_creator_allows_pending_unjoined_duel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    challenge = _challenge(
+        status="PENDING",
+        creator_user_id=11,
+        opponent_user_id=None,
+    )
+
+    monkeypatch.setattr(
+        friend_challenges_manage.FriendChallengesRepo,
+        "get_by_id_for_update",
+        _async_return(challenge),
+    )
+    monkeypatch.setattr(
+        friend_challenges_manage,
+        "_expire_friend_challenge_if_due",
+        lambda **_kwargs: False,
+    )
+    monkeypatch.setattr(
+        friend_challenges_manage,
+        "emit_analytics_event",
+        _async_return(None),
+    )
+    monkeypatch.setattr(
+        friend_challenges_manage,
+        "_build_friend_challenge_snapshot",
+        lambda challenge_row: challenge_row,
+    )
+
+    result = await friend_challenges_manage.cancel_friend_challenge_by_creator(
+        _Session(),
+        user_id=11,
+        challenge_id=challenge.id,
+        now_utc=NOW_UTC,
+    )
+
+    assert result is challenge
+    assert challenge.status == DUEL_STATUS_CANCELED
+    assert challenge.completed_at == NOW_UTC
+
+
+@pytest.mark.asyncio
 async def test_cancel_friend_challenge_by_creator_emits_expired_event_before_access_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -406,7 +453,7 @@ async def test_publish_friend_challenge_to_arena_creates_active_duel_from_creato
 
 
 @pytest.mark.asyncio
-async def test_publish_friend_challenge_to_arena_rejects_empty_friend_duel(
+async def test_publish_friend_challenge_to_arena_requests_baseline_for_empty_friend_duel(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     challenge = _challenge(status="PENDING", creator_user_id=11, opponent_user_id=None)
@@ -432,7 +479,7 @@ async def test_publish_friend_challenge_to_arena_rejects_empty_friend_duel(
         _unexpected_create_duel,
     )
 
-    with pytest.raises(FriendChallengeAccessError):
+    with pytest.raises(FriendChallengeArenaPublishBaselineRequiredError):
         await friend_challenges_manage.publish_friend_challenge_to_arena(
             _Session(),
             user_id=11,

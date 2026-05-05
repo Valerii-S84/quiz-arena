@@ -135,7 +135,7 @@ async def test_handle_friend_challenge_create_selected_hides_raw_url_and_keeps_s
     assert inline_queries == ["invite:duel:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert callbacks == [
-        "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        "friend:invite:required:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        "menu:main",
+        "arena:publish_friend:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "friend:delete:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "duels:friend",
     ]

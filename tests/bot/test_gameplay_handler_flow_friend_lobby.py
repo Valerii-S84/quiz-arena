@@ -87,12 +87,16 @@ async def test_handle_friend_challenge_create_selected_sends_waiting_keyboard(mo
     assert captured["total_rounds"] == 7
     assert captured["challenge_type"] == "DIRECT"
     assert [button.text for button in invite_buttons] == [
-        "📤 Teilen ->",
-        "✅ Einladung gesendet",
-        "⚔️ Jetzt spielen",
-        "⏳ Auf Freund warten",
+        "📤 Link teilen",
+        "🏟 In der Arena veröffentlichen",
+        "❌ Duell abbrechen",
+        "↩️ Zurück",
     ]
-    assert "arena:publish_friend:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" not in callbacks
+    assert callbacks == [
+        "arena:publish_friend:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "friend:delete:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "duels:friend",
+    ]
     assert not any(button.url and "duel_" in button.url for button in invite_buttons)
     assert len(callback.message.answers) == 1
 
@@ -117,9 +121,9 @@ async def test_handle_friend_challenge_invite_sent_answers_with_waiting_toast() 
         if button.callback_data
     ]
     assert edited_callbacks == [
-        "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        "friend:next:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        "menu:main",
+        "arena:publish_friend:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "friend:delete:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "duels:friend",
     ]
     edited_buttons = [button for row in edited_markup.inline_keyboard for button in row]
     assert not any(button.url and "duel_" in button.url for button in edited_buttons)

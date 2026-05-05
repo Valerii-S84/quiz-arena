@@ -389,8 +389,11 @@ async def test_handle_answer_friend_challenge_completion_sends_proof_card_with_s
         for call in callback.message.answers
         if call.text and TEXTS_DE["msg.friend.challenge.proof.title"] in call.text
     )
-    assert TEXTS_DE["msg.friend.challenge.finished.win"] in (finish_call.text or "")
+    assert "🎉 Gewonnen!" in (finish_call.text or "")
     keyboard = finish_call.kwargs["reply_markup"]
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
-    assert "friend:share:result:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" in callbacks
+    assert callbacks == [
+        "friend:rematch:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "arena:list",
+    ]
     assert queued_challenges == ["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]

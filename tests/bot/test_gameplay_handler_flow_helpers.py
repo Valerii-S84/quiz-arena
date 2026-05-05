@@ -30,7 +30,10 @@ def test_build_friend_score_text_handles_creator_and_completed_round() -> None:
 
 def test_build_friend_finish_text_handles_win_and_draw() -> None:
     win_text = gameplay._build_friend_finish_text(
-        challenge=_challenge_snapshot(status="COMPLETED", winner_user_id=10),
+        challenge=_challenge_snapshot(
+            status="COMPLETED",
+            winner_user_id=10,
+        ),
         user_id=10,
         opponent_label="Bob",
     )
@@ -44,9 +47,30 @@ def test_build_friend_finish_text_handles_win_and_draw() -> None:
         user_id=10,
         opponent_label="Bob",
     )
-    assert TEXTS_DE["msg.friend.challenge.finished.win"] in win_text
-    assert TEXTS_DE["msg.friend.challenge.finished.draw"] in draw_text
+    assert "🎉 Gewonnen!" in win_text
+    assert "Du:\n5/12" in win_text
+    assert "Bob:\n4/12" in win_text
+    assert "Unentschieden." in draw_text
     assert TEXTS_DE["msg.friend.challenge.finished.expired"] in expired_text
+
+
+def test_build_friend_finish_text_shows_time_tie_break() -> None:
+    challenge = _challenge_snapshot(status="COMPLETED", winner_user_id=20)
+    challenge.creator_score = 5
+    challenge.opponent_score = 5
+    challenge.creator_time_ms = 61_000
+    challenge.opponent_time_ms = 52_000
+
+    text = gameplay._build_friend_finish_text(
+        challenge=challenge,
+        user_id=10,
+        opponent_label="Bob",
+    )
+
+    assert "Knapp verloren." in text
+    assert "Bob war schneller." in text
+    assert "Du:\n5/12 · 01:01" in text
+    assert "Bob:\n5/12 · 00:52" in text
 
 
 def test_build_friend_proof_card_text_includes_winner_score_and_signature() -> None:
@@ -57,7 +81,7 @@ def test_build_friend_proof_card_text_includes_winner_score_and_signature() -> N
     )
     assert TEXTS_DE["msg.friend.challenge.proof.title"] in proof_text
     assert "Sieger: Du" in proof_text
-    assert "Ergebnis: Du 5 | Bob 4" in proof_text
+    assert "Ergebnis: Du 5/12 | Bob 4/12" in proof_text
     assert "Titel:" in proof_text
 
 

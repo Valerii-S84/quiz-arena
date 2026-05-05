@@ -54,6 +54,10 @@ from app.game.arena_duels.types import (
 from app.game.questions.catalog import QUICK_MIX_MODE_CODE
 from app.game.sessions.errors import (
     FriendChallengeAccessError,
+    FriendChallengeArenaPublishBaselineRequiredError,
+    FriendChallengeCompletedError,
+    FriendChallengeExpiredError,
+    FriendChallengeFullError,
     FriendChallengeLimitExceededError,
     FriendChallengeNotFoundError,
     FriendChallengePaymentRequiredError,
@@ -278,6 +282,8 @@ async def handle_arena_publish_friend(
     session_local,
     user_onboarding_service,
     publish_friend_challenge_to_arena,
+    start_friend_challenge_round=None,
+    build_question_text=None,
 ) -> None:
     friend_challenge_id = _parse_arena_duel_id(
         callback,
@@ -294,6 +300,8 @@ async def handle_arena_publish_friend(
     now_utc = datetime.now(timezone.utc)
     invalid_state = False
     published_duel = None
+    baseline_round_start = None
+    snapshot = None
     async with session_local.begin() as session:
         snapshot = await user_onboarding_service.ensure_home_snapshot(
             session,
@@ -335,6 +343,28 @@ async def handle_arena_publish_friend(
                     time_ms=published_time_ms if isinstance(published_time_ms, int) else None,
                 ),
             )
+        except FriendChallengeArenaPublishBaselineRequiredError:
+            if start_friend_challenge_round is None:
+                invalid_state = True
+            else:
+                try:
+                    baseline_round_start = await start_friend_challenge_round(
+                        session,
+                        user_id=snapshot.user_id,
+                        challenge_id=friend_challenge_id,
+                        idempotency_key=(
+                            f"start:friend:arena_publish:{friend_challenge_id}:{callback.id}"
+                        ),
+                        now_utc=now_utc,
+                    )
+                except (
+                    FriendChallengeNotFoundError,
+                    FriendChallengeAccessError,
+                    FriendChallengeCompletedError,
+                    FriendChallengeExpiredError,
+                    FriendChallengeFullError,
+                ):
+                    invalid_state = True
         except (
             ArenaDuelAccessError,
             ArenaDuelIncompleteError,
@@ -347,6 +377,30 @@ async def handle_arena_publish_friend(
         await callback.message.answer(
             TEXTS_DE["msg.duels.arena.friend_publish.invalid"],
             reply_markup=build_arena_back_keyboard(),
+        )
+        await callback.answer()
+        return
+
+    if baseline_round_start is not None:
+        if build_question_text is None:
+            await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+            return
+        start_result = _extract_start_result(baseline_round_start)
+        if start_result is None or snapshot is None:
+            await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
+            return
+        await callback.message.answer(
+            build_question_text(
+                source="FRIEND_CHALLENGE",
+                snapshot_free_energy=snapshot.free_energy,
+                snapshot_paid_energy=snapshot.paid_energy,
+                start_result=start_result,
+            ),
+            reply_markup=build_quiz_keyboard(
+                session_id=str(start_result.session.session_id),
+                options=start_result.session.options,
+            ),
+            parse_mode="HTML",
         )
         await callback.answer()
         return

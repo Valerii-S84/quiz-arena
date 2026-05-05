@@ -44,6 +44,10 @@ async def test_internal_analytics_executive_returns_latest_rows_desc() -> None:
                     purchase_precheckout_ok_events_total=4,
                     purchase_paid_uncredited_events_total=4,
                     purchase_credited_events_total=4,
+                    duel_menu_opened_events_total=11,
+                    friend_duel_completed_events_total=7,
+                    duel_ticket_clicked_events_total=3,
+                    premium_week_clicked_events_total=2,
                     calculated_at=now_utc,
                 ),
                 AnalyticsDaily(
@@ -95,3 +99,7 @@ async def test_internal_analytics_executive_returns_latest_rows_desc() -> None:
     assert payload["rows"][0]["gameplay_completion_rate"] == pytest.approx(0.8)
     assert payload["rows"][0]["purchase_init_events_total"] == 5
     assert payload["rows"][0]["purchase_credited_events_total"] == 4
+    assert payload["rows"][0]["duel_menu_opened_events_total"] == 11
+    assert payload["rows"][0]["friend_duel_completed_events_total"] == 7
+    assert payload["rows"][0]["duel_ticket_clicked_events_total"] == 3
+    assert payload["rows"][0]["premium_week_clicked_events_total"] == 2

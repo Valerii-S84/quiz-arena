@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,13 +8,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.models.quiz_sessions import QuizSession
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
+from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.game.arena_duels.analytics import ARENA_EVENT_FRIEND_DUEL_COMPLETED
+from app.game.duels.constants import DUEL_QUESTION_COUNT
 from app.game.friend_challenges.constants import (
     DUEL_STATUS_ACCEPTED,
     DUEL_STATUS_COMPLETED,
     DUEL_STATUS_CREATOR_DONE,
     DUEL_STATUS_OPPONENT_DONE,
     DUEL_STATUS_PENDING,
+    DUEL_TYPE_DIRECT,
     is_duel_playable_for_user,
     is_duel_playable_status,
     normalize_duel_status,
@@ -29,6 +33,12 @@ from .friend_challenges_internal import (
 from .friend_challenges_tournament_progress import handle_tournament_duel_progress
 
 
+@dataclass(frozen=True, slots=True)
+class _FriendDuelTiming:
+    creator_time_ms: int
+    opponent_time_ms: int
+
+
 async def _apply_friend_challenge_answer(
     session: AsyncSession,
     *,
@@ -40,6 +50,7 @@ async def _apply_friend_challenge_answer(
     friend_snapshot = None
     friend_round_completed = False
     friend_waiting_for_opponent = False
+    friend_result_timing: _FriendDuelTiming | None = None
     if quiz_session.source == "FRIEND_CHALLENGE" and quiz_session.friend_challenge_id is not None:
         challenge = await FriendChallengesRepo.get_by_id_for_update(
             session,
@@ -110,15 +121,14 @@ async def _apply_friend_challenge_answer(
                 challenge.current_round = challenge.total_rounds
                 challenge.status = DUEL_STATUS_COMPLETED
                 challenge.completed_at = now_utc
-                if challenge.creator_score > challenge.opponent_score:
-                    challenge.winner_user_id = challenge.creator_user_id
-                elif (
-                    challenge.opponent_score > challenge.creator_score
-                    and challenge.opponent_user_id is not None
-                ):
-                    challenge.winner_user_id = challenge.opponent_user_id
-                else:
-                    challenge.winner_user_id = None
+                friend_result_timing = await _resolve_friend_duel_timing_if_needed(
+                    session,
+                    challenge=challenge,
+                )
+                challenge.winner_user_id = _resolve_friend_challenge_winner(
+                    challenge,
+                    timing=friend_result_timing,
+                )
             elif challenge.creator_finished_at:
                 challenge.status = DUEL_STATUS_CREATOR_DONE
             elif challenge.opponent_finished_at:
@@ -135,6 +145,9 @@ async def _apply_friend_challenge_answer(
                 now_utc=now_utc,
             )
         friend_snapshot = _build_friend_challenge_snapshot(challenge)
+        if friend_result_timing is not None:
+            friend_snapshot.creator_time_ms = friend_result_timing.creator_time_ms
+            friend_snapshot.opponent_time_ms = friend_result_timing.opponent_time_ms
         friend_waiting_for_opponent = is_duel_playable_for_user(
             status=challenge.status,
             has_opponent=has_opponent,
@@ -172,3 +185,64 @@ async def _apply_friend_challenge_answer(
                 },
             )
     return friend_snapshot, friend_round_completed, friend_waiting_for_opponent
+
+
+def _resolve_friend_challenge_winner(
+    challenge,
+    *,
+    timing: _FriendDuelTiming | None,
+) -> int | None:
+    if challenge.creator_score > challenge.opponent_score:
+        return int(challenge.creator_user_id)
+    if (
+        challenge.opponent_score > challenge.creator_score
+        and challenge.opponent_user_id is not None
+    ):
+        return int(challenge.opponent_user_id)
+    if timing is None:
+        return None
+    return _resolve_time_tie_break_winner(challenge=challenge, timing=timing)
+
+
+def _uses_time_tie_break(challenge) -> bool:
+    return (
+        challenge.tournament_match_id is None
+        and challenge.challenge_type == DUEL_TYPE_DIRECT
+        and int(challenge.total_rounds) == DUEL_QUESTION_COUNT
+        and challenge.opponent_user_id is not None
+    )
+
+
+async def _resolve_friend_duel_timing_if_needed(
+    session: AsyncSession,
+    *,
+    challenge,
+) -> _FriendDuelTiming | None:
+    if not _uses_time_tie_break(challenge):
+        return None
+    creator_time_ms = await QuizSessionsRepo.sum_completed_duration_ms_for_friend_challenge_user(
+        session,
+        friend_challenge_id=challenge.id,
+        user_id=challenge.creator_user_id,
+    )
+    opponent_time_ms = await QuizSessionsRepo.sum_completed_duration_ms_for_friend_challenge_user(
+        session,
+        friend_challenge_id=challenge.id,
+        user_id=challenge.opponent_user_id,
+    )
+    return _FriendDuelTiming(
+        creator_time_ms=creator_time_ms,
+        opponent_time_ms=opponent_time_ms,
+    )
+
+
+def _resolve_time_tie_break_winner(
+    *,
+    challenge,
+    timing: _FriendDuelTiming,
+) -> int | None:
+    if timing.creator_time_ms < timing.opponent_time_ms:
+        return int(challenge.creator_user_id)
+    if timing.opponent_time_ms < timing.creator_time_ms:
+        return int(challenge.opponent_user_id)
+    return None

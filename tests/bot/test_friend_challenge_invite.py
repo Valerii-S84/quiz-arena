@@ -75,10 +75,10 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
     assert "http" not in photo_call["caption"]
     buttons = [button for row in keyboard.inline_keyboard for button in row]
     assert [button.text for button in buttons] == [
-        "📤 Teilen ->",
-        "✅ Einladung gesendet",
-        "⚔️ Jetzt spielen",
-        "⏳ Auf Freund warten",
+        "📤 Link teilen",
+        "🏟 In der Arena veröffentlichen",
+        "❌ Duell abbrechen",
+        "↩️ Zurück",
     ]
     assert not any(button.url and "duel_" in button.url for button in buttons)
     assert [button.switch_inline_query for button in buttons if button.switch_inline_query] == [
@@ -86,7 +86,7 @@ async def test_friend_challenge_invite_photo_hides_raw_url_and_keeps_share_contr
     ]
     callbacks = [button.callback_data for button in buttons if button.callback_data]
     assert callbacks == [
-        "friend:invite:sent:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        "friend:invite:required:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-        "menu:main",
+        "arena:publish_friend:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "friend:delete:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "duels:friend",
     ]

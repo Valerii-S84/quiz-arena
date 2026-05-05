@@ -25,11 +25,16 @@ from app.game.friend_challenges.constants import (
     DUEL_STATUS_CANCELED,
     DUEL_STATUS_CREATOR_DONE,
     DUEL_STATUS_EXPIRED,
+    DUEL_STATUS_PENDING,
     DUEL_TYPE_DIRECT,
     DUEL_TYPE_OPEN,
     normalize_duel_status,
 )
-from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
+from app.game.sessions.errors import (
+    FriendChallengeAccessError,
+    FriendChallengeArenaPublishBaselineRequiredError,
+    FriendChallengeNotFoundError,
+)
 from app.game.sessions.types import FriendChallengeSnapshot
 
 from .friend_challenges_create import create_friend_challenge
@@ -99,7 +104,7 @@ async def cancel_friend_challenge_by_creator(
         )
     if challenge.creator_user_id != user_id:
         raise FriendChallengeAccessError
-    if challenge.status != DUEL_STATUS_EXPIRED:
+    if not _friend_challenge_can_be_canceled_by_creator(challenge):
         raise FriendChallengeAccessError
 
     challenge.status = DUEL_STATUS_CANCELED
@@ -144,9 +149,11 @@ async def publish_friend_challenge_to_arena(
 
     from app.db.repo.arena_duels_repo import ArenaDuelsRepo
 
-    question_ids = _validate_arena_publish_question_ids(challenge.question_ids)
+    if _friend_creator_baseline_needs_play(challenge):
+        raise FriendChallengeArenaPublishBaselineRequiredError
     if not _friend_creator_baseline_is_ready(challenge):
         raise FriendChallengeAccessError
+    question_ids = _validate_arena_publish_question_ids(challenge.question_ids)
 
     existing = await ArenaDuelsRepo.get_source_friend_duel_with_baseline_for_update(
         session,
@@ -217,10 +224,21 @@ def _ensure_friend_challenge_can_publish_to_arena(
         raise FriendChallengeAccessError
     if challenge.challenge_type != DUEL_TYPE_DIRECT:
         raise FriendChallengeAccessError
-    if challenge.status != DUEL_STATUS_CREATOR_DONE:
+    if int(challenge.total_rounds) != DUEL_QUESTION_COUNT:
+        raise FriendChallengeAccessError
+    if challenge.status not in {DUEL_STATUS_PENDING, DUEL_STATUS_CREATOR_DONE}:
         raise FriendChallengeAccessError
     if challenge.tournament_match_id is not None:
         raise FriendChallengeAccessError
+
+
+def _friend_challenge_can_be_canceled_by_creator(challenge: FriendChallenge) -> bool:
+    if challenge.status == DUEL_STATUS_EXPIRED:
+        return True
+    return challenge.opponent_user_id is None and challenge.status in {
+        DUEL_STATUS_PENDING,
+        DUEL_STATUS_CREATOR_DONE,
+    }
 
 
 def _friend_creator_baseline_is_ready(challenge: FriendChallenge) -> bool:
@@ -228,6 +246,14 @@ def _friend_creator_baseline_is_ready(challenge: FriendChallenge) -> bool:
         int(challenge.total_rounds) == DUEL_QUESTION_COUNT
         and int(challenge.creator_answered_round) >= DUEL_QUESTION_COUNT
         and challenge.creator_finished_at is not None
+    )
+
+
+def _friend_creator_baseline_needs_play(challenge: FriendChallenge) -> bool:
+    return (
+        challenge.status == DUEL_STATUS_PENDING
+        and int(challenge.creator_answered_round) < DUEL_QUESTION_COUNT
+        and challenge.creator_finished_at is None
     )
 
 

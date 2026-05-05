@@ -59,6 +59,8 @@ class FriendChallengeSnapshot:
     winner_user_id: int | None = None
     expires_at: datetime | None = None
     tournament_match_id: UUID | None = None
+    creator_time_ms: int | None = None
+    opponent_time_ms: int | None = None
 
 
 @dataclass(slots=True)
