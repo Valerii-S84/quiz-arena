@@ -187,6 +187,8 @@ async def test_refund_purchase_creates_refund_entry_with_empty_asset_breakdown(
     assert result.idempotent_replay is False
     assert streak_calls == [{"user_id": 7, "amount": 0, "now_utc": NOW}]
     assert created_entries[0].metadata_["asset_breakdown"] == {}
+
+
 @pytest.mark.asyncio
 async def test_refund_purchase_creates_refund_entry_and_marks_purchase_refunded(
     monkeypatch: pytest.MonkeyPatch,

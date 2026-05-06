@@ -44,18 +44,26 @@ async def test_mark_invoice_sent_updates_created_purchase_once(
         assert purchase_id == purchase.id
         return purchase
 
-    async def _fake_emit_purchase_event(_session, *, event_type: str, purchase, happened_at, extra_payload=None) -> None:
+    async def _fake_emit_purchase_event(
+        _session, *, event_type: str, purchase, happened_at, extra_payload=None
+    ) -> None:
         assert extra_payload is None
-        events.append({"event_type": event_type, "purchase_id": purchase.id, "happened_at": happened_at})
+        events.append(
+            {"event_type": event_type, "purchase_id": purchase.id, "happened_at": happened_at}
+        )
 
-    monkeypatch.setattr(purchase_precheckout.PurchasesRepo, "get_by_id_for_update", _fake_get_by_id_for_update)
+    monkeypatch.setattr(
+        purchase_precheckout.PurchasesRepo, "get_by_id_for_update", _fake_get_by_id_for_update
+    )
     monkeypatch.setattr(purchase_precheckout, "_emit_purchase_event", _fake_emit_purchase_event)
     monkeypatch.setattr(purchase_precheckout, "datetime", _FixedDatetime)
 
     await purchase_precheckout.mark_invoice_sent(SessionStub(), purchase_id=purchase.id)
 
     assert purchase.status == "INVOICE_SENT"
-    assert events == [{"event_type": "purchase_invoice_sent", "purchase_id": purchase.id, "happened_at": NOW}]
+    assert events == [
+        {"event_type": "purchase_invoice_sent", "purchase_id": purchase.id, "happened_at": NOW}
+    ]
 
 
 @pytest.mark.parametrize(

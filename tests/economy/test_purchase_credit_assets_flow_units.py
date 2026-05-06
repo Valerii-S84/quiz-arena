@@ -35,14 +35,20 @@ async def test_credit_purchase_assets_applies_energy_streak_promo_and_ledger(
         ledger_entries.append(entry)
         return entry
 
-    async def _fake_emit_purchase_event(_session, *, event_type: str, purchase, happened_at, extra_payload=None) -> None:
+    async def _fake_emit_purchase_event(
+        _session, *, event_type: str, purchase, happened_at, extra_payload=None
+    ) -> None:
         assert purchase.id == purchase.id
         assert happened_at == NOW
         assert extra_payload is None
         events.append(event_type)
 
-    monkeypatch.setattr(purchase_credit_assets.EnergyService, "credit_paid_energy", _fake_credit_paid_energy)
-    monkeypatch.setattr(purchase_credit_assets.StreakRepo, "add_streak_saver_token", _fake_add_streak_saver_token)
+    monkeypatch.setattr(
+        purchase_credit_assets.EnergyService, "credit_paid_energy", _fake_credit_paid_energy
+    )
+    monkeypatch.setattr(
+        purchase_credit_assets.StreakRepo, "add_streak_saver_token", _fake_add_streak_saver_token
+    )
     monkeypatch.setattr(
         purchase_credit_assets,
         "_validate_reserved_discount_for_purchase",
@@ -101,12 +107,16 @@ async def test_credit_purchase_assets_applies_premium_without_purchase_ledger_fo
     async def _fail_create(_session, *, entry: LedgerEntry):
         pytest.fail("purchase ledger entry should not be created for zero stars purchase")
 
-    async def _fake_emit_purchase_event(_session, *, event_type: str, purchase, happened_at, extra_payload=None) -> None:
+    async def _fake_emit_purchase_event(
+        _session, *, event_type: str, purchase, happened_at, extra_payload=None
+    ) -> None:
         assert happened_at == NOW
         assert extra_payload is None
         events.append(event_type)
 
-    monkeypatch.setattr(purchase_credit_assets, "_apply_premium_entitlement", _fake_apply_premium_entitlement)
+    monkeypatch.setattr(
+        purchase_credit_assets, "_apply_premium_entitlement", _fake_apply_premium_entitlement
+    )
     monkeypatch.setattr(purchase_credit_assets.LedgerRepo, "create", _fail_create)
     monkeypatch.setattr(purchase_credit_assets, "_emit_purchase_event", _fake_emit_purchase_event)
 
@@ -144,7 +154,9 @@ async def test_credit_purchase_assets_keeps_already_applied_promo_usage_stable(
     async def _fake_validate_reserved_discount(*_args, **_kwargs):
         return redemption, code
 
-    async def _fake_emit_purchase_event(_session, *, event_type: str, purchase, happened_at, extra_payload=None) -> None:
+    async def _fake_emit_purchase_event(
+        _session, *, event_type: str, purchase, happened_at, extra_payload=None
+    ) -> None:
         assert happened_at == NOW
         events.append(event_type)
 
