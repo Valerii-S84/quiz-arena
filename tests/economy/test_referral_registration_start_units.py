@@ -87,7 +87,9 @@ async def test_register_start_for_new_user_marks_reverse_pair_as_rejected_fraud(
 
     monkeypatch.setattr(registration.ReferralsRepo, "get_by_referred_user_id", _async_return(None))
     monkeypatch.setattr(registration.UsersRepo, "get_by_referral_code", _async_return(referrer))
-    monkeypatch.setattr(registration.ReferralsRepo, "get_reverse_pair_since", _async_return(object()))
+    monkeypatch.setattr(
+        registration.ReferralsRepo, "get_reverse_pair_since", _async_return(object())
+    )
 
     async def _fake_create(_session, *, referral):
         created.append(referral)
@@ -113,7 +115,11 @@ async def test_register_start_for_new_user_marks_reverse_pair_as_rejected_fraud(
     ("starts_today", "expected_status", "expected_fraud_score"),
     [
         (registration.REFERRAL_STARTS_DAILY_LIMIT - 1, "STARTED", Decimal("0")),
-        (registration.REFERRAL_STARTS_DAILY_LIMIT, "REJECTED_FRAUD", registration.FRAUD_SCORE_VELOCITY),
+        (
+            registration.REFERRAL_STARTS_DAILY_LIMIT,
+            "REJECTED_FRAUD",
+            registration.FRAUD_SCORE_VELOCITY,
+        ),
     ],
 )
 async def test_register_start_for_new_user_creates_started_or_velocity_rejection(

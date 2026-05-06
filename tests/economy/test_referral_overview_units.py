@@ -47,7 +47,9 @@ def test_build_overview_reports_claimable_reward_and_next_unlock_time() -> None:
     referrals = [
         _referral(1, status="QUALIFIED", qualified_at=old_qualified_at),
         _referral(2, status="QUALIFIED", qualified_at=old_qualified_at),
-        _referral(3, status="REWARDED", qualified_at=old_qualified_at, rewarded_at=old_qualified_at),
+        _referral(
+            3, status="REWARDED", qualified_at=old_qualified_at, rewarded_at=old_qualified_at
+        ),
         _referral(4, status="QUALIFIED", qualified_at=old_qualified_at),
         _referral(5, status="QUALIFIED", qualified_at=old_qualified_at),
         _referral(6, status="QUALIFIED", qualified_at=old_qualified_at),
@@ -74,7 +76,9 @@ def test_build_overview_reports_claimable_reward_and_next_unlock_time() -> None:
 def test_build_overview_counts_deferred_rewards_when_monthly_cap_is_reached() -> None:
     now_utc = datetime(2026, 2, 20, 12, 0, tzinfo=UTC)
     old_qualified_at = now_utc - overview.REWARD_DELAY - timedelta(hours=1)
-    referrals = [_referral(index, status="QUALIFIED", qualified_at=old_qualified_at) for index in range(1, 7)]
+    referrals = [
+        _referral(index, status="QUALIFIED", qualified_at=old_qualified_at) for index in range(1, 7)
+    ]
 
     result = overview._build_overview_from_referrals(
         referral_code="REF123",
@@ -91,7 +95,9 @@ def test_build_overview_counts_deferred_rewards_when_monthly_cap_is_reached() ->
 def test_build_overview_hides_claimable_rewards_while_rewards_are_locked() -> None:
     now_utc = datetime(2026, 2, 20, 12, 0, tzinfo=UTC)
     old_qualified_at = now_utc - overview.REWARD_DELAY - timedelta(hours=1)
-    referrals = [_referral(index, status="QUALIFIED", qualified_at=old_qualified_at) for index in range(1, 4)]
+    referrals = [
+        _referral(index, status="QUALIFIED", qualified_at=old_qualified_at) for index in range(1, 4)
+    ]
 
     result = overview._build_overview_from_referrals(
         referral_code="REF123",

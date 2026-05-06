@@ -18,7 +18,9 @@ def _async_return(value):
     return _inner
 
 
-def _referral(referral_id: int, *, created_at: datetime, referrer_user_id: int = 7, referred_user_id: int = 8):
+def _referral(
+    referral_id: int, *, created_at: datetime, referrer_user_id: int = 7, referred_user_id: int = 8
+):
     return SimpleNamespace(
         id=referral_id,
         status="STARTED",
@@ -39,7 +41,9 @@ async def test_run_qualification_checks_rejects_reverse_pair_as_fraud(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now_utc = datetime(2026, 2, 20, 12, 0, tzinfo=UTC)
-    started = _referral(1, created_at=now_utc - timedelta(days=1), referrer_user_id=42, referred_user_id=91)
+    started = _referral(
+        1, created_at=now_utc - timedelta(days=1), referrer_user_id=42, referred_user_id=91
+    )
     rejected: list[tuple[int, int]] = []
 
     monkeypatch.setattr(qualification.ReferralsRepo, "list_started_ids", _async_return([1]))
