@@ -10,6 +10,8 @@ from app.economy.purchases.errors import PurchaseInitValidationError
 from app.economy.purchases.service import init as purchase_init
 from tests.purchase_service_test_helpers import NOW, SessionStub, purchase_model
 from tests.type_helpers import build_promo_redemption
+
+
 @pytest.mark.asyncio
 async def test_init_purchase_replays_matching_active_invoice_with_same_reserved_discount(
     monkeypatch: pytest.MonkeyPatch,
@@ -22,6 +24,7 @@ async def test_init_purchase_replays_matching_active_invoice_with_same_reserved_
         stars_amount=3,
     )
     redemption = build_promo_redemption(status="RESERVED", promo_code_id=22, user_id=7)
+
     async def _fake_get_by_idempotency_key(_session, _idempotency_key: str):
         return None
 
@@ -58,6 +61,8 @@ async def test_init_purchase_replays_matching_active_invoice_with_same_reserved_
 
     assert result.purchase_id == active_invoice.id
     assert result.idempotent_replay is True
+
+
 @pytest.mark.asyncio
 async def test_init_purchase_marks_stale_invoice_failed_without_expiring_missing_redemption(
     monkeypatch: pytest.MonkeyPatch,
@@ -69,6 +74,7 @@ async def test_init_purchase_marks_stale_invoice_failed_without_expiring_missing
     )
     created: list[Purchase] = []
     new_redemption = build_promo_redemption(status="RESERVED", promo_code_id=22, user_id=7)
+
     async def _fake_get_by_idempotency_key(_session, _idempotency_key: str):
         return None
 
@@ -80,9 +86,7 @@ async def test_init_purchase_marks_stale_invoice_failed_without_expiring_missing
     async def _fake_get_active_invoice_for_user_product_for_update(*_args, **_kwargs):
         return active_invoice
 
-    async def _fake_get_redemption_by_applied_purchase_id_for_update(
-        _session, purchase_id: UUID
-    ):
+    async def _fake_get_redemption_by_applied_purchase_id_for_update(_session, purchase_id: UUID):
         assert purchase_id == active_invoice.id
         return None
 
@@ -135,12 +139,15 @@ async def test_init_purchase_marks_stale_invoice_failed_without_expiring_missing
 
     assert active_invoice.status == "FAILED"
     assert new_redemption.applied_purchase_id == result.purchase_id == created[0].id
+
+
 @pytest.mark.asyncio
 async def test_init_purchase_rejects_missing_redemption_after_purchase_create(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def _fake_get_by_idempotency_key(_session, _idempotency_key: str):
         return None
+
     async def _fake_get_active_invoice_for_user_product_for_update(*_args, **_kwargs):
         return None
 

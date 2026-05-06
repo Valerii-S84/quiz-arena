@@ -161,4 +161,3 @@ async def test_init_purchase_replays_existing_active_invoice_without_promo_looku
 
     assert result.purchase_id == active_invoice.id
     assert result.idempotent_replay is True
-

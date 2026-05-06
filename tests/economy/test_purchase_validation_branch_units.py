@@ -41,9 +41,7 @@ async def test_ensure_discount_capacity_available_allows_remaining_capacity(
 async def test_validate_streak_saver_purchase_limit_allows_exact_unlock_boundary(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    state = SimpleNamespace(
-        streak_saver_last_purchase_at=NOW - STREAK_SAVER_PURCHASE_LOCK_WINDOW
-    )
+    state = SimpleNamespace(streak_saver_last_purchase_at=NOW - STREAK_SAVER_PURCHASE_LOCK_WINDOW)
 
     async def _fake_get_by_user_id_for_update(_session, _user_id: int):
         return state
@@ -111,4 +109,3 @@ async def test_validate_and_reserve_discount_redemption_keeps_reserved_status_fo
     assert promo_code_id == code.id
     assert redemption.status == "RESERVED"
     assert redemption.reserved_until == NOW + PROMO_RESERVATION_TTL
-

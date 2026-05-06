@@ -4,8 +4,7 @@ import importlib.util
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from types import SimpleNamespace
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -70,7 +69,9 @@ def _load_rewards_distribution_module():
     _install_module("app.economy.referrals.service.time_utils", time_utils_module)
 
     module_name = "app.economy.referrals.service.rewards_distribution"
-    spec = importlib.util.spec_from_file_location(module_name, service_dir / "rewards_distribution.py")
+    spec = importlib.util.spec_from_file_location(
+        module_name, service_dir / "rewards_distribution.py"
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
@@ -116,9 +117,7 @@ async def test_run_reward_distribution_grants_reward_for_eligible_anchor(
     async def _fake_list_referrer_ids_with_reward_candidates(_session, **_kwargs):
         return [7]
 
-    async def _fake_list_for_referrers_for_update(
-        _session, *, referrer_user_ids: list[int]
-    ):
+    async def _fake_list_for_referrers_for_update(_session, *, referrer_user_ids: list[int]):
         assert referrer_user_ids == [7]
         return {7: [anchor]}
 
