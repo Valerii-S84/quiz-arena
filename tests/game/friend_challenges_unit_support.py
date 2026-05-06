@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from typing import Any
 from uuid import UUID, uuid4
 
 from app.db.models.quiz_sessions import QuizSession
@@ -28,7 +29,7 @@ def async_return(value: object):
     return _inner
 
 
-def challenge(**overrides: object) -> SimpleNamespace:
+def challenge(**overrides: object) -> Any:
     payload: dict[str, object] = {
         "id": uuid4(),
         "invite_token": "invite-token",
@@ -60,7 +61,7 @@ def challenge(**overrides: object) -> SimpleNamespace:
     return SimpleNamespace(**payload)
 
 
-def completed_challenge(**overrides: object) -> SimpleNamespace:
+def completed_challenge(**overrides: object) -> Any:
     payload = {
         "status": "COMPLETED",
         "current_round": 5,
@@ -77,7 +78,7 @@ def completed_challenge(**overrides: object) -> SimpleNamespace:
     return challenge(**payload)
 
 
-def duel(**overrides: object) -> SimpleNamespace:
+def duel(**overrides: object) -> Any:
     payload: dict[str, object] = {
         "id": uuid4(),
         "invite_token": "new-invite-token",
