@@ -3,9 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
+from app.db.models.referrals import Referral
+from app.db.models.users import User
 from app.economy.referrals.service import registration
 from tests.type_helpers import AsyncSessionStub
 
@@ -19,8 +22,15 @@ def _async_return(value):
     return _inner
 
 
-def _user(user_id: int, telegram_user_id: int) -> SimpleNamespace:
-    return SimpleNamespace(id=user_id, telegram_user_id=telegram_user_id, referred_by_user_id=None)
+def _user(user_id: int, telegram_user_id: int) -> User:
+    return cast(
+        User,
+        SimpleNamespace(
+            id=user_id,
+            telegram_user_id=telegram_user_id,
+            referred_by_user_id=None,
+        ),
+    )
 
 
 @pytest.mark.asyncio
@@ -62,7 +72,7 @@ async def test_register_start_for_new_user_returns_existing_status_without_creat
 )
 async def test_register_start_for_new_user_rejects_missing_or_self_like_referrer(
     monkeypatch: pytest.MonkeyPatch,
-    referrer: SimpleNamespace | None,
+    referrer: User | None,
 ) -> None:
     monkeypatch.setattr(registration.ReferralsRepo, "get_by_referred_user_id", _async_return(None))
     monkeypatch.setattr(registration.UsersRepo, "get_by_referral_code", _async_return(referrer))
@@ -83,7 +93,7 @@ async def test_register_start_for_new_user_marks_reverse_pair_as_rejected_fraud(
 ) -> None:
     referred_user = _user(5, 50)
     referrer = _user(8, 80)
-    created: list[object] = []
+    created: list[Referral] = []
 
     monkeypatch.setattr(registration.ReferralsRepo, "get_by_referred_user_id", _async_return(None))
     monkeypatch.setattr(registration.UsersRepo, "get_by_referral_code", _async_return(referrer))
@@ -91,7 +101,7 @@ async def test_register_start_for_new_user_marks_reverse_pair_as_rejected_fraud(
         registration.ReferralsRepo, "get_reverse_pair_since", _async_return(object())
     )
 
-    async def _fake_create(_session, *, referral):
+    async def _fake_create(_session, *, referral: Referral):
         created.append(referral)
 
     monkeypatch.setattr(registration.ReferralsRepo, "create", _fake_create)
@@ -131,7 +141,7 @@ async def test_register_start_for_new_user_creates_started_or_velocity_rejection
     now_utc = datetime(2026, 2, 20, 12, 0, tzinfo=UTC)
     referred_user = _user(5, 50)
     referrer = _user(8, 80)
-    created: list[object] = []
+    created: list[Referral] = []
 
     monkeypatch.setattr(registration.ReferralsRepo, "get_by_referred_user_id", _async_return(None))
     monkeypatch.setattr(registration.UsersRepo, "get_by_referral_code", _async_return(referrer))
@@ -147,7 +157,7 @@ async def test_register_start_for_new_user_creates_started_or_velocity_rejection
         _async_return(starts_today),
     )
 
-    async def _fake_create(_session, *, referral):
+    async def _fake_create(_session, *, referral: Referral):
         created.append(referral)
 
     monkeypatch.setattr(registration.ReferralsRepo, "create", _fake_create)
