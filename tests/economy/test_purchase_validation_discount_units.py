@@ -188,3 +188,28 @@ async def test_validate_and_reserve_discount_redemption_rejects_invalid_promo_pa
             product=product_spec(),
             now_utc=NOW,
         )
+
+
+@pytest.mark.asyncio
+async def test_validate_and_reserve_discount_redemption_rejects_product_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    redemption = build_promo_redemption(status="VALIDATED", user_id=7)
+    _patch_redemption(monkeypatch, redemption)
+    _patch_code(
+        monkeypatch,
+        promo_code(
+            id=redemption.promo_code_id,
+            applicable_products=["PREMIUM_MONTH"],
+            target_scope="ANY",
+        ),
+    )
+
+    with pytest.raises(PurchaseInitValidationError):
+        await purchase_validation._validate_and_reserve_discount_redemption(
+            SessionStub(),
+            redemption_id=redemption.id,
+            user_id=7,
+            product=product_spec(),
+            now_utc=NOW,
+        )
