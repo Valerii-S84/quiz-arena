@@ -10,7 +10,7 @@ from app.db.session import SessionLocal
 from app.game.sessions.service import GameSessionService
 from app.workers.tasks import friend_challenges_proof_cards
 from tests.integration.friend_challenge_fixtures import _create_user
-from tests.integration.test_private_tournament_worker_integration import _DummyWorkerBot
+from tests.integration.private_tournament_worker_integration_support import _DummyWorkerBot
 
 UTC = timezone.utc
 

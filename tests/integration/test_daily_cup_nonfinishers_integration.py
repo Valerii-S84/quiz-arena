@@ -15,7 +15,9 @@ from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
 from app.workers.tasks import daily_cup_nonfinishers_summary
 from tests.integration.friend_challenge_fixtures import _create_user
-from tests.integration.test_private_tournament_worker_integration import _ensure_tournament_schema
+from tests.integration.private_tournament_worker_integration_support import (
+    _ensure_tournament_schema,
+)
 
 UTC = timezone.utc
 

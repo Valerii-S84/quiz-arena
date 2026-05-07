@@ -31,12 +31,12 @@ from tests.integration.friend_challenge_fixtures import (
     _create_user,
     _seed_friend_challenge_questions,
 )
+from tests.integration.private_tournament_worker_integration_support import _DummyWorkerBot
 from tests.integration.test_daily_cup_worker_integration import (
     _create_daily_cup_registration_tournament,
     _ensure_tournament_schema,
     _join_users,
 )
-from tests.integration.test_private_tournament_worker_integration import _DummyWorkerBot
 
 UTC = timezone.utc
 

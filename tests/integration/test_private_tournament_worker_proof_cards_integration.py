@@ -12,7 +12,7 @@ from app.db.session import SessionLocal
 from app.game.tournaments.service import create_private_tournament, join_private_tournament_by_code
 from app.workers.tasks import tournaments_proof_cards
 from tests.integration.friend_challenge_fixtures import _create_user
-from tests.integration.test_private_tournament_worker_integration import (
+from tests.integration.private_tournament_worker_integration_support import (
     _DummyWorkerBot,
     _ensure_tournament_schema,
 )
