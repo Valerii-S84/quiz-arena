@@ -60,11 +60,25 @@ async def resolve_arena_create_access_type(
     from app.game.arena_duels.errors import ArenaDuelAccessError, ArenaDuelPaymentRequiredError
     from app.game.duels import limits as limits_module
 
+    async def _count_creator_free_uses(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        access_type: str,
+        since: datetime | None = None,
+    ) -> int:
+        return await ArenaDuelsRepo.count_creator_duels_by_access_type(
+            session,
+            creator_user_id=user_id,
+            access_type=access_type,
+            since=since,
+        )
+
     return await _resolve_arena_access_type(
         session,
         user_id=user_id,
         now_utc=now_utc,
-        count_free_uses=ArenaDuelsRepo.count_creator_duels_by_access_type,
+        count_free_uses=_count_creator_free_uses,
         access_error=ArenaDuelAccessError,
         payment_required_error=ArenaDuelPaymentRequiredError,
         duel_limit_action=DUEL_LIMIT_ACTION_ARENA_CREATE,

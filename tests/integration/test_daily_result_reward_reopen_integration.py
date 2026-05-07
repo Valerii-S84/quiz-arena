@@ -18,6 +18,7 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.energy.service import EnergyService
 from app.game.questions.runtime_bank import get_question_by_id
+from app.game.sessions.errors import FriendChallengePaymentRequiredError
 from app.game.sessions.service import FRIEND_CHALLENGE_TICKET_PRODUCT_CODE, GameSessionService
 from app.game.sessions.types import AnswerSessionResult, StartSessionResult
 from app.services import user_onboarding
@@ -261,16 +262,6 @@ async def test_reopening_daily_result_screen_does_not_duplicate_ticket_credit(
         )
         assert purchase_credit_count == 0
 
-        reward_purchase_rows = int(
-            await session.scalar(
-                select(func.count(Purchase.id)).where(
-                    Purchase.idempotency_key == reward_idempotency_key
-                )
-            )
-            or 0
-        )
-        assert reward_purchase_rows == 1
-
     _FrozenDateTime.current = started_at + timedelta(minutes=5)
     monkeypatch.setattr(user_onboarding, "datetime", _FrozenDateTime)
 
@@ -308,3 +299,66 @@ async def test_reopening_daily_result_screen_does_not_duplicate_ticket_credit(
             or 0
         )
         assert purchase_credit_count == 0
+
+
+@pytest.mark.asyncio
+async def test_daily_result_ticket_reward_is_consumed_as_single_paid_friend_access(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    started_at = datetime(2026, 4, 25, 9, 0, tzinfo=UTC)
+    user_id, telegram_user_id = await _create_user("daily-result-ticket-consumption")
+    completed = await _complete_daily(user_id=user_id, score=7, started_at=started_at)
+    daily_run_id = completed.daily_run_id
+    assert daily_run_id is not None
+    reward_idempotency_key = f"daily:reward:ticket:{daily_run_id}"
+
+    _FrozenDateTime.current = started_at + timedelta(minutes=5)
+    monkeypatch.setattr(user_onboarding, "datetime", _FrozenDateTime)
+
+    callback = await _open_daily_result_screen(
+        telegram_user_id=telegram_user_id,
+        daily_run_id=daily_run_id,
+    )
+    assert callback.message.answers[0].text == TEXTS_DE["msg.daily.result.reward.ticket"]
+
+    async with SessionLocal.begin() as session:
+        first = await GameSessionService.create_friend_challenge(
+            session,
+            creator_user_id=user_id,
+            mode_code="QUICK_MIX_A1A2",
+            now_utc=started_at + timedelta(minutes=6),
+        )
+        second = await GameSessionService.create_friend_challenge(
+            session,
+            creator_user_id=user_id,
+            mode_code="QUICK_MIX_A1A2",
+            now_utc=started_at + timedelta(minutes=7),
+        )
+        paid = await GameSessionService.create_friend_challenge(
+            session,
+            creator_user_id=user_id,
+            mode_code="QUICK_MIX_A1A2",
+            now_utc=started_at + timedelta(minutes=8),
+        )
+
+        assert first.access_type == "FREE"
+        assert second.access_type == "FREE"
+        assert paid.access_type == "PAID_TICKET"
+
+        with pytest.raises(FriendChallengePaymentRequiredError):
+            await GameSessionService.create_friend_challenge(
+                session,
+                creator_user_id=user_id,
+                mode_code="QUICK_MIX_A1A2",
+                now_utc=started_at + timedelta(minutes=9),
+            )
+
+        reward_purchase_rows = int(
+            await session.scalar(
+                select(func.count(Purchase.id)).where(
+                    Purchase.idempotency_key == reward_idempotency_key
+                )
+            )
+            or 0
+        )
+        assert reward_purchase_rows == 1

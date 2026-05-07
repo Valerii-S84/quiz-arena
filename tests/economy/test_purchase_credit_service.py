@@ -62,6 +62,36 @@ async def test_apply_successful_payment_rejects_missing_purchase(
 
 
 @pytest.mark.asyncio
+async def test_apply_successful_payment_rejects_purchase_owned_by_different_user(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    purchase = _purchase(user_id=8, status="INVOICE_SENT", stars_amount=5)
+
+    async def _fake_get_by_invoice_payload_for_update(_session, _invoice_payload):
+        return purchase
+
+    monkeypatch.setattr(
+        purchase_credit.PurchasesRepo,
+        "get_by_invoice_payload_for_update",
+        _fake_get_by_invoice_payload_for_update,
+    )
+
+    with pytest.raises(PurchaseNotFoundError):
+        await purchase_credit.apply_successful_payment(
+            _Session(),
+            user_id=7,
+            invoice_payload="inv-other-user",
+            telegram_payment_charge_id="charge-1",
+            raw_successful_payment={
+                "invoice_payload": "inv-other-user",
+                "currency": "XTR",
+                "total_amount": 5,
+            },
+            now_utc=datetime.now(UTC),
+        )
+
+
+@pytest.mark.asyncio
 async def test_apply_successful_payment_rejects_invalid_purchase_status(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -190,6 +220,9 @@ async def test_apply_successful_payment_rejects_non_xtr_currency_for_paid_purcha
             now_utc=datetime.now(UTC),
         )
 
+    assert purchase.status == "INVOICE_SENT"
+    assert purchase.raw_successful_payment is None
+
 
 @pytest.mark.asyncio
 async def test_apply_successful_payment_rejects_mismatched_total_amount_for_paid_purchase(
@@ -219,6 +252,43 @@ async def test_apply_successful_payment_rejects_mismatched_total_amount_for_paid
             },
             now_utc=datetime.now(UTC),
         )
+
+    assert purchase.status == "INVOICE_SENT"
+    assert purchase.raw_successful_payment is None
+
+
+@pytest.mark.asyncio
+async def test_apply_successful_payment_rejects_missing_payment_payload_for_paid_purchase(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    purchase = _purchase(status="INVOICE_SENT", stars_amount=5)
+
+    async def _fake_get_by_invoice_payload_for_update(_session, _invoice_payload):
+        return purchase
+
+    async def _fail_credit_purchase_assets(*_args, **_kwargs) -> None:
+        pytest.fail("paid purchase without successful payment payload must not be credited")
+
+    monkeypatch.setattr(
+        purchase_credit.PurchasesRepo,
+        "get_by_invoice_payload_for_update",
+        _fake_get_by_invoice_payload_for_update,
+    )
+    monkeypatch.setattr(purchase_credit, "credit_purchase_assets", _fail_credit_purchase_assets)
+
+    with pytest.raises(PurchasePrecheckoutValidationError):
+        await purchase_credit.apply_successful_payment(
+            _Session(),
+            user_id=7,
+            invoice_payload="inv-missing-payment",
+            telegram_payment_charge_id="charge-1",
+            raw_successful_payment={},
+            now_utc=datetime.now(UTC),
+        )
+
+    assert purchase.status == "INVOICE_SENT"
+    assert purchase.telegram_payment_charge_id is None
+    assert purchase.raw_successful_payment is None
 
 
 @pytest.mark.asyncio
@@ -372,7 +442,6 @@ async def test_apply_zero_cost_purchase_marks_paid_and_credits_assets(
         happened_at: datetime,
         extra_payload: dict[str, object],
     ) -> None:
-        assert purchase.id == purchase.id
         assert happened_at == now_utc
         assert extra_payload["zero_cost"] is True
         events.append(event_type)
