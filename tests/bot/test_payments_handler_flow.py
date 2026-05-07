@@ -221,7 +221,9 @@ async def test_handle_successful_payment_sends_success_text(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
-async def test_handle_successful_payment_sends_failure_text_for_validation_error(monkeypatch) -> None:
+async def test_handle_successful_payment_sends_failure_text_for_validation_error(
+    monkeypatch,
+) -> None:
     monkeypatch.setattr(payments, "SessionLocal", DummySessionLocal())
 
     async def _fake_apply_payment(*args, **kwargs):

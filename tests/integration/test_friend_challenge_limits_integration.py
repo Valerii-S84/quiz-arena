@@ -7,9 +7,9 @@ import pytest
 
 from app.db.models.entitlements import Entitlement
 from app.db.session import SessionLocal
+from app.economy.purchases.service import PurchaseService
 from app.game.arena_duels.errors import ArenaDuelPaymentRequiredError
 from app.game.duels.limits import DuelLimitService
-from app.economy.purchases.service import PurchaseService
 from app.game.sessions.errors import FriendChallengePaymentRequiredError
 from app.game.sessions.service import GameSessionService
 from tests.integration.friend_challenge_fixtures import UTC, _create_user
