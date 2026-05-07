@@ -1,0 +1,106 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap");
+
+:root {
+  --bg: #f4f1ea;
+  --bg-2: #fffdf8;
+  --text: #1f1c18;
+  --muted: #6a645d;
+  --ink: #17324d;
+  --ink-soft: #e5eef8;
+  --warn: #ef6f2e;
+  --ok: #21835b;
+  --err: #b92f2f;
+  --card: #ffffff;
+  --line: #d7cec2;
+  --shadow: 0 18px 35px rgba(47, 32, 12, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 10% 10%, #fff2cf 0%, transparent 32%),
+    radial-gradient(circle at 80% 5%, #d7ebff 0%, transparent 36%),
+    linear-gradient(135deg, var(--bg), var(--bg-2));
+  min-height: 100vh;
+}
+
+.background-grid {
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(23, 50, 77, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(23, 50, 77, 0.05) 1px, transparent 1px);
+  background-size: 34px 34px;
+  pointer-events: none;
+}
+
+.topbar,
+.layout {
+  position: relative;
+  z-index: 1;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: end;
+  padding: 26px 28px 10px;
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+h1 {
+  margin: 4px 0 0;
+  font-size: clamp(24px, 2.8vw, 38px);
+  letter-spacing: -0.02em;
+}
+
+.layout {
+  display: grid;
+  gap: 16px;
+  padding: 8px 28px 32px;
+}
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.login-panel {
+  width: min(460px, 100%);
+}
+
+.login-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.mono,
+.json-view,
+.event-payload {
+  font-family: "IBM Plex Mono", "Fira Code", monospace;
+}
