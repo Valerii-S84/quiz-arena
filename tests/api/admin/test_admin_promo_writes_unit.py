@@ -11,6 +11,7 @@ from app.api.routes.admin.promo_write_helpers import (
     campaign_name,
     promo_details,
     resolve_discount_fields,
+    resolve_max_total_uses,
 )
 from tests.type_helpers import build_promo_code
 
@@ -115,6 +116,22 @@ def test_apply_mutation_payload_supports_legacy_premium_grant_patch() -> None:
     assert promo.discount_percent is None
     assert promo.grant_premium_days == 90
     assert promo.target_scope == "ANY"
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        (PromoPatchRequest(max_total_uses=0), None),
+        (PromoPatchRequest(max_total_uses=5), 5),
+        (PromoPatchRequest(max_uses=0), None),
+        (PromoPatchRequest(max_uses=9), 9),
+    ],
+)
+def test_resolve_max_total_uses_handles_zero_and_legacy_alias(
+    payload: PromoPatchRequest,
+    expected: int | None,
+) -> None:
+    assert resolve_max_total_uses(payload) == expected
 
 
 def test_write_helpers_build_fallback_name_and_audit_details() -> None:
