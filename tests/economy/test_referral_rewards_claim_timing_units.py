@@ -14,54 +14,22 @@ from tests.economy.referral_rewards_claim_units_support import (
 
 
 @pytest.mark.asyncio
-async def test_claim_next_reward_choice_rejects_unsupported_reward_code() -> None:
-    with pytest.raises(ValueError):
-        await rewards_claim.claim_next_reward_choice(
-            _Session(),
-            user_id=7,
-            reward_code="bad-code",
-            now_utc=datetime.now(UTC),
-        )
-
-
-@pytest.mark.asyncio
-async def test_claim_next_reward_choice_returns_none_for_missing_user(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    async def _fake_get_by_id(_session, _user_id):
-        return None
-
-    monkeypatch.setattr(rewards_claim.UsersRepo, "get_by_id", _fake_get_by_id)
-
-    result = await rewards_claim.claim_next_reward_choice(
-        _Session(),
-        user_id=7,
-        reward_code=rewards_claim.REWARD_CODE_PREMIUM_WEEK,
-        now_utc=datetime.now(UTC),
-    )
-
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_claim_next_reward_choice_returns_monthly_cap_and_marks_anchor(
+async def test_claim_next_reward_choice_returns_too_early_for_delayed_reward(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now_utc = datetime.now(UTC)
-    user = SimpleNamespace(referral_code="REF-CAP")
-    referrals = [SimpleNamespace(id=1)]
-    anchor = _anchor(
-        referral_id=41, qualified_at=now_utc - rewards_claim.REWARD_DELAY - timedelta(minutes=1)
-    )
+    user = SimpleNamespace(referral_code="REF-EARLY")
+    anchor = _anchor(referral_id=42, qualified_at=now_utc - timedelta(hours=1))
+    captured: list[dict[str, object]] = []
 
     async def _fake_get_by_id(_session, _user_id):
         return user
 
     async def _fake_list_for_referrer_for_update(_session, *, referrer_user_id: int):
-        return referrals
+        return [anchor]
 
     async def _fake_count_rewards_for_referrer_between(_session, **_kwargs):
-        return rewards_claim.REFERRAL_REWARDS_PER_MONTH_CAP
+        return 0
 
     async def _fake_count_paid_purchases_for_user(_session, *, user_id: int):
         assert user_id == 7
@@ -78,11 +46,14 @@ async def test_claim_next_reward_choice_returns_monthly_cap_and_marks_anchor(
         rewarded_this_month: int,
         rewards_unlocked: bool,
     ):
-        assert referral_code == "REF-CAP"
-        assert referrals is referrals
-        assert rewarded_this_month == rewards_claim.REFERRAL_REWARDS_PER_MONTH_CAP
-        assert rewards_unlocked is True
-        return _overview("cap")
+        captured.append(
+            {
+                "referral_code": referral_code,
+                "rewarded_this_month": rewarded_this_month,
+                "rewards_unlocked": rewards_unlocked,
+            }
+        )
+        return _overview("early")
 
     monkeypatch.setattr(rewards_claim.UsersRepo, "get_by_id", _fake_get_by_id)
     monkeypatch.setattr(
@@ -113,6 +84,7 @@ async def test_claim_next_reward_choice_returns_monthly_cap_and_marks_anchor(
     )
 
     assert result is not None
-    assert result.status == "MONTHLY_CAP"
+    assert result.status == "TOO_EARLY"
     assert result.reward_code is None
-    assert anchor.status == "DEFERRED_LIMIT"
+    assert captured[0]["referral_code"] == "REF-EARLY"
+    assert captured[0]["rewards_unlocked"] is True

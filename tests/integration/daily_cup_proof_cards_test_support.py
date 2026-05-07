@@ -21,7 +21,7 @@ from app.economy.energy.service import EnergyService
 from app.workers.tasks import daily_cup_proof_cards
 from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
 from tests.integration.friend_challenge_fixtures import _create_user
-from tests.integration.test_private_tournament_worker_integration import (
+from tests.integration.private_tournament_worker_integration_support import (
     _DummyWorkerBot,
     _ensure_tournament_schema,
 )
