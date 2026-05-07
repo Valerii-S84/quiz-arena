@@ -55,7 +55,11 @@ async def test_friend_challenge_allows_two_free_then_requires_paid_ticket() -> N
             user_id=creator_user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id=f"tg_fc_ticket_{uuid4().hex}",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=now_utc + timedelta(minutes=4),
         )
 
@@ -138,3 +142,73 @@ async def test_tournament_duels_do_not_consume_free_friend_challenge_quota() -> 
         )
 
         assert challenge.access_type == "FREE"
+
+
+@pytest.mark.asyncio
+async def test_friend_challenge_free_quota_resets_on_new_berlin_day() -> None:
+    creator_user_id = await _create_user("fc_limit_berlin_midnight_reset")
+    late_berlin_day_utc = datetime(2026, 1, 15, 22, 57, tzinfo=UTC)
+    new_berlin_day_utc = datetime(2026, 1, 15, 23, 1, tzinfo=UTC)
+
+    async with SessionLocal.begin() as session:
+        first = await GameSessionService.create_friend_challenge(
+            session,
+            creator_user_id=creator_user_id,
+            mode_code="QUICK_MIX_A1A2",
+            now_utc=late_berlin_day_utc,
+        )
+        second = await GameSessionService.create_friend_challenge(
+            session,
+            creator_user_id=creator_user_id,
+            mode_code="QUICK_MIX_A1A2",
+            now_utc=late_berlin_day_utc + timedelta(minutes=1),
+        )
+        assert first.access_type == "FREE"
+        assert second.access_type == "FREE"
+
+        with pytest.raises(FriendChallengePaymentRequiredError):
+            await GameSessionService.create_friend_challenge(
+                session,
+                creator_user_id=creator_user_id,
+                mode_code="QUICK_MIX_A1A2",
+                now_utc=late_berlin_day_utc + timedelta(minutes=2),
+            )
+
+        reset_day_first = await GameSessionService.create_friend_challenge(
+            session,
+            creator_user_id=creator_user_id,
+            mode_code="QUICK_MIX_A1A2",
+            now_utc=new_berlin_day_utc,
+        )
+
+        assert reset_day_first.access_type == "FREE"
+
+
+@pytest.mark.asyncio
+async def test_friend_challenge_free_quota_persists_across_early_berlin_hours() -> None:
+    creator_user_id = await _create_user("fc_limit_berlin_early_hours")
+    berlin_day_start_utc = datetime(2026, 1, 15, 23, 5, tzinfo=UTC)
+
+    async with SessionLocal.begin() as session:
+        first = await GameSessionService.create_friend_challenge(
+            session,
+            creator_user_id=creator_user_id,
+            mode_code="QUICK_MIX_A1A2",
+            now_utc=berlin_day_start_utc,
+        )
+        second = await GameSessionService.create_friend_challenge(
+            session,
+            creator_user_id=creator_user_id,
+            mode_code="QUICK_MIX_A1A2",
+            now_utc=berlin_day_start_utc + timedelta(minutes=70),
+        )
+        assert first.access_type == "FREE"
+        assert second.access_type == "FREE"
+
+        with pytest.raises(FriendChallengePaymentRequiredError):
+            await GameSessionService.create_friend_challenge(
+                session,
+                creator_user_id=creator_user_id,
+                mode_code="QUICK_MIX_A1A2",
+                now_utc=berlin_day_start_utc + timedelta(minutes=114),
+            )

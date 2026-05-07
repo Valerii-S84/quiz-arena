@@ -142,7 +142,11 @@ async def test_successful_payment_applies_redemption_once_and_increments_used_to
             user_id=user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id="tg_charge_promo_success_1",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=now_utc,
         )
         second = await PurchaseService.apply_successful_payment(
@@ -150,7 +154,11 @@ async def test_successful_payment_applies_redemption_once_and_increments_used_to
             user_id=user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id="tg_charge_promo_success_1",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=now_utc,
         )
 

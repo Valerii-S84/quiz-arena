@@ -46,7 +46,11 @@ async def test_duplicate_payment_callbacks_credit_only_once() -> None:
             user_id=user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id="tg_charge_dup_001",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=now_utc,
         )
         second = await PurchaseService.apply_successful_payment(
@@ -54,7 +58,11 @@ async def test_duplicate_payment_callbacks_credit_only_once() -> None:
             user_id=user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id="tg_charge_dup_001",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=now_utc,
         )
         third = await PurchaseService.apply_successful_payment(
@@ -62,7 +70,11 @@ async def test_duplicate_payment_callbacks_credit_only_once() -> None:
             user_id=user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id="tg_charge_dup_001",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=now_utc,
         )
 

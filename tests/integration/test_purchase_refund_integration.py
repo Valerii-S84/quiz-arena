@@ -40,7 +40,11 @@ async def test_credited_purchase_refund_creates_single_debit_and_revokes_entitle
             user_id=user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id="tg_charge_refund_credit_1",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=created_at,
         )
 

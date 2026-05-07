@@ -137,7 +137,11 @@ async def test_apply_successful_payment_credits_legacy_premium_starter_as_premiu
         user_id=7,
         invoice_payload="inv-starter",
         telegram_payment_charge_id="charge-1",
-        raw_successful_payment={"invoice_payload": "inv-starter"},
+        raw_successful_payment={
+            "invoice_payload": "inv-starter",
+            "currency": "XTR",
+            "total_amount": 29,
+        },
         now_utc=now_utc,
     )
 
@@ -155,6 +159,66 @@ async def test_apply_successful_payment_credits_legacy_premium_starter_as_premiu
     assert result.product_code == "PREMIUM_WEEK"
     assert result.status == "CREDITED"
     assert result.idempotent_replay is False
+
+
+@pytest.mark.asyncio
+async def test_apply_successful_payment_rejects_non_xtr_currency_for_paid_purchase(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    purchase = _purchase(status="INVOICE_SENT", stars_amount=5)
+
+    async def _fake_get_by_invoice_payload_for_update(_session, _invoice_payload):
+        return purchase
+
+    monkeypatch.setattr(
+        purchase_credit.PurchasesRepo,
+        "get_by_invoice_payload_for_update",
+        _fake_get_by_invoice_payload_for_update,
+    )
+
+    with pytest.raises(PurchasePrecheckoutValidationError):
+        await purchase_credit.apply_successful_payment(
+            _Session(),
+            user_id=7,
+            invoice_payload="inv-wrong-currency",
+            telegram_payment_charge_id="charge-1",
+            raw_successful_payment={
+                "invoice_payload": "inv-wrong-currency",
+                "currency": "USD",
+                "total_amount": 5,
+            },
+            now_utc=datetime.now(UTC),
+        )
+
+
+@pytest.mark.asyncio
+async def test_apply_successful_payment_rejects_mismatched_total_amount_for_paid_purchase(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    purchase = _purchase(status="INVOICE_SENT", stars_amount=5)
+
+    async def _fake_get_by_invoice_payload_for_update(_session, _invoice_payload):
+        return purchase
+
+    monkeypatch.setattr(
+        purchase_credit.PurchasesRepo,
+        "get_by_invoice_payload_for_update",
+        _fake_get_by_invoice_payload_for_update,
+    )
+
+    with pytest.raises(PurchasePrecheckoutValidationError):
+        await purchase_credit.apply_successful_payment(
+            _Session(),
+            user_id=7,
+            invoice_payload="inv-wrong-total",
+            telegram_payment_charge_id="charge-1",
+            raw_successful_payment={
+                "invoice_payload": "inv-wrong-total",
+                "currency": "XTR",
+                "total_amount": 6,
+            },
+            now_utc=datetime.now(UTC),
+        )
 
 
 @pytest.mark.asyncio

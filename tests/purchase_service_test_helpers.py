@@ -62,6 +62,7 @@ def purchase_model(
     applied_promo_code_id: int | None = None,
     idempotency_key: str = "idem-existing",
     invoice_payload: str = "inv_existing",
+    telegram_pre_checkout_query_id: str | None = None,
 ) -> Purchase:
     return Purchase(
         id=purchase_id or uuid4(),
@@ -76,6 +77,7 @@ def purchase_model(
         applied_promo_code_id=applied_promo_code_id,
         idempotency_key=idempotency_key,
         invoice_payload=invoice_payload,
+        telegram_pre_checkout_query_id=telegram_pre_checkout_query_id,
         created_at=NOW,
     )
 

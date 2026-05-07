@@ -38,7 +38,11 @@ async def test_streak_saver_is_blocked_within_7_day_window() -> None:
             user_id=user_id,
             invoice_payload=first.invoice_payload,
             telegram_payment_charge_id="tg_charge_streak_saver_1",
-            raw_successful_payment={"invoice_payload": first.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": first.invoice_payload,
+                "currency": "XTR",
+                "total_amount": first.final_stars_amount,
+            },
             now_utc=now_utc,
         )
 
@@ -87,7 +91,11 @@ async def test_streak_saver_is_allowed_after_7_days() -> None:
             user_id=user_id,
             invoice_payload=first.invoice_payload,
             telegram_payment_charge_id="tg_charge_streak_saver_2",
-            raw_successful_payment={"invoice_payload": first.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": first.invoice_payload,
+                "currency": "XTR",
+                "total_amount": first.final_stars_amount,
+            },
             now_utc=now_utc,
         )
 

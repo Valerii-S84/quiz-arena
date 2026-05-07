@@ -93,7 +93,8 @@ def resolve_access_type(
             credited_tickets=credited_tickets,
             premium_active=False,
         )
-    if paid_ticket_uses < credited_tickets:
+    has_ticket_balance = credited_tickets > paid_ticket_uses
+    if has_ticket_balance:
         return _build_decision(
             allowed=True,
             access_type=DUEL_ACCESS_PAID_TICKET,

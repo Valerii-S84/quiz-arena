@@ -45,7 +45,11 @@ async def _create_credited_purchase(
             user_id=user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id=f"tg_charge_{idempotency_prefix}",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=now_utc,
         )
         assert credit_result.idempotent_replay is False
@@ -238,7 +242,11 @@ async def test_refund_after_recovery_keeps_single_credit_and_single_debit() -> N
                 idempotency_key="inv-b-refund-after-recovery:init",
                 invoice_payload="inv_b_refund_after_recovery_1",
                 telegram_payment_charge_id="tg_charge_inv_b_refund_after_recovery_1",
-                raw_successful_payment={"invoice_payload": "inv_b_refund_after_recovery_1"},
+                raw_successful_payment={
+                    "invoice_payload": "inv_b_refund_after_recovery_1",
+                    "currency": "XTR",
+                    "total_amount": 5,
+                },
                 created_at=now_utc - timedelta(minutes=20),
                 paid_at=now_utc - timedelta(minutes=10),
             )

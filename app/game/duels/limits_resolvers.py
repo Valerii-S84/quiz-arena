@@ -10,6 +10,7 @@ async def resolve_friend_create_access_type(
     *,
     creator_user_id: int,
     now_utc: datetime,
+    berlin_day_start_utc,
     users_repo,
     entitlements_repo,
     friend_challenges_repo,
@@ -34,7 +35,7 @@ async def resolve_friend_create_access_type(
     if premium_active:
         return duel_access_premium
 
-    day_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_start = berlin_day_start_utc(now_utc)
     free_used_today = (
         await friend_challenges_repo.count_by_creator_access_type_excluding_arena_revanche(
             session,

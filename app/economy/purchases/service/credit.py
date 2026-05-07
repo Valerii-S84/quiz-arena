@@ -47,6 +47,11 @@ async def apply_successful_payment(
     }:
         raise PurchasePrecheckoutValidationError
 
+    _validate_successful_payment_payload(
+        purchase=purchase,
+        raw_successful_payment=raw_successful_payment,
+    )
+
     previous_status = purchase.status
     purchase.telegram_payment_charge_id = telegram_payment_charge_id
     purchase.raw_successful_payment = raw_successful_payment
@@ -80,6 +85,25 @@ async def apply_successful_payment(
         status=purchase.status,
         idempotent_replay=False,
     )
+
+
+def _validate_successful_payment_payload(
+    *,
+    purchase,
+    raw_successful_payment: dict[str, object],
+) -> None:
+    if purchase.stars_amount == 0:
+        return
+
+    currency = raw_successful_payment.get("currency")
+    if currency != "XTR":
+        raise PurchasePrecheckoutValidationError
+
+    total_amount = raw_successful_payment.get("total_amount")
+    if total_amount is None:
+        return
+    if not isinstance(total_amount, int) or total_amount != purchase.stars_amount:
+        raise PurchasePrecheckoutValidationError
 
 
 async def apply_zero_cost_purchase(

@@ -38,7 +38,11 @@ async def test_recovery_job_credits_stale_paid_uncredited_purchase() -> None:
                 idempotency_key="recovery-success-1",
                 invoice_payload="inv_recovery_success_1",
                 telegram_payment_charge_id="tg_charge_recovery_1",
-                raw_successful_payment={"invoice_payload": "inv_recovery_success_1"},
+                raw_successful_payment={
+                    "invoice_payload": "inv_recovery_success_1",
+                    "currency": "XTR",
+                    "total_amount": 5,
+                },
                 created_at=now_utc - timedelta(minutes=15),
                 paid_at=now_utc - timedelta(minutes=10),
             )
@@ -81,7 +85,11 @@ async def test_recovery_marks_purchase_for_review_after_three_failures() -> None
                 idempotency_key="recovery-review-1",
                 invoice_payload="inv_recovery_review_1",
                 telegram_payment_charge_id="tg_charge_recovery_review_1",
-                raw_successful_payment={"invoice_payload": "inv_recovery_review_1"},
+                raw_successful_payment={
+                    "invoice_payload": "inv_recovery_review_1",
+                    "currency": "XTR",
+                    "total_amount": 1,
+                },
                 created_at=now_utc - timedelta(minutes=15),
                 paid_at=now_utc - timedelta(minutes=10),
             )

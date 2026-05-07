@@ -37,7 +37,11 @@ async def test_reconciliation_detects_diff_and_persists_run() -> None:
                 idempotency_key="recon-credited-1",
                 invoice_payload="inv_recon_credited_1",
                 telegram_payment_charge_id="tg_charge_recon_credited_1",
-                raw_successful_payment={"invoice_payload": "inv_recon_credited_1"},
+                raw_successful_payment={
+                    "invoice_payload": "inv_recon_credited_1",
+                    "currency": "XTR",
+                    "total_amount": 5,
+                },
                 created_at=now_utc - timedelta(minutes=50),
                 paid_at=now_utc - timedelta(minutes=45),
                 credited_at=now_utc - timedelta(minutes=44),
@@ -57,7 +61,11 @@ async def test_reconciliation_detects_diff_and_persists_run() -> None:
                 idempotency_key="recon-stale-1",
                 invoice_payload="inv_recon_stale_1",
                 telegram_payment_charge_id="tg_charge_recon_stale_1",
-                raw_successful_payment={"invoice_payload": "inv_recon_stale_1"},
+                raw_successful_payment={
+                    "invoice_payload": "inv_recon_stale_1",
+                    "currency": "XTR",
+                    "total_amount": 5,
+                },
                 created_at=now_utc - timedelta(minutes=50),
                 paid_at=now_utc - timedelta(minutes=45),
             )

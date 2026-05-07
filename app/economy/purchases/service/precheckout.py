@@ -36,6 +36,7 @@ async def validate_precheckout(
     user_id: int,
     invoice_payload: str,
     total_amount: int,
+    precheckout_query_id: str | None = None,
     now_utc: datetime | None = None,
 ) -> None:
     purchase = await PurchasesRepo.get_by_invoice_payload_for_update(session, invoice_payload)
@@ -55,6 +56,8 @@ async def validate_precheckout(
             purchase=purchase,
             now_utc=check_time,
         )
+    if purchase.telegram_pre_checkout_query_id is None and precheckout_query_id is not None:
+        purchase.telegram_pre_checkout_query_id = precheckout_query_id
 
     if purchase.status != "PRECHECKOUT_OK":
         purchase.status = "PRECHECKOUT_OK"

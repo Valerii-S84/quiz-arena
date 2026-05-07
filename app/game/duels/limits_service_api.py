@@ -35,6 +35,7 @@ async def resolve_friend_create_access_type(
         session,
         creator_user_id=creator_user_id,
         now_utc=now_utc,
+        berlin_day_start_utc=limits_module._berlin_day_start_utc,
         users_repo=limits_module.UsersRepo,
         entitlements_repo=limits_module.EntitlementsRepo,
         friend_challenges_repo=limits_module.FriendChallengesRepo,

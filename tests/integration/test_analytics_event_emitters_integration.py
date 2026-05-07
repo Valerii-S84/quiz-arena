@@ -85,7 +85,11 @@ async def test_purchase_flow_emits_key_funnel_events() -> None:
             user_id=user_id,
             invoice_payload=init_result.invoice_payload,
             telegram_payment_charge_id=f"tg_charge_{uuid4().hex}",
-            raw_successful_payment={"invoice_payload": init_result.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init_result.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init_result.final_stars_amount,
+            },
             now_utc=now_utc + timedelta(minutes=2),
         )
 

@@ -37,6 +37,7 @@ async def validate_precheckout(
     telegram_user: User,
     invoice_payload: str,
     total_amount: int,
+    precheckout_query_id: str,
 ) -> None:
     async with SessionLocal.begin() as session:
         snapshot = await UserOnboardingService.ensure_home_snapshot(
@@ -48,6 +49,7 @@ async def validate_precheckout(
             user_id=snapshot.user_id,
             invoice_payload=invoice_payload,
             total_amount=total_amount,
+            precheckout_query_id=precheckout_query_id,
         )
 
 

@@ -48,7 +48,11 @@ async def test_purchase_credit_is_aggregated_single_ledger_entry(
             user_id=user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id=f"tg_charge_credit_aggregation_{product_code}",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=now_utc,
         )
 
