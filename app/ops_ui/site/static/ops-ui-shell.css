@@ -1,0 +1,136 @@
+.tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.logout-form {
+  margin: 0;
+}
+
+.tab {
+  text-decoration: none;
+  color: var(--ink);
+  font-weight: 600;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+  padding: 9px 13px;
+  border-radius: 999px;
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.tab:hover {
+  transform: translateY(-1px);
+}
+
+.tab.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 16px;
+  animation: rise 280ms ease both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.inline-controls,
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-controls.wrap {
+  flex-wrap: wrap;
+}
+
+label {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+input,
+select,
+button {
+  font: inherit;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  padding: 7px 10px;
+  min-height: 38px;
+}
+
+input,
+select {
+  background: #fff;
+}
+
+button {
+  background: var(--ink);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  border-color: var(--ink);
+}
+
+button:hover {
+  filter: brightness(1.05);
+}
+
+button.ghost {
+  background: #fff;
+  color: var(--ink);
+}
+
+button.warn {
+  background: var(--warn);
+  border-color: var(--warn);
+}
+
+button.ok {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+button.tiny {
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 12px;
+}

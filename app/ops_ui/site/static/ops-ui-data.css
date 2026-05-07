@@ -1,0 +1,138 @@
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(155deg, #fff, #faf7f2);
+  padding: 11px;
+}
+
+.card .label {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.card .value {
+  margin: 6px 0 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  padding: 10px 8px;
+  font-size: 13px;
+  vertical-align: top;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.json-view {
+  margin: 10px 0 0;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #f9f5ef;
+  white-space: pre-wrap;
+  min-height: 56px;
+}
+
+.event-feed {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.event-item {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+}
+
+.event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.event-type {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.pill.ok {
+  color: var(--ok);
+  border-color: rgba(33, 131, 91, 0.35);
+  background: rgba(33, 131, 91, 0.12);
+}
+
+.pill.err {
+  color: var(--err);
+  border-color: rgba(185, 47, 47, 0.35);
+  background: rgba(185, 47, 47, 0.1);
+}
+
+.flash {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  min-width: 220px;
+  max-width: 420px;
+  border-radius: 12px;
+  padding: 12px 13px;
+  color: #fff;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 200ms ease, transform 200ms ease;
+  pointer-events: none;
+  background: #102c47;
+  box-shadow: var(--shadow);
+}
+
+.flash.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.flash.ok {
+  background: #1f6f4f;
+}
+
+.flash.err {
+  background: #8f2f2f;
+}

@@ -1,0 +1,21 @@
+@media (max-width: 900px) {
+  .topbar,
+  .layout {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .field-row,
+  .inline-controls {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .auth-panel input {
+    width: 100%;
+  }
+
+  table {
+    min-width: 720px;
+  }
+}
