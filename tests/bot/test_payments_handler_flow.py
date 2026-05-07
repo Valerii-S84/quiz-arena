@@ -221,6 +221,23 @@ async def test_handle_successful_payment_sends_success_text(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
+async def test_handle_successful_payment_sends_failure_text_for_validation_error(monkeypatch) -> None:
+    monkeypatch.setattr(payments, "SessionLocal", DummySessionLocal())
+
+    async def _fake_apply_payment(*args, **kwargs):
+        raise PurchasePrecheckoutValidationError()
+
+    monkeypatch.setattr(payments, "apply_successful_payment", _fake_apply_payment)
+
+    message = _PaymentMessage(
+        from_user=SimpleNamespace(id=1), successful_payment=_SuccessfulPayment()
+    )
+    await payments.handle_successful_payment(message)  # type: ignore[arg-type]
+
+    assert message.answers[0].text == TEXTS_DE["msg.purchase.error.failed"]
+
+
+@pytest.mark.asyncio
 async def test_handle_buy_with_offer_marks_click_without_conversion(
     monkeypatch,
 ) -> None:

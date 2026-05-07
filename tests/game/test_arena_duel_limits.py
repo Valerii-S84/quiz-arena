@@ -31,6 +31,7 @@ async def test_arena_create_free_once_per_berlin_day_allowed(
     )
 
     assert access_type == DUEL_ACCESS_FREE
+    assert captured["arena_create_user_id"] == 11
     assert captured["arena_create_since"] == BERLIN_DAY_START_UTC
 
 
@@ -62,6 +63,7 @@ async def test_arena_accept_three_free_per_berlin_day_allowed(
     )
 
     assert access_type == DUEL_ACCESS_FREE
+    assert captured["arena_accept_user_id"] == 11
     assert captured["arena_accept_since"] == BERLIN_DAY_START_UTC
 
 
@@ -205,10 +207,12 @@ def _patch_limit_dependencies(
         return premium
 
     async def _count_creator_duels(*_args, **kwargs):
+        capture["arena_create_user_id"] = kwargs["creator_user_id"]
         capture["arena_create_since"] = kwargs["since"]
         return arena_create_free
 
     async def _count_challenger_attempts(*_args, **kwargs):
+        capture["arena_accept_user_id"] = kwargs["user_id"]
         capture["arena_accept_since"] = kwargs["since"]
         return arena_accept_free
 

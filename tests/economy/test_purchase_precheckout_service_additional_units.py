@@ -137,3 +137,54 @@ async def test_validate_precheckout_keeps_existing_ok_status_without_reemitting(
 
     assert purchase.status == "PRECHECKOUT_OK"
     assert purchase.telegram_pre_checkout_query_id == "pre-existing"
+
+
+@pytest.mark.asyncio
+async def test_validate_precheckout_replay_keeps_first_query_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    purchase = purchase_model(
+        status="INVOICE_SENT",
+        applied_promo_code_id=None,
+        invoice_payload="inv-replay-query-id",
+    )
+    events: list[str] = []
+
+    async def _fake_get_by_invoice_payload_for_update(_session, invoice_payload: str):
+        assert invoice_payload == purchase.invoice_payload
+        return purchase
+
+    async def _fake_emit_purchase_event(
+        _session, *, event_type: str, purchase, happened_at, extra_payload=None
+    ) -> None:
+        assert happened_at == NOW
+        assert extra_payload is None
+        events.append(event_type)
+
+    monkeypatch.setattr(
+        purchase_precheckout.PurchasesRepo,
+        "get_by_invoice_payload_for_update",
+        _fake_get_by_invoice_payload_for_update,
+    )
+    monkeypatch.setattr(purchase_precheckout, "_emit_purchase_event", _fake_emit_purchase_event)
+
+    await purchase_precheckout.validate_precheckout(
+        SessionStub(),
+        user_id=purchase.user_id,
+        invoice_payload=purchase.invoice_payload,
+        total_amount=purchase.stars_amount,
+        precheckout_query_id="pre-first",
+        now_utc=NOW,
+    )
+    await purchase_precheckout.validate_precheckout(
+        SessionStub(),
+        user_id=purchase.user_id,
+        invoice_payload=purchase.invoice_payload,
+        total_amount=purchase.stars_amount,
+        precheckout_query_id="pre-second",
+        now_utc=NOW,
+    )
+
+    assert purchase.status == "PRECHECKOUT_OK"
+    assert purchase.telegram_pre_checkout_query_id == "pre-first"
+    assert events == ["purchase_precheckout_ok"]
