@@ -122,9 +122,20 @@ def test_admin_promo_create_route_rejects_invalid_discount_type_and_dates(
             "valid_until": (NOW - timedelta(minutes=1)).isoformat(),
         },
     )
+    mixed_timezone_awareness = client.post(
+        "/admin/promo",
+        json={
+            "code": "SPRING50",
+            "discount_type": "PERCENT",
+            "discount_value": 50,
+            "valid_from": NOW.isoformat(),
+            "valid_until": "2026-03-16T12:00:00",
+        },
+    )
 
     assert invalid_discount.status_code == 422
     assert invalid_dates.status_code == 422
+    assert mixed_timezone_awareness.status_code == 422
 
 
 def test_admin_promo_mutation_routes_delegate_with_ids(

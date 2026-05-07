@@ -93,9 +93,15 @@ class PromoRevokeRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=256)
 
 
+def _is_timezone_aware(value: datetime) -> bool:
+    return value.tzinfo is not None and value.utcoffset() is not None
+
+
 def _ensure_valid_date_range(*, valid_from: datetime | None, valid_until: datetime | None) -> None:
     if valid_from is None or valid_until is None:
         return
+    if _is_timezone_aware(valid_from) != _is_timezone_aware(valid_until):
+        raise ValueError("valid_from and valid_until must use matching timezone awareness")
     if valid_until <= valid_from:
         raise ValueError("valid_until must be after valid_from")
 
