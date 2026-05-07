@@ -109,7 +109,8 @@ class DuelLimitService:
                 credited_tickets=credited_tickets,
                 premium_active=False,
             )
-        if paid_ticket_uses < credited_tickets:
+        has_ticket_balance = credited_tickets > paid_ticket_uses
+        if has_ticket_balance:
             return DuelLimitDecision(
                 allowed=True,
                 access_type=DUEL_ACCESS_PAID_TICKET,
@@ -153,7 +154,7 @@ class DuelLimitService:
         if premium_active:
             return DUEL_ACCESS_PREMIUM
 
-        day_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_start = _berlin_day_start_utc(now_utc)
         free_used_today = (
             await (
                 FriendChallengesRepo.count_by_creator_access_type_excluding_arena_revanche(

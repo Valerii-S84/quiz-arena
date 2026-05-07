@@ -44,7 +44,11 @@ async def _create_credited_purchase(
             user_id=user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id=f"tg_charge_{idempotency_prefix}",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=now_utc,
         )
         assert credit_result.idempotent_replay is False
@@ -113,7 +117,11 @@ async def test_credit_is_idempotent_on_same_purchase() -> None:
             user_id=user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id="tg_charge_inv_a_credit_idempotent_1",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=now_utc,
         )
         second = await PurchaseService.apply_successful_payment(
@@ -121,7 +129,11 @@ async def test_credit_is_idempotent_on_same_purchase() -> None:
             user_id=user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id="tg_charge_inv_a_credit_idempotent_1",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=now_utc,
         )
 

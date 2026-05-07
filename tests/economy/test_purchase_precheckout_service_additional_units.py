@@ -97,6 +97,7 @@ async def test_validate_precheckout_rejects_invalid_purchase_state(
             user_id=user_id,
             invoice_payload="inv-invalid",
             total_amount=total_amount,
+            precheckout_query_id="pre-invalid",
             now_utc=NOW,
         )
 
@@ -105,7 +106,11 @@ async def test_validate_precheckout_rejects_invalid_purchase_state(
 async def test_validate_precheckout_keeps_existing_ok_status_without_reemitting(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    purchase = purchase_model(status="PRECHECKOUT_OK", applied_promo_code_id=None)
+    purchase = purchase_model(
+        status="PRECHECKOUT_OK",
+        applied_promo_code_id=None,
+        telegram_pre_checkout_query_id="pre-existing",
+    )
 
     async def _fake_get_by_invoice_payload_for_update(_session, invoice_payload: str):
         assert invoice_payload == "inv-existing-ok"
@@ -126,7 +131,9 @@ async def test_validate_precheckout_keeps_existing_ok_status_without_reemitting(
         user_id=purchase.user_id,
         invoice_payload="inv-existing-ok",
         total_amount=purchase.stars_amount,
+        precheckout_query_id="pre-replayed",
         now_utc=NOW,
     )
 
     assert purchase.status == "PRECHECKOUT_OK"
+    assert purchase.telegram_pre_checkout_query_id == "pre-existing"

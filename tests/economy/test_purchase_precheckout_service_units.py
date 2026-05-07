@@ -63,10 +63,12 @@ async def test_validate_precheckout_marks_purchase_without_promo_ok_and_emits_ev
         user_id=purchase.user_id,
         invoice_payload=purchase.invoice_payload,
         total_amount=purchase.stars_amount,
+        precheckout_query_id="pre-1",
         now_utc=NOW,
     )
 
     assert purchase.status == "PRECHECKOUT_OK"
+    assert purchase.telegram_pre_checkout_query_id == "pre-1"
     assert events == [
         {
             "event_type": "purchase_precheckout_ok",
@@ -118,6 +120,7 @@ async def test_validate_precheckout_rejects_expired_reserved_promo(
             user_id=purchase.user_id,
             invoice_payload=purchase.invoice_payload,
             total_amount=purchase.stars_amount,
+            precheckout_query_id="pre-expired",
             now_utc=NOW,
         )
 

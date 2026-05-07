@@ -17,8 +17,9 @@ from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
 class _PreCheckoutQuery:
     def __init__(
-        self, *, from_user: SimpleNamespace, invoice_payload: str, total_amount: int
+        self, *, from_user: SimpleNamespace, invoice_payload: str, total_amount: int, query_id: str
     ) -> None:
+        self.id = query_id
         self.from_user = from_user
         self.invoice_payload = invoice_payload
         self.total_amount = total_amount
@@ -34,9 +35,12 @@ class _SuccessfulPayment:
         self.telegram_payment_charge_id = "charge-1"
 
     def model_dump(self, exclude_none: bool = True) -> dict[str, object]:
+        assert exclude_none is True
         return {
             "invoice_payload": self.invoice_payload,
             "telegram_payment_charge_id": self.telegram_payment_charge_id,
+            "currency": "XTR",
+            "total_amount": 29,
         }
 
 
@@ -135,11 +139,55 @@ async def test_handle_precheckout_rejects_invalid_payload(monkeypatch) -> None:
     monkeypatch.setattr(payments.PurchaseService, "validate_precheckout", _fake_validate)
 
     query = _PreCheckoutQuery(
-        from_user=SimpleNamespace(id=3), invoice_payload="inv-1", total_amount=10
+        from_user=SimpleNamespace(id=3),
+        invoice_payload="inv-1",
+        total_amount=10,
+        query_id="pre-1",
     )
     await payments.handle_precheckout(query)  # type: ignore[arg-type]
 
     assert query.calls == [{"ok": False, "error_message": TEXTS_DE["msg.purchase.error.failed"]}]
+
+
+@pytest.mark.asyncio
+async def test_handle_precheckout_passes_query_id_to_runtime(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    async def _fake_validate_precheckout(
+        *,
+        telegram_user,
+        invoice_payload,
+        total_amount,
+        precheckout_query_id,
+    ):
+        calls.append(
+            {
+                "telegram_user_id": telegram_user.id,
+                "invoice_payload": invoice_payload,
+                "total_amount": total_amount,
+                "precheckout_query_id": precheckout_query_id,
+            }
+        )
+
+    monkeypatch.setattr(payments, "validate_precheckout", _fake_validate_precheckout)
+
+    query = _PreCheckoutQuery(
+        from_user=SimpleNamespace(id=3),
+        invoice_payload="inv-2",
+        total_amount=29,
+        query_id="pre-2",
+    )
+    await payments.handle_precheckout(query)  # type: ignore[arg-type]
+
+    assert calls == [
+        {
+            "telegram_user_id": 3,
+            "invoice_payload": "inv-2",
+            "total_amount": 29,
+            "precheckout_query_id": "pre-2",
+        }
+    ]
+    assert query.calls == [{"ok": True, "error_message": None}]
 
 
 @pytest.mark.asyncio

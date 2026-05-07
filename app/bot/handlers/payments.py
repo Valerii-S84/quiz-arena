@@ -222,6 +222,7 @@ async def handle_precheckout(pre_checkout_query: PreCheckoutQuery) -> None:
             telegram_user=pre_checkout_query.from_user,
             invoice_payload=pre_checkout_query.invoice_payload,
             total_amount=pre_checkout_query.total_amount,
+            precheckout_query_id=pre_checkout_query.id,
         )
     except (PurchasePrecheckoutValidationError, ProductNotFoundError):
         await pre_checkout_query.answer(

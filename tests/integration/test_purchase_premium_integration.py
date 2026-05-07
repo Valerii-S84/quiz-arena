@@ -58,7 +58,11 @@ async def test_premium_month_purchase_grants_active_entitlement() -> None:
             user_id=user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id="tg_charge_premium_month_1",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=now_utc,
         )
 
@@ -138,7 +142,11 @@ async def test_premium_upgrade_extends_from_existing_end_and_revokes_old_entitle
             user_id=user_id,
             invoice_payload=init.invoice_payload,
             telegram_payment_charge_id="tg_charge_premium_upgrade_1",
-            raw_successful_payment={"invoice_payload": init.invoice_payload},
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
             now_utc=now_utc,
         )
 
