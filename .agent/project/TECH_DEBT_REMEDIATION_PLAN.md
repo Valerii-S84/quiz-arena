@@ -12,35 +12,60 @@
 агент має працювати за цим планом, якщо користувач явно не задав інший
 порядок.
 
-## 1. Baseline audit snapshot
+## 1. Baseline and current snapshot
 
 Базова точка для цього плану: аудит репозиторію станом на `2026-04-15`.
+Поточне уточнення scope: аудит локального backend repo станом на
+`2026-05-08`.
 
-Підтверджені проблеми:
+Початкові проблеми з базового аудиту:
 
 - `High`: admin auth token revocation має fail-open поведінку при
   недоступності Redis (`app/services/admin/auth.py`).
-- `High`: frontend lint/build вже падають локально, але frontend не
-  покритий GitHub CI.
+- `High`: frontend lint/build вже падали локально в тодішньому repo layout;
+  цей пункт superseded для backend repo після split у standalone frontend
+  repo.
 - `Medium`: `18` Python-файлів у `app/` перевищують `220` рядків; `1`
   файл перевищує `250`.
 - `Medium`: `96` production functions/methods довші за `60` рядків.
-- `Medium`: frontend має великі client/page файли без test layer
-  (`promo-client.tsx`, `app/(public)/page.tsx`).
+- `Medium`: frontend мав великі client/page файли без test layer; цей
+  пункт тепер належить standalone frontend repo.
 - `Medium`: `mypy` покладається на `ignore_errors = true` для `tests.*`
   і частини складних app-модулів.
-- `Low`: є drift між project docs і фактичним стеком frontend
-  (`PROJECT_CONTEXT.md` каже `Next.js 14`, фактично використовується
-  `Next.js 15.5.14`).
+- `Low`: є drift між project docs і фактичним frontend/backend split.
+
+Поточний стан локального backend repo на `2026-05-08`:
+
+- `frontend/` у робочому дереві відсутній.
+- Frontend source, frontend CI, and frontend image publishing live in the
+  standalone repo `https://github.com/Valerii-S84/quiz-arena-frontend`.
+- This backend repo still owns compose/proxy orchestration for consuming the
+  published frontend runtime image via `FRONTEND_IMAGE`.
+- Frontend findings from the original audit are superseded for this repo and
+  must be handled in the standalone frontend repo, not by recreating local
+  `frontend/` assumptions here.
+- Admin auth fail-open finding is remediated in code: token decode
+  depends on Redis-backed revoke state and raises `AdminAuthStateError` when
+  auth state is unavailable; route dependencies map that state to HTTP 503.
+- Targeted admin auth tests passed locally (`45 passed`).
+- Full backend local CI passed on `2026-05-08` via `bash scripts/local_ci.sh`.
+- Backend structural debt remains: `18` app files above `220` lines and
+  `108` production functions/methods above `60` lines.
+- `mypy` is green, and no `ignore_errors = true` override for production
+  `app` modules was found in `pyproject.toml`.
+- Test-suite structural debt remains limited to
+  `tests/game/test_sessions_start_arena.py` above `400` lines.
 
 ## 2. Definition of clean state
 
 Репозиторій вважається приведеним до чистого стану тільки якщо:
 
-- не лишилося відкритих `High`-severity проблем із базового аудиту;
-- mandatory local gates проходять для backend і frontend;
-- GitHub CI покриває обидві активні частини репозиторію:
-  Python backend і Next.js frontend;
+- не лишилося відкритих `High`-severity проблем із базового аудиту, які
+  належать цьому backend repo;
+- mandatory local gates проходять для backend;
+- frontend source/CI/image publishing debt не дублюється в цьому repo і
+  відстежується окремо в `quiz-arena-frontend`;
+- GitHub CI покриває активну частину цього repo: Python backend;
 - security-критичні flow не мають fail-open поведінки без явного,
   затвердженого compensating control;
 - structural debt зменшений до керованого рівня, а не лише заморожений;
@@ -53,9 +78,9 @@
   погодженого винятку;
 - production functions/methods довші за `60` рядків відсутні або
   лишаються тільки в явно задокументованому short exception list;
-- frontend не має page/client файлів понад `500` рядків;
 - `mypy` не має `ignore_errors = true` для production app-пакетів;
-- frontend має хоча б базовий automated test layer для критичних flows.
+- backend test modules понад `400` рядків відсутні або розбиті за
+  сценаріями.
 
 ## 3. Execution protocol
 
@@ -81,26 +106,29 @@ Project boundaries, які не можна ігнорувати:
 
 Порядок фаз є обов'язковим, якщо користувач явно не змінив пріоритет.
 
-### Phase 0. Restore green gates
+### Phase 0. Align repo scope and active docs
 
 Мета:
 
-- прибрати поточні blocking failures у frontend;
-- зробити так, щоб repo мав чесний green/red сигнал.
+- прибрати stale локальні frontend припущення з active agent context;
+- зробити так, щоб backend repo мав чесний green/red сигнал без вимоги
+  неіснуючого `frontend/`.
 
 Обов'язкові задачі:
 
-- виправити поточний lint/build blocker у `frontend/app/(public)/page.tsx`
-  (`<a href="/">` -> `Link`);
-- перевірити, що `npm run lint` і `npm run build` проходять локально;
-- винести frontend lint/build у CI або інший mandatory protected gate;
-- якщо для цього треба міняти `.github/workflows/**`, спочатку Ask First.
+- оновити `.agent/project/PROJECT_CONTEXT.md` під фактичний backend repo
+  scope;
+- оновити `.agent/project/CODE_STYLE.md` так, щоб він не вимагав
+  `cd frontend && ...` у цьому repo;
+- оновити цей remediation plan так, щоб frontend work було явно винесене в
+  standalone repo scope;
+- не змінювати `.github/workflows/**` без окремого підтвердження.
 
 DoD фази:
 
-- frontend lint проходить;
-- frontend production build проходить;
-- frontend не лишається поза mandatory gate.
+- active project docs не посилаються на локальний `frontend/` як source tree;
+- required local gates відповідають фактичному backend repo;
+- frontend debt не пріоритизується в цьому repo як локальна робота.
 
 ### Phase 1. Close security and auth-state debt
 
@@ -125,6 +153,12 @@ DoD фази:
 - outage не призводить до fail-open авторизації;
 - regression tests покривають degraded-state сценарії.
 
+Поточний статус:
+
+- Closed for this backend repo.
+- Full backend local CI proof: `bash scripts/local_ci.sh` passed on
+  `2026-05-08`.
+
 ### Phase 2. Stabilize structure in hottest backend zones
 
 Мета:
@@ -134,12 +168,13 @@ DoD фази:
 
 Перший пріоритет:
 
-- `app/services/admin/auth.py`
-- `app/bot/handlers/gameplay.py`
-- `app/bot/handlers/gameplay_flows/friend_answer_completion_flow.py`
-- `app/api/routes/admin/overview_queries.py`
-- `app/game/sessions/service/progression.py`
-- oversized worker/tasks modules around daily cup, tournaments, proof cards
+- `app/bot/handlers/gameplay_duels.py`
+- `app/db/repo/analytics_mutations.py`
+- `app/game/sessions/service/friend_challenges_manage.py`
+- long orchestration functions:
+  `app/bot/handlers/gameplay_flows/answer_flow.py::handle_answer`,
+  `app/workers/tasks/friend_challenges_async.py::run_friend_challenge_deadlines_async`,
+  `app/bot/handlers/gameplay_flows/friend_answer_flow.py::handle_friend_answer_branch`
 
 Правило декомпозиції:
 
@@ -155,34 +190,36 @@ DoD фази:
 - top long functions більше не концентрують кілька рівнів абстракції;
 - refactor підтверджений релевантними тестами.
 
-### Phase 3. Decompose frontend and add safety net
+Поточний статус:
+
+- `app/workers/tasks/friend_challenges_notifications.py` розділено на
+  orchestration, notification content і delivery modules; primary file
+  зменшено до `80` рядків, нові modules лишаються нижче `220` рядків.
+
+### Phase 3. External frontend remediation handoff
 
 Мета:
 
-- прибрати frontend single-file concentration;
-- додати базовий test layer для критичних UI flows.
+- не виконувати frontend cleanup у цьому backend repo;
+- не відновлювати локальний `frontend/` як side effect cleanup;
+- залишити явний handoff для standalone repo.
 
 Перший пріоритет:
 
-- `frontend/app/(admin)/admin/(secure)/promo/promo-client.tsx`
-- `frontend/app/(public)/page.tsx`
+- Аудит і cleanup standalone repo `quiz-arena-frontend`.
 
 Обов'язкові задачі:
 
-- розділити data-fetching hooks, formatting helpers, modal/view components
-  і page shell;
-- не лишати data orchestration, form state, modal rendering і table logic в
-  одному giant component;
-- додати frontend test runner і мінімальний coverage для:
-  public home navigation,
-  admin login entry,
-  promo create/edit/bulk happy path.
+- не запускати `cd frontend && ...` у цьому repo;
+- не додавати frontend source або frontend toolchain у цей repo без
+  окремого explicit scope;
+- якщо користувач просить frontend debt, переключити роботу на standalone
+  frontend repo.
 
 DoD фази:
 
-- ключові frontend файли розбиті на читабельні модулі;
-- `frontend` має test command у package scripts;
-- критичні flows мають автоматизовану перевірку.
+- backend repo docs не містять stale локальних frontend інструкцій;
+- standalone frontend debt не маскується як закритий у backend repo.
 
 ### Phase 4. Remove type-safety blind spots
 
@@ -224,40 +261,17 @@ DoD фази:
 - назва тесту і його setup швидко читаються без deep scrolling;
 - coverage для refactored flows збережений або покращений.
 
-### Phase 6. Eliminate documentation and tooling drift
-
-Мета:
-
-- синхронізувати агентський і runtime контекст із фактичним станом репо.
-
-Обов'язкові задачі:
-
-- оновити project docs під фактичні версії Next.js / React / lint flow;
-- замінити deprecated `next lint` flow на актуальний ESLint CLI path;
-- прибрати або заархівувати stale planning docs, якщо вони заважають
-  onboarding або вводять в оману;
-- не змінювати historical archive без потреби.
-
-DoD фази:
-
-- docs не суперечать фактичному стеку;
-- локальні команди збігаються з реально підтримуваним toolchain;
-- onboarding не залежить від застарілих припущень.
-
 ## 5. PR slicing rules
 
 Якщо cleanup виконується серією PR/гілок, використовуй такий порядок:
 
-1. frontend red -> green
-2. frontend gate in CI
-3. admin auth fail-open fix
-4. admin auth decomposition
-5. backend monolith split by hotspot
-6. frontend promo decomposition
-7. frontend test layer
-8. mypy override removal by domain
-9. oversized test split
-10. docs/tooling drift cleanup
+1. active backend repo docs/scope alignment
+2. admin auth full backend CI proof
+3. backend monolith split by hotspot
+4. mypy cleanup by domain, only if production blind spots are found
+5. oversized test split
+6. external frontend remediation in `quiz-arena-frontend`, if requested in
+   that repo scope
 
 У кожному PR має бути тільки один з цих результатів або одна дуже вузька
 частина фази.
@@ -274,9 +288,8 @@ Backend-focused зміни:
 
 Frontend-focused зміни:
 
-- `cd frontend && npm run lint`
-- `cd frontend && npm run build`
-- frontend tests, якщо test runner вже доданий
+- Not applicable in this backend repo.
+- For standalone frontend work, use that repo's own active rules and gates.
 
 Flow-sensitive або infra-sensitive зміни:
 
@@ -291,13 +304,15 @@ Flow-sensitive або infra-sensitive зміни:
 - розширювати `ignore_errors = true` або множити `type: ignore`;
 - додавати нові broad `except Exception` без вузько поясненої причини;
 - переносити складність у "helper"/"utils" файли без доменної ролі;
-- залишати frontend без green lint/build після будь-яких frontend змін.
+- додавати локальний frontend toolchain/source у backend repo без explicit
+  frontend reintegration scope.
 
 ## 8. Completion condition for the whole plan
 
 План можна вважати закритим тільки якщо:
 
-- Phase 0-6 завершені або явно superseded новим затвердженим планом;
-- repo має green backend і frontend gates;
-- базові audit findings від `2026-04-15` більше не актуальні;
+- Phase 0-5 завершені для цього backend repo або явно superseded новим
+  затвердженим планом;
+- repo має green backend gates;
+- backend-owned audit findings від `2026-04-15` більше не актуальні;
 - новий агент може почати роботу без прихованого cleanup контексту.
