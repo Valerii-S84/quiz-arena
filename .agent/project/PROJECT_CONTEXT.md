@@ -8,28 +8,37 @@
 ## 1. Stack
 
 - Project name: `Quiz Arena` (`quiz-arena-bot`)
-- Primary languages: `Python 3.12`, `TypeScript`, `Bash`
-- Runtime / platform: `FastAPI + aiogram + Celery on Python 3.12`, `Next.js 15.5.15 / React 18.3.1 frontend`, `Docker Compose local/prod`, `Linux VPS production`
-- Main frameworks / libraries: `FastAPI`, `aiogram`, `SQLAlchemy`, `Alembic`, `Celery`, `Redis`, `Pydantic`, `Next.js`, `React`, `Tailwind CSS`
+- Primary languages: `Python 3.12`, `Bash`
+- Runtime / platform: `FastAPI + aiogram + Celery on Python 3.12`, `Docker Compose local/prod`, `Linux VPS production`
+- Main frameworks / libraries: `FastAPI`, `aiogram`, `SQLAlchemy`, `Alembic`, `Celery`, `Redis`, `Pydantic`
 - Data stores: `PostgreSQL`, `Redis`, `QuizBank CSV assets`
 - Default user-facing language: `German only for all product-facing UI, bot text, admin UI text, notifications, and other user-visible copy`
 
 ## 2. Project structure
 
-- Root entrypoints: `app/main.py`, `app/workers/celery_app.py`, `scripts/run_bot_polling.py`, `frontend/app/`, `docker-compose.yml`, `docker-compose.prod.yml`
-- Source directories: `app/`, `frontend/app/`, `frontend/lib/`, `scripts/`, `tools/`
+- Root entrypoints: `app/main.py`, `app/workers/celery_app.py`, `scripts/run_bot_polling.py`, `docker-compose.yml`, `docker-compose.prod.yml`
+- Source directories: `app/`, `scripts/`, `tools/`
 - Test directories: `tests/` (including `tests/integration/`)
 - Config / infra directories: `alembic/`, `deploy/`, `.github/workflows/`, `docs/runbooks/`
-- Read-only or protected paths: `.agent/core/`, `.env*`, `.github/workflows/`, `deploy/`, `docker-compose.prod.yml`, `frontend/.next/`, `frontend/node_modules/`
+- Read-only or protected paths: `.agent/core/`, `.env*`, `.github/workflows/`, `deploy/`, `docker-compose.prod.yml`
+
+Frontend boundary:
+
+- `frontend/` is not part of this working tree.
+- Frontend source, frontend CI, and frontend image publishing live in the
+  standalone repo `https://github.com/Valerii-S84/quiz-arena-frontend`.
+- This backend repo still owns compose/proxy orchestration for consuming the
+  published frontend runtime image via `FRONTEND_IMAGE`.
+- Do not run or require `cd frontend && ...` commands in this repo.
 
 ## 3. Key commands
 
 | Purpose | Command | Notes |
 |---|---|---|
-| Test | `make test` | Backend flow prepares `quiz_arena_test`, runs Alembic migrations, then `pytest -q`; frontend unit tests run via `cd frontend && npm test`; full local CI equivalent is `bash scripts/local_ci.sh` |
-| Lint | `make lint && make format-check && make type-check` | Python gate is `ruff`, `black --check`, `isort --check-only`, `mypy`; frontend changes additionally use `cd frontend && npm run lint` (`ESLint CLI` over `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.mts`, `.cts`, `.tsx`) |
-| Build | `cd frontend && npm run build` | Frontend has the only explicit app build command; production runtime build uses `docker compose -f docker-compose.prod.yml up -d --build` |
-| Dev / Run | `make up` | Starts local `postgres` and `redis`; then use `make run-api`, `make run-worker`, `make run-beat`, and `cd frontend && npm run dev` as needed |
+| Test | `make test` | Backend flow prepares `quiz_arena_test`, runs Alembic migrations, then `pytest -q`; full backend local CI equivalent is `bash scripts/local_ci.sh` |
+| Lint | `make lint && make format-check && make type-check` | Python gate is `ruff`, `black --check`, `isort --check-only`, `mypy` |
+| Build | `docker build -t quiz-arena-backend .` | Optional backend image build when Docker image validation is explicitly in scope |
+| Dev / Run | `make up` | Starts local `postgres` and `redis`; then use `make run-api`, `make run-worker`, and `make run-beat` as needed |
 
 ## 4. External dependencies
 
@@ -42,7 +51,7 @@
 
 ## 5. Project constraints
 
-- Protected paths: `.agent/core/**`, `.env*`, `.github/workflows/**`, `deploy/**`, `docker-compose.prod.yml`, `frontend/.next/**`, `frontend/node_modules/**`
+- Protected paths: `.agent/core/**`, `.env*`, `.github/workflows/**`, `deploy/**`, `docker-compose.prod.yml`
 - Secrets / credentials locations: `.env`, `.env.example`, `.env.production.example`, `.env.backup_before_prod_recovery_*`; real production runtime env lives only at `/opt/quiz-arena/.env` on the server.
 - Deploy / production boundaries: Production runs from `/opt/quiz-arena` via `docker-compose.prod.yml` + `deploy/Caddyfile`; public domain is `deutchquizarena.de`; post-deploy checks must cover health, webhook, Celery and Redis.
 - Approval-required operations: production deploys; changes to `.github/workflows/**` or CODEOWNERS/branch protection; server-side `.env` handling; changes to deploy/runtime config; migrations or data backfills outside the normal reviewed flow.

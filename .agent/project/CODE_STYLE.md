@@ -6,13 +6,13 @@
 Невикористані секції позначай як `Not used in this repo.`
 
 primary_language: `Python`
-active_sections: `Python, JavaScript / TypeScript, SQL, Shell / CLI, Tests and fixtures`
+active_sections: `Python, SQL, Shell / CLI, Tests and fixtures`
 fallback: якщо `primary_language` або `active_sections` не
 заповнено, Ask First перед застосуванням стилю.
 
 ## Active languages
 
-- Languages in scope: `Python`, `TypeScript`, `SQL`, `Bash`
+- Languages in scope: `Python`, `SQL`, `Bash`
 
 ## Python
 
@@ -25,12 +25,10 @@ fallback: якщо `primary_language` або `active_sections` не
 
 ## JavaScript / TypeScript
 
-- Formatter: `No dedicated formatter config found; preserve existing Next.js/TS formatting and avoid reformat-only edits`
-- Linter: `ESLint CLI` via `cd frontend && npm run lint`; current repo config is `frontend/eslint.config.mjs`
-- Module / import conventions: `Next.js app-router layout under frontend/app`; TS path alias `@/*` maps to `frontend/*`
-- Types / strictness rules: `strict = true`, `noEmit = true`, `allowJs = false`, `forceConsistentCasingInFileNames = true`, `moduleResolution = bundler`; Next `typedRoutes` is enabled
-- Frontend / build conventions: `Next.js 15.5.15` + `React 18.3.1` app, `reactStrictMode: true`, Tailwind/PostCSS pipeline, build with `cd frontend && npm run build`
-- JS/TS-specific test rules: `Vitest` is configured via `cd frontend && npm test`; when touching frontend code, run at least frontend lint and build, and run `npm test` when the scope changes frontend tests, frontend test tooling, or frontend logic already covered by Vitest`
+- `Not used in this repo.`
+- Frontend source, frontend CI, and frontend image publishing live in the
+  standalone repo `https://github.com/Valerii-S84/quiz-arena-frontend`.
+- Do not require `cd frontend && ...` gates for work in this backend repo.
 
 ## Go
 
@@ -56,9 +54,9 @@ fallback: якщо `primary_language` або `active_sections` не
 
 - Test frameworks: `pytest`, `pytest-asyncio`, `FastAPI TestClient`, `httpx.AsyncClient`
 - Fixture / mock conventions: `Bootstrap env through pytest_env_bootstrap.py`; prefer local pytest fixtures and monkeypatch; integration tests use Postgres/Redis plus Alembic against quiz_arena_test`
-- Required test suites before close-out: `Python changes: Ruff, Black --check, isort --check-only, mypy, pytest -q --ignore=tests/integration`; run `bash scripts/local_ci.sh` when the scope touches integration/runtime expectations; frontend changes require `cd frontend && npm run lint` and `cd frontend && npm run build`, plus `cd frontend && npm test` when the scope changes frontend tests, frontend test tooling, or frontend logic already covered by Vitest`
+- Required test suites before close-out: `Python changes: Ruff, Black --check, isort --check-only, mypy, pytest -q --ignore=tests/integration`; run `bash scripts/local_ci.sh` when the scope touches integration/runtime expectations
 
 ## Framework or repo-specific exceptions
 
 - `All product-facing strings stay in German; this applies to bot text, UI copy, notifications, public/admin user-visible labels, and similar surfaced content.`
-- `frontend/.next/`, `frontend/node_modules/`, caches, reports, and QuizBank/generated artifacts are not style references and should not be used as justification for formatting or structural decisions
+- Caches, reports, and QuizBank/generated artifacts are not style references and should not be used as justification for formatting or structural decisions
