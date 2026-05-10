@@ -6,7 +6,11 @@ from uuid import UUID
 
 import pytest
 
-from app.bot.handlers.gameplay_flows import friend_answer_flow
+from app.bot.handlers.gameplay_flows import (
+    friend_answer_flow,
+    friend_answer_notifications,
+    friend_answer_progress,
+)
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.types import AnswerSessionResult, FriendChallengeSnapshot
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
@@ -40,6 +44,77 @@ def _friend_result(*, status: str) -> AnswerSessionResult:
         friend_challenge_answered_round=5,
         friend_challenge_round_completed=True,
         friend_challenge_waiting_for_opponent=False,
+    )
+
+
+def _friend_answer_context(
+    *,
+    session_local=DummySessionLocal(),
+    ensure_home_snapshot=None,
+    start_friend_challenge_round=None,
+    resolve_opponent_label=None,
+    notify_opponent=None,
+    friend_opponent_user_id=None,
+    build_friend_score_text=None,
+    build_friend_ttl_text=None,
+    build_friend_finish_text=None,
+    build_public_badge_label=None,
+    build_friend_proof_card_text=None,
+    enqueue_friend_challenge_proof_cards=None,
+    build_series_progress_text=None,
+    send_friend_round_question=None,
+) -> friend_answer_flow.FriendAnswerFlowContext:
+    async def _default_home_snapshot(session, *, telegram_user):
+        del session, telegram_user
+        return SimpleNamespace(user_id=10, free_energy=10, paid_energy=0)
+
+    async def _default_start_round(*args, **kwargs):
+        del args, kwargs
+        return SimpleNamespace(
+            snapshot=_friend_result(status="ACTIVE").friend_challenge,
+            start_result=None,
+            already_answered_current_round=True,
+        )
+
+    async def _default_resolve_label(**kwargs):
+        del kwargs
+        return "Freund"
+
+    async def _default_notify(*args, **kwargs):
+        del args, kwargs
+        return None
+
+    async def _default_send_question(*args, **kwargs):
+        del args, kwargs
+        return None
+
+    return friend_answer_flow.FriendAnswerFlowContext(
+        services=friend_answer_flow.FriendAnswerFlowServices(
+            session_local=session_local,
+            user_onboarding_service=SimpleNamespace(
+                ensure_home_snapshot=ensure_home_snapshot or _default_home_snapshot
+            ),
+            game_session_service=SimpleNamespace(
+                start_friend_challenge_round=(start_friend_challenge_round or _default_start_round)
+            ),
+        ),
+        actions=friend_answer_flow.FriendAnswerFlowActions(
+            notify_opponent=notify_opponent or _default_notify,
+            enqueue_friend_challenge_proof_cards=(
+                enqueue_friend_challenge_proof_cards or (lambda **kwargs: None)
+            ),
+            send_friend_round_question=send_friend_round_question or _default_send_question,
+        ),
+        rendering=friend_answer_flow.FriendAnswerFlowRendering(
+            resolve_opponent_label=resolve_opponent_label or _default_resolve_label,
+            friend_opponent_user_id=friend_opponent_user_id or (lambda **kwargs: 20),
+            build_friend_score_text=build_friend_score_text or (lambda **kwargs: "score"),
+            build_friend_ttl_text=build_friend_ttl_text or (lambda **kwargs: None),
+            build_friend_finish_text=build_friend_finish_text or (lambda **kwargs: "finish"),
+            build_public_badge_label=build_public_badge_label or (lambda **kwargs: "badge"),
+            build_friend_proof_card_text=build_friend_proof_card_text or (lambda **kwargs: "proof"),
+            build_series_progress_text=build_series_progress_text or (lambda **kwargs: "series"),
+        ),
     )
 
 
@@ -86,12 +161,12 @@ async def test_friend_answer_branch_notifies_creator_once_when_opponent_finishes
         notifications.append((opponent_user_id, text, callback_data))
 
     monkeypatch.setattr(
-        friend_answer_flow.FriendChallengesRepo,
+        friend_answer_notifications.FriendChallengesRepo,
         "get_by_id",
         _fake_get_by_id,
     )
     monkeypatch.setattr(
-        friend_answer_flow,
+        friend_answer_notifications,
         "reserve_duel_push_slot",
         _fake_reserve_duel_push_slot,
     )
@@ -105,20 +180,13 @@ async def test_friend_answer_branch_notifies_creator_once_when_opponent_finishes
         callback,
         result=_friend_result(status="OPPONENT_DONE"),
         now_utc=datetime(2026, 3, 9, 12, 0, 0),
-        session_local=DummySessionLocal(),
-        user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_fake_home_snapshot),
-        game_session_service=SimpleNamespace(start_friend_challenge_round=_fake_start_round),
-        resolve_opponent_label=_fake_resolve_label,
-        notify_opponent=_fake_notify,
-        friend_opponent_user_id=lambda **kwargs: 10,
-        build_friend_score_text=lambda **kwargs: "score",
-        build_friend_ttl_text=lambda **kwargs: None,
-        build_friend_finish_text=lambda **kwargs: "finish",
-        build_public_badge_label=lambda **kwargs: "badge",
-        build_friend_proof_card_text=lambda **kwargs: "proof",
-        enqueue_friend_challenge_proof_cards=lambda **kwargs: None,
-        build_series_progress_text=lambda **kwargs: "series",
-        send_friend_round_question=lambda **kwargs: None,
+        context=_friend_answer_context(
+            ensure_home_snapshot=_fake_home_snapshot,
+            start_friend_challenge_round=_fake_start_round,
+            resolve_opponent_label=_fake_resolve_label,
+            notify_opponent=_fake_notify,
+            friend_opponent_user_id=lambda **kwargs: 10,
+        ),
     )
 
     assert notifications == [
@@ -166,7 +234,7 @@ async def test_friend_answer_branch_skips_push_when_creator_already_started(
         notifications.append(opponent_user_id)
 
     monkeypatch.setattr(
-        friend_answer_flow.FriendChallengesRepo,
+        friend_answer_notifications.FriendChallengesRepo,
         "get_by_id",
         _fake_get_by_id,
     )
@@ -180,20 +248,13 @@ async def test_friend_answer_branch_skips_push_when_creator_already_started(
         callback,
         result=_friend_result(status="OPPONENT_DONE"),
         now_utc=datetime(2026, 3, 9, 12, 0, 0),
-        session_local=DummySessionLocal(),
-        user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_fake_home_snapshot),
-        game_session_service=SimpleNamespace(start_friend_challenge_round=_fake_start_round),
-        resolve_opponent_label=_fake_resolve_label,
-        notify_opponent=_fake_notify,
-        friend_opponent_user_id=lambda **kwargs: 10,
-        build_friend_score_text=lambda **kwargs: "score",
-        build_friend_ttl_text=lambda **kwargs: None,
-        build_friend_finish_text=lambda **kwargs: "finish",
-        build_public_badge_label=lambda **kwargs: "badge",
-        build_friend_proof_card_text=lambda **kwargs: "proof",
-        enqueue_friend_challenge_proof_cards=lambda **kwargs: None,
-        build_series_progress_text=lambda **kwargs: "series",
-        send_friend_round_question=lambda **kwargs: None,
+        context=_friend_answer_context(
+            ensure_home_snapshot=_fake_home_snapshot,
+            start_friend_challenge_round=_fake_start_round,
+            resolve_opponent_label=_fake_resolve_label,
+            notify_opponent=_fake_notify,
+            friend_opponent_user_id=lambda **kwargs: 10,
+        ),
     )
 
     assert notifications == []
@@ -220,12 +281,12 @@ async def test_friend_answer_branch_skips_repo_lookup_when_creator_answers(
         return None
 
     monkeypatch.setattr(
-        friend_answer_flow.FriendChallengesRepo,
+        friend_answer_notifications.FriendChallengesRepo,
         "get_by_id",
         _unexpected_get_by_id,
     )
     monkeypatch.setattr(
-        friend_answer_flow,
+        friend_answer_progress,
         "handle_completed_friend_challenge",
         _fake_handle_completed,
     )
@@ -239,20 +300,12 @@ async def test_friend_answer_branch_skips_repo_lookup_when_creator_answers(
         callback,
         result=_friend_result(status="COMPLETED"),
         now_utc=datetime(2026, 3, 9, 12, 0, 0),
-        session_local=DummySessionLocal(),
-        user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_fake_home_snapshot),
-        game_session_service=SimpleNamespace(start_friend_challenge_round=None),
-        resolve_opponent_label=_fake_resolve_label,
-        notify_opponent=lambda **kwargs: None,
-        friend_opponent_user_id=lambda **kwargs: 20,
-        build_friend_score_text=lambda **kwargs: "score",
-        build_friend_ttl_text=lambda **kwargs: None,
-        build_friend_finish_text=lambda **kwargs: "finish",
-        build_public_badge_label=lambda **kwargs: "badge",
-        build_friend_proof_card_text=lambda **kwargs: "proof",
-        enqueue_friend_challenge_proof_cards=lambda **kwargs: None,
-        build_series_progress_text=lambda **kwargs: "series",
-        send_friend_round_question=lambda **kwargs: None,
+        context=_friend_answer_context(
+            ensure_home_snapshot=_fake_home_snapshot,
+            start_friend_challenge_round=None,
+            resolve_opponent_label=_fake_resolve_label,
+            friend_opponent_user_id=lambda **kwargs: 20,
+        ),
     )
 
 
@@ -315,20 +368,12 @@ async def test_friend_answer_branch_shows_arena_publish_after_creator_baseline(
             friend_challenge_waiting_for_opponent=True,
         ),
         now_utc=datetime(2026, 5, 4, 12, 0, 0),
-        session_local=DummySessionLocal(),
-        user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_fake_home_snapshot),
-        game_session_service=SimpleNamespace(start_friend_challenge_round=_fake_start_round),
-        resolve_opponent_label=_fake_resolve_label,
-        notify_opponent=lambda **kwargs: None,
-        friend_opponent_user_id=lambda **kwargs: None,
-        build_friend_score_text=lambda **kwargs: "score",
-        build_friend_ttl_text=lambda **kwargs: None,
-        build_friend_finish_text=lambda **kwargs: "finish",
-        build_public_badge_label=lambda **kwargs: "badge",
-        build_friend_proof_card_text=lambda **kwargs: "proof",
-        enqueue_friend_challenge_proof_cards=lambda **kwargs: None,
-        build_series_progress_text=lambda **kwargs: "series",
-        send_friend_round_question=lambda **kwargs: None,
+        context=_friend_answer_context(
+            ensure_home_snapshot=_fake_home_snapshot,
+            start_friend_challenge_round=_fake_start_round,
+            resolve_opponent_label=_fake_resolve_label,
+            friend_opponent_user_id=lambda **kwargs: None,
+        ),
     )
 
     waiting_call = callback.message.answers[-1]

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from aiogram.types import CallbackQuery
 
-from app.bot.handlers import gameplay_callbacks
+from app.bot.handlers import gameplay_callbacks, gameplay_views
 from app.bot.handlers.gameplay_flows import friend_lobby_flow
 from app.bot.handlers.gameplay_friend_challenge_context import get_gameplay_module
 from app.bot.keyboards.duels import build_friend_duel_keyboard
@@ -58,8 +58,8 @@ async def handle_friend_challenge_create_selected(callback: CallbackQuery) -> No
         game_session_service=gameplay.GameSessionService,
         parse_friend_create_format=gameplay_callbacks.parse_friend_create_format,
         build_friend_invite_link=gameplay._build_friend_invite_link,
-        build_friend_plan_text=gameplay._build_friend_plan_text,
-        build_friend_ttl_text=gameplay._build_friend_ttl_text,
+        build_friend_plan_text=gameplay_views._build_friend_plan_text,
+        build_friend_ttl_text=gameplay_views._build_friend_ttl_text,
     )
 
 

@@ -102,24 +102,32 @@ async def _run_friend_answer_branch(
         callback,
         result=result,
         now_utc=datetime(2026, 2, 19, 19, 0, tzinfo=UTC),
-        session_local=SessionLocal,
-        user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_fake_home_snapshot),
-        game_session_service=GameSessionService,
-        resolve_opponent_label=_fake_resolve_label,
-        notify_opponent=_fake_notify,
-        friend_opponent_user_id=lambda challenge, user_id: (
-            challenge.opponent_user_id
-            if challenge.creator_user_id == user_id
-            else challenge.creator_user_id
+        context=friend_answer_flow.FriendAnswerFlowContext(
+            services=friend_answer_flow.FriendAnswerFlowServices(
+                session_local=SessionLocal,
+                user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_fake_home_snapshot),
+                game_session_service=GameSessionService,
+            ),
+            actions=friend_answer_flow.FriendAnswerFlowActions(
+                notify_opponent=_fake_notify,
+                enqueue_friend_challenge_proof_cards=lambda **kwargs: None,
+                send_friend_round_question=_fake_send_question,
+            ),
+            rendering=friend_answer_flow.FriendAnswerFlowRendering(
+                resolve_opponent_label=_fake_resolve_label,
+                friend_opponent_user_id=lambda challenge, user_id: (
+                    challenge.opponent_user_id
+                    if challenge.creator_user_id == user_id
+                    else challenge.creator_user_id
+                ),
+                build_friend_score_text=lambda **kwargs: "score",
+                build_friend_ttl_text=lambda **kwargs: None,
+                build_friend_finish_text=lambda **kwargs: "finish",
+                build_public_badge_label=lambda **kwargs: "badge",
+                build_friend_proof_card_text=lambda **kwargs: "proof",
+                build_series_progress_text=lambda **kwargs: "series",
+            ),
         ),
-        build_friend_score_text=lambda **kwargs: "score",
-        build_friend_ttl_text=lambda **kwargs: None,
-        build_friend_finish_text=lambda **kwargs: "finish",
-        build_public_badge_label=lambda **kwargs: "badge",
-        build_friend_proof_card_text=lambda **kwargs: "proof",
-        enqueue_friend_challenge_proof_cards=lambda **kwargs: None,
-        build_series_progress_text=lambda **kwargs: "series",
-        send_friend_round_question=_fake_send_question,
     )
     return notifications
 

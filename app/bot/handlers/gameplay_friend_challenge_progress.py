@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from aiogram.types import CallbackQuery
 
-from app.bot.handlers import gameplay_callbacks
+from app.bot.handlers import gameplay_callbacks, gameplay_helpers, gameplay_views
 from app.bot.handlers.gameplay_flows import (
     friend_challenge_flow,
+    friend_challenge_result_share,
     friend_next_flow,
     friend_series_flow,
     proof_card_flow,
@@ -39,10 +40,10 @@ async def handle_friend_challenge_rematch(callback: CallbackQuery) -> None:
         user_onboarding_service=gameplay.UserOnboardingService,
         game_session_service=gameplay.GameSessionService,
         resolve_opponent_label=gameplay._resolve_opponent_label,
-        friend_opponent_user_id=gameplay._friend_opponent_user_id,
+        friend_opponent_user_id=gameplay_helpers._friend_opponent_user_id,
         notify_opponent=gameplay._notify_opponent,
-        build_friend_plan_text=gameplay._build_friend_plan_text,
-        build_friend_ttl_text=gameplay._build_friend_ttl_text,
+        build_friend_plan_text=gameplay_views._build_friend_plan_text,
+        build_friend_ttl_text=gameplay_views._build_friend_ttl_text,
     )
 
 
@@ -59,10 +60,10 @@ async def handle_friend_challenge_series_best3(callback: CallbackQuery) -> None:
         user_onboarding_service=gameplay.UserOnboardingService,
         game_session_service=gameplay.GameSessionService,
         resolve_opponent_label=gameplay._resolve_opponent_label,
-        friend_opponent_user_id=gameplay._friend_opponent_user_id,
+        friend_opponent_user_id=gameplay_helpers._friend_opponent_user_id,
         notify_opponent=gameplay._notify_opponent,
-        build_friend_plan_text=gameplay._build_friend_plan_text,
-        build_series_progress_text=gameplay._build_series_progress_text,
+        build_friend_plan_text=gameplay_views._build_friend_plan_text,
+        build_series_progress_text=gameplay_views._build_series_progress_text,
     )
 
 
@@ -79,10 +80,10 @@ async def handle_friend_challenge_series_next(callback: CallbackQuery) -> None:
         user_onboarding_service=gameplay.UserOnboardingService,
         game_session_service=gameplay.GameSessionService,
         resolve_opponent_label=gameplay._resolve_opponent_label,
-        friend_opponent_user_id=gameplay._friend_opponent_user_id,
+        friend_opponent_user_id=gameplay_helpers._friend_opponent_user_id,
         notify_opponent=gameplay._notify_opponent,
-        build_friend_plan_text=gameplay._build_friend_plan_text,
-        build_series_progress_text=gameplay._build_series_progress_text,
+        build_friend_plan_text=gameplay_views._build_friend_plan_text,
+        build_series_progress_text=gameplay_views._build_series_progress_text,
     )
 
 
@@ -96,8 +97,8 @@ async def handle_friend_challenge_share_result(callback: CallbackQuery) -> None:
         user_onboarding_service=gameplay.UserOnboardingService,
         game_session_service=gameplay.GameSessionService,
         resolve_opponent_label=gameplay._resolve_opponent_label,
-        build_friend_proof_card_text=gameplay._build_friend_proof_card_text,
-        build_friend_result_share_url=gameplay._build_friend_result_share_url,
+        build_friend_proof_card_text=gameplay_views._build_friend_proof_card_text,
+        build_friend_result_share_url=_build_friend_result_share_url,
         emit_analytics_event=gameplay.emit_analytics_event,
         event_source_bot=gameplay.EVENT_SOURCE_BOT,
     )
@@ -113,7 +114,18 @@ async def handle_friend_challenge_next(callback: CallbackQuery) -> None:
         user_onboarding_service=gameplay.UserOnboardingService,
         game_session_service=gameplay.GameSessionService,
         resolve_opponent_label=gameplay._resolve_opponent_label,
-        build_friend_score_text=gameplay._build_friend_score_text,
-        build_friend_ttl_text=gameplay._build_friend_ttl_text,
+        build_friend_score_text=gameplay_views._build_friend_score_text,
+        build_friend_ttl_text=gameplay_views._build_friend_ttl_text,
         send_friend_round_question=gameplay._send_friend_round_question,
+    )
+
+
+async def _build_friend_result_share_url(
+    callback: CallbackQuery,
+    *,
+    proof_card_text: str,
+) -> str | None:
+    return await friend_challenge_result_share.build_result_share_url(
+        callback=callback,
+        proof_card_text=proof_card_text,
     )
