@@ -170,31 +170,45 @@ async def handle_mode(callback: CallbackQuery) -> None:
 async def handle_answer(callback: CallbackQuery) -> None:
     await answer_flow.handle_answer(
         callback,
+        context=_build_answer_flow_context(),
+    )
+
+
+def _build_answer_flow_context() -> answer_flow.AnswerFlowContext:
+    return answer_flow.AnswerFlowContext(
         parse_answer_callback=gameplay_callbacks.parse_answer_callback,
-        session_local=SessionLocal,
-        user_onboarding_service=UserOnboardingService,
-        game_session_service=GameSessionService,
-        referral_service=ReferralService,
-        channel_bonus_service=ChannelBonusService,
-        offer_service=OfferService,
-        offer_logging_error=OfferLoggingError,
-        build_question_text=_build_question_text,
-        emit_analytics_event=emit_analytics_event,
-        event_source_bot=EVENT_SOURCE_BOT,
-        continue_regular_mode_after_answer=play_flow.continue_regular_mode_after_answer,
-        handle_daily_answer_branch=daily_flow.handle_daily_answer_branch,
-        handle_friend_answer_branch=friend_answer_flow.handle_friend_answer_branch,
-        resolve_opponent_label=_resolve_opponent_label,
-        notify_opponent=_notify_opponent,
-        friend_opponent_user_id=_friend_opponent_user_id,
-        build_friend_score_text=_build_friend_score_text,
-        build_friend_ttl_text=_build_friend_ttl_text,
-        build_friend_finish_text=_build_friend_finish_text,
-        build_public_badge_label=_build_public_badge_label,
-        build_friend_proof_card_text=_build_friend_proof_card_text,
-        enqueue_friend_challenge_proof_cards=gameplay_proof_cards.enqueue_duel_proof_cards,
-        build_series_progress_text=_build_series_progress_text,
-        send_friend_round_question=_send_friend_round_question,
+        services=answer_flow.AnswerFlowServices(
+            session_local=SessionLocal,
+            user_onboarding_service=UserOnboardingService,
+            referral_service=ReferralService,
+            channel_bonus_service=ChannelBonusService,
+            game_session_service=GameSessionService,
+            offer_service=OfferService,
+            offer_logging_error=OfferLoggingError,
+        ),
+        analytics=answer_flow.AnswerFlowAnalytics(
+            emit_event=emit_analytics_event,
+            event_source_bot=EVENT_SOURCE_BOT,
+        ),
+        branches=answer_flow.AnswerFlowBranches(
+            continue_regular_mode_after_answer=play_flow.continue_regular_mode_after_answer,
+            handle_daily_answer_branch=daily_flow.handle_daily_answer_branch,
+            handle_friend_answer_branch=friend_answer_flow.handle_friend_answer_branch,
+            notify_opponent=_notify_opponent,
+            enqueue_friend_challenge_proof_cards=gameplay_proof_cards.enqueue_duel_proof_cards,
+            send_friend_round_question=_send_friend_round_question,
+        ),
+        rendering=answer_flow.AnswerFlowRendering(
+            build_question_text=_build_question_text,
+            resolve_opponent_label=_resolve_opponent_label,
+            friend_opponent_user_id=_friend_opponent_user_id,
+            build_friend_score_text=_build_friend_score_text,
+            build_friend_ttl_text=_build_friend_ttl_text,
+            build_friend_finish_text=_build_friend_finish_text,
+            build_public_badge_label=_build_public_badge_label,
+            build_friend_proof_card_text=_build_friend_proof_card_text,
+            build_series_progress_text=_build_series_progress_text,
+        ),
     )
 
 
