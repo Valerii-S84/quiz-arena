@@ -40,5 +40,5 @@ class ArenaAttemptsRepo:
         row = result.one_or_none()
         if row is None:
             return None
-        attempt, duel = row.t
+        attempt, duel = row._t
         return ArenaAttemptStartContext(attempt=attempt, duel=duel)
