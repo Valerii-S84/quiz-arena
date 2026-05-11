@@ -46,6 +46,32 @@ async def emit_notification_event(
     )
 
 
+async def emit_deadline_notification_events(
+    session: AsyncSession,
+    *,
+    now_utc: datetime,
+    reminder_events: list[DeadlinePayload],
+    expired_notice_events: list[DeadlinePayload],
+    emit_event: AnalyticsEmitter,
+) -> None:
+    for payload in reminder_events:
+        await emit_notification_event(
+            session,
+            event_type="friend_challenge_last_chance_sent",
+            payload=payload,
+            happened_at=now_utc,
+            emit_event=emit_event,
+        )
+    for payload in expired_notice_events:
+        await emit_notification_event(
+            session,
+            event_type="friend_challenge_expired_notice_sent",
+            payload=payload,
+            happened_at=now_utc,
+            emit_event=emit_event,
+        )
+
+
 def _build_expired_analytics_payload(item: DeadlinePayload) -> DeadlinePayload:
     expires_at = item["expires_at"]
     if not isinstance(expires_at, datetime):

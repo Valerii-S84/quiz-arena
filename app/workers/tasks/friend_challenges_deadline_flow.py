@@ -13,8 +13,8 @@ from app.workers.tasks.friend_challenges_deadline_decisions import (
 )
 from app.workers.tasks.friend_challenges_deadline_events import (
     AnalyticsEmitter,
+    emit_deadline_notification_events,
     emit_duel_expired_event,
-    emit_notification_event,
 )
 from app.workers.tasks.friend_challenges_deadline_types import (
     DeadlineNotificationResult,
@@ -161,32 +161,8 @@ async def emit_notification_events(
     async with session_factory.begin() as session:
         await emit_deadline_notification_events(
             session,
-            context=context,
-            notification_result=notification_result,
-            emit_event=emit_event,
-        )
-
-
-async def emit_deadline_notification_events(
-    session: AsyncSession,
-    *,
-    context: FriendChallengeDeadlineContext,
-    notification_result: DeadlineNotificationResult,
-    emit_event: AnalyticsEmitter,
-) -> None:
-    for payload in notification_result.reminder_events:
-        await emit_notification_event(
-            session,
-            event_type="friend_challenge_last_chance_sent",
-            payload=payload,
-            happened_at=context.now_utc,
-            emit_event=emit_event,
-        )
-    for payload in notification_result.expired_notice_events:
-        await emit_notification_event(
-            session,
-            event_type="friend_challenge_expired_notice_sent",
-            payload=payload,
-            happened_at=context.now_utc,
+            now_utc=context.now_utc,
+            reminder_events=notification_result.reminder_events,
+            expired_notice_events=notification_result.expired_notice_events,
             emit_event=emit_event,
         )

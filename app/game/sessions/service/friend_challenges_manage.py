@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -131,6 +132,41 @@ async def publish_friend_challenge_to_arena(
     friend_challenge_id: UUID,
     now_utc: datetime,
 ) -> ArenaDuelSnapshot:
+    from app.db.repo.arena_duels_repo import ArenaDuelsRepo
+
+    challenge = await _load_friend_challenge_for_arena_publish(
+        session,
+        user_id=user_id,
+        friend_challenge_id=friend_challenge_id,
+        now_utc=now_utc,
+    )
+    _ensure_friend_creator_baseline_publishable(challenge)
+    question_ids = _validate_arena_publish_question_ids(challenge.question_ids)
+    existing_snapshot = await _get_existing_arena_publish_snapshot(
+        session,
+        challenge=challenge,
+        now_utc=now_utc,
+        arena_duels_repo=ArenaDuelsRepo,
+    )
+    if existing_snapshot is not None:
+        return existing_snapshot
+
+    return await _create_arena_publish_from_friend_challenge(
+        session,
+        challenge=challenge,
+        question_ids=question_ids,
+        now_utc=now_utc,
+        arena_duels_repo=ArenaDuelsRepo,
+    )
+
+
+async def _load_friend_challenge_for_arena_publish(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    friend_challenge_id: UUID,
+    now_utc: datetime,
+) -> FriendChallenge:
     challenge = await FriendChallengesRepo.get_by_id_for_update(session, friend_challenge_id)
     if challenge is None:
         raise FriendChallengeNotFoundError
@@ -138,35 +174,67 @@ async def publish_friend_challenge_to_arena(
         status=challenge.status,
         has_opponent=challenge.opponent_user_id is not None,
     )
-    if _expire_friend_challenge_if_due(challenge=challenge, now_utc=now_utc):
-        await _emit_friend_challenge_expired_event(
-            session,
-            challenge=challenge,
-            happened_at=now_utc,
-            source=EVENT_SOURCE_BOT,
-        )
+    await _expire_friend_challenge_for_arena_publish(
+        session,
+        challenge=challenge,
+        now_utc=now_utc,
+    )
     _ensure_friend_challenge_can_publish_to_arena(challenge=challenge, user_id=user_id)
+    return challenge
 
-    from app.db.repo.arena_duels_repo import ArenaDuelsRepo
 
+async def _expire_friend_challenge_for_arena_publish(
+    session: AsyncSession,
+    *,
+    challenge: FriendChallenge,
+    now_utc: datetime,
+) -> None:
+    if not _expire_friend_challenge_if_due(challenge=challenge, now_utc=now_utc):
+        return
+    await _emit_friend_challenge_expired_event(
+        session,
+        challenge=challenge,
+        happened_at=now_utc,
+        source=EVENT_SOURCE_BOT,
+    )
+
+
+def _ensure_friend_creator_baseline_publishable(challenge: FriendChallenge) -> None:
     if _friend_creator_baseline_needs_play(challenge):
         raise FriendChallengeArenaPublishBaselineRequiredError
     if not _friend_creator_baseline_is_ready(challenge):
         raise FriendChallengeAccessError
-    question_ids = _validate_arena_publish_question_ids(challenge.question_ids)
 
-    existing = await ArenaDuelsRepo.get_source_friend_duel_with_baseline_for_update(
+
+async def _get_existing_arena_publish_snapshot(
+    session: AsyncSession,
+    *,
+    challenge: FriendChallenge,
+    now_utc: datetime,
+    arena_duels_repo: Any,
+) -> ArenaDuelSnapshot | None:
+    existing = await arena_duels_repo.get_source_friend_duel_with_baseline_for_update(
         session,
         source_friend_challenge_id=challenge.id,
     )
-    if existing is not None:
-        if existing.duel.status != ARENA_DUEL_STATUS_ACTIVE or existing.duel.expires_at <= now_utc:
-            raise FriendChallengeAccessError
-        return _build_arena_duel_snapshot(
-            duel=existing.duel,
-            baseline_attempt=existing.baseline_attempt,
-        )
+    if existing is None:
+        return None
+    if existing.duel.status != ARENA_DUEL_STATUS_ACTIVE or existing.duel.expires_at <= now_utc:
+        raise FriendChallengeAccessError
+    return _build_arena_duel_snapshot(
+        duel=existing.duel,
+        baseline_attempt=existing.baseline_attempt,
+    )
 
+
+async def _create_arena_publish_from_friend_challenge(
+    session: AsyncSession,
+    *,
+    challenge: FriendChallenge,
+    question_ids: tuple[str, ...],
+    now_utc: datetime,
+    arena_duels_repo: Any,
+) -> ArenaDuelSnapshot:
     access_type = str(challenge.access_type)
     DuelLimitService.assert_resolved_access_type(ARENA_SOURCE, access_type=access_type)
     baseline_time_ms = await QuizSessionsRepo.sum_completed_duration_ms_for_friend_challenge_user(
@@ -174,35 +242,23 @@ async def publish_friend_challenge_to_arena(
         friend_challenge_id=challenge.id,
         user_id=challenge.creator_user_id,
     )
-    duel = await ArenaDuelsRepo.create_duel(
+    duel = await arena_duels_repo.create_duel(
         session,
-        duel=ArenaDuel(
-            id=uuid4(),
-            creator_user_id=challenge.creator_user_id,
-            baseline_attempt_id=None,
-            question_ids=list(question_ids),
-            mode_code=challenge.mode_code,
+        duel=_build_arena_publish_duel(
+            challenge=challenge,
+            question_ids=question_ids,
             access_type=access_type,
-            status=ARENA_DUEL_STATUS_ACTIVE,
-            expires_at=arena_duel_expires_at(now_utc=now_utc),
-            created_at=now_utc,
-            updated_at=now_utc,
-            source_friend_challenge_id=challenge.id,
+            now_utc=now_utc,
         ),
     )
-    baseline_attempt = await ArenaDuelsRepo.create_attempt(
+    baseline_attempt = await arena_duels_repo.create_attempt(
         session,
-        attempt=ArenaAttempt(
-            id=uuid4(),
-            arena_duel_id=duel.id,
-            user_id=challenge.creator_user_id,
-            role=ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+        attempt=_build_arena_publish_baseline_attempt(
+            duel=duel,
+            challenge=challenge,
             access_type=access_type,
-            score=int(challenge.creator_score),
-            time_ms=baseline_time_ms,
-            result=ARENA_ATTEMPT_RESULT_BASELINE,
-            completed_at=challenge.creator_finished_at,
-            created_at=now_utc,
+            baseline_time_ms=baseline_time_ms,
+            now_utc=now_utc,
         ),
     )
     duel.baseline_attempt_id = baseline_attempt.id
@@ -210,6 +266,50 @@ async def publish_friend_challenge_to_arena(
     return _build_arena_duel_snapshot(
         duel=duel,
         baseline_attempt=baseline_attempt,
+    )
+
+
+def _build_arena_publish_duel(
+    *,
+    challenge: FriendChallenge,
+    question_ids: tuple[str, ...],
+    access_type: str,
+    now_utc: datetime,
+) -> ArenaDuel:
+    return ArenaDuel(
+        id=uuid4(),
+        creator_user_id=challenge.creator_user_id,
+        baseline_attempt_id=None,
+        question_ids=list(question_ids),
+        mode_code=challenge.mode_code,
+        access_type=access_type,
+        status=ARENA_DUEL_STATUS_ACTIVE,
+        expires_at=arena_duel_expires_at(now_utc=now_utc),
+        created_at=now_utc,
+        updated_at=now_utc,
+        source_friend_challenge_id=challenge.id,
+    )
+
+
+def _build_arena_publish_baseline_attempt(
+    *,
+    duel: ArenaDuel,
+    challenge: FriendChallenge,
+    access_type: str,
+    baseline_time_ms: int,
+    now_utc: datetime,
+) -> ArenaAttempt:
+    return ArenaAttempt(
+        id=uuid4(),
+        arena_duel_id=duel.id,
+        user_id=challenge.creator_user_id,
+        role=ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
+        access_type=access_type,
+        score=int(challenge.creator_score),
+        time_ms=baseline_time_ms,
+        result=ARENA_ATTEMPT_RESULT_BASELINE,
+        completed_at=challenge.creator_finished_at,
+        created_at=now_utc,
     )
 
 
