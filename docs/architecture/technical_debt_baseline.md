@@ -14,7 +14,7 @@ publishing are owned by the standalone `quiz-arena-frontend` repository.
 | `app/` Python files over 250 lines | 10 |
 | `app/` Python files over 280 lines | 1 |
 | Production functions/methods over 60 lines | 104 |
-| Functions/methods with more than 7 parameters | 75 |
+| Functions/methods with more than 7 parameters | 74 |
 | Functions/methods with nesting deeper than 3 | 16 |
 | Test files over 400 lines | 1 |
 
@@ -27,7 +27,7 @@ publishing are owned by the standalone `quiz-arena-frontend` repository.
 | `app/` Python files over 250 lines | 12 | 10 | -2 |
 | `app/` Python files over 280 lines | 3 | 1 | -2 |
 | Production functions/methods over 60 lines | 108 | 104 | -4 |
-| Functions/methods with more than 7 parameters | 76 | 75 | -1 |
+| Functions/methods with more than 7 parameters | 76 | 74 | -2 |
 | Functions/methods with nesting deeper than 3 | 19 | 16 | -3 |
 | Test files over 400 lines | 1 | 1 | 0 |
 
@@ -86,14 +86,9 @@ Commands run on 2026-05-11:
 | Command | Result |
 |---|---|
 | `bash scripts/check_line_limits.sh` | Passed with legacy warnings. |
-| `.venv/bin/python scripts/check_architecture_debt.py` | Failed: one new architecture debt item. |
+| `.venv/bin/python scripts/check_architecture_debt.py` | Passed with legacy warnings. |
 | `bash scripts/check_architecture_imports.sh` | Passed. |
 | `bash scripts/check_import_cycles.sh` | Passed. |
-
-Current failing debt guard item:
-
-- `app/game/sessions/service/friend_challenges_arena_publish.py::publish_friend_challenge_to_arena_impl`
-  has `8` parameters, exceeding the `7` parameter guard.
 
 ## Guard Policy
 
