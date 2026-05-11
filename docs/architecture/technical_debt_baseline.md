@@ -1,6 +1,6 @@
 # Technical Debt Baseline
 
-Date: 2026-05-10
+Date: 2026-05-11
 
 Scope: backend repository only. Frontend source, frontend CI, and frontend image
 publishing are owned by the standalone `quiz-arena-frontend` repository.
@@ -9,26 +9,91 @@ publishing are owned by the standalone `quiz-arena-frontend` repository.
 
 | Metric | Count |
 |---|---:|
-| `app/` Python files over 200 lines | 39 |
-| `app/` Python files over 220 lines | 18 |
-| `app/` Python files over 250 lines | 12 |
-| `app/` Python files over 280 lines | 3 |
-| Production functions/methods over 60 lines | 108 |
-| Functions/methods with more than 7 parameters | 76 |
-| Functions/methods with nesting deeper than 3 | 19 |
+| `app/` Python files over 200 lines | 35 |
+| `app/` Python files over 220 lines | 16 |
+| `app/` Python files over 250 lines | 10 |
+| `app/` Python files over 280 lines | 1 |
+| Production functions/methods over 60 lines | 104 |
+| Functions/methods with more than 7 parameters | 75 |
+| Functions/methods with nesting deeper than 3 | 16 |
 | Test files over 400 lines | 1 |
 
-## Hotspots
+## Progress Since 2026-05-10 Baseline
 
-| File or function | Signal |
+| Metric | 2026-05-10 | 2026-05-11 | Delta |
+|---|---:|---:|---:|
+| `app/` Python files over 200 lines | 39 | 35 | -4 |
+| `app/` Python files over 220 lines | 18 | 16 | -2 |
+| `app/` Python files over 250 lines | 12 | 10 | -2 |
+| `app/` Python files over 280 lines | 3 | 1 | -2 |
+| Production functions/methods over 60 lines | 108 | 104 | -4 |
+| Functions/methods with more than 7 parameters | 76 | 75 | -1 |
+| Functions/methods with nesting deeper than 3 | 19 | 16 | -3 |
+| Test files over 400 lines | 1 | 1 | 0 |
+
+Recent refactors removed these previous top hotspots from the current top list:
+
+- `app/bot/handlers/gameplay_duels.py`: `298` lines to `173` lines.
+- `app/game/sessions/service/friend_challenges_manage.py`: `286` lines to `137`
+  lines.
+- `app/workers/tasks/friend_challenges_async.py::run_friend_challenge_deadlines_async`:
+  no longer reports as a function over `60` lines or nesting deeper than `3`.
+
+## Current Hotspots
+
+Ranked by remaining size, function length, parameter count, nesting depth, and
+runtime risk.
+
+| Rank | File or function | Signal |
+|---:|---|---|
+| 1 | `app/db/repo/analytics_mutations.py` | `287` lines; largest remaining `app/` file. |
+| 2 | `app/bot/handlers/gameplay_views_friend.py` | `276` lines; bot handler/view surface. |
+| 3 | `app/game/questions/runtime_bank_mode_select.py` | `270` lines; question selection runtime path. |
+| 4 | `app/bot/handlers/payments.py` | `264` lines; `handle_buy` is `116` lines. |
+| 5 | `app/workers/tasks/tournaments_proof_cards_delivery.py` | `264` lines; `deliver_proof_cards` is `136` lines with `13` parameters. |
+| 6 | `app/bot/handlers/start_friend_challenge_flow.py::handle_start_friend_challenge_payload` | `167` lines, `12` parameters. |
+| 7 | `app/economy/promo/service.py::PromoService.redeem` | `152` lines in economy/promo write path. |
+| 8 | `app/game/sessions/service/sessions_submit_friend_challenge.py::_apply_friend_challenge_answer` | `146` lines, nesting `5`. |
+| 9 | `app/game/sessions/service/friend_challenges_rounds.py::start_friend_challenge_round` | `143` lines; file is `221` lines. |
+| 10 | `app/bot/handlers/gameplay_flows/play_flow.py::continue_regular_mode_after_answer` | `110` lines, `10` parameters, nesting `5`. |
+| 11 | `tests/game/test_sessions_start_arena.py` | `403` lines; only test file over `400`. |
+
+## Current Files Over 220 Lines
+
+| File | Lines |
+|---|---:|
+| `app/db/repo/analytics_mutations.py` | 287 |
+| `app/bot/handlers/gameplay_views_friend.py` | 276 |
+| `app/game/questions/runtime_bank_mode_select.py` | 270 |
+| `app/bot/handlers/payments.py` | 264 |
+| `app/workers/tasks/tournaments_proof_cards_delivery.py` | 264 |
+| `app/bot/handlers/gameplay_flows/play_flow.py` | 257 |
+| `app/economy/energy/energy_consume.py` | 257 |
+| `app/game/sessions/service/sessions_submit_daily.py` | 253 |
+| `app/game/sessions/service/daily_question_sets.py` | 251 |
+| `app/workers/tasks/arena_duels.py` | 251 |
+| `app/game/sessions/service/sessions_submit_friend_challenge.py` | 248 |
+| `app/api/routes/admin/promo_models.py` | 238 |
+| `app/services/analytics_daily.py` | 233 |
+| `app/bot/handlers/gameplay_flows/friend_lobby_flow.py` | 226 |
+| `app/bot/texts/de.py` | 223 |
+| `app/game/sessions/service/friend_challenges_rounds.py` | 221 |
+
+## Architecture Guard Status
+
+Commands run on 2026-05-11:
+
+| Command | Result |
 |---|---|
-| `app/bot/handlers/gameplay_duels.py` | 298 lines, 61.21% coverage |
-| `app/db/repo/analytics_mutations.py` | 287 lines, 62.90% coverage |
-| `app/game/sessions/service/friend_challenges_manage.py` | 286 lines, 89.40% coverage |
-| `app/bot/handlers/gameplay_flows/answer_flow.py::handle_answer` | 189 lines, 26 parameters |
-| `app/workers/tasks/friend_challenges_async.py::run_friend_challenge_deadlines_async` | 171 lines, nesting 5 |
-| `app/bot/handlers/gameplay_flows/friend_answer_flow.py::handle_friend_answer_branch` | 169 lines, 17 parameters |
-| `tests/game/test_sessions_start_arena.py` | 404 lines |
+| `bash scripts/check_line_limits.sh` | Passed with legacy warnings. |
+| `.venv/bin/python scripts/check_architecture_debt.py` | Failed: one new architecture debt item. |
+| `bash scripts/check_architecture_imports.sh` | Passed. |
+| `bash scripts/check_import_cycles.sh` | Passed. |
+
+Current failing debt guard item:
+
+- `app/game/sessions/service/friend_challenges_arena_publish.py::publish_friend_challenge_to_arena_impl`
+  has `8` parameters, exceeding the `7` parameter guard.
 
 ## Guard Policy
 
