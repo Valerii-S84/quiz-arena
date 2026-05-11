@@ -107,8 +107,14 @@ def count_lines(content: str) -> int:
 
 def max_nesting(node: ast.AST, depth: int = 0) -> int:
     current = depth + 1 if isinstance(node, NESTING_NODES) else depth
+    children = (
+        child
+        for child in ast.iter_child_nodes(node)
+        if not isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+    )
     return max(
-        (max_nesting(child, current) for child in ast.iter_child_nodes(node)), default=current
+        (max_nesting(child, current) for child in children),
+        default=current,
     )
 
 
