@@ -4,21 +4,22 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.bot.handlers import gameplay, gameplay_views_question
+from app.bot.handlers import gameplay, gameplay_helpers, gameplay_views, gameplay_views_question
+from app.bot.keyboards.friend_challenge import build_friend_challenge_share_url
 from app.bot.texts.de import TEXTS_DE
 from tests.bot.gameplay_flow_fixtures import _challenge_snapshot, _start_result
 from tests.bot.helpers import DummyCallback, DummyMessage
 
 
 def test_format_user_label_prefers_username_then_first_name() -> None:
-    assert gameplay._format_user_label(username="alice", first_name="Alice") == "@alice"
-    assert gameplay._format_user_label(username=" ", first_name="Alice") == "Alice"
-    assert gameplay._format_user_label(username=None, first_name=" ") == "Freund"
+    assert gameplay_views._format_user_label(username="alice", first_name="Alice") == "@alice"
+    assert gameplay_views._format_user_label(username=" ", first_name="Alice") == "Alice"
+    assert gameplay_views._format_user_label(username=None, first_name=" ") == "Freund"
 
 
 def test_build_friend_score_text_handles_creator_and_completed_round() -> None:
     challenge = _challenge_snapshot(status="COMPLETED")
-    text = gameplay._build_friend_score_text(
+    text = gameplay_views._build_friend_score_text(
         challenge=challenge,
         user_id=10,
         opponent_label="Bob",
@@ -29,7 +30,7 @@ def test_build_friend_score_text_handles_creator_and_completed_round() -> None:
 
 
 def test_build_friend_finish_text_handles_win_and_draw() -> None:
-    win_text = gameplay._build_friend_finish_text(
+    win_text = gameplay_views._build_friend_finish_text(
         challenge=_challenge_snapshot(
             status="COMPLETED",
             winner_user_id=10,
@@ -37,12 +38,12 @@ def test_build_friend_finish_text_handles_win_and_draw() -> None:
         user_id=10,
         opponent_label="Bob",
     )
-    draw_text = gameplay._build_friend_finish_text(
+    draw_text = gameplay_views._build_friend_finish_text(
         challenge=_challenge_snapshot(status="COMPLETED", winner_user_id=None),
         user_id=10,
         opponent_label="Bob",
     )
-    expired_text = gameplay._build_friend_finish_text(
+    expired_text = gameplay_views._build_friend_finish_text(
         challenge=_challenge_snapshot(status="EXPIRED", winner_user_id=None),
         user_id=10,
         opponent_label="Bob",
@@ -61,7 +62,7 @@ def test_build_friend_finish_text_shows_time_tie_break() -> None:
     challenge.creator_time_ms = 61_000
     challenge.opponent_time_ms = 52_000
 
-    text = gameplay._build_friend_finish_text(
+    text = gameplay_views._build_friend_finish_text(
         challenge=challenge,
         user_id=10,
         opponent_label="Bob",
@@ -74,7 +75,7 @@ def test_build_friend_finish_text_shows_time_tie_break() -> None:
 
 
 def test_build_friend_proof_card_text_includes_winner_score_and_signature() -> None:
-    proof_text = gameplay._build_friend_proof_card_text(
+    proof_text = gameplay_views._build_friend_proof_card_text(
         challenge=_challenge_snapshot(status="COMPLETED", winner_user_id=10),
         user_id=10,
         opponent_label="Bob",
@@ -191,7 +192,7 @@ def test_build_question_text_uses_daily_arena_cup_header_override() -> None:
 
 
 def test_build_friend_plan_text_hides_level_mix() -> None:
-    text = gameplay._build_friend_plan_text(total_rounds=12)
+    text = gameplay_views._build_friend_plan_text(total_rounds=12)
 
     assert text == "12 Fragen. Keine Energie-Kosten."
     assert "A1" not in text
@@ -208,7 +209,7 @@ async def test_build_friend_invite_link_returns_none_on_bot_error() -> None:
         from_user=SimpleNamespace(id=1),
         message=message,
     )
-    assert await gameplay._build_friend_invite_link(callback, invite_token="abc") is None
+    assert await gameplay_helpers._build_friend_invite_link(callback, invite_token="abc") is None
 
 
 @pytest.mark.asyncio
@@ -220,9 +221,11 @@ async def test_build_friend_result_share_url_returns_none_on_bot_error() -> None
         from_user=SimpleNamespace(id=1),
         message=message,
     )
-    share_url = await gameplay._build_friend_result_share_url(
+    share_url = await gameplay_helpers._build_friend_result_share_url(
         callback,
         proof_card_text="proof card",
+        share_cta_text=TEXTS_DE["msg.friend.challenge.proof.share.cta"],
+        build_share_url=build_friend_challenge_share_url,
     )
     assert share_url is None
 
@@ -234,7 +237,7 @@ async def test_build_friend_invite_link_uses_public_bot_username() -> None:
         from_user=SimpleNamespace(id=1),
         message=DummyMessage(),
     )
-    invite_link = await gameplay._build_friend_invite_link(
+    invite_link = await gameplay_helpers._build_friend_invite_link(
         callback,
         challenge_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
     )
@@ -250,9 +253,11 @@ async def test_build_friend_result_share_url_uses_public_bot_link() -> None:
         from_user=SimpleNamespace(id=1),
         message=DummyMessage(),
     )
-    share_url = await gameplay._build_friend_result_share_url(
+    share_url = await gameplay_helpers._build_friend_result_share_url(
         callback,
         proof_card_text="proof card",
+        share_cta_text=TEXTS_DE["msg.friend.challenge.proof.share.cta"],
+        build_share_url=build_friend_challenge_share_url,
     )
     assert share_url is not None
     assert "https%3A%2F%2Ft.me%2FDeine_Deutsch_Quiz_bot" in share_url

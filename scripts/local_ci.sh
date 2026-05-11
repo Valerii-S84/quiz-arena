@@ -140,6 +140,7 @@ architecture_guards() {
   CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_line_limits.sh
   CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_growth_delta.sh
   CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_monolith_pattern.sh
+  "$PYTHON_BIN" scripts/check_architecture_debt.py "$BASE_REF"
   CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_no_print_app.sh
   CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_no_except_exception_pass.sh
   CI=1 FORCE_GROWTH_CHECK=1 BASE_REF="$BASE_REF" bash scripts/check_architecture_imports.sh
