@@ -7,6 +7,7 @@ from app.game.arena_duels.constants import ARENA_DUEL_STATUS_EXPIRED
 from app.game.friend_challenges.constants import (
     DUEL_STATUS_COMPLETED,
     DUEL_STATUS_CREATOR_DONE,
+    DUEL_STATUS_EXPIRED,
     DUEL_STATUS_WALKOVER,
     DUEL_TYPE_OPEN,
 )
@@ -97,6 +98,61 @@ async def test_publish_friend_challenge_to_arena_rejects_expired_duplicate_publi
             friend_challenge_id=current_challenge.id,
             now_utc=NOW_UTC,
         )
+
+
+@pytest.mark.asyncio
+async def test_publish_friend_challenge_to_arena_emits_expired_event_before_rejecting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    current_challenge = challenge(
+        status=DUEL_STATUS_CREATOR_DONE,
+        creator_user_id=11,
+        opponent_user_id=None,
+    )
+    emitted: list[dict[str, object]] = []
+
+    async def fake_emit_expired(*_args, **kwargs):
+        emitted.append(kwargs)
+
+    async def unexpected_source_lookup(*_args, **_kwargs):
+        pytest.fail("expired friend-duel must not reach Arena lookup")
+
+    def fake_expire(**_kwargs):
+        current_challenge.status = DUEL_STATUS_EXPIRED
+        return True
+
+    monkeypatch.setattr(
+        friend_challenges_manage.FriendChallengesRepo,
+        "get_by_id_for_update",
+        async_return(current_challenge),
+    )
+    monkeypatch.setattr(friend_challenges_manage, "_expire_friend_challenge_if_due", fake_expire)
+    monkeypatch.setattr(
+        friend_challenges_manage,
+        "_emit_friend_challenge_expired_event",
+        fake_emit_expired,
+    )
+    monkeypatch.setattr(
+        ArenaDuelsRepo,
+        "get_source_friend_duel_with_baseline_for_update",
+        unexpected_source_lookup,
+    )
+
+    with pytest.raises(FriendChallengeAccessError):
+        await friend_challenges_manage.publish_friend_challenge_to_arena(
+            SessionStub(),
+            user_id=11,
+            friend_challenge_id=current_challenge.id,
+            now_utc=NOW_UTC,
+        )
+
+    assert emitted == [
+        {
+            "challenge": current_challenge,
+            "happened_at": NOW_UTC,
+            "source": friend_challenges_manage.EVENT_SOURCE_BOT,
+        }
+    ]
 
 
 @pytest.mark.asyncio

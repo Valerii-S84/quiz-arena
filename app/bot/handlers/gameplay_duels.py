@@ -1,23 +1,17 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
 import app.bot.handlers.gameplay_flows.arena_duel_flow as arena_duel_flow
 import app.bot.handlers.gameplay_flows.arena_revanche_flow as arena_revanche_flow
-from app.bot.handlers import gameplay_callbacks, gameplay_helpers
-from app.bot.handlers.gameplay_views import _build_question_text
-from app.bot.keyboards.duels import (
-    build_arena_create_keyboard,
-    build_duels_menu_keyboard,
-    build_friend_duel_keyboard,
+from app.bot.handlers import gameplay_callbacks
+from app.bot.handlers.gameplay_flows import (
+    duels_arena_router_flow,
+    duels_menu_flow,
+    duels_revanche_router_flow,
 )
-from app.bot.keyboards.home import build_home_keyboard
-from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
-from app.game.arena_duels.accept import accept_arena_duel, get_arena_duel_accept_preview
 from app.game.arena_duels.analytics import (
     ARENA_EVENT_DUEL_MENU_OPENED,
     ARENA_EVENT_DUEL_MODE_SELECTED,
@@ -31,11 +25,6 @@ from app.game.arena_duels.revanche import (
     prepare_arena_revanche_request,
     record_arena_revanche_sent,
 )
-from app.game.arena_duels.service import (
-    create_arena_duel_baseline,
-    create_friend_challenge_from_arena_duel,
-    list_active_arena_duels,
-)
 from app.game.duels import rollout as duel_rollout
 from app.game.duels.constants import (
     ARENA_CREATE_CALLBACK,
@@ -45,198 +34,107 @@ from app.game.duels.constants import (
     DUEL_FRIEND_CALLBACK,
     DUEL_MENU_CALLBACK,
 )
-from app.game.duels.limits import DuelLimitService
-from app.game.sessions.service import GameSessionService
 from app.game.sessions.service.friend_challenges_manage import publish_friend_challenge_to_arena
 from app.services.user_onboarding import UserOnboardingService
 
+__all__ = [
+    "arena_duel_flow",
+    "arena_revanche_flow",
+    "build_arena_event_payload",
+    "cleanup_arena_revanche_request",
+    "load_arena_revanche_context",
+    "prepare_arena_revanche_request",
+    "publish_friend_challenge_to_arena",
+    "record_arena_revanche_sent",
+]
 
-async def _answer_duels_disabled(callback: CallbackQuery) -> None:
-    if callback.message is None:
-        await callback.answer(TEXTS_DE["msg.duels.disabled"], show_alert=True)
-        return
-    await callback.message.answer(
-        TEXTS_DE["msg.duels.disabled"],
-        reply_markup=build_home_keyboard(),
-    )
-    await callback.answer()
+
+async def _require_duels_enabled(callback: CallbackQuery) -> bool:
+    if duel_rollout.is_canonical_duels_enabled():
+        return True
+    await duels_menu_flow.answer_duels_disabled(callback)
+    return False
 
 
 async def handle_duels_menu(callback: CallbackQuery, *, emit_event: bool = False) -> None:
-    if not duel_rollout.is_canonical_duels_enabled():
-        await _answer_duels_disabled(callback)
+    if not await _require_duels_enabled(callback):
         return
-    if callback.message is None:
-        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
-        return
-    if emit_event:
-        await _emit_duel_callback_events(
-            callback,
-            events=((ARENA_EVENT_DUEL_MENU_OPENED, "menu"),),
-        )
-    await callback.message.answer(
-        TEXTS_DE["msg.duels.menu"],
-        reply_markup=build_duels_menu_keyboard(),
+    await duels_menu_flow.handle_duels_menu(
+        callback,
+        emit_event=emit_event,
+        session_local=SessionLocal,
+        user_onboarding_service=UserOnboardingService,
+        emit_arena_analytics_event=emit_arena_analytics_event,
+        duel_menu_opened_event=ARENA_EVENT_DUEL_MENU_OPENED,
     )
-    await callback.answer()
 
 
 async def handle_arena_open(callback: CallbackQuery) -> None:
-    if not duel_rollout.is_canonical_duels_enabled():
-        await _answer_duels_disabled(callback)
+    if not await _require_duels_enabled(callback):
         return
     if callback.data == DUEL_ARENA_CALLBACK:
-        await _emit_duel_callback_events(
+        await duels_menu_flow.emit_duel_callback_events(
             callback,
             events=((ARENA_EVENT_DUEL_MODE_SELECTED, "arena"),),
+            session_local=SessionLocal,
+            user_onboarding_service=UserOnboardingService,
+            emit_arena_analytics_event=emit_arena_analytics_event,
         )
-    await arena_duel_flow.handle_arena_open(
-        callback,
-        session_local=SessionLocal,
-        user_onboarding_service=UserOnboardingService,
-        list_active_arena_duels=list_active_arena_duels,
-    )
+    await duels_arena_router_flow.handle_arena_open(callback)
 
 
 async def handle_arena_create(callback: CallbackQuery) -> None:
-    if not duel_rollout.is_canonical_duels_enabled():
-        await _answer_duels_disabled(callback)
-        return
-    if callback.message is None:
-        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
-        return
-    await callback.message.answer(
-        TEXTS_DE["msg.duels.arena.create"],
-        reply_markup=build_arena_create_keyboard(),
-    )
-    await callback.answer()
+    if await _require_duels_enabled(callback):
+        await duels_arena_router_flow.handle_arena_create(callback)
 
 
 async def handle_arena_start_create(callback: CallbackQuery) -> None:
-    if not duel_rollout.is_canonical_duels_enabled():
-        await _answer_duels_disabled(callback)
-        return
-    await arena_duel_flow.handle_arena_start_create(
-        callback,
-        session_local=SessionLocal,
-        user_onboarding_service=UserOnboardingService,
-        resolve_arena_create_access_type=DuelLimitService.resolve_arena_create_access_type,
-        create_arena_duel_baseline=create_arena_duel_baseline,
-        build_question_text=_build_question_text,
-    )
+    if await _require_duels_enabled(callback):
+        await duels_arena_router_flow.handle_arena_start_create(callback)
 
 
 async def handle_arena_accept_preview(callback: CallbackQuery) -> None:
-    if not duel_rollout.is_canonical_duels_enabled():
-        await _answer_duels_disabled(callback)
-        return
-    await arena_duel_flow.handle_arena_accept_preview(
-        callback,
-        arena_accept_re=gameplay_callbacks.ARENA_ACCEPT_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        session_local=SessionLocal,
-        user_onboarding_service=UserOnboardingService,
-        get_arena_duel_accept_preview=get_arena_duel_accept_preview,
-    )
+    if await _require_duels_enabled(callback):
+        await duels_arena_router_flow.handle_arena_accept_preview(callback)
 
 
 async def handle_arena_start_attempt(callback: CallbackQuery) -> None:
-    if not duel_rollout.is_canonical_duels_enabled():
-        await _answer_duels_disabled(callback)
-        return
-    await arena_duel_flow.handle_arena_start_attempt(
-        callback,
-        arena_start_attempt_re=gameplay_callbacks.ARENA_START_ATTEMPT_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        session_local=SessionLocal,
-        user_onboarding_service=UserOnboardingService,
-        resolve_arena_accept_access_type=DuelLimitService.resolve_arena_accept_access_type,
-        accept_arena_duel=accept_arena_duel,
-        build_question_text=_build_question_text,
-    )
+    if await _require_duels_enabled(callback):
+        await duels_arena_router_flow.handle_arena_start_attempt(callback)
 
 
 async def handle_arena_publish_friend(callback: CallbackQuery) -> None:
-    if not duel_rollout.is_canonical_duels_enabled():
-        await _answer_duels_disabled(callback)
-        return
-    await arena_duel_flow.handle_arena_publish_friend(
-        callback,
-        arena_publish_friend_re=gameplay_callbacks.ARENA_PUBLISH_FRIEND_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        session_local=SessionLocal,
-        user_onboarding_service=UserOnboardingService,
-        publish_friend_challenge_to_arena=publish_friend_challenge_to_arena,
-        start_friend_challenge_round=GameSessionService.start_friend_challenge_round,
-        build_question_text=_build_question_text,
-    )
+    if await _require_duels_enabled(callback):
+        await duels_arena_router_flow.handle_arena_publish_friend(callback)
 
 
 async def handle_arena_challenge_friend(callback: CallbackQuery) -> None:
-    if not duel_rollout.is_canonical_duels_enabled():
-        await _answer_duels_disabled(callback)
-        return
-    await arena_duel_flow.handle_arena_challenge_friend(
-        callback,
-        arena_challenge_friend_re=gameplay_callbacks.ARENA_CHALLENGE_FRIEND_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        session_local=SessionLocal,
-        user_onboarding_service=UserOnboardingService,
-        create_friend_challenge_from_arena_duel=create_friend_challenge_from_arena_duel,
-        build_friend_invite_link=gameplay_helpers._build_friend_invite_link,
-    )
+    if await _require_duels_enabled(callback):
+        await duels_arena_router_flow.handle_arena_challenge_friend(callback)
 
 
 async def handle_arena_revanche_confirm(callback: CallbackQuery) -> None:
-    if not duel_rollout.is_canonical_duels_enabled():
-        await _answer_duels_disabled(callback)
-        return
-    await arena_revanche_flow.handle_arena_revanche_confirm(
-        callback,
-        arena_revanche_re=gameplay_callbacks.ARENA_REVANCHE_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        session_local=SessionLocal,
-        user_onboarding_service=UserOnboardingService,
-        load_arena_revanche_context=load_arena_revanche_context,
-    )
+    if await _require_duels_enabled(callback):
+        await duels_revanche_router_flow.handle_arena_revanche_confirm(callback)
 
 
 async def handle_arena_revanche_send(callback: CallbackQuery) -> None:
-    if not duel_rollout.is_canonical_duels_enabled():
-        await _answer_duels_disabled(callback)
-        return
-    await arena_revanche_flow.handle_arena_revanche_send(
-        callback,
-        arena_revanche_send_re=gameplay_callbacks.ARENA_REVANCHE_SEND_RE,
-        parse_uuid_callback=gameplay_callbacks.parse_uuid_callback,
-        session_local=SessionLocal,
-        user_onboarding_service=UserOnboardingService,
-        prepare_arena_revanche_request=prepare_arena_revanche_request,
-        record_arena_revanche_sent=record_arena_revanche_sent,
-        cleanup_arena_revanche_request=cleanup_arena_revanche_request,
-    )
+    if await _require_duels_enabled(callback):
+        await duels_revanche_router_flow.handle_arena_revanche_send(callback)
 
 
 async def handle_friend_duel_open(callback: CallbackQuery, *, emit_event: bool = False) -> None:
-    if not duel_rollout.is_canonical_duels_enabled():
-        await _answer_duels_disabled(callback)
+    if not await _require_duels_enabled(callback):
         return
-    if callback.message is None:
-        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
-        return
-    if emit_event:
-        await _emit_duel_callback_events(
-            callback,
-            events=(
-                (ARENA_EVENT_DUEL_MODE_SELECTED, "friend"),
-                (ARENA_EVENT_FRIEND_DUEL_OPENED, None),
-            ),
-        )
-    await callback.message.answer(
-        TEXTS_DE["msg.duels.friend"],
-        reply_markup=build_friend_duel_keyboard(),
+    await duels_menu_flow.handle_friend_duel_open(
+        callback,
+        emit_event=emit_event,
+        session_local=SessionLocal,
+        user_onboarding_service=UserOnboardingService,
+        emit_arena_analytics_event=emit_arena_analytics_event,
+        duel_mode_selected_event=ARENA_EVENT_DUEL_MODE_SELECTED,
+        friend_duel_opened_event=ARENA_EVENT_FRIEND_DUEL_OPENED,
     )
-    await callback.answer()
 
 
 async def _handle_duels_menu_registered(callback: CallbackQuery) -> None:
@@ -245,29 +143,6 @@ async def _handle_duels_menu_registered(callback: CallbackQuery) -> None:
 
 async def _handle_friend_duel_open_registered(callback: CallbackQuery) -> None:
     await handle_friend_duel_open(callback, emit_event=True)
-
-
-async def _emit_duel_callback_events(
-    callback: CallbackQuery,
-    *,
-    events: tuple[tuple[str, str | None], ...],
-) -> None:
-    if callback.from_user is None:
-        return
-    now_utc = datetime.now(timezone.utc)
-    async with SessionLocal.begin() as session:
-        snapshot = await UserOnboardingService.ensure_home_snapshot(
-            session,
-            telegram_user=callback.from_user,
-        )
-        for event_type, action in events:
-            await emit_arena_analytics_event(
-                session,
-                event_type=event_type,
-                happened_at=now_utc,
-                user_id=snapshot.user_id,
-                payload=build_arena_event_payload(user_id=snapshot.user_id, action=action),
-            )
 
 
 def register(router: Router) -> None:

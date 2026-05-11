@@ -1,42 +1,30 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
-from app.db.models.arena_duels import ArenaAttempt, ArenaDuel
 from app.db.models.friend_challenges import FriendChallenge
 from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
-from app.game.arena_duels.constants import (
-    ARENA_ATTEMPT_RESULT_BASELINE,
-    ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
-    ARENA_DUEL_STATUS_ACTIVE,
-    ARENA_SOURCE,
-    arena_duel_expires_at,
-)
-from app.game.arena_duels.errors import ArenaDuelAccessError
 from app.game.arena_duels.types import ArenaDuelSnapshot
-from app.game.duels.constants import DUEL_QUESTION_COUNT
-from app.game.duels.limits import DuelLimitService
 from app.game.friend_challenges.constants import (
     DUEL_STATUS_CANCELED,
     DUEL_STATUS_CREATOR_DONE,
     DUEL_STATUS_EXPIRED,
     DUEL_STATUS_PENDING,
-    DUEL_TYPE_DIRECT,
     DUEL_TYPE_OPEN,
     normalize_duel_status,
 )
-from app.game.sessions.errors import (
-    FriendChallengeAccessError,
-    FriendChallengeArenaPublishBaselineRequiredError,
-    FriendChallengeNotFoundError,
-)
+from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 from app.game.sessions.types import FriendChallengeSnapshot
 
+from .friend_challenges_arena_publish import (
+    ArenaPublishDependencies,
+    publish_friend_challenge_to_arena_impl,
+)
 from .friend_challenges_create import create_friend_challenge
 from .friend_challenges_internal import (
     _build_friend_challenge_snapshot,
@@ -131,105 +119,18 @@ async def publish_friend_challenge_to_arena(
     friend_challenge_id: UUID,
     now_utc: datetime,
 ) -> ArenaDuelSnapshot:
-    challenge = await FriendChallengesRepo.get_by_id_for_update(session, friend_challenge_id)
-    if challenge is None:
-        raise FriendChallengeNotFoundError
-    challenge.status = normalize_duel_status(
-        status=challenge.status,
-        has_opponent=challenge.opponent_user_id is not None,
-    )
-    if _expire_friend_challenge_if_due(challenge=challenge, now_utc=now_utc):
-        await _emit_friend_challenge_expired_event(
-            session,
-            challenge=challenge,
-            happened_at=now_utc,
-            source=EVENT_SOURCE_BOT,
-        )
-    _ensure_friend_challenge_can_publish_to_arena(challenge=challenge, user_id=user_id)
-
-    from app.db.repo.arena_duels_repo import ArenaDuelsRepo
-
-    if _friend_creator_baseline_needs_play(challenge):
-        raise FriendChallengeArenaPublishBaselineRequiredError
-    if not _friend_creator_baseline_is_ready(challenge):
-        raise FriendChallengeAccessError
-    question_ids = _validate_arena_publish_question_ids(challenge.question_ids)
-
-    existing = await ArenaDuelsRepo.get_source_friend_duel_with_baseline_for_update(
-        session,
-        source_friend_challenge_id=challenge.id,
-    )
-    if existing is not None:
-        if existing.duel.status != ARENA_DUEL_STATUS_ACTIVE or existing.duel.expires_at <= now_utc:
-            raise FriendChallengeAccessError
-        return _build_arena_duel_snapshot(
-            duel=existing.duel,
-            baseline_attempt=existing.baseline_attempt,
-        )
-
-    access_type = str(challenge.access_type)
-    DuelLimitService.assert_resolved_access_type(ARENA_SOURCE, access_type=access_type)
-    baseline_time_ms = await QuizSessionsRepo.sum_completed_duration_ms_for_friend_challenge_user(
-        session,
-        friend_challenge_id=challenge.id,
-        user_id=challenge.creator_user_id,
-    )
-    duel = await ArenaDuelsRepo.create_duel(
-        session,
-        duel=ArenaDuel(
-            id=uuid4(),
-            creator_user_id=challenge.creator_user_id,
-            baseline_attempt_id=None,
-            question_ids=list(question_ids),
-            mode_code=challenge.mode_code,
-            access_type=access_type,
-            status=ARENA_DUEL_STATUS_ACTIVE,
-            expires_at=arena_duel_expires_at(now_utc=now_utc),
-            created_at=now_utc,
-            updated_at=now_utc,
-            source_friend_challenge_id=challenge.id,
+    return await publish_friend_challenge_to_arena_impl(
+        session=session,
+        user_id=user_id,
+        friend_challenge_id=friend_challenge_id,
+        now_utc=now_utc,
+        dependencies=ArenaPublishDependencies(
+            friend_challenges_repo=FriendChallengesRepo,
+            quiz_sessions_repo=QuizSessionsRepo,
+            expire_friend_challenge_if_due=_expire_friend_challenge_if_due,
+            emit_friend_challenge_expired_event=_emit_friend_challenge_expired_event,
         ),
     )
-    baseline_attempt = await ArenaDuelsRepo.create_attempt(
-        session,
-        attempt=ArenaAttempt(
-            id=uuid4(),
-            arena_duel_id=duel.id,
-            user_id=challenge.creator_user_id,
-            role=ARENA_ATTEMPT_ROLE_CREATOR_BASELINE,
-            access_type=access_type,
-            score=int(challenge.creator_score),
-            time_ms=baseline_time_ms,
-            result=ARENA_ATTEMPT_RESULT_BASELINE,
-            completed_at=challenge.creator_finished_at,
-            created_at=now_utc,
-        ),
-    )
-    duel.baseline_attempt_id = baseline_attempt.id
-    await session.flush()
-    return _build_arena_duel_snapshot(
-        duel=duel,
-        baseline_attempt=baseline_attempt,
-    )
-
-
-def _ensure_friend_challenge_can_publish_to_arena(
-    *,
-    challenge: FriendChallenge,
-    user_id: int,
-) -> None:
-    if challenge.creator_user_id != user_id:
-        raise FriendChallengeAccessError
-    if challenge.opponent_user_id is not None:
-        raise FriendChallengeAccessError
-    if challenge.challenge_type != DUEL_TYPE_DIRECT:
-        raise FriendChallengeAccessError
-    if int(challenge.total_rounds) != DUEL_QUESTION_COUNT:
-        raise FriendChallengeAccessError
-    if challenge.status not in {DUEL_STATUS_PENDING, DUEL_STATUS_CREATOR_DONE}:
-        raise FriendChallengeAccessError
-    if challenge.tournament_match_id is not None:
-        raise FriendChallengeAccessError
 
 
 def _friend_challenge_can_be_canceled_by_creator(challenge: FriendChallenge) -> bool:
@@ -239,48 +140,3 @@ def _friend_challenge_can_be_canceled_by_creator(challenge: FriendChallenge) -> 
         DUEL_STATUS_PENDING,
         DUEL_STATUS_CREATOR_DONE,
     }
-
-
-def _friend_creator_baseline_is_ready(challenge: FriendChallenge) -> bool:
-    return (
-        int(challenge.total_rounds) == DUEL_QUESTION_COUNT
-        and int(challenge.creator_answered_round) >= DUEL_QUESTION_COUNT
-        and challenge.creator_finished_at is not None
-    )
-
-
-def _friend_creator_baseline_needs_play(challenge: FriendChallenge) -> bool:
-    return (
-        challenge.status == DUEL_STATUS_PENDING
-        and int(challenge.creator_answered_round) < DUEL_QUESTION_COUNT
-        and challenge.creator_finished_at is None
-    )
-
-
-def _validate_arena_publish_question_ids(question_ids: object) -> tuple[str, ...]:
-    if not isinstance(question_ids, list):
-        raise ArenaDuelAccessError
-    validated = tuple(question_id for question_id in question_ids if isinstance(question_id, str))
-    if len(validated) != DUEL_QUESTION_COUNT or any(not question_id for question_id in validated):
-        raise ArenaDuelAccessError
-    return validated
-
-
-def _build_arena_duel_snapshot(
-    *,
-    duel: ArenaDuel,
-    baseline_attempt: ArenaAttempt,
-) -> ArenaDuelSnapshot:
-    return ArenaDuelSnapshot(
-        duel_id=duel.id,
-        creator_user_id=duel.creator_user_id,
-        mode_code=duel.mode_code,
-        status=duel.status,
-        question_ids=_validate_arena_publish_question_ids(duel.question_ids),
-        baseline_attempt_id=baseline_attempt.id,
-        baseline_score=baseline_attempt.score,
-        baseline_time_ms=baseline_attempt.time_ms,
-        expires_at=duel.expires_at,
-        created_at=duel.created_at,
-        updated_at=duel.updated_at,
-    )
