@@ -21,7 +21,10 @@ from app.game.friend_challenges.constants import (
 from app.game.sessions.errors import FriendChallengeAccessError, FriendChallengeNotFoundError
 from app.game.sessions.types import FriendChallengeSnapshot
 
-from .friend_challenges_arena_publish import publish_friend_challenge_to_arena_impl
+from .friend_challenges_arena_publish import (
+    ArenaPublishDependencies,
+    publish_friend_challenge_to_arena_impl,
+)
 from .friend_challenges_create import create_friend_challenge
 from .friend_challenges_internal import (
     _build_friend_challenge_snapshot,
@@ -121,10 +124,12 @@ async def publish_friend_challenge_to_arena(
         user_id=user_id,
         friend_challenge_id=friend_challenge_id,
         now_utc=now_utc,
-        friend_challenges_repo=FriendChallengesRepo,
-        quiz_sessions_repo=QuizSessionsRepo,
-        expire_friend_challenge_if_due=_expire_friend_challenge_if_due,
-        emit_friend_challenge_expired_event=_emit_friend_challenge_expired_event,
+        dependencies=ArenaPublishDependencies(
+            friend_challenges_repo=FriendChallengesRepo,
+            quiz_sessions_repo=QuizSessionsRepo,
+            expire_friend_challenge_if_due=_expire_friend_challenge_if_due,
+            emit_friend_challenge_expired_event=_emit_friend_challenge_expired_event,
+        ),
     )
 
 

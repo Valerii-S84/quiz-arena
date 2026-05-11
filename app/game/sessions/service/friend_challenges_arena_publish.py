@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -30,16 +31,21 @@ from .friend_challenges_arena_publish_rules import (
 )
 
 
+@dataclass(frozen=True)
+class ArenaPublishDependencies:
+    friend_challenges_repo: Any
+    quiz_sessions_repo: Any
+    expire_friend_challenge_if_due: ExpireFriendChallenge
+    emit_friend_challenge_expired_event: EmitExpiredEvent
+
+
 async def publish_friend_challenge_to_arena_impl(
     session: AsyncSession,
     *,
     user_id: int,
     friend_challenge_id: UUID,
     now_utc: datetime,
-    friend_challenges_repo: Any,
-    quiz_sessions_repo: Any,
-    expire_friend_challenge_if_due: ExpireFriendChallenge,
-    emit_friend_challenge_expired_event: EmitExpiredEvent,
+    dependencies: ArenaPublishDependencies,
 ) -> ArenaDuelSnapshot:
     from app.db.repo.arena_duels_repo import ArenaDuelsRepo
 
@@ -48,9 +54,9 @@ async def publish_friend_challenge_to_arena_impl(
         user_id=user_id,
         friend_challenge_id=friend_challenge_id,
         now_utc=now_utc,
-        friend_challenges_repo=friend_challenges_repo,
-        expire_friend_challenge_if_due=expire_friend_challenge_if_due,
-        emit_friend_challenge_expired_event=emit_friend_challenge_expired_event,
+        friend_challenges_repo=dependencies.friend_challenges_repo,
+        expire_friend_challenge_if_due=dependencies.expire_friend_challenge_if_due,
+        emit_friend_challenge_expired_event=dependencies.emit_friend_challenge_expired_event,
     )
     ensure_friend_creator_baseline_publishable(challenge)
     question_ids = validate_arena_publish_question_ids(challenge.question_ids)
@@ -69,7 +75,7 @@ async def publish_friend_challenge_to_arena_impl(
         question_ids=question_ids,
         now_utc=now_utc,
         arena_duels_repo=ArenaDuelsRepo,
-        quiz_sessions_repo=quiz_sessions_repo,
+        quiz_sessions_repo=dependencies.quiz_sessions_repo,
     )
 
 
