@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from app.workers.tasks import tournaments_proof_cards_delivery as delivery
+from app.workers.tasks import tournaments_proof_cards_sender as sender
 from tests.game.tournaments_unit_support import NOW_UTC, participant_row, tournament_row
 from tests.workers.payments_reliability_async_support import SessionLocalStub
 
@@ -24,29 +25,37 @@ async def test_load_proof_card_context_filters_invalid_and_user_specific() -> No
 
     assert (
         await delivery.load_proof_card_context(
-            session=object(),
-            parsed_tournament_id=tournament.id,
-            user_id=None,
-            tournaments_repo=SimpleNamespace(get_by_id=_async_return(None)),
-            participants_repo=object(),
-            users_repo=object(),
-            format_points_fn=str,
-            format_tournament_format_fn=str,
-            format_user_label_fn=lambda **_kwargs: "label",
+            request=delivery.TournamentProofCardContextRequest(
+                session=object(),
+                parsed_tournament_id=tournament.id,
+                user_id=None,
+            ),
+            services=delivery.TournamentProofCardContextServices(
+                tournaments_repo=SimpleNamespace(get_by_id=_async_return(None)),
+                participants_repo=object(),
+                users_repo=object(),
+                format_points_fn=str,
+                format_tournament_format_fn=str,
+                format_user_label_fn=lambda **_kwargs: "label",
+            ),
         )
         is None
     )
 
     context = await delivery.load_proof_card_context(
-        session=object(),
-        parsed_tournament_id=tournament.id,
-        user_id=22,
-        tournaments_repo=SimpleNamespace(get_by_id=_async_return(tournament)),
-        participants_repo=SimpleNamespace(list_for_tournament=_async_return(participants)),
-        users_repo=SimpleNamespace(list_by_ids=_async_return(users)),
-        format_points_fn=lambda value: f"{value:g}",
-        format_tournament_format_fn=lambda value: value,
-        format_user_label_fn=lambda username, first_name: username or first_name,
+        request=delivery.TournamentProofCardContextRequest(
+            session=object(),
+            parsed_tournament_id=tournament.id,
+            user_id=22,
+        ),
+        services=delivery.TournamentProofCardContextServices(
+            tournaments_repo=SimpleNamespace(get_by_id=_async_return(tournament)),
+            participants_repo=SimpleNamespace(list_for_tournament=_async_return(participants)),
+            users_repo=SimpleNamespace(list_by_ids=_async_return(users)),
+            format_points_fn=lambda value: f"{value:g}",
+            format_tournament_format_fn=lambda value: value,
+            format_user_label_fn=lambda username, first_name: username or first_name,
+        ),
     )
 
     assert context is not None
@@ -68,22 +77,24 @@ async def test_deliver_proof_cards_sends_cached_and_rendered_cards(
     context = _context(tournament=tournament, participants=rows)
     bot = _Bot()
     repo = _ParticipantsRepo(rows)
-    monkeypatch.setattr(
-        delivery, "BufferedInputFile", lambda content, filename: (content, filename)
-    )
+    monkeypatch.setattr(sender, "BufferedInputFile", lambda content, filename: (content, filename))
 
     result = await delivery.deliver_proof_cards(
-        context=context,
-        tournament_id=str(tournament.id),
-        now_utc=NOW_UTC,
-        session_factory=SessionLocalStub(),
-        participants_repo=repo,
-        build_bot_fn=lambda: bot,
-        build_caption_fn=lambda **kwargs: f"#{kwargs['place']} {kwargs['points']}",
-        render_card_fn=lambda **_kwargs: b"png",
-        explicit_resend=False,
-        logger=SimpleNamespace(
-            warning=lambda *_args, **_kwargs: None, info=lambda *_args, **_kwargs: None
+        request=delivery.TournamentProofCardDeliveryRequest(
+            context=context,
+            tournament_id=str(tournament.id),
+            now_utc=NOW_UTC,
+            explicit_resend=False,
+        ),
+        services=delivery.TournamentProofCardDeliveryServices(
+            session_factory=SessionLocalStub(),
+            participants_repo=repo,
+            build_bot_fn=lambda: bot,
+            build_caption_fn=lambda **kwargs: f"#{kwargs['place']} {kwargs['points']}",
+            render_card_fn=lambda **_kwargs: b"png",
+            logger=SimpleNamespace(
+                warning=lambda *_args, **_kwargs: None, info=lambda *_args, **_kwargs: None
+            ),
         ),
     )
 
@@ -106,18 +117,24 @@ async def test_deliver_proof_cards_queues_retry_after_lock_skip() -> None:
         return True
 
     result = await delivery.deliver_proof_cards(
-        context=_context(tournament=tournament, participants=[row]),
-        tournament_id=str(tournament.id),
-        now_utc=NOW_UTC,
-        session_factory=SessionLocalStub(),
-        participants_repo=SimpleNamespace(get_for_tournament_user_for_update=_async_return(None)),
-        build_bot_fn=lambda: _Bot(),
-        build_caption_fn=lambda **_kwargs: "caption",
-        render_card_fn=lambda **_kwargs: b"png",
-        explicit_resend=False,
-        enqueue_retry_fn=_enqueue_retry,
-        logger=SimpleNamespace(
-            warning=lambda *_args, **_kwargs: None, info=lambda *_args, **_kwargs: None
+        request=delivery.TournamentProofCardDeliveryRequest(
+            context=_context(tournament=tournament, participants=[row]),
+            tournament_id=str(tournament.id),
+            now_utc=NOW_UTC,
+            explicit_resend=False,
+        ),
+        services=delivery.TournamentProofCardDeliveryServices(
+            session_factory=SessionLocalStub(),
+            participants_repo=SimpleNamespace(
+                get_for_tournament_user_for_update=_async_return(None)
+            ),
+            build_bot_fn=lambda: _Bot(),
+            build_caption_fn=lambda **_kwargs: "caption",
+            render_card_fn=lambda **_kwargs: b"png",
+            enqueue_retry_fn=_enqueue_retry,
+            logger=SimpleNamespace(
+                warning=lambda *_args, **_kwargs: None, info=lambda *_args, **_kwargs: None
+            ),
         ),
     )
 

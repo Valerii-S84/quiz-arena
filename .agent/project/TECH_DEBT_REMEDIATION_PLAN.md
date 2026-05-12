@@ -172,12 +172,10 @@ DoD фази:
 
 Перший пріоритет:
 
-- `app/bot/handlers/gameplay_views_friend.py`
-- `app/game/questions/runtime_bank_mode_select.py`
-- `app/workers/tasks/tournaments_proof_cards_delivery.py`
-- `app/bot/handlers/payments.py`
-- `app/economy/energy/energy_consume.py`
 - `app/bot/handlers/gameplay_flows/play_flow.py`
+- `app/game/sessions/service/sessions_submit_daily.py`
+- `app/game/sessions/service/daily_question_sets.py`
+- `app/workers/tasks/arena_duels.py`
 - long orchestration functions from the current architecture-debt guard output.
 
 Правило декомпозиції:
@@ -210,10 +208,18 @@ DoD фази:
   into friend overview, result rendering and proof-card rendering modules.
 - `2026-05-12` cleanup slice split runtime mode question selection into public
   selection facade and pool-picker modules.
-- Architecture debt after these two slices: `14` app files above `220` lines,
-  `102` production functions/methods above `60` lines, `74`
-  functions/methods above `7` parameters and `16` functions above the nesting
-  limit.
+- `2026-05-12` cleanup slice split `app/bot/handlers/payments.py` into buy-flow,
+  buy-init, completion and duel-paywall modules; `payments.py` is now `115`
+  lines.
+- `2026-05-12` cleanup slice split private tournament proof-card delivery into
+  delivery orchestration, request/service models and per-user sender modules;
+  `app/workers/tasks/tournaments_proof_cards_delivery.py` is now `204` lines.
+- `2026-05-12` cleanup slice split quiz energy consumption into a compatibility
+  facade, consume orchestration and result/ledger/event helpers;
+  `app/economy/energy/energy_consume.py` is now `132` lines.
+- Architecture debt after these slices: `10` app files above `220` lines, `98`
+  production functions/methods above `60` lines, `72` functions/methods above
+  `7` parameters and `15` functions above the nesting limit.
 
 ### Phase 3. External frontend remediation handoff
 

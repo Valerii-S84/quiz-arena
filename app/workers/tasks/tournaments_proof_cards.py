@@ -16,6 +16,11 @@ from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.tasks.tournaments_proof_card_render import render_tournament_proof_card_png
 from app.workers.tasks.tournaments_proof_cards_delivery import (
+    TournamentProofCardContext,
+    TournamentProofCardContextRequest,
+    TournamentProofCardContextServices,
+    TournamentProofCardDeliveryRequest,
+    TournamentProofCardDeliveryServices,
     deliver_proof_cards,
     load_proof_card_context,
 )
@@ -74,6 +79,63 @@ def _build_proof_card_result(
     }
 
 
+async def _load_completed_tournament_context(
+    *,
+    parsed_tournament_id: UUID,
+    user_id: int | None,
+) -> TournamentProofCardContext | None:
+    async with SessionLocal.begin() as session:
+        return await load_proof_card_context(
+            request=TournamentProofCardContextRequest(
+                session=session,
+                parsed_tournament_id=parsed_tournament_id,
+                user_id=user_id,
+            ),
+            services=TournamentProofCardContextServices(
+                tournaments_repo=TournamentsRepo,
+                participants_repo=TournamentParticipantsRepo,
+                users_repo=UsersRepo,
+                format_points_fn=_format_points,
+                format_tournament_format_fn=_format_tournament_format,
+                format_user_label_fn=_format_user_label,
+            ),
+        )
+
+
+async def _deliver_loaded_context(
+    *,
+    context: TournamentProofCardContext,
+    tournament_id: str,
+    explicit_resend: bool,
+    lock_retry_attempt: int,
+) -> dict[str, int]:
+    delivery_result = await deliver_proof_cards(
+        request=TournamentProofCardDeliveryRequest(
+            context=context,
+            tournament_id=tournament_id,
+            now_utc=datetime.now(timezone.utc),
+            explicit_resend=explicit_resend,
+            lock_retry_attempt=lock_retry_attempt,
+        ),
+        services=TournamentProofCardDeliveryServices(
+            session_factory=SessionLocal,
+            participants_repo=TournamentParticipantsRepo,
+            build_bot_fn=build_bot,
+            build_caption_fn=_build_caption,
+            render_card_fn=render_tournament_proof_card_png,
+            enqueue_retry_fn=enqueue_private_tournament_proof_cards,
+            logger=logger,
+        ),
+    )
+    return _build_proof_card_result(
+        processed=1,
+        participants_total=context.participants_total,
+        sent=delivery_result.sent,
+        cached_reused=delivery_result.cached_reused,
+        failed=delivery_result.failed,
+    )
+
+
 async def run_private_tournament_proof_cards_async(
     *,
     tournament_id: str,
@@ -89,48 +151,23 @@ async def run_private_tournament_proof_cards_async(
 
     resolved_explicit_resend = bool(explicit_resend and user_id is not None)
 
-    async with SessionLocal.begin() as session:
-        context = await load_proof_card_context(
-            session=session,
-            parsed_tournament_id=parsed_tournament_id,
-            user_id=user_id,
-            tournaments_repo=TournamentsRepo,
-            participants_repo=TournamentParticipantsRepo,
-            users_repo=UsersRepo,
-            format_points_fn=_format_points,
-            format_tournament_format_fn=_format_tournament_format,
-            format_user_label_fn=_format_user_label,
-        )
-        if context is None:
-            return _build_proof_card_result(processed=0, participants_total=0)
-        if not context.participants:
-            return _build_proof_card_result(processed=1, participants_total=0)
+    context = await _load_completed_tournament_context(
+        parsed_tournament_id=parsed_tournament_id,
+        user_id=user_id,
+    )
+    if context is None:
+        return _build_proof_card_result(processed=0, participants_total=0)
+    if not context.participants:
+        return _build_proof_card_result(processed=1, participants_total=0)
 
     if initial_delay_seconds > 0:
         await asyncio.sleep(max(0, int(initial_delay_seconds)))
 
-    now_utc = datetime.now(timezone.utc)
-    delivery_result = await deliver_proof_cards(
+    return await _deliver_loaded_context(
         context=context,
         tournament_id=tournament_id,
-        now_utc=now_utc,
-        session_factory=SessionLocal,
-        participants_repo=TournamentParticipantsRepo,
-        build_bot_fn=build_bot,
-        build_caption_fn=_build_caption,
-        render_card_fn=render_tournament_proof_card_png,
         explicit_resend=resolved_explicit_resend,
-        enqueue_retry_fn=enqueue_private_tournament_proof_cards,
         lock_retry_attempt=lock_retry_attempt,
-        logger=logger,
-    )
-
-    return _build_proof_card_result(
-        processed=1,
-        participants_total=context.participants_total,
-        sent=delivery_result.sent,
-        cached_reused=delivery_result.cached_reused,
-        failed=delivery_result.failed,
     )
 
 

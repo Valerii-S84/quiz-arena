@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from typing import Any
 from uuid import uuid4
 
 from app.workers.tasks import tournaments_proof_cards
@@ -53,17 +54,24 @@ def test_tournament_proof_cards_delivery_retries_lock_skips_and_counts_failures(
 
     result = asyncio.run(
         deliver_proof_cards(
-            context=context,
-            tournament_id=str(context.parsed_tournament_id),
-            now_utc=datetime.now(timezone.utc),
-            session_factory=session_local_with_sessions("s1", "s2"),
-            participants_repo=_Repo(),
-            build_bot_fn=lambda: bot,
-            build_caption_fn=lambda **_kwargs: "caption",
-            render_card_fn=lambda **_kwargs: b"png",
-            explicit_resend=False,
-            enqueue_retry_fn=_queue_retry,
-            logger=SimpleNamespace(info=lambda *_a, **_k: None, warning=lambda *_a, **_k: None),
+            request=tournaments_proof_cards.TournamentProofCardDeliveryRequest(
+                context=context,
+                tournament_id=str(context.parsed_tournament_id),
+                now_utc=datetime.now(timezone.utc),
+                explicit_resend=False,
+            ),
+            services=tournaments_proof_cards.TournamentProofCardDeliveryServices(
+                session_factory=session_local_with_sessions("s1", "s2"),
+                participants_repo=_Repo(),
+                build_bot_fn=lambda: bot,
+                build_caption_fn=lambda **_kwargs: "caption",
+                render_card_fn=lambda **_kwargs: b"png",
+                enqueue_retry_fn=_queue_retry,
+                logger=SimpleNamespace(
+                    info=lambda *_a, **_k: None,
+                    warning=lambda *_a, **_k: None,
+                ),
+            ),
         )
     )
 
@@ -75,7 +83,7 @@ def test_tournament_proof_cards_delivery_retries_lock_skips_and_counts_failures(
 def test_private_tournament_proof_cards_orchestration_and_enqueue(monkeypatch) -> None:
     tournament_id = uuid4()
     context = SimpleNamespace(participants=[SimpleNamespace(user_id=1)], participants_total=1)
-    calls: list[dict[str, object]] = []
+    calls: list[dict[str, Any]] = []
 
     async def _context(**_kwargs):
         return context
@@ -107,7 +115,7 @@ def test_private_tournament_proof_cards_orchestration_and_enqueue(monkeypatch) -
         "cached_reused": 0,
         "failed": 0,
     }
-    assert calls[0]["explicit_resend"] is True
+    assert calls[0]["request"].explicit_resend is True
 
     monkeypatch.setattr(
         tournaments_proof_cards,
@@ -121,7 +129,7 @@ async def _sleep_done() -> None:
     return None
 
 
-def _record_call(target: list[dict[str, object]]):
+def _record_call(target: list[dict[str, Any]]):
     def _inner(**kwargs) -> bool:
         target.append(kwargs)
         return True

@@ -4,8 +4,13 @@ from datetime import datetime, timezone
 
 import structlog
 from aiogram import F, Router
-from aiogram.types import CallbackQuery, LabeledPrice, Message, PreCheckoutQuery
+from aiogram.types import CallbackQuery, Message, PreCheckoutQuery
 
+from app.bot.handlers.payments_buy_flow import BuyHandlerServices, handle_buy_callback
+from app.bot.handlers.payments_duel_paywall import _emit_duel_paywall_click
+from app.bot.handlers.payments_duel_paywall import (
+    _is_duel_paywall_callback as _is_duel_paywall_callback,
+)
 from app.bot.handlers.payments_helpers import (
     build_purchase_idempotency_key,
     extract_offer_impression_id_from_purchase_idempotency_key,
@@ -23,25 +28,11 @@ from app.db.session import SessionLocal
 from app.economy.offers.service import OfferService
 from app.economy.purchases.catalog import get_product, is_product_available_for_sale
 from app.economy.purchases.errors import (
-    PremiumDowngradeNotAllowedError,
     ProductNotFoundError,
-    PurchaseInitValidationError,
     PurchaseNotFoundError,
     PurchasePrecheckoutValidationError,
-    StreakSaverPurchaseLimitError,
 )
 from app.economy.purchases.service import PurchaseService
-from app.game.arena_duels.analytics import (
-    ARENA_EVENT_DUEL_TICKET_CLICKED,
-    ARENA_EVENT_PREMIUM_WEEK_CLICKED,
-    build_arena_event_payload,
-    emit_arena_analytics_event,
-)
-from app.game.duels.constants import (
-    DUEL_PAYWALL_CALLBACK_CONTEXT,
-    DUEL_PREMIUM_WEEK_PRODUCT_CODE,
-    DUEL_TICKET_PRODUCT_CODE,
-)
 from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="payments")
@@ -56,162 +47,22 @@ _success_text_key = success_text_key
 
 @router.callback_query(F.data.startswith("buy:"))
 async def handle_buy(callback: CallbackQuery) -> None:
-    if callback.data is None or callback.from_user is None:
-        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
-        return
-
-    try:
-        product_code, promo_redemption_id, offer_impression_id = parse_buy_callback_data(
-            callback.data
-        )
-    except ValueError:
-        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
-        return
-
-    product = get_product(product_code)
-    if product is None or not is_product_available_for_sale(product_code):
-        await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)
-        return
-
-    now_utc = datetime.now(timezone.utc)
-    try:
-        async with SessionLocal.begin() as session:
-            snapshot = await UserOnboardingService.ensure_home_snapshot(
-                session,
-                telegram_user=callback.from_user,
-            )
-            if offer_impression_id is not None:
-                await OfferService.mark_offer_clicked(
-                    session,
-                    user_id=snapshot.user_id,
-                    impression_id=offer_impression_id,
-                    clicked_at=now_utc,
-                )
-            if _is_duel_paywall_callback(callback.data, product_code=product_code):
-                await _emit_duel_paywall_click(
-                    session,
-                    user_id=snapshot.user_id,
-                    product_code=product_code,
-                    happened_at=now_utc,
-                )
-            init_result = await PurchaseService.init_purchase(
-                session,
-                user_id=snapshot.user_id,
-                product_code=product_code,
-                idempotency_key=build_purchase_idempotency_key(
-                    product_code=product_code,
-                    callback_id=callback.id,
-                    offer_impression_id=offer_impression_id,
-                ),
-                now_utc=now_utc,
-                promo_redemption_id=promo_redemption_id,
-            )
-    except PremiumDowngradeNotAllowedError:
-        await callback.answer(TEXTS_DE["msg.premium.downgrade.blocked"], show_alert=True)
-        return
-    except StreakSaverPurchaseLimitError:
-        await callback.answer(TEXTS_DE["msg.purchase.error.streaksaver.limit"], show_alert=True)
-        return
-    except (ProductNotFoundError, PurchaseInitValidationError):
-        await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)
-        return
-
-    if init_result.final_stars_amount == 0:
-        try:
-            await apply_zero_cost_purchase(
-                telegram_user=callback.from_user,
-                purchase_id=init_result.purchase_id,
-                now_utc=now_utc,
-            )
-        except (
-            PurchaseNotFoundError,
-            ProductNotFoundError,
-            PurchasePrecheckoutValidationError,
-        ):
-            await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)
-            return
-
-        if callback.message is not None:
-            await callback.message.answer(
-                TEXTS_DE[success_text_key(product_code)],
-                reply_markup=build_home_keyboard(),
-            )
-        await callback.answer()
-        return
-
-    if callback.bot is None:
-        await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)
-        return
-
-    try:
-        await callback.bot.send_invoice(
-            chat_id=callback.from_user.id,
-            title=product.title,
-            description=product.description,
-            payload=init_result.invoice_payload,
-            currency="XTR",
-            prices=[LabeledPrice(label=product.title, amount=init_result.final_stars_amount)],
-            provider_token=None,
-        )
-    except Exception as exc:
-        logger.exception(
-            "telegram_send_invoice_failed",
-            user_id=callback.from_user.id,
-            purchase_id=str(init_result.purchase_id),
-            product_code=product_code,
-            error_type=type(exc).__name__,
-        )
-        await callback.answer(TEXTS_DE["msg.purchase.error.failed"], show_alert=True)
-        return
-
-    async with SessionLocal.begin() as session:
-        await PurchaseService.mark_invoice_sent(
-            session,
-            purchase_id=init_result.purchase_id,
-        )
-
-    await callback.answer()
-
-
-async def _emit_duel_paywall_click(
-    session,
-    *,
-    user_id: int,
-    product_code: str,
-    happened_at: datetime,
-) -> None:
-    event_type = _duel_paywall_click_event_type(product_code)
-    if event_type is None:
-        return
-    await emit_arena_analytics_event(
-        session,
-        event_type=event_type,
-        happened_at=happened_at,
-        user_id=user_id,
-        payload=build_arena_event_payload(
-            user_id=user_id,
-            action="buy",
-            access_type=product_code,
+    await handle_buy_callback(
+        callback=callback,
+        services=BuyHandlerServices(
+            parse_buy_callback_data_fn=parse_buy_callback_data,
+            get_product_fn=get_product,
+            is_product_available_for_sale_fn=is_product_available_for_sale,
+            session_local=SessionLocal,
+            user_onboarding_service=UserOnboardingService,
+            offer_service=OfferService,
+            purchase_service=PurchaseService,
+            emit_duel_paywall_click_fn=_emit_duel_paywall_click,
+            build_purchase_idempotency_key_fn=build_purchase_idempotency_key,
+            apply_zero_cost_purchase_fn=apply_zero_cost_purchase,
+            success_text_key_fn=success_text_key,
+            logger=logger,
         ),
-    )
-
-
-def _duel_paywall_click_event_type(product_code: str) -> str | None:
-    if product_code == DUEL_TICKET_PRODUCT_CODE:
-        return ARENA_EVENT_DUEL_TICKET_CLICKED
-    if product_code == DUEL_PREMIUM_WEEK_PRODUCT_CODE:
-        return ARENA_EVENT_PREMIUM_WEEK_CLICKED
-    return None
-
-
-def _is_duel_paywall_callback(callback_data: str, *, product_code: str) -> bool:
-    parts = callback_data.split(":")
-    return (
-        len(parts) == 3
-        and parts[0] == "buy"
-        and parts[1] == product_code
-        and parts[2] == DUEL_PAYWALL_CALLBACK_CONTEXT
-        and _duel_paywall_click_event_type(product_code) is not None
     )
 
 
