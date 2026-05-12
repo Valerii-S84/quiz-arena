@@ -16,7 +16,7 @@
 
 Базова точка для цього плану: аудит репозиторію станом на `2026-04-15`.
 Поточне уточнення scope: аудит локального backend repo станом на
-`2026-05-08`.
+`2026-05-12`.
 
 Початкові проблеми з базового аудиту:
 
@@ -34,7 +34,7 @@
   і частини складних app-модулів.
 - `Low`: є drift між project docs і фактичним frontend/backend split.
 
-Поточний стан локального backend repo на `2026-05-08`:
+Поточний стан локального backend repo на `2026-05-12`:
 
 - `frontend/` у робочому дереві відсутній.
 - Frontend source, frontend CI, and frontend image publishing live in the
@@ -48,9 +48,13 @@
   depends on Redis-backed revoke state and raises `AdminAuthStateError` when
   auth state is unavailable; route dependencies map that state to HTTP 503.
 - Targeted admin auth tests passed locally (`45 passed`).
-- Full backend local CI passed on `2026-05-08` via `bash scripts/local_ci.sh`.
-- Backend structural debt remains: `18` app files above `220` lines and
-  `108` production functions/methods above `60` lines.
+- Full backend local CI passed on `2026-05-08` via `bash scripts/local_ci.sh`;
+  partial backend proof passed on `2026-05-12` via lint, format-check, mypy,
+  QuizBank report check and unit/bot pytest without integration.
+- Backend structural debt remains before the `2026-05-12` first cleanup slice:
+  `16` app files above `220` lines, `104` production functions/methods above
+  `60` lines, `74` functions/methods above `7` parameters and `16` functions
+  above the nesting limit.
 - `mypy` is green, and no `ignore_errors = true` override for production
   `app` modules was found in `pyproject.toml`.
 - Test-suite structural debt remains limited to
@@ -168,13 +172,13 @@ DoD фази:
 
 Перший пріоритет:
 
-- `app/bot/handlers/gameplay_duels.py`
-- `app/db/repo/analytics_mutations.py`
-- `app/game/sessions/service/friend_challenges_manage.py`
-- long orchestration functions:
-  `app/bot/handlers/gameplay_flows/answer_flow.py::handle_answer`,
-  `app/workers/tasks/friend_challenges_async.py::run_friend_challenge_deadlines_async`,
-  `app/bot/handlers/gameplay_flows/friend_answer_flow.py::handle_friend_answer_branch`
+- `app/bot/handlers/gameplay_views_friend.py`
+- `app/game/questions/runtime_bank_mode_select.py`
+- `app/workers/tasks/tournaments_proof_cards_delivery.py`
+- `app/bot/handlers/payments.py`
+- `app/economy/energy/energy_consume.py`
+- `app/bot/handlers/gameplay_flows/play_flow.py`
+- long orchestration functions from the current architecture-debt guard output.
 
 Правило декомпозиції:
 
@@ -195,6 +199,21 @@ DoD фази:
 - `app/workers/tasks/friend_challenges_notifications.py` розділено на
   orchestration, notification content і delivery modules; primary file
   зменшено до `80` рядків, нові modules лишаються нижче `220` рядків.
+- Earlier first-priority candidates
+  (`app/bot/handlers/gameplay_duels.py`,
+  `app/db/repo/analytics_mutations.py`,
+  `app/game/sessions/service/friend_challenges_manage.py`,
+  `app/workers/tasks/friend_challenges_async.py`,
+  `app/bot/handlers/gameplay_flows/friend_answer_flow.py`) are currently below
+  their file/function line limits or already decomposed.
+- `2026-05-12` cleanup slice split `app/bot/handlers/gameplay_views_friend.py`
+  into friend overview, result rendering and proof-card rendering modules.
+- `2026-05-12` cleanup slice split runtime mode question selection into public
+  selection facade and pool-picker modules.
+- Architecture debt after these two slices: `14` app files above `220` lines,
+  `102` production functions/methods above `60` lines, `74`
+  functions/methods above `7` parameters and `16` functions above the nesting
+  limit.
 
 ### Phase 3. External frontend remediation handoff
 
