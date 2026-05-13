@@ -5,10 +5,13 @@ from datetime import datetime, timezone
 from aiogram.types import CallbackQuery, Message
 
 from app.bot.handlers.start_analytics import build_start_event_payload
+from app.bot.handlers.start_friend_challenge_dependencies import (
+    FRIEND_CHALLENGE_RENDERERS,
+    build_friend_challenge_payload_context,
+)
 from app.bot.handlers.start_friend_challenge_flow import handle_start_friend_challenge_payload
 from app.bot.handlers.start_helpers import (
     _notify_creator_about_join,
-    _resolve_opponent_label,
     _resolve_welcome_image_file_id,
     _send_home_message,
 )
@@ -19,13 +22,7 @@ from app.bot.handlers.start_parsing import (
     _extract_tournament_invite_code,
 )
 from app.bot.handlers.start_tournament_flow import handle_start_tournament_payload
-from app.bot.handlers.start_views import (
-    _build_friend_plan_text,
-    _build_friend_score_text,
-    _build_friend_ttl_text,
-    _build_home_text,
-    _build_question_text,
-)
+from app.bot.handlers.start_views import _build_home_text
 from app.bot.keyboards.offers import build_offer_keyboard
 from app.bot.keyboards.shop import build_shop_keyboard
 from app.bot.texts.de import TEXTS_DE
@@ -35,7 +32,6 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.offers.service import OfferLoggingError, OfferService
 from app.game import TournamentServiceFacade
-from app.game.sessions.service import GameSessionService
 from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
 
@@ -84,18 +80,15 @@ async def handle_start_message(message: Message) -> None:
         )
 
         friend_challenge_result = await handle_start_friend_challenge_payload(
-            session=session,
-            now_utc=now_utc,
-            snapshot=snapshot,
-            friend_invite_token=friend_invite_token,
-            duel_challenge_id=duel_challenge_id,
-            start_message_id=message.message_id,
-            game_session_service=GameSessionService,
-            resolve_opponent_label=_resolve_opponent_label,
-            build_friend_plan_text=_build_friend_plan_text,
-            build_friend_score_text=_build_friend_score_text,
-            build_friend_ttl_text=_build_friend_ttl_text,
-            build_question_text=_build_question_text,
+            build_friend_challenge_payload_context(
+                session=session,
+                now_utc=now_utc,
+                snapshot=snapshot,
+                friend_invite_token=friend_invite_token,
+                duel_challenge_id=duel_challenge_id,
+                start_message_id=message.message_id,
+            ),
+            FRIEND_CHALLENGE_RENDERERS,
         )
         if friend_challenge_result is not None:
             pass

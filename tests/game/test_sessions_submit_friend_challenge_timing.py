@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from app.game.sessions.service import sessions_submit_friend_challenge
+from app.game.sessions.service import (
+    sessions_submit_friend_challenge,
+    sessions_submit_friend_challenge_resolution,
+)
 from tests.game.friend_challenges_unit_support import (
     NOW_UTC,
     Session,
@@ -34,7 +37,7 @@ async def test_canonical_friend_duel_uses_time_tie_break_for_equal_score(
         async_return(row),
     )
     monkeypatch.setattr(
-        sessions_submit_friend_challenge.QuizSessionsRepo,
+        sessions_submit_friend_challenge_resolution.QuizSessionsRepo,
         "sum_completed_duration_ms_for_friend_challenge_user",
         _sum_time,
     )
@@ -81,7 +84,7 @@ async def test_tournament_friend_duel_keeps_score_only_draw_semantics(
         async_return(row),
     )
     monkeypatch.setattr(
-        sessions_submit_friend_challenge.QuizSessionsRepo,
+        sessions_submit_friend_challenge_resolution.QuizSessionsRepo,
         "sum_completed_duration_ms_for_friend_challenge_user",
         _unexpected_sum_time,
     )

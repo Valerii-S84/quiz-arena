@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.game.sessions.service import friend_challenges_rounds
+from app.game.sessions.service import friend_challenges_rounds, friend_challenges_rounds_start
 from app.game.tournaments.constants import TOURNAMENT_TYPE_DAILY_ARENA
 from tests.game.friend_challenges_unit_support import (
     NOW_UTC,
@@ -28,7 +28,7 @@ async def test_round_start_returns_already_answered_when_user_finished(
         "get_by_id_for_update",
         async_return(row),
     )
-    monkeypatch.setattr(friend_challenges_rounds, "start_session", _unexpected_start_session)
+    monkeypatch.setattr(friend_challenges_rounds_start, "start_session", _unexpected_start_session)
 
     result = await friend_challenges_rounds.start_friend_challenge_round(
         Session(),
@@ -58,12 +58,12 @@ async def test_round_start_replays_existing_session_with_daily_arena_header(
         async_return(row),
     )
     monkeypatch.setattr(
-        friend_challenges_rounds.QuizSessionsRepo,
+        friend_challenges_rounds_start.QuizSessionsRepo,
         "get_by_friend_challenge_round_user",
         async_return(existing),
     )
     monkeypatch.setattr(
-        friend_challenges_rounds,
+        friend_challenges_rounds_start,
         "_build_start_result_from_existing_session",
         async_return(replay),
     )
@@ -124,16 +124,16 @@ async def _run_start_with_question_sources(
         async_return(row),
     )
     monkeypatch.setattr(
-        friend_challenges_rounds.QuizSessionsRepo,
+        friend_challenges_rounds_start.QuizSessionsRepo,
         "get_by_friend_challenge_round_user",
         async_return(None),
     )
     monkeypatch.setattr(
-        friend_challenges_rounds.QuizSessionsRepo,
+        friend_challenges_rounds_start.QuizSessionsRepo,
         "get_by_friend_challenge_round_any_user",
         async_return(shared_round_session),
     )
-    monkeypatch.setattr(friend_challenges_rounds, "start_session", _fake_start_session)
+    monkeypatch.setattr(friend_challenges_rounds_start, "start_session", _fake_start_session)
 
     return await friend_challenges_rounds.start_friend_challenge_round(
         Session(),
