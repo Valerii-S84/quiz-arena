@@ -1,41 +1,78 @@
+(quiz_arena_routes) {
+	encode zstd gzip
+
+	handle /webhook* {
+		reverse_proxy api:8000
+	}
+
+	@health_legacy path /health
+	@internal_ready path /api/ready /api/ready/*
+
+	# Keep the legacy public health endpoint, but only with the sanitized backend payload.
+	handle @health_legacy {
+		reverse_proxy api:8000
+	}
+
+	# Detailed readiness remains container-local and must not be exposed publicly.
+	handle @internal_ready {
+		respond "Not Found" 404
+	}
+
+	handle /api/quiz-teaser/* {
+		reverse_proxy frontend:3000
+	}
+
+	handle_path /api/* {
+		reverse_proxy api:8000
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	tls {$CADDY_EMAIL}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
+
 www.deutchquizarena.de {
-  redir https://deutchquizarena.de{uri} 308
+	redir https://deutchquizarena.de{uri} 308
 }
 
 deutchquizarena.de {
-  encode zstd gzip
+	import quiz_arena_routes
+	tls {$CADDY_EMAIL}
+}
 
-  handle /webhook* {
-    reverse_proxy api:8000
-  }
+# Emergency access while public DNSSEC validation for deutchquizarena.de is broken.
+deutchquizarena.46.225.181.45.sslip.io {
+	import quiz_arena_routes
+	tls {$CADDY_EMAIL}
+}
 
-  @health_legacy path /health
-  @internal_ready path /api/ready /api/ready/*
+http://46.225.181.45 {
+	import quiz_arena_routes
+}
 
-  # Keep the legacy public health endpoint, but only with the sanitized backend payload.
-  handle @health_legacy {
-    reverse_proxy api:8000
-  }
+api.valerchik.de {
+	encode zstd gzip
 
-  # Detailed readiness remains container-local and must not be exposed publicly.
-  handle @internal_ready {
-    respond "Not Found" 404
-  }
+	@unauthorized not header X-API-Key {$API_QUIZ_BANK_PUBLIC_API_KEY}
+	respond @unauthorized "Unauthorized" 401
 
-  handle_path /api/* {
-    reverse_proxy api:8000
-  }
+	reverse_proxy api-quiz-bank-pilot:8000
 
-  handle {
-    reverse_proxy frontend:3000
-  }
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
 
-  tls {$CADDY_EMAIL}
-
-  header {
-    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-    X-Content-Type-Options "nosniff"
-    X-Frame-Options "DENY"
-    Referrer-Policy "strict-origin-when-cross-origin"
-  }
+	tls {$CADDY_EMAIL}
 }

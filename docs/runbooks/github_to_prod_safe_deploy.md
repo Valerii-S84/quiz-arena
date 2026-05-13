@@ -91,6 +91,7 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d 
 
 Очікування перед цим кроком:
 - у `/opt/quiz-arena/.env` заданий `FRONTEND_IMAGE=<registry>/<owner>/quiz-arena-frontend:<tag>`;
+- production runtime env names are listed in `docs/runbooks/production_runtime_env.md`;
 - цей image уже зібраний і запушений зі standalone frontend repo;
 - browser-facing API base baked у frontend image має лишатися same-host `/api`.
 
