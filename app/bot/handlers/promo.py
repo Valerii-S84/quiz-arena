@@ -29,7 +29,6 @@ from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="promo")
 PROMO_INPUT_RE = re.compile(r"^/?promo\s+(.+)$", re.IGNORECASE)
-PROMO_PLAIN_RE = re.compile(r"^[A-Z0-9][A-Z0-9_-]{1,63}$")
 
 
 def _is_reply_to_promo_prompt(message: Message) -> bool:
@@ -57,10 +56,6 @@ def _extract_promo_code(message: Message) -> str | None:
             return None
         return text
 
-    # Accept plain promo-like codes sent as standalone messages in private chat.
-    if not text.startswith("/") and PROMO_PLAIN_RE.fullmatch(text.upper()) is not None:
-        return text
-
     return None
 
 
@@ -86,11 +81,6 @@ async def handle_promo_open(callback: CallbackQuery) -> None:
 
 @router.message(Command("promo"))
 async def handle_promo_command(message: Message) -> None:
-    await _redeem_promo_from_text(message)
-
-
-@router.message(F.text.regexp(PROMO_PLAIN_RE))
-async def handle_promo_plain_text(message: Message) -> None:
     await _redeem_promo_from_text(message)
 
 
