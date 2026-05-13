@@ -55,17 +55,17 @@ deutchquizarena.46.225.181.45.sslip.io {
 	tls {$CADDY_EMAIL}
 }
 
-http://46.225.181.45 {
-	import quiz_arena_routes
-}
-
 api.valerchik.de {
 	encode zstd gzip
 
 	@unauthorized not header X-API-Key {$API_QUIZ_BANK_PUBLIC_API_KEY}
-	respond @unauthorized "Unauthorized" 401
+	handle @unauthorized {
+		respond "Unauthorized" 401
+	}
 
-	reverse_proxy api-quiz-bank-pilot:8000
+	handle {
+		reverse_proxy api-quiz-bank-pilot:8000
+	}
 
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
