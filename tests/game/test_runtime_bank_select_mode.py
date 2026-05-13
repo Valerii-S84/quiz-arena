@@ -227,6 +227,59 @@ async def test_select_question_for_mode_prefers_requested_level(
 
 
 @pytest.mark.asyncio
+async def test_select_question_for_mode_treats_empty_allowed_levels_as_unfiltered(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorded_levels: list[tuple[str, ...] | None] = []
+
+    async def fake_list_question_ids_all_active(  # noqa: ANN001
+        session,
+        *,
+        exclude_question_ids=None,
+        preferred_levels=None,
+        require_quick_mix_eligible=False,
+    ):
+        return []
+
+    async def fake_list_question_ids_for_mode(  # noqa: ANN001
+        session,
+        *,
+        mode_code,
+        exclude_question_ids=None,
+        preferred_levels=None,
+    ):
+        recorded_levels.append(tuple(preferred_levels) if preferred_levels is not None else None)
+        if preferred_levels is None:
+            return ["q_default"]
+        return []
+
+    monkeypatch.setattr(
+        "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
+        fake_list_question_ids_all_active,
+    )
+    monkeypatch.setattr(
+        "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_for_mode",
+        fake_list_question_ids_for_mode,
+    )
+    _install_question_record_repo(
+        monkeypatch,
+        lambda question_id: _fake_record(question_id, mode_code="ARTIKEL_SPRINT"),
+    )
+
+    selected = await select_question_for_mode(
+        _Session(),
+        "ARTIKEL_SPRINT",
+        local_date_berlin=date(2026, 2, 19),
+        recent_question_ids=[],
+        selection_seed="seed-empty-levels",
+        allowed_levels=[],
+    )
+
+    assert selected.question_id == "q_default"
+    assert recorded_levels == [None]
+
+
+@pytest.mark.asyncio
 async def test_select_question_for_mode_relaxes_only_within_allowed_levels(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
