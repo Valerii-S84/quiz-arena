@@ -107,7 +107,7 @@ def test_transition_low_to_available_on_regen_tick() -> None:
     assert classify_energy_state(state_after, premium_active=False) == EnergyBucketState.AVAILABLE
 
 
-def test_transition_to_available_on_daily_topup() -> None:
+def test_daily_topup_does_not_refill_free_energy() -> None:
     state_before = snapshot(
         free_energy=2,
         paid_energy=0,
@@ -117,8 +117,9 @@ def test_transition_to_available_on_daily_topup() -> None:
     state_after, applied = apply_daily_topup(state_before, local_date_berlin=date(2026, 2, 17))
 
     assert applied is True
-    assert state_after.free_energy == FREE_ENERGY_CAP
-    assert classify_energy_state(state_after, premium_active=False) == EnergyBucketState.AVAILABLE
+    assert state_after.free_energy == 2
+    assert state_after.last_daily_topup_local_date == date(2026, 2, 17)
+    assert classify_energy_state(state_after, premium_active=False) == EnergyBucketState.LOW
 
 
 @pytest.mark.parametrize(

@@ -46,14 +46,9 @@ def apply_daily_topup(
     if local_date_berlin <= snapshot.last_daily_topup_local_date:
         return snapshot, False
 
-    free_energy = snapshot.free_energy
-    if free_energy < snapshot.free_cap:
-        free_energy = snapshot.free_cap
-
     return (
         replace(
             snapshot,
-            free_energy=free_energy,
             last_daily_topup_local_date=local_date_berlin,
         ),
         True,
