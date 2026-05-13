@@ -94,6 +94,19 @@ async def test_handle_promo_open_ignores_inaccessible_callback_message() -> None
 
 
 @pytest.mark.asyncio
+async def test_handle_promo_reply_ignores_non_promo_replies() -> None:
+    message = _PromoMessage(text="DIE", from_user=SimpleNamespace(id=1))
+    message.reply_to_message = SimpleNamespace(
+        from_user=SimpleNamespace(is_bot=True),
+        text="der Schrank -> ?",
+    )
+
+    await promo.handle_promo_reply(message)  # type: ignore[arg-type]
+
+    assert message.answers == []
+
+
+@pytest.mark.asyncio
 async def test_redeem_promo_from_text_handles_invalid_code(monkeypatch) -> None:
     monkeypatch.setattr(promo, "SessionLocal", DummySessionLocal())
 
@@ -163,33 +176,6 @@ async def test_redeem_promo_from_text_handles_discount_success(monkeypatch) -> N
 
     assert message.answers[0].text == TEXTS_DE["msg.promo.success.discount"]
     assert "25% Rabatt" in (message.answers[1].text or "")
-
-
-@pytest.mark.asyncio
-async def test_handle_promo_plain_text_redeems_code(monkeypatch) -> None:
-    monkeypatch.setattr(promo, "SessionLocal", DummySessionLocal())
-
-    async def _fake_home_snapshot(session, *, telegram_user):
-        return SimpleNamespace(user_id=101)
-
-    async def _fake_redeem(*args, **kwargs):
-        return PromoRedeemResult(
-            redemption_id=UUID("33333333-3333-3333-3333-333333333333"),
-            result_type="PERCENT_DISCOUNT",
-            idempotent_replay=False,
-            discount_percent=30,
-            target_scope="ANY",
-            reserved_until=datetime.now(timezone.utc),
-        )
-
-    monkeypatch.setattr(promo.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(promo.PromoService, "redeem", _fake_redeem)
-
-    message = _PromoMessage(text="CHIK3", from_user=SimpleNamespace(id=3))
-    await promo.handle_promo_plain_text(message)  # type: ignore[arg-type]
-
-    assert message.answers[0].text == TEXTS_DE["msg.promo.success.discount"]
-    assert "30% Rabatt" in (message.answers[1].text or "")
 
 
 @pytest.mark.asyncio
