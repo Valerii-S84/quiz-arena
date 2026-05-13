@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from tests.bot.start_handler_flow_support import (
     TEXTS_DE,
     UUID,
@@ -97,7 +99,14 @@ async def test_handle_start_duel_payload_joins_and_shows_challenge_immediately(m
     monkeypatch.setattr(start.GameSessionService, "join_friend_challenge_by_id", _fake_join_by_id)
     monkeypatch.setattr(start.GameSessionService, "start_friend_challenge_round", _fake_start_round)
     monkeypatch.setattr(start.start_flow, "_notify_creator_about_join", _fake_notify_creator)
-    monkeypatch.setattr(start.start_flow, "_resolve_opponent_label", _fake_resolve_label)
+    monkeypatch.setattr(
+        start.start_flow,
+        "FRIEND_CHALLENGE_RENDERERS",
+        replace(
+            start.start_flow.FRIEND_CHALLENGE_RENDERERS,
+            resolve_opponent_label=_fake_resolve_label,
+        ),
+    )
 
     message = _StartMessage(
         text="/start duel_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",

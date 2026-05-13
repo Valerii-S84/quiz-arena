@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.game.sessions.service import friend_challenges_rounds
+from app.game.sessions.service import friend_challenges_rounds, friend_challenges_rounds_start
 from tests.game.friend_challenges_unit_support import (
     NOW_UTC,
     Session,
@@ -107,17 +107,17 @@ async def _start_with_selected_question(
         async_return(row),
     )
     monkeypatch.setattr(
-        friend_challenges_rounds.QuizSessionsRepo,
+        friend_challenges_rounds_start.QuizSessionsRepo,
         "get_by_friend_challenge_round_user",
         async_return(None),
     )
     monkeypatch.setattr(
-        friend_challenges_rounds.QuizSessionsRepo,
+        friend_challenges_rounds_start.QuizSessionsRepo,
         "get_by_friend_challenge_round_any_user",
         async_return(None),
     )
     monkeypatch.setattr(
-        friend_challenges_rounds.QuizSessionsRepo,
+        friend_challenges_rounds_start.QuizSessionsRepo,
         "list_friend_challenge_question_ids_before_round",
         async_return(["old-q"]),
     )
@@ -125,7 +125,7 @@ async def _start_with_selected_question(
         "app.game.sessions.service.select_friend_challenge_question",
         _fake_select_question,
     )
-    monkeypatch.setattr(friend_challenges_rounds, "start_session", _fake_start_session)
+    monkeypatch.setattr(friend_challenges_rounds_start, "start_session", _fake_start_session)
 
     await friend_challenges_rounds.start_friend_challenge_round(
         Session(),
