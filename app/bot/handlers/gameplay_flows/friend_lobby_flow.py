@@ -3,15 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, cast
 
-from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery
 
 from app.bot.keyboards.duels import build_friend_duel_keyboard
 from app.bot.keyboards.friend_challenge import (
-    build_friend_challenge_back_keyboard,
     build_friend_challenge_limit_keyboard,
     build_friend_challenge_share_confirmed_keyboard,
-    build_friend_challenge_share_keyboard,
 )
 from app.bot.texts.de import TEXTS_DE
 from app.core.config import get_settings
@@ -22,9 +19,9 @@ from app.game.sessions.errors import (
     FriendChallengeNotFoundError,
     FriendChallengePaymentRequiredError,
 )
-from app.game.sessions.types import FriendChallengeSnapshot
 
-from . import friend_my_duels_flow
+from .friend_lobby_invite_flow import send_friend_challenge_invite as _send_friend_challenge_invite
+from .friend_my_duels_flow import handle_friend_my_duels as handle_friend_my_duels
 
 
 async def handle_friend_challenge_type_selected(
@@ -99,54 +96,15 @@ async def handle_friend_challenge_create_selected(
 async def send_friend_challenge_invite(
     callback: CallbackQuery,
     *,
-    challenge: FriendChallengeSnapshot,
+    challenge,
     build_friend_invite_link,
 ) -> None:
-    if callback.from_user is None or callback.message is None:
-        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
-        return
-    invite_link = await build_friend_invite_link(callback, challenge_id=str(challenge.challenge_id))
-    if invite_link is None:
-        await callback.message.answer(
-            TEXTS_DE["msg.friend.challenge.created.fallback"].format(
-                invite_token=challenge.invite_token
-            ),
-            reply_markup=build_friend_challenge_back_keyboard(),
-        )
-        return
-    welcome_image_file_id = get_settings().resolved_welcome_image_file_id
-    photo_sent = False
-    share_keyboard = build_friend_challenge_share_keyboard(
-        invite_link=invite_link,
-        challenge_id=str(challenge.challenge_id),
+    await _send_friend_challenge_invite(
+        callback,
+        challenge=challenge,
+        build_friend_invite_link=build_friend_invite_link,
+        get_settings_factory=get_settings,
     )
-    if welcome_image_file_id:
-        bot = callback.bot
-        assert bot is not None
-        try:
-            await bot.send_photo(
-                chat_id=callback.from_user.id,
-                photo=welcome_image_file_id,
-                caption=TEXTS_DE["msg.friend.challenge.invite.caption"],
-                parse_mode="HTML",
-                reply_markup=share_keyboard,
-            )
-            photo_sent = True
-        except TelegramAPIError as e:
-            import logging
-
-            logging.getLogger(__name__).error(
-                "send_photo failed for friend challenge: user=%s file_id=%s error=%s",
-                callback.from_user.id,
-                welcome_image_file_id,
-                e,
-            )
-    if not photo_sent:
-        await callback.message.answer(
-            TEXTS_DE["msg.friend.challenge.invite.caption"],
-            parse_mode="HTML",
-            reply_markup=share_keyboard,
-        )
 
 
 async def handle_friend_challenge_invite_sent(
@@ -207,20 +165,3 @@ async def handle_friend_copy_link(
             await callback.answer()
             return
     await callback.answer(TEXTS_DE["msg.friend.challenge.link.share.inline"])
-
-
-async def handle_friend_my_duels(
-    callback: CallbackQuery,
-    *,
-    session_local,
-    user_onboarding_service,
-    game_session_service,
-    resolve_opponent_label,
-) -> None:
-    await friend_my_duels_flow.handle_friend_my_duels(
-        callback,
-        session_local=session_local,
-        user_onboarding_service=user_onboarding_service,
-        game_session_service=game_session_service,
-        resolve_opponent_label=resolve_opponent_label,
-    )
