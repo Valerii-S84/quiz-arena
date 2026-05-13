@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -23,14 +23,19 @@ class _Session(AsyncSessionStub):
         self.flush_count += 1
 
 
-def _energy_state(*, free_energy: int, paid_energy: int = 0) -> SimpleNamespace:
+def _energy_state(
+    *,
+    free_energy: int,
+    paid_energy: int = 0,
+    last_daily_topup_local_date: date | None = None,
+) -> SimpleNamespace:
     return SimpleNamespace(
         free_energy=free_energy,
         paid_energy=paid_energy,
         free_cap=10,
         regen_interval_sec=1800,
         last_regen_at=NOW_UTC,
-        last_daily_topup_local_date=NOW_UTC.date(),
+        last_daily_topup_local_date=last_daily_topup_local_date or NOW_UTC.date(),
         version=0,
         updated_at=NOW_UTC,
     )
@@ -95,6 +100,51 @@ async def test_consume_quiz_debits_free_energy_and_emits_zero_event(
     assert entry.balance_after == 0
     assert zero_events[0]["before_state"] == EnergyBucketState.LOW
     assert zero_events[0]["after_state"] == EnergyBucketState.EMPTY
+
+
+@pytest.mark.asyncio
+async def test_consume_quiz_does_not_daily_refill_before_debit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = _Session()
+    state = _energy_state(
+        free_energy=2,
+        last_daily_topup_local_date=date(2026, 4, 23),
+    )
+
+    monkeypatch.setattr(
+        energy_consume_quiz,
+        "get_or_create_state_for_update",
+        _async_return(state),
+    )
+    monkeypatch.setattr(
+        energy_consume_quiz.EntitlementsRepo,
+        "has_active_premium",
+        _async_return(False),
+    )
+    monkeypatch.setattr(
+        energy_consume_quiz.LedgerRepo,
+        "get_by_idempotency_key",
+        _async_return(None),
+    )
+    monkeypatch.setattr(energy_consume_quiz.LedgerRepo, "create", _async_return(None))
+    monkeypatch.setattr(
+        energy_consume_quiz,
+        "emit_energy_zero_event_if_needed",
+        _async_return(None),
+    )
+
+    result = await energy_consume_quiz.consume_quiz(
+        session,
+        user_id=11,
+        idempotency_key="quiz:consume:daily-topup-regression",
+        now_utc=NOW_UTC,
+    )
+
+    assert result.allowed is True
+    assert result.free_energy == 1
+    assert state.free_energy == 1
+    assert state.last_daily_topup_local_date == NOW_UTC.date()
 
 
 @pytest.mark.asyncio
