@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
@@ -14,24 +13,21 @@ from app.economy.energy.service import EnergyService
 from app.economy.purchases.catalog import get_product
 from app.economy.streak.service import StreakService
 
-from .constants import DAILY_CHALLENGE_TOTAL_QUESTIONS, FRIEND_CHALLENGE_TICKET_PRODUCT_CODE
+from .constants import DAILY_CHALLENGE_TOTAL_QUESTIONS
+from .sessions_submit_daily_progress import advance_daily_run
+from .sessions_submit_daily_replay_state import build_daily_replay_state_impl
+from .sessions_submit_daily_rewards import DailyTicketRewardDeps, credit_daily_duel_ticket
+from .sessions_submit_daily_state import (
+    DailyAnswerState,
+    build_existing_daily_run_state,
+    build_missing_daily_run_state,
+)
 
 DAILY_TICKET_REWARD_SCORE = DAILY_CHALLENGE_TOTAL_QUESTIONS
 DAILY_FREE_ENERGY_REWARD_BY_SCORE = {
     6: 3,
     5: 2,
 }
-
-
-@dataclass(frozen=True, slots=True)
-class DailyAnswerState:
-    daily_run_id: UUID | None
-    current_question: int
-    total_questions: int
-    score: int
-    completed: bool
-    current_streak: int
-    best_streak: int
 
 
 def _build_daily_ticket_reward_idempotency_key(*, daily_run_id: UUID) -> str:
@@ -55,28 +51,17 @@ async def _credit_daily_duel_ticket(
     daily_run_id: UUID,
     now_utc: datetime,
 ) -> None:
-    purchase_service = _get_purchase_service()
-    purchase_idempotency_key = _build_daily_ticket_reward_idempotency_key(daily_run_id=daily_run_id)
-    purchase = await PurchasesRepo.get_by_idempotency_key(session, purchase_idempotency_key)
-    if purchase is None:
-        product = get_product(FRIEND_CHALLENGE_TICKET_PRODUCT_CODE)
-        if product is None:
-            raise ValueError("friend challenge ticket product is not configured")
-        purchase = purchase_service._build_purchase(
-            product,
-            user_id=user_id,
-            idempotency_key=purchase_idempotency_key,
-            discount_stars_amount=product.stars_amount,
-            applied_promo_code_id=None,
-            now_utc=now_utc,
-        )
-        await PurchasesRepo.create(session, purchase=purchase, created_at=now_utc)
-
-    await purchase_service.apply_zero_cost_purchase(
+    await credit_daily_duel_ticket(
         session,
-        purchase_id=purchase.id,
         user_id=user_id,
+        daily_run_id=daily_run_id,
         now_utc=now_utc,
+        deps=DailyTicketRewardDeps(
+            purchase_service_factory=_get_purchase_service,
+            product_lookup=get_product,
+            purchases_repo=PurchasesRepo,
+            idempotency_key_builder=_build_daily_ticket_reward_idempotency_key,
+        ),
     )
 
 
@@ -118,37 +103,12 @@ async def build_daily_replay_state(
     current_streak: int,
     best_streak: int,
 ) -> DailyAnswerState:
-    if replay_session.daily_run_id is None:
-        return DailyAnswerState(
-            daily_run_id=None,
-            current_question=0,
-            total_questions=DAILY_CHALLENGE_TOTAL_QUESTIONS,
-            score=0,
-            completed=False,
-            current_streak=current_streak,
-            best_streak=best_streak,
-        )
-
-    run = await DailyRunsRepo.get_by_id(session, replay_session.daily_run_id)
-    if run is None:
-        return DailyAnswerState(
-            daily_run_id=replay_session.daily_run_id,
-            current_question=0,
-            total_questions=DAILY_CHALLENGE_TOTAL_QUESTIONS,
-            score=0,
-            completed=False,
-            current_streak=current_streak,
-            best_streak=best_streak,
-        )
-
-    return DailyAnswerState(
-        daily_run_id=run.id,
-        current_question=run.current_question,
-        total_questions=DAILY_CHALLENGE_TOTAL_QUESTIONS,
-        score=run.score,
-        completed=run.status == "COMPLETED",
+    return await build_daily_replay_state_impl(
+        session,
+        replay_session=replay_session,
         current_streak=current_streak,
         best_streak=best_streak,
+        daily_runs_repo=DailyRunsRepo,
     )
 
 
@@ -161,93 +121,92 @@ async def apply_daily_answer(
     now_utc: datetime,
 ) -> DailyAnswerState:
     if quiz_session.daily_run_id is None:
-        streak_snapshot = await StreakService.sync_rollover(
+        return await _build_missing_daily_answer_state(
             session,
-            user_id=user_id,
-            now_utc=now_utc,
-        )
-        return DailyAnswerState(
             daily_run_id=None,
-            current_question=1,
-            total_questions=DAILY_CHALLENGE_TOTAL_QUESTIONS,
-            score=1 if is_correct else 0,
-            completed=False,
-            current_streak=streak_snapshot.current_streak,
-            best_streak=streak_snapshot.best_streak,
+            user_id=user_id,
+            is_correct=is_correct,
+            now_utc=now_utc,
         )
 
     run = await DailyRunsRepo.get_by_id_for_update(session, quiz_session.daily_run_id)
     if run is None:
-        streak_snapshot = await StreakService.sync_rollover(
+        return await _build_missing_daily_answer_state(
             session,
-            user_id=user_id,
-            now_utc=now_utc,
-        )
-        return DailyAnswerState(
             daily_run_id=quiz_session.daily_run_id,
-            current_question=1,
-            total_questions=DAILY_CHALLENGE_TOTAL_QUESTIONS,
-            score=1 if is_correct else 0,
-            completed=False,
-            current_streak=streak_snapshot.current_streak,
-            best_streak=streak_snapshot.best_streak,
-        )
-
-    completed_now = False
-    if run.status != "COMPLETED":
-        run.status = "IN_PROGRESS"
-        run.completed_at = None
-        run.current_question = min(DAILY_CHALLENGE_TOTAL_QUESTIONS, run.current_question + 1)
-        if is_correct:
-            run.score = min(DAILY_CHALLENGE_TOTAL_QUESTIONS, run.score + 1)
-        if run.current_question >= DAILY_CHALLENGE_TOTAL_QUESTIONS:
-            run.status = "COMPLETED"
-            run.completed_at = now_utc
-            completed_now = True
-
-    if completed_now:
-        await _apply_daily_completion_reward(
-            session,
             user_id=user_id,
-            daily_run_id=run.id,
-            score=run.score,
+            is_correct=is_correct,
             now_utc=now_utc,
         )
-        streak_activity = await StreakService.record_activity(
+
+    if advance_daily_run(run, is_correct=is_correct, now_utc=now_utc):
+        streak = await _record_daily_completion(
             session,
             user_id=user_id,
-            activity_at_utc=now_utc,
-        )
-        current_streak = streak_activity.current_streak
-        best_streak = streak_activity.best_streak
-        await emit_analytics_event(
-            session,
-            event_type="daily_completed",
-            source=EVENT_SOURCE_BOT,
-            happened_at=now_utc,
-            user_id=user_id,
-            payload={
-                "daily_run_id": str(run.id),
-                "berlin_date": run.berlin_date.isoformat(),
-                "score": run.score,
-                "total_questions": DAILY_CHALLENGE_TOTAL_QUESTIONS,
-            },
+            run=run,
+            now_utc=now_utc,
         )
     else:
-        streak_snapshot = await StreakService.sync_rollover(
+        streak = await StreakService.sync_rollover(
             session,
             user_id=user_id,
             now_utc=now_utc,
         )
-        current_streak = streak_snapshot.current_streak
-        best_streak = streak_snapshot.best_streak
 
-    return DailyAnswerState(
-        daily_run_id=run.id,
-        current_question=run.current_question,
-        total_questions=DAILY_CHALLENGE_TOTAL_QUESTIONS,
-        score=run.score,
-        completed=run.status == "COMPLETED",
-        current_streak=current_streak,
-        best_streak=best_streak,
+    return build_existing_daily_run_state(
+        run=run,
+        current_streak=streak.current_streak,
+        best_streak=streak.best_streak,
     )
+
+
+async def _build_missing_daily_answer_state(
+    session: AsyncSession,
+    *,
+    daily_run_id: UUID | None,
+    user_id: int,
+    is_correct: bool,
+    now_utc: datetime,
+) -> DailyAnswerState:
+    streak = await StreakService.sync_rollover(session, user_id=user_id, now_utc=now_utc)
+    return build_missing_daily_run_state(
+        daily_run_id=daily_run_id,
+        is_correct=is_correct,
+        current_streak=streak.current_streak,
+        best_streak=streak.best_streak,
+    )
+
+
+async def _record_daily_completion(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    run,
+    now_utc: datetime,
+):
+    await _apply_daily_completion_reward(
+        session,
+        user_id=user_id,
+        daily_run_id=run.id,
+        score=run.score,
+        now_utc=now_utc,
+    )
+    streak = await StreakService.record_activity(
+        session,
+        user_id=user_id,
+        activity_at_utc=now_utc,
+    )
+    await emit_analytics_event(
+        session,
+        event_type="daily_completed",
+        source=EVENT_SOURCE_BOT,
+        happened_at=now_utc,
+        user_id=user_id,
+        payload={
+            "daily_run_id": str(run.id),
+            "berlin_date": run.berlin_date.isoformat(),
+            "score": run.score,
+            "total_questions": DAILY_CHALLENGE_TOTAL_QUESTIONS,
+        },
+    )
+    return streak

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
-from app.game.sessions.types import StartSessionResult
+if TYPE_CHECKING:
+    from app.game.sessions.types import StartSessionResult
 
 
 @dataclass(frozen=True, slots=True)
