@@ -82,6 +82,10 @@ services:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: /api
       API_INTERNAL_URL: ${FRONTEND_API_INTERNAL_URL:-http://api:8000}
+      QUIZ_BANK_API_BASE_URL: ${QUIZ_BANK_API_BASE_URL:?QUIZ_BANK_API_BASE_URL is required}
+      QUIZ_BANK_EDGE_API_KEY: ${QUIZ_BANK_EDGE_API_KEY:?QUIZ_BANK_EDGE_API_KEY is required}
+      QUIZ_BANK_CONSUMER_ID: ${QUIZ_BANK_CONSUMER_ID:?QUIZ_BANK_CONSUMER_ID is required}
+      QUIZ_BANK_CONSUMER_API_KEY: ${QUIZ_BANK_CONSUMER_API_KEY:?QUIZ_BANK_CONSUMER_API_KEY is required}
     depends_on:
       api:
         condition: service_healthy
@@ -146,12 +150,16 @@ services:
         condition: service_healthy
       frontend:
         condition: service_started
+    networks:
+      - default
+      - api_quiz_bank
     ports:
       - "80:80"
       - "443:443"
     environment:
       DOMAIN: ${DOMAIN:?DOMAIN is required}
       CADDY_EMAIL: ${CADDY_EMAIL:?CADDY_EMAIL is required}
+      API_QUIZ_BANK_PUBLIC_API_KEY: ${API_QUIZ_BANK_PUBLIC_API_KEY:?API_QUIZ_BANK_PUBLIC_API_KEY is required}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -162,3 +170,8 @@ volumes:
   redis_data:
   caddy_data:
   caddy_config:
+
+networks:
+  api_quiz_bank:
+    external: true
+    name: api-quiz-bank_default
