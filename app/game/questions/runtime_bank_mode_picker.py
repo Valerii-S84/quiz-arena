@@ -113,7 +113,10 @@ async def _pick_question_id_from_pool(
 def _allowed_levels_tuple(allowed_levels: Sequence[str] | None) -> tuple[str, ...] | None:
     if allowed_levels is None:
         return None
-    return tuple(dict.fromkeys(level.strip().upper() for level in allowed_levels if level))
+    normalized_levels = tuple(
+        dict.fromkeys(level.strip().upper() for level in allowed_levels if level and level.strip())
+    )
+    return normalized_levels or None
 
 
 async def _select_candidate_id_once(
