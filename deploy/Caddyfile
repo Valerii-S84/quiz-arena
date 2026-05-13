@@ -64,7 +64,7 @@ api.valerchik.de {
 	}
 
 	handle {
-		reverse_proxy api-quiz-bank-pilot:8000
+		reverse_proxy api-quiz-bank:8000
 	}
 
 	header {

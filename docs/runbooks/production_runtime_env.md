@@ -17,4 +17,8 @@ Required runtime variables for the tracked production compose and Caddy config:
 - `QUIZ_BANK_CONSUMER_API_KEY`
 - `API_QUIZ_BANK_PUBLIC_API_KEY`
 
+The `api.valerchik.de` edge route also requires the separate Quiz Bank runtime to be
+running on Docker network `api-quiz-bank_default` with service DNS
+`api-quiz-bank:8000`.
+
 Do not commit real tokens, passwords, keys, or full production `.env` files.

@@ -150,6 +150,9 @@ services:
         condition: service_healthy
       frontend:
         condition: service_started
+    networks:
+      - default
+      - api_quiz_bank
     ports:
       - "80:80"
       - "443:443"
@@ -167,3 +170,8 @@ volumes:
   redis_data:
   caddy_data:
   caddy_config:
+
+networks:
+  api_quiz_bank:
+    external: true
+    name: api-quiz-bank_default
