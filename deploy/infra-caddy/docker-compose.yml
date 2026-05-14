@@ -1,0 +1,41 @@
+# Draft target compose file for future infra-caddy ownership.
+# Do not run this from the repository checkout. It is intended for a reviewed
+# copy to /opt/infra-caddy during an approved migration window.
+
+services:
+  caddy:
+    image: caddy:2.8
+    container_name: infra_caddy_prod
+    restart: unless-stopped
+    env_file:
+      - .env.caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - quiz_arena_edge
+      - quiz_arena_site_edge
+      - api_quiz_bank_edge
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+    external: true
+    name: quiz-arena_caddy_data
+  caddy_config:
+    external: true
+    name: quiz-arena_caddy_config
+
+networks:
+  quiz_arena_edge:
+    external: true
+    name: quiz-arena-edge
+  quiz_arena_site_edge:
+    external: true
+    name: quiz-arena-site-edge
+  api_quiz_bank_edge:
+    external: true
+    name: api-quiz-bank-edge
