@@ -268,6 +268,10 @@ stability window.
 
 - Create `.env.quiz-arena`, `.env.site`, `.env.quiz-bank`, and `.env.caddy`
   from the matrix.
+- If `api` is recreated while applying the split env, verify or reconnect
+  `quiz-arena-api-1` on `quiz-arena-edge` with alias `api` before public health
+  checks. Caddy reaches `/health`, `/api/*`, and `/webhook*` through
+  `api:8000`, so this edge alias is a hard runtime invariant.
 - Do not delete the old `.env` until all stacks are verified and backups are
   confirmed.
 - Never print values during the split.
@@ -332,6 +336,7 @@ Run after future migration:
 | --- | --- | --- |
 | TLS certificates lost or regenerated incorrectly | Public HTTPS outage or rate-limit risk | Reuse `quiz-arena_caddy_data` and `quiz-arena_caddy_config` as external volumes; back them up before cutover |
 | Wrong Docker aliases | Caddy returns `502` | Preserve aliases `api`, `site-frontend`, `api-quiz-bank`; readiness-gate the site frontend before public cutover |
+| API recreated without edge alias | `/health`, `/api/*`, or `/webhook*` returns `502` | After any Phase 9 `api` recreate, verify or reconnect `quiz-arena-api-1` to `quiz-arena-edge` with alias `api`, reload Caddy, then run public checks |
 | Caddy cannot see upstream networks | Quiz Arena or API Quiz Bank outage | Attach Caddy to all three edge networks |
 | Telegram webhook gets `502` or connection refused | Bot stops receiving updates | Verify `/webhook* -> api:8000` immediately after cutover; roll back Caddy first |
 | `api.valerchik.de` returns `502` | Quiz Bank API unavailable | Keep `api-quiz-bank-edge` alias and verify authorized edge route before proceeding |

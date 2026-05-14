@@ -1044,12 +1044,76 @@ docker compose --env-file .env.quiz-arena -f docker-compose.prod.yml config --qu
 Do not restart backend services in this phase unless a separate approved
 service-specific env reload is scheduled.
 
+If an approved service-specific env reload is scheduled, restart only the
+backend services that need the split env. The `api` service must remain
+reachable from Caddy through `api:8000` on `quiz-arena-edge`; verify or
+reconnect that edge alias before running public route checks.
+
+Restart and readiness-gate `api`:
+
+```bash
+cd /opt/quiz-arena
+docker compose --env-file .env.quiz-arena -f docker-compose.prod.yml up -d \
+  --no-deps --no-build api
+
+docker network inspect quiz-arena-edge \
+  --format '{{json .Containers}}' | grep -q 'quiz-arena-api-1' \
+  || docker network connect --alias api quiz-arena-edge quiz-arena-api-1
+
+docker exec infra_caddy_prod getent hosts api
+docker exec infra_caddy_prod caddy reload --config /etc/caddy/Caddyfile
+
+for attempt in $(seq 1 30); do
+  if docker run --rm --network quiz-arena-edge alpine:3.20 \
+    sh -lc 'wget -q -O /tmp/api_ready.out --timeout=3 http://api:8000/ready && test -s /tmp/api_ready.out'
+  then
+    break
+  fi
+  if [ "${attempt}" = "30" ]; then
+    echo "api did not become ready on quiz-arena-edge" >&2
+    exit 1
+  fi
+  sleep 2
+done
+
+curl -fsS https://deutchquizarena.de/health
+curl -sS -o /tmp/api_ready_after_phase9.out -w '%{http_code}\n' \
+  https://deutchquizarena.de/api/ready \
+  | grep -qx '404'
+```
+
+Restart worker and beat only after `api` is healthy through Caddy:
+
+```bash
+cd /opt/quiz-arena
+docker compose --env-file .env.quiz-arena -f docker-compose.prod.yml up -d \
+  --no-deps --no-build worker beat
+```
+
 Rollback for Phase 9:
 
 ```bash
 rm -f /opt/quiz-arena/.env.quiz-arena
 cp -a "${BACKUP_DIR}/env/quiz-arena.env.before" /opt/quiz-arena/.env
+cp -a "${BACKUP_DIR}/files/quiz-arena.docker-compose.prod.yml.before" \
+  /opt/quiz-arena/docker-compose.prod.yml
+
+cd /opt/quiz-arena
+docker compose -f docker-compose.prod.yml --env-file .env up -d \
+  --no-deps --no-build api worker beat
+
+docker network inspect quiz-arena-edge \
+  --format '{{json .Containers}}' | grep -q 'quiz-arena-api-1' \
+  || docker network connect --alias api quiz-arena-edge quiz-arena-api-1
+docker exec infra_caddy_prod getent hosts api
+docker exec infra_caddy_prod caddy reload --config /etc/caddy/Caddyfile
+
 curl -fsS https://deutchquizarena.de/health
+curl -fsS https://deutchquizarena.de/ >/tmp/frontend_phase9_rollback.html
+test -s /tmp/frontend_phase9_rollback.html
+curl -sS -o /tmp/api_valerchik_unauthorized_phase9_rollback.out \
+  -w '%{http_code}\n' https://api.valerchik.de/health \
+  | grep -qx '401'
 ```
 
 ## Phase 10: Final Verification Checklist
