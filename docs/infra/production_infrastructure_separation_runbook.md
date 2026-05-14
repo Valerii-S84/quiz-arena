@@ -387,7 +387,7 @@ docker network inspect quiz-arena-edge \
 
 docker network inspect quiz-arena-site-edge \
   --format '{{json .Containers}}' | grep -q 'quiz-arena-frontend-1' \
-  || docker network connect --alias frontend quiz-arena-site-edge quiz-arena-frontend-1
+  || docker network connect --alias site-frontend quiz-arena-site-edge quiz-arena-frontend-1
 
 docker network inspect api-quiz-bank-edge \
   --format '{{json .Containers}}' | grep -q 'api-quiz-bank-pilot' \
@@ -411,7 +411,7 @@ Verify upstream DNS from the future Caddy networks:
 docker run --rm --network quiz-arena-edge alpine:3.20 \
   sh -lc 'getent hosts api'
 docker run --rm --network quiz-arena-site-edge alpine:3.20 \
-  sh -lc 'getent hosts frontend'
+  sh -lc 'getent hosts site-frontend'
 docker run --rm --network api-quiz-bank-edge alpine:3.20 \
   sh -lc 'getent hosts api-quiz-bank'
 ```
@@ -740,6 +740,79 @@ docker compose --env-file .env.site -f docker-compose.prod.yml up -d frontend
 docker compose --env-file .env.site -f docker-compose.prod.yml ps
 ```
 
+Keep Caddy pinned to the old frontend while the new site frontend starts:
+
+```bash
+cd /opt/infra-caddy
+cp -a Caddyfile "${BACKUP_DIR}/files/infra-caddy.Caddyfile.pre_site_route_switch"
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/opt/infra-caddy/Caddyfile")
+text = path.read_text(encoding="utf-8")
+for old in ("site-frontend:3000", "frontend:3000"):
+    text = text.replace(old, "quiz-arena-frontend-1:3000")
+path.write_text(text, encoding="utf-8")
+PY
+docker compose --env-file .env.caddy -f docker-compose.yml exec -T caddy \
+  caddy reload --config /etc/caddy/Caddyfile
+```
+
+Readiness-gate the new frontend internally before any public route switch:
+
+```bash
+docker run --rm --network quiz-arena-edge alpine:3.20 \
+  sh -lc 'wget -q -O /tmp/site_frontend.html --timeout=5 http://quiz-arena-site-frontend-1:3000/ && test -s /tmp/site_frontend.html'
+docker run --rm --network quiz-arena-site-edge alpine:3.20 \
+  sh -lc 'wget -q -O /tmp/site_frontend.html --timeout=5 http://quiz-arena-site-frontend-1:3000/ && test -s /tmp/site_frontend.html'
+```
+
+Move the stable `site-frontend` alias to the new site container only after the
+internal readiness checks pass:
+
+```bash
+docker network disconnect quiz-arena-site-edge quiz-arena-frontend-1 || true
+docker network inspect quiz-arena-site-edge \
+  --format '{{json .Containers}}' | grep -q 'quiz-arena-site-frontend-1' \
+  || docker network connect --alias site-frontend quiz-arena-site-edge quiz-arena-site-frontend-1
+docker exec infra_caddy_prod getent hosts site-frontend
+docker run --rm --network quiz-arena-site-edge alpine:3.20 \
+  sh -lc 'wget -q -O /tmp/site_frontend.html --timeout=5 http://site-frontend:3000/ && test -s /tmp/site_frontend.html'
+```
+
+Switch Caddy to the stable site frontend upstream:
+
+```bash
+cd /opt/infra-caddy
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/opt/infra-caddy/Caddyfile")
+allowed = {
+    "frontend:3000",
+    "quiz-arena-frontend-1:3000",
+    "quiz-arena-site-frontend-1:3000",
+    "site-frontend:3000",
+}
+lines = []
+for line in path.read_text(encoding="utf-8").splitlines(keepends=True):
+    newline = "\n" if line.endswith("\n") else ""
+    raw = line[:-1] if newline else line
+    leading = raw[: len(raw) - len(raw.lstrip())]
+    parts = raw.split()
+    if len(parts) == 2 and parts[0] == "reverse_proxy" and parts[1] in allowed:
+        line = f"{leading}reverse_proxy site-frontend:3000{newline}"
+    lines.append(line)
+path.write_text("".join(lines), encoding="utf-8")
+PY
+docker run --rm \
+  --env-file /opt/infra-caddy/.env.caddy \
+  -v /opt/infra-caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
+  caddy:2.8 caddy validate --config /etc/caddy/Caddyfile
+docker compose --env-file .env.caddy -f docker-compose.yml exec -T caddy \
+  caddy reload --config /etc/caddy/Caddyfile
+```
+
 Verify new frontend container and edge route:
 
 ```bash
@@ -755,19 +828,15 @@ fi
 ```
 
 If the route is healthy and Caddy logs are clean, detach the old frontend from
-edge networks and stop only the old frontend service:
+edge networks. Keep the old frontend container available for rollback through
+the 24-48 hour stability window; do not stop or remove it during this phase:
 
 ```bash
-docker network disconnect quiz-arena-site-edge quiz-arena-frontend-1 || true
 docker network disconnect quiz-arena-edge quiz-arena-frontend-1 || true
-
-cd /opt/quiz-arena
-docker compose -f docker-compose.prod.yml --env-file .env stop frontend
-docker compose -f docker-compose.prod.yml --env-file .env rm -f frontend
 ```
 
 Copy backend-only target compose into `/opt/quiz-arena` after old Caddy and old
-frontend are no longer active:
+frontend public routing are no longer active:
 
 ```bash
 cp -a /opt/quiz-arena/docker-compose.prod.yml \
