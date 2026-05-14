@@ -1,0 +1,33 @@
+# Draft target compose file for future quiz-arena-site ownership.
+# Do not apply directly on the VPS without the approved migration runbook.
+# Use with: docker compose --env-file .env.site -f docker-compose.prod.yml ...
+
+services:
+  frontend:
+    image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required}
+    restart: unless-stopped
+    env_file:
+      - .env.site
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: /api
+      API_INTERNAL_URL: ${FRONTEND_API_INTERNAL_URL:-http://api:8000}
+      QUIZ_BANK_API_BASE_URL: ${QUIZ_BANK_API_BASE_URL:?QUIZ_BANK_API_BASE_URL is required}
+      QUIZ_BANK_EDGE_API_KEY: ${QUIZ_BANK_EDGE_API_KEY:?QUIZ_BANK_EDGE_API_KEY is required}
+      QUIZ_BANK_CONSUMER_ID: ${QUIZ_BANK_CONSUMER_ID:?QUIZ_BANK_CONSUMER_ID is required}
+      QUIZ_BANK_CONSUMER_API_KEY: ${QUIZ_BANK_CONSUMER_API_KEY:?QUIZ_BANK_CONSUMER_API_KEY is required}
+    expose:
+      - "3000"
+    networks:
+      quiz_arena_site_edge:
+        aliases:
+          - frontend
+      quiz_arena_edge:
+
+networks:
+  quiz_arena_site_edge:
+    external: true
+    name: quiz-arena-site-edge
+  quiz_arena_edge:
+    external: true
+    name: quiz-arena-edge
