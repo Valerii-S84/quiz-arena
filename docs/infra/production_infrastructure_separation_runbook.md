@@ -1082,12 +1082,34 @@ curl -sS -o /tmp/api_ready_after_phase9.out -w '%{http_code}\n' \
   | grep -qx '404'
 ```
 
-Restart worker and beat only after `api` is healthy through Caddy:
+Restart worker only after `api` is healthy through Caddy. Do not call the
+final public `/health` check until Celery responds: `/health` includes a
+Celery worker ping and can return `503` while the worker is still booting.
 
 ```bash
 cd /opt/quiz-arena
 docker compose --env-file .env.quiz-arena -f docker-compose.prod.yml up -d \
-  --no-deps --no-build worker beat
+  --no-deps --no-build worker
+
+for attempt in $(seq 1 30); do
+  if docker exec -i quiz-arena-worker-1 python - <<'PY'
+from app.workers.celery_app import celery_app
+
+replies = celery_app.control.inspect(timeout=5).ping() or {}
+raise SystemExit(0 if replies else 1)
+PY
+  then
+    break
+  fi
+  if [ "${attempt}" = "30" ]; then
+    echo "celery worker did not respond to ping" >&2
+    exit 1
+  fi
+  sleep 2
+done
+
+docker compose --env-file .env.quiz-arena -f docker-compose.prod.yml up -d \
+  --no-deps --no-build beat
 ```
 
 Rollback for Phase 9:
