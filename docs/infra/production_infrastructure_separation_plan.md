@@ -86,7 +86,7 @@ Caddy must continue to use the same upstream hostnames:
 | Upstream name | Target provider | Network requirement |
 | --- | --- | --- |
 | `api:8000` | `quiz-arena` service `api` | `api` attached to `quiz-arena-edge` with alias `api`; Caddy also attached |
-| `frontend:3000` | `quiz-arena-site` service `frontend` | `frontend` attached to `quiz-arena-site-edge` with alias `frontend`; Caddy also attached |
+| `site-frontend:3000` | `quiz-arena-site` service `frontend` | `frontend` attached to `quiz-arena-site-edge` with alias `site-frontend`; Caddy also attached |
 | `api-quiz-bank:8000` | `api-quiz-bank` service | API Quiz Bank service attached to `api-quiz-bank-edge` with alias `api-quiz-bank`; Caddy also attached |
 
 The `quiz-arena-site` frontend should also attach to `quiz-arena-edge` while
@@ -101,9 +101,9 @@ frontend calls to the backend without routing them through the public edge.
 | `deutchquizarena.de` | `/webhook*` | `api:8000` |
 | `deutchquizarena.de` | `/health` | `api:8000` |
 | `deutchquizarena.de` | `/api/ready`, `/api/ready/*` | public `404` |
-| `deutchquizarena.de` | `/api/quiz-teaser/*` | `frontend:3000` |
+| `deutchquizarena.de` | `/api/quiz-teaser/*` | `site-frontend:3000` |
 | `deutchquizarena.de` | `/api/*` | `api:8000` with path prefix stripped by `handle_path` |
-| `deutchquizarena.de` | fallback | `frontend:3000` |
+| `deutchquizarena.de` | fallback | `site-frontend:3000` |
 | `deutchquizarena.46.225.181.45.sslip.io` | same as `deutchquizarena.de` | same behavior |
 | `api.valerchik.de` | missing or wrong `X-API-Key` | `401` |
 | `api.valerchik.de` | authorized requests | `api-quiz-bank:8000` |
@@ -127,7 +127,7 @@ External Docker networks to create during the future migration:
 | Network | Created by | Connected services | Required aliases |
 | --- | --- | --- | --- |
 | `quiz-arena-edge` | Phase 2 operator command | `infra-caddy/caddy`, `quiz-arena/api`, `quiz-arena-site/frontend` while it needs backend SSR access | `api` on backend service |
-| `quiz-arena-site-edge` | Phase 2 operator command | `infra-caddy/caddy`, `quiz-arena-site/frontend` | `frontend` on frontend service |
+| `quiz-arena-site-edge` | Phase 2 operator command | `infra-caddy/caddy`, `quiz-arena-site/frontend` | `site-frontend` on frontend service |
 | `api-quiz-bank-edge` | Phase 2 operator command | `infra-caddy/caddy`, `api-quiz-bank/api-quiz-bank` | `api-quiz-bank` on API Quiz Bank service |
 
 Network creation commands for the future migration window:
@@ -156,7 +156,7 @@ Target owner: `infra-caddy`.
    same time on ports `80` and `443`.
 5. Use a controlled start mode before public cutover:
    - Validate the target Caddyfile syntax.
-   - Confirm the new container can resolve `api`, `frontend`, and
+   - Confirm the new container can resolve `api`, `site-frontend`, and
      `api-quiz-bank` on the target networks.
    - If a temporary rehearsal container is used, bind it only to loopback
      ports and avoid ACME writes against production certificates.
@@ -246,12 +246,23 @@ service recovery path.
 
 - Create `/opt/quiz-arena-site`.
 - Move frontend service ownership into `quiz-arena-site`.
-- Attach frontend to `quiz-arena-site-edge` with alias `frontend`.
+- Attach frontend to `quiz-arena-site-edge` with stable alias
+  `site-frontend`.
 - Keep frontend attached to `quiz-arena-edge` while it needs
   `API_INTERNAL_URL=http://api:8000`.
+- Readiness-gate `quiz-arena-site-frontend-1:3000` internally before switching
+  Caddy.
+- Switch Caddy public frontend routes to `site-frontend:3000` only after the
+  internal readiness check succeeds.
+- After public verification, detach the old `quiz-arena-frontend-1` from
+  `quiz-arena-edge` and `quiz-arena-site-edge`, but keep it running on
+  `quiz-arena_default` as a rollback runtime through the stability window.
 
-Rollback: restore frontend service in the old `quiz-arena` compose stack and
-point Caddy back to the old `frontend` upstream if needed.
+Rollback: reconnect `quiz-arena-frontend-1` to `quiz-arena-edge`, point Caddy
+frontend upstreams to `quiz-arena-frontend-1:3000`, reload Caddy, and verify
+frontend, `/api/quiz-teaser/*`, `/health`, public `/api/ready`, Telegram
+webhook, and Caddy logs. Do not delete the old frontend runtime during the
+stability window.
 
 ### Phase 9: Split env files
 
@@ -320,7 +331,7 @@ Run after future migration:
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
 | TLS certificates lost or regenerated incorrectly | Public HTTPS outage or rate-limit risk | Reuse `quiz-arena_caddy_data` and `quiz-arena_caddy_config` as external volumes; back them up before cutover |
-| Wrong Docker aliases | Caddy returns `502` | Preserve aliases `api`, `frontend`, `api-quiz-bank`; test resolution before public cutover |
+| Wrong Docker aliases | Caddy returns `502` | Preserve aliases `api`, `site-frontend`, `api-quiz-bank`; readiness-gate the site frontend before public cutover |
 | Caddy cannot see upstream networks | Quiz Arena or API Quiz Bank outage | Attach Caddy to all three edge networks |
 | Telegram webhook gets `502` or connection refused | Bot stops receiving updates | Verify `/webhook* -> api:8000` immediately after cutover; roll back Caddy first |
 | `api.valerchik.de` returns `502` | Quiz Bank API unavailable | Keep `api-quiz-bank-edge` alias and verify authorized edge route before proceeding |
