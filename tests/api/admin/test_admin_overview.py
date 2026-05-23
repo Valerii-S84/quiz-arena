@@ -15,10 +15,12 @@ from app.api.routes.admin import (
     overview_activity_metrics,
     overview_metrics,
     overview_queries,
+    overview_series,
     overview_streak_metrics,
 )
 from app.main import app
 from app.services.admin import cache as admin_cache
+from tests.db.repo._helpers import RecordingSession, compile_statement
 from tests.type_helpers import AsyncBeginContext, AsyncSessionStub
 from tests.type_helpers import RowsResult as _RowsResult
 from tests.type_helpers import ScalarResult as _ScalarResult
@@ -184,6 +186,22 @@ def test_retention_day_rate_base_guard_is_unreachable() -> None:
 
 
 @pytest.mark.asyncio
+async def test_fetch_user_language_distribution_normalizes_and_orders_language_codes() -> None:
+    session = RecordingSession(_RowsResult([("de", 4), ("unknown", 2), ("en", 1)]))
+
+    distribution = await overview_series.fetch_user_language_distribution(session)
+
+    assert distribution == [
+        {"language": "de", "users": 4},
+        {"language": "unknown", "users": 2},
+        {"language": "en", "users": 1},
+    ]
+    sql = compile_statement(session.statement)
+    assert "coalesce(nullif(lower(trim(users.language_code)), ''), 'unknown')" in sql
+    assert "ORDER BY count(users.id) DESC" in sql
+
+
+@pytest.mark.asyncio
 async def test_build_overview_payload_builds_kpis_and_alerts() -> None:
     session = _SessionWithExec(
         _ScalarResult(100),
@@ -215,6 +233,7 @@ async def test_build_overview_payload_builds_kpis_and_alerts() -> None:
         _RowsResult([]),
         _RowsResult([(10, 2), (11, 3)]),
         _RowsResult([]),
+        _RowsResult([("de", 2), ("en", 1)]),
         _ScalarResult(10),
         _ScalarResult(5),
         _ScalarResult(5),
@@ -244,6 +263,8 @@ async def test_build_overview_payload_builds_kpis_and_alerts() -> None:
     assert payload.hourly_activity_series[10] == {"hour": 10, "active_users": 2}
     assert payload.hourly_activity_series[11] == {"hour": 11, "active_users": 3}
     assert payload.hourly_activity_series[12] == {"hour": 12, "active_users": 0}
+    assert payload.user_language_distribution[0].language == "de"
+    assert payload.user_language_distribution[0].users == 2
     assert payload.funnel[1] == {"step": "First Quiz", "value": 7}
     assert payload.funnel[2] == {"step": "Streak 3+", "value": 7}
     assert payload.funnel[3] == {"step": "Purchase", "value": 3}
@@ -308,6 +329,9 @@ def test_admin_overview_route_uses_cache_hit(
         "users_series": [],
         "funnel": [],
         "top_products": [],
+        "user_language_distribution": [],
+        "user_age_distribution": [],
+        "user_gender_distribution": [],
         "feature_usage": {},
         "alerts": [],
     }
@@ -353,6 +377,18 @@ def test_admin_overview_route_builds_payload_and_stores_cache(
             "users_series": [],
             "funnel": [],
             "top_products": [],
+            "user_language_distribution": [
+                {
+                    "language": "de",
+                    "users": 4,
+                },
+                {
+                    "language": "en",
+                    "users": 1,
+                },
+            ],
+            "user_age_distribution": [],
+            "user_gender_distribution": [],
             "feature_usage": {},
             "alerts": [],
         }
@@ -369,4 +405,14 @@ def test_admin_overview_route_builds_payload_and_stores_cache(
 
     assert response.status_code == 200
     assert response.json()["period"] == "7d"
+    assert response.json()["user_language_distribution"] == [
+        {
+            "language": "de",
+            "users": 4,
+        },
+        {
+            "language": "en",
+            "users": 1,
+        },
+    ]
     assert stored[0]["key"] == "admin:overview:7"
