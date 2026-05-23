@@ -22,6 +22,16 @@ class KpiCard(BaseModel):
     delta_pct: float
 
 
+class UserLanguageBucket(BaseModel):
+    language: str = Field(min_length=1)
+    users: int = Field(ge=0)
+
+
+class UserDistributionBucket(BaseModel):
+    group: str = Field(min_length=1)
+    users: int = Field(ge=0)
+
+
 class OverviewResponse(BaseModel):
     period: str
     generated_at: datetime
@@ -31,6 +41,9 @@ class OverviewResponse(BaseModel):
     hourly_activity_series: list[dict[str, object]] = Field(default_factory=list)
     funnel: list[dict[str, object]]
     top_products: list[dict[str, object]]
+    user_language_distribution: list[UserLanguageBucket] = Field(default_factory=list)
+    user_age_distribution: list[UserDistributionBucket] = Field(default_factory=list)
+    user_gender_distribution: list[UserDistributionBucket] = Field(default_factory=list)
     feature_usage: dict[str, KpiCard] = Field(default_factory=dict)
     alerts: list[dict[str, object]]
 

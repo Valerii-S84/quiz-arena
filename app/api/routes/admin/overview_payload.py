@@ -20,6 +20,7 @@ from app.api.routes.admin.overview_series import (
     fetch_hourly_activity_series,
     fetch_revenue_series,
     fetch_top_products,
+    fetch_user_language_distribution,
     fetch_users_series,
 )
 from app.api.routes.admin.overview_streak_metrics import count_users_reaching_streak_threshold
@@ -112,6 +113,7 @@ async def build_overview_payload(
     top_products = await fetch_top_products(
         session, from_utc=windows.current_start, to_utc=windows.current_end
     )
+    user_language_distribution = await fetch_user_language_distribution(session)
     feature_usage = await build_feature_usage_payload(
         session,
         range_start=windows.current_start,
@@ -144,6 +146,9 @@ async def build_overview_payload(
             streak3_users=streak3_users,
         ),
         "top_products": top_products,
+        "user_language_distribution": user_language_distribution,
+        "user_age_distribution": [],
+        "user_gender_distribution": [],
         "feature_usage": feature_usage,
         "alerts": alerts,
     }

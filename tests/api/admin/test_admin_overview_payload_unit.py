@@ -170,6 +170,7 @@ async def test_build_overview_payload_combines_empty_sections(
     monkeypatch.setattr(overview_payload, "fetch_users_series", _empty_list)
     monkeypatch.setattr(overview_payload, "fetch_hourly_activity_series", _empty_list)
     monkeypatch.setattr(overview_payload, "fetch_top_products", _empty_list)
+    monkeypatch.setattr(overview_payload, "fetch_user_language_distribution", _empty_list)
     monkeypatch.setattr(overview_payload, "build_feature_usage_payload", _feature_usage)
     monkeypatch.setattr(overview_payload, "_build_alerts", _alerts)
 
@@ -180,6 +181,9 @@ async def test_build_overview_payload_combines_empty_sections(
     assert payload["users_series"] == []
     assert payload["hourly_activity_series"] == []
     assert payload["top_products"] == []
+    assert payload["user_language_distribution"] == []
+    assert payload["user_age_distribution"] == []
+    assert payload["user_gender_distribution"] == []
     assert payload["feature_usage"] == {}
     assert payload["alerts"] == []
     assert payload["funnel"] == [
