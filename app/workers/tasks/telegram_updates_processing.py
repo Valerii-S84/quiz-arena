@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import structlog
+from aiogram import Bot, Dispatcher
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import Update
 
+from app.bot.diagnostics import install_outgoing_trace, log_update_trace
 from app.db.repo.processed_updates_repo import ProcessedUpdatesRepo
 from app.db.session import SessionLocal
 from app.workers.tasks.telegram_updates_config import (
@@ -17,6 +19,50 @@ from app.workers.tasks.telegram_updates_config import (
 from app.workers.tasks.telegram_updates_reliability import emit_reliability_event
 
 logger = structlog.get_logger("app.workers.tasks.telegram_updates")
+
+
+async def _close_dispatcher_storage(dispatcher: object) -> None:
+    storage = getattr(dispatcher, "storage", None)
+    close = getattr(storage, "close", None)
+    if callable(close):
+        await close()
+
+
+async def _set_update_status(update_id: int, status: str) -> None:
+    async with SessionLocal.begin() as session:
+        await ProcessedUpdatesRepo.set_status(
+            session,
+            update_id=update_id,
+            status=status,
+            processing_task_id=None,
+        )
+
+
+async def _feed_update_with_trace(
+    *,
+    bot: Bot,
+    dispatcher: Dispatcher,
+    update_payload: dict[str, object],
+    update_id: int,
+) -> None:
+    update = Update.model_validate(update_payload)
+    await log_update_trace(
+        phase="before",
+        update_id=update_id,
+        update=update,
+        dispatcher=dispatcher,
+        bot=bot,
+    )
+    try:
+        await dispatcher.feed_update(bot, update)
+    finally:
+        await log_update_trace(
+            phase="after",
+            update_id=update_id,
+            update=update,
+            dispatcher=dispatcher,
+            bot=bot,
+        )
 
 
 async def _acquire_processing_slot(
@@ -88,22 +134,21 @@ async def process_update_async(
 
     from app.workers.tasks import telegram_updates as telegram_updates_tasks
 
+    install_outgoing_trace()
     bot = telegram_updates_tasks.build_bot()
     dispatcher = telegram_updates_tasks.build_dispatcher()
 
     try:
-        update = Update.model_validate(update_payload)
-        await dispatcher.feed_update(bot, update)
+        await _feed_update_with_trace(
+            bot=bot,
+            dispatcher=dispatcher,
+            update_payload=update_payload,
+            update_id=update_id,
+        )
     except (TelegramBadRequest, TelegramForbiddenError) as exc:
         # Non-retryable Telegram API errors (stale callback query, blocked chat, etc.)
         # should not trigger Celery retries that can spam users with duplicated messages.
-        async with SessionLocal.begin() as session:
-            await ProcessedUpdatesRepo.set_status(
-                session,
-                update_id=update_id,
-                status="PROCESSED",
-                processing_task_id=None,
-            )
+        await _set_update_status(update_id, "PROCESSED")
         logger.warning(
             "telegram_update_non_retryable_error",
             update_id=update_id,
@@ -111,25 +156,14 @@ async def process_update_async(
         )
         return "processed"
     except Exception:
-        async with SessionLocal.begin() as session:
-            await ProcessedUpdatesRepo.set_status(
-                session,
-                update_id=update_id,
-                status="FAILED",
-                processing_task_id=None,
-            )
+        await _set_update_status(update_id, "FAILED")
         logger.exception("telegram_update_processing_failed", update_id=update_id)
         raise
     finally:
         await bot.session.close()
+        await _close_dispatcher_storage(dispatcher)
 
-    async with SessionLocal.begin() as session:
-        await ProcessedUpdatesRepo.set_status(
-            session,
-            update_id=update_id,
-            status="PROCESSED",
-            processing_task_id=None,
-        )
+    await _set_update_status(update_id, "PROCESSED")
 
     logger.info("telegram_update_processed", update_id=update_id)
     return "processed"

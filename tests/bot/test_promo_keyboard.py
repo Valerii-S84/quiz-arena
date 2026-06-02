@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from app.bot.keyboards.promo import build_promo_discount_keyboard
+from app.bot.keyboards.promo import build_promo_discount_keyboard, build_promo_input_keyboard
+
+
+def test_build_promo_input_keyboard_has_cancel_button() -> None:
+    keyboard = build_promo_input_keyboard()
+
+    assert keyboard.inline_keyboard[0][0].callback_data == "promo:cancel"
 
 
 def test_build_promo_discount_keyboard_for_specific_product_scope() -> None:

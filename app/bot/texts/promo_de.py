@@ -1,0 +1,15 @@
+PROMO_TEXTS_DE: dict[str, str] = {
+    "msg.promo.reply_prefix": "🎟 Promo-Code",
+    "msg.promo.input.hint": "🎟 Promo-Code\nSende deinen Code als neue Nachricht oder nutze /promo CODE.\nBeispiel: /promo WILLKOMMEN-50",
+    "msg.promo.cancelled": "Promo-Code abgebrochen.",
+    "msg.promo.success.grant": "✅ Promo-Code aktiviert.",
+    "msg.promo.success.grant.details": "Aktiviert: {premium_days} Tage Premium bis {premium_ends_at} (Berlin).",
+    "msg.promo.success.discount": "✅ Promo-Code aktiviert.",
+    "msg.promo.success.discount.details": "Aktiviert: {discount_label} fuer {scope_label} bis {reserved_until} (Berlin).",
+    "msg.promo.discount.unavailable": "⚠️ Das Promo-Angebot ist derzeit nicht verfuegbar.",
+    "msg.promo.error.invalid": "❌ Promo-Code ungültig oder nicht aktiv. Prüfe den Code und versuche es erneut.",
+    "msg.promo.error.expired": "❌ Dieser Promo-Code ist abgelaufen.",
+    "msg.promo.error.used": "ℹ️ Diesen Promo-Code hast du bereits verwendet.",
+    "msg.promo.error.not_applicable": "❌ Dieser Promo-Code gilt nicht für dieses Produkt.",
+    "msg.promo.error.rate_limited": "⏳ Zu viele Versuche. Bitte versuche es später erneut.",
+}

@@ -1,6 +1,8 @@
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 
+from app.bot.diagnostics import install_outgoing_trace
+from app.bot.fsm_storage import LoopAwareRedisStorage
 from app.bot.handlers.channel_bonus import router as channel_bonus_router
 from app.bot.handlers.gameplay import router as gameplay_router
 from app.bot.handlers.gameplay_inline_share import router as gameplay_inline_share_router
@@ -9,6 +11,7 @@ from app.bot.handlers.payments import router as payments_router
 from app.bot.handlers.promo import router as promo_router
 from app.bot.handlers.referral import router as referral_router
 from app.bot.handlers.start import router as start_router
+from app.bot.middlewares.fsm_cleanup import FsmCleanupMiddleware
 from app.core.config import get_settings
 
 _dispatcher: Dispatcher | None = None
@@ -16,6 +19,7 @@ _dispatcher: Dispatcher | None = None
 
 def build_bot() -> Bot:
     settings = get_settings()
+    install_outgoing_trace()
     return Bot(token=settings.telegram_bot_token, default=DefaultBotProperties())
 
 
@@ -24,7 +28,9 @@ def build_dispatcher() -> Dispatcher:
     if _dispatcher is not None:
         return _dispatcher
 
-    dispatcher = Dispatcher()
+    dispatcher = Dispatcher(storage=LoopAwareRedisStorage(get_settings().redis_url))
+    dispatcher.message.middleware(FsmCleanupMiddleware())
+    dispatcher.callback_query.middleware(FsmCleanupMiddleware())
     dispatcher.include_router(start_router)
     dispatcher.include_router(channel_bonus_router)
     dispatcher.include_router(gameplay_inline_share_router)

@@ -6,6 +6,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 
+from app.bot.texts.de import TEXTS_DE
 from app.db.models.entitlements import Entitlement
 from app.db.models.promo_redemptions import PromoRedemption
 from app.db.models.purchases import Purchase
@@ -21,6 +22,104 @@ from tests.integration.telegram_sandbox_smoke_fixtures import (
     _post_webhook_update,
     _precheckout_update,
 )
+
+
+@pytest.mark.asyncio
+async def test_telegram_webhook_ignores_stale_promo_reply_without_waiting_state(
+    monkeypatch,
+) -> None:
+    bot_api = _BotApiStub()
+    queue = _configure_webhook_processing(monkeypatch, bot_api)
+    telegram_user_id = 90_000_000_011
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
+        base_url="http://testserver",
+    ) as client:
+        await _post_webhook_update(
+            client,
+            _message_update(
+                update_id=1_000_011,
+                telegram_user_id=telegram_user_id,
+                message_id=111,
+                text="WILLKOMMEN-50",
+                reply_to_text=TEXTS_DE["msg.promo.input.hint"],
+            ),
+        )
+        await queue.drain()
+
+    assert bot_api.sent_messages == []
+
+    async with SessionLocal.begin() as session:
+        user = await session.scalar(select(User).where(User.telegram_user_id == telegram_user_id))
+        assert user is None
+
+
+@pytest.mark.asyncio
+async def test_telegram_webhook_promo_button_state_accepts_plain_text_once(
+    monkeypatch,
+) -> None:
+    now_utc = datetime.now(UTC)
+    await _create_discount_promo_code(
+        raw_code="STATE-50",
+        discount_percent=50,
+        target_scope="PREMIUM_MONTH",
+        now_utc=now_utc,
+    )
+    bot_api = _BotApiStub()
+    queue = _configure_webhook_processing(monkeypatch, bot_api)
+    telegram_user_id = 90_000_000_012
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
+        base_url="http://testserver",
+    ) as client:
+        await _post_webhook_update(
+            client,
+            _callback_update(
+                update_id=1_000_012,
+                telegram_user_id=telegram_user_id,
+                callback_query_id="cb-smoke-promo-open-1",
+                data="promo:open",
+            ),
+        )
+        await queue.drain()
+
+        assert bot_api.sent_messages[-1]["text"] == TEXTS_DE["msg.promo.input.hint"]
+
+        await _post_webhook_update(
+            client,
+            _message_update(
+                update_id=1_000_013,
+                telegram_user_id=telegram_user_id,
+                message_id=113,
+                text="STATE-50",
+            ),
+        )
+        await queue.drain()
+        sent_after_redeem = len(bot_api.sent_messages)
+
+        await _post_webhook_update(
+            client,
+            _message_update(
+                update_id=1_000_014,
+                telegram_user_id=telegram_user_id,
+                message_id=114,
+                text="STATE-50",
+            ),
+        )
+        await queue.drain()
+
+    assert bot_api.sent_messages[1]["text"] == TEXTS_DE["msg.promo.success.discount"]
+    assert len(bot_api.sent_messages) == sent_after_redeem
+
+    async with SessionLocal.begin() as session:
+        user = await session.scalar(select(User).where(User.telegram_user_id == telegram_user_id))
+        assert user is not None
+        redemption_count = await session.scalar(
+            select(func.count(PromoRedemption.id)).where(PromoRedemption.user_id == user.id)
+        )
+        assert int(redemption_count or 0) == 1
 
 
 @pytest.mark.asyncio
