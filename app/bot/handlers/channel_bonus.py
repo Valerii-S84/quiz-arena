@@ -124,6 +124,18 @@ async def handle_channel_bonus_check(callback: CallbackQuery) -> None:
                 user_id=snapshot.user_id,
                 payload={"source": "channel_bonus_check"},
             )
+        elif claim_result.status == ChannelBonusService.STATUS_CHECK_RETRY:
+            await emit_analytics_event(
+                session,
+                event_type="channel_bonus_check_retry_required",
+                source=EVENT_SOURCE_BOT,
+                happened_at=now_utc,
+                user_id=snapshot.user_id,
+                payload={
+                    "source": "channel_bonus_check",
+                    "reason": claim_result.reason or "unknown",
+                },
+            )
         elif claim_result.status == ChannelBonusService.STATUS_CHECK_ERROR:
             await emit_analytics_event(
                 session,
@@ -131,13 +143,18 @@ async def handle_channel_bonus_check(callback: CallbackQuery) -> None:
                 source=EVENT_SOURCE_BOT,
                 happened_at=now_utc,
                 user_id=snapshot.user_id,
-                payload={"source": "channel_bonus_check"},
+                payload={
+                    "source": "channel_bonus_check",
+                    "reason": claim_result.reason or "unknown",
+                },
             )
 
     if claim_result.status == ChannelBonusService.STATUS_CLAIMED:
         await callback.message.answer(TEXTS_DE["msg.channel.bonus.success"])
     elif claim_result.status == ChannelBonusService.STATUS_NOT_SUBSCRIBED:
         await callback.message.answer(TEXTS_DE["msg.channel.bonus.not_subscribed"])
+    elif claim_result.status == ChannelBonusService.STATUS_CHECK_RETRY:
+        await callback.message.answer(TEXTS_DE["msg.channel.bonus.check.retry"])
     elif claim_result.status == ChannelBonusService.STATUS_CHECK_ERROR:
         await callback.message.answer(TEXTS_DE["msg.channel.bonus.check.error"])
     await callback.answer()

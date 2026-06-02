@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from aiogram import Bot
-from aiogram.exceptions import TelegramAPIError
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest, TelegramNetworkError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -18,7 +18,16 @@ logger = logging.getLogger(__name__)
 _CHANNEL_BONUS_STATUS_CLAIMED = "CLAIMED"
 _CHANNEL_BONUS_STATUS_ALREADY_CLAIMED = "ALREADY_CLAIMED"
 _CHANNEL_BONUS_STATUS_NOT_SUBSCRIBED = "NOT_SUBSCRIBED"
+_CHANNEL_BONUS_STATUS_CHECK_RETRY = "CHECK_RETRY"
 _CHANNEL_BONUS_STATUS_CHECK_ERROR = "CHECK_ERROR"
+
+_CHECK_REASON_BOT_OR_CHANNEL_CONFIG = "bot_or_channel_config_broken"
+_CHECK_REASON_CHANNEL_NOT_CONFIGURED = "channel_not_configured"
+_CHECK_REASON_CHECKER_BOT_INVALID_TOKEN = "checker_bot_invalid_token"
+_CHECK_REASON_PARTICIPANT_ID_INVALID = "participant_id_invalid"
+_CHECK_REASON_TELEGRAM_API_ERROR = "telegram_api_error"
+_CHECK_REASON_TELEGRAM_TEMPORARY_ERROR = "telegram_temporary_error"
+_CHECK_REASON_USER_NOT_FOUND = "user_not_found"
 
 _SUBSCRIBED_MEMBER_STATUSES = {"creator", "administrator", "member", "restricted"}
 
@@ -28,6 +37,14 @@ class ChannelBonusClaimResult:
     status: str
     free_energy: int | None = None
     paid_energy: int | None = None
+    reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ChannelBonusSubscriptionCheck:
+    subscribed: bool | None
+    retryable: bool = False
+    reason: str | None = None
 
 
 def _clean_channel_value(raw_channel_value: str) -> str:
@@ -110,7 +127,7 @@ async def _is_user_subscribed_to_bonus_channel(
     channel_target: int | str,
     telegram_user_id: int,
     checker_bot_token: str,
-) -> bool | None:
+) -> ChannelBonusSubscriptionCheck:
     active_bot = bot
     checker_bot: Bot | None = None
     normalized_checker_token = checker_bot_token.strip()
@@ -120,19 +137,51 @@ async def _is_user_subscribed_to_bonus_channel(
             active_bot = checker_bot
         except ValueError as exc:
             logger.warning("channel_bonus_checker_bot_invalid_token", exc_info=exc)
-            return None
+            return ChannelBonusSubscriptionCheck(
+                subscribed=None,
+                reason=_CHECK_REASON_CHECKER_BOT_INVALID_TOKEN,
+            )
 
     try:
         member = await active_bot.get_chat_member(chat_id=channel_target, user_id=telegram_user_id)
-    except (TelegramAPIError, TimeoutError, OSError) as exc:
-        logger.warning("channel_bonus_check_failed", exc_info=exc)
-        return None
+    except TelegramBadRequest as exc:
+        if _is_participant_id_invalid(exc):
+            logger.warning("channel_bonus_participant_id_invalid", exc_info=exc)
+            return ChannelBonusSubscriptionCheck(
+                subscribed=None,
+                retryable=True,
+                reason=_CHECK_REASON_PARTICIPANT_ID_INVALID,
+            )
+        logger.warning("channel_bonus_check_bad_request", exc_info=exc)
+        return ChannelBonusSubscriptionCheck(
+            subscribed=None,
+            reason=_CHECK_REASON_BOT_OR_CHANNEL_CONFIG,
+        )
+    except (TelegramNetworkError, TimeoutError, OSError) as exc:
+        logger.warning("channel_bonus_check_temporary_error", exc_info=exc)
+        return ChannelBonusSubscriptionCheck(
+            subscribed=None,
+            retryable=True,
+            reason=_CHECK_REASON_TELEGRAM_TEMPORARY_ERROR,
+        )
+    except TelegramAPIError as exc:
+        logger.warning("channel_bonus_check_api_error", exc_info=exc)
+        return ChannelBonusSubscriptionCheck(
+            subscribed=None,
+            reason=_CHECK_REASON_TELEGRAM_API_ERROR,
+        )
     finally:
         if checker_bot is not None:
             await checker_bot.session.close()
 
     member_status = str(getattr(member, "status", "")).lower().strip()
-    return member_status in _SUBSCRIBED_MEMBER_STATUSES
+    return ChannelBonusSubscriptionCheck(
+        subscribed=member_status in _SUBSCRIBED_MEMBER_STATUSES,
+    )
+
+
+def _is_participant_id_invalid(exc: TelegramBadRequest) -> bool:
+    return "PARTICIPANT_ID_INVALID" in str(exc).upper()
 
 
 async def claim_bonus_if_subscribed(
@@ -147,23 +196,34 @@ async def claim_bonus_if_subscribed(
     channel_target = _resolve_channel_target(settings.bonus_channel_id)
     if channel_target is None:
         logger.warning("channel_bonus_channel_not_configured")
-        return ChannelBonusClaimResult(status=_CHANNEL_BONUS_STATUS_CHECK_ERROR)
+        return ChannelBonusClaimResult(
+            status=_CHANNEL_BONUS_STATUS_CHECK_ERROR,
+            reason=_CHECK_REASON_CHANNEL_NOT_CONFIGURED,
+        )
 
-    subscribed = await _is_user_subscribed_to_bonus_channel(
+    subscription_check = await _is_user_subscribed_to_bonus_channel(
         bot=bot,
         channel_target=channel_target,
         telegram_user_id=telegram_user_id,
         checker_bot_token=str(getattr(settings, "bonus_check_bot_token", "") or ""),
     )
-    if subscribed is None:
-        return ChannelBonusClaimResult(status=_CHANNEL_BONUS_STATUS_CHECK_ERROR)
-    if not subscribed:
+    if subscription_check.subscribed is None:
+        status = (
+            _CHANNEL_BONUS_STATUS_CHECK_RETRY
+            if subscription_check.retryable
+            else _CHANNEL_BONUS_STATUS_CHECK_ERROR
+        )
+        return ChannelBonusClaimResult(status=status, reason=subscription_check.reason)
+    if not subscription_check.subscribed:
         return ChannelBonusClaimResult(status=_CHANNEL_BONUS_STATUS_NOT_SUBSCRIBED)
 
     user = await UsersRepo.get_by_id_for_update(session, user_id)
     if user is None:
         logger.warning("channel_bonus_user_not_found")
-        return ChannelBonusClaimResult(status=_CHANNEL_BONUS_STATUS_CHECK_ERROR)
+        return ChannelBonusClaimResult(
+            status=_CHANNEL_BONUS_STATUS_CHECK_ERROR,
+            reason=_CHECK_REASON_USER_NOT_FOUND,
+        )
     if user.channel_bonus_claimed_at is not None:
         return ChannelBonusClaimResult(status=_CHANNEL_BONUS_STATUS_ALREADY_CLAIMED)
 
@@ -182,6 +242,7 @@ class ChannelBonusService:
     STATUS_CLAIMED = _CHANNEL_BONUS_STATUS_CLAIMED
     STATUS_ALREADY_CLAIMED = _CHANNEL_BONUS_STATUS_ALREADY_CLAIMED
     STATUS_NOT_SUBSCRIBED = _CHANNEL_BONUS_STATUS_NOT_SUBSCRIBED
+    STATUS_CHECK_RETRY = _CHANNEL_BONUS_STATUS_CHECK_RETRY
     STATUS_CHECK_ERROR = _CHANNEL_BONUS_STATUS_CHECK_ERROR
 
     is_bonus_claimed = staticmethod(is_bonus_claimed)

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from logging import WARNING
 from types import SimpleNamespace
 
 import pytest
+from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
+from aiogram.methods import GetChatMember
 
 from app.services import channel_bonus
 from app.services.channel_bonus import ChannelBonusService
@@ -28,6 +31,10 @@ class _FakeBot(DummyBot):
         if self._error is not None:
             raise self._error
         return SimpleNamespace(status=self._status)
+
+
+def _get_chat_member_method() -> GetChatMember:
+    return GetChatMember(chat_id="@quiz_arena_test", user_id=503)
 
 
 @pytest.mark.asyncio
@@ -126,7 +133,10 @@ async def test_claim_bonus_does_not_grant_when_not_subscribed(monkeypatch) -> No
 
 
 @pytest.mark.asyncio
-async def test_claim_bonus_does_not_grant_when_check_fails(monkeypatch) -> None:
+async def test_claim_bonus_asks_user_to_retry_when_participant_id_is_invalid(
+    monkeypatch,
+    caplog,
+) -> None:
     async def _fail_fill_to_free_cap(*args, **kwargs):
         raise AssertionError("bonus must not be granted when channel check fails")
 
@@ -140,6 +150,7 @@ async def test_claim_bonus_does_not_grant_when_check_fails(monkeypatch) -> None:
         "fill_to_free_cap",
         _fail_fill_to_free_cap,
     )
+    caplog.set_level(WARNING)
 
     session = _Session()
 
@@ -147,11 +158,94 @@ async def test_claim_bonus_does_not_grant_when_check_fails(monkeypatch) -> None:
         session,
         user_id=303,
         telegram_user_id=503,
-        bot=_FakeBot(error=TimeoutError("network timeout")),
+        bot=_FakeBot(
+            error=TelegramBadRequest(
+                method=_get_chat_member_method(),
+                message="PARTICIPANT_ID_INVALID",
+            )
+        ),
+        now_utc=datetime(2026, 2, 26, 18, 0, tzinfo=timezone.utc),
+    )
+
+    assert result.status == ChannelBonusService.STATUS_CHECK_RETRY
+    assert result.reason == "participant_id_invalid"
+    assert "channel_bonus_participant_id_invalid" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_claim_bonus_keeps_config_errors_separate_from_user_retry(
+    monkeypatch,
+    caplog,
+) -> None:
+    async def _fail_fill_to_free_cap(*args, **kwargs):
+        raise AssertionError("bonus must not be granted when channel config is broken")
+
+    monkeypatch.setattr(
+        channel_bonus,
+        "get_settings",
+        lambda: SimpleNamespace(bonus_channel_id="@quiz_arena_test"),
+    )
+    monkeypatch.setattr(
+        channel_bonus.EnergyService,
+        "fill_to_free_cap",
+        _fail_fill_to_free_cap,
+    )
+    caplog.set_level(WARNING)
+
+    result = await ChannelBonusService.claim_bonus_if_subscribed(
+        _Session(),
+        user_id=303,
+        telegram_user_id=503,
+        bot=_FakeBot(
+            error=TelegramBadRequest(
+                method=_get_chat_member_method(),
+                message="Bad Request: chat not found",
+            )
+        ),
         now_utc=datetime(2026, 2, 26, 18, 0, tzinfo=timezone.utc),
     )
 
     assert result.status == ChannelBonusService.STATUS_CHECK_ERROR
+    assert result.reason == "bot_or_channel_config_broken"
+    assert "channel_bonus_check_bad_request" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_claim_bonus_asks_user_to_retry_when_telegram_error_is_temporary(
+    monkeypatch,
+    caplog,
+) -> None:
+    async def _fail_fill_to_free_cap(*args, **kwargs):
+        raise AssertionError("bonus must not be granted when channel check fails")
+
+    monkeypatch.setattr(
+        channel_bonus,
+        "get_settings",
+        lambda: SimpleNamespace(bonus_channel_id="@quiz_arena_test"),
+    )
+    monkeypatch.setattr(
+        channel_bonus.EnergyService,
+        "fill_to_free_cap",
+        _fail_fill_to_free_cap,
+    )
+    caplog.set_level(WARNING)
+
+    result = await ChannelBonusService.claim_bonus_if_subscribed(
+        _Session(),
+        user_id=303,
+        telegram_user_id=503,
+        bot=_FakeBot(
+            error=TelegramNetworkError(
+                method=_get_chat_member_method(),
+                message="temporary network error",
+            )
+        ),
+        now_utc=datetime(2026, 2, 26, 18, 0, tzinfo=timezone.utc),
+    )
+
+    assert result.status == ChannelBonusService.STATUS_CHECK_RETRY
+    assert result.reason == "telegram_temporary_error"
+    assert "channel_bonus_check_temporary_error" in caplog.text
 
 
 @pytest.mark.asyncio

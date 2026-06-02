@@ -222,6 +222,14 @@ async def test_handle_channel_bonus_check_rejects_missing_bot(monkeypatch) -> No
             TEXTS_DE["msg.channel.bonus.not_subscribed"],
         ),
         (
+            ChannelBonusService.STATUS_CHECK_RETRY,
+            [
+                "channel_bonus_check_started",
+                "channel_bonus_check_retry_required",
+            ],
+            TEXTS_DE["msg.channel.bonus.check.retry"],
+        ),
+        (
             ChannelBonusService.STATUS_CHECK_ERROR,
             ["channel_bonus_check_started", "channel_bonus_check_failed_error"],
             TEXTS_DE["msg.channel.bonus.check.error"],
@@ -252,7 +260,7 @@ async def test_handle_channel_bonus_check_emits_expected_events_for_result_statu
         assert telegram_user_id == 11
         assert bot is callback.bot
         assert now_utc is not None
-        return SimpleNamespace(status=status)
+        return SimpleNamespace(status=status, reason="participant_id_invalid")
 
     monkeypatch.setattr(channel_bonus, "Message", DummyMessage)
     monkeypatch.setattr(channel_bonus, "SessionLocal", _SessionLocal(session))

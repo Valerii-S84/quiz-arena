@@ -11,6 +11,7 @@ TEXTS_DE: dict[str, str] = {
     "msg.channel.bonus.offer": "📺 Lerne täglich kostenlos Deutsch\n\nAbonniere unseren Kanal und hol dir\neinmalig volle Energie - sofort!\n\n⚡ Belohnung: volle Energie ({max_energy}/{max_energy})",
     "msg.channel.bonus.success": "⚡ Energie aufgeladen!\nDu hast jetzt volle Energie. Viel Erfolg!",
     "msg.channel.bonus.not_subscribed": "📺 Du bist noch nicht dabei.\nAbonniere den Kanal und komm zurück!",
+    "msg.channel.bonus.check.retry": "⚠️ Die Anmeldung konnte nicht geprüft werden.\nÖffne den Kanal, abonniere ihn, komm zurück und tippe erneut auf „Überprüfen“.",
     "msg.channel.bonus.check.error": "⚠️ Überprüfung fehlgeschlagen.\nVersuche es in einem Moment erneut.",
     "msg.channel.bonus.already_claimed": "✅ Kanal-Bonus bereits erhalten",
     "msg.system.error": "Es ist ein Fehler aufgetreten. Bitte versuche es erneut.",
