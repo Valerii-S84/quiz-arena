@@ -5,6 +5,11 @@ from datetime import datetime, timezone
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 
+from app.bot.handlers.channel_bonus_results import (
+    answer_channel_bonus_result,
+    emit_channel_bonus_check_started,
+    emit_channel_bonus_result_event,
+)
 from app.bot.keyboards.channel_bonus import build_channel_bonus_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
@@ -89,15 +94,11 @@ async def handle_channel_bonus_check(callback: CallbackQuery) -> None:
             session,
             telegram_user=callback.from_user,
         )
-        await emit_analytics_event(
+        await emit_channel_bonus_check_started(
             session,
-            event_type="channel_bonus_check_started",
-            source=EVENT_SOURCE_BOT,
-            happened_at=now_utc,
             user_id=snapshot.user_id,
-            payload={"source": "channel_bonus_check"},
+            now_utc=now_utc,
         )
-
         claim_result = await ChannelBonusService.claim_bonus_if_subscribed(
             session,
             user_id=snapshot.user_id,
@@ -105,41 +106,15 @@ async def handle_channel_bonus_check(callback: CallbackQuery) -> None:
             bot=bot,
             now_utc=now_utc,
         )
+        await emit_channel_bonus_result_event(
+            session,
+            user_id=snapshot.user_id,
+            now_utc=now_utc,
+            status=claim_result.status,
+            reason=getattr(claim_result, "reason", None),
+        )
 
-        if claim_result.status == ChannelBonusService.STATUS_CLAIMED:
-            await emit_analytics_event(
-                session,
-                event_type="channel_bonus_claimed",
-                source=EVENT_SOURCE_BOT,
-                happened_at=now_utc,
-                user_id=snapshot.user_id,
-                payload={"source": "channel_bonus_check"},
-            )
-        elif claim_result.status == ChannelBonusService.STATUS_NOT_SUBSCRIBED:
-            await emit_analytics_event(
-                session,
-                event_type="channel_bonus_check_failed_not_subscribed",
-                source=EVENT_SOURCE_BOT,
-                happened_at=now_utc,
-                user_id=snapshot.user_id,
-                payload={"source": "channel_bonus_check"},
-            )
-        elif claim_result.status == ChannelBonusService.STATUS_CHECK_ERROR:
-            await emit_analytics_event(
-                session,
-                event_type="channel_bonus_check_failed_error",
-                source=EVENT_SOURCE_BOT,
-                happened_at=now_utc,
-                user_id=snapshot.user_id,
-                payload={"source": "channel_bonus_check"},
-            )
-
-    if claim_result.status == ChannelBonusService.STATUS_CLAIMED:
-        await callback.message.answer(TEXTS_DE["msg.channel.bonus.success"])
-    elif claim_result.status == ChannelBonusService.STATUS_NOT_SUBSCRIBED:
-        await callback.message.answer(TEXTS_DE["msg.channel.bonus.not_subscribed"])
-    elif claim_result.status == ChannelBonusService.STATUS_CHECK_ERROR:
-        await callback.message.answer(TEXTS_DE["msg.channel.bonus.check.error"])
+    await answer_channel_bonus_result(callback.message, status=claim_result.status)
     await callback.answer()
 
 

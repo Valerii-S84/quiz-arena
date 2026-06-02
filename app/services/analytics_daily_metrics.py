@@ -49,7 +49,7 @@ class QuizMetrics:
 def safe_rate(*, numerator: int, denominator: int) -> float:
     if denominator <= 0:
         return 0.0
-    return numerator / denominator
+    return min(numerator / denominator, 1.0)
 
 
 async def collect_purchase_metrics(

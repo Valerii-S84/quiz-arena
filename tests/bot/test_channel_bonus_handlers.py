@@ -5,7 +5,8 @@ from typing import Any, cast
 
 import pytest
 
-from app.bot.handlers import channel_bonus
+from app.bot.handlers import channel_bonus, channel_bonus_results
+from app.bot.texts.channel_bonus import CHANNEL_BONUS_CHECK_RETRY_TEXT
 from app.bot.texts.de import TEXTS_DE
 from app.services.channel_bonus import ChannelBonusService
 from tests.bot.helpers import DummyCallback, DummyMessage
@@ -222,6 +223,14 @@ async def test_handle_channel_bonus_check_rejects_missing_bot(monkeypatch) -> No
             TEXTS_DE["msg.channel.bonus.not_subscribed"],
         ),
         (
+            ChannelBonusService.STATUS_CHECK_RETRY,
+            [
+                "channel_bonus_check_started",
+                "channel_bonus_check_retry_required",
+            ],
+            CHANNEL_BONUS_CHECK_RETRY_TEXT,
+        ),
+        (
             ChannelBonusService.STATUS_CHECK_ERROR,
             ["channel_bonus_check_started", "channel_bonus_check_failed_error"],
             TEXTS_DE["msg.channel.bonus.check.error"],
@@ -252,7 +261,7 @@ async def test_handle_channel_bonus_check_emits_expected_events_for_result_statu
         assert telegram_user_id == 11
         assert bot is callback.bot
         assert now_utc is not None
-        return SimpleNamespace(status=status)
+        return SimpleNamespace(status=status, reason="participant_id_invalid")
 
     monkeypatch.setattr(channel_bonus, "Message", DummyMessage)
     monkeypatch.setattr(channel_bonus, "SessionLocal", _SessionLocal(session))
@@ -261,7 +270,7 @@ async def test_handle_channel_bonus_check_emits_expected_events_for_result_statu
         "ensure_home_snapshot",
         _fake_snapshot,
     )
-    monkeypatch.setattr(channel_bonus, "emit_analytics_event", _fake_emit)
+    monkeypatch.setattr(channel_bonus_results, "emit_analytics_event", _fake_emit)
     monkeypatch.setattr(ChannelBonusService, "claim_bonus_if_subscribed", _fake_claim)
 
     callback = DummyCallback(
@@ -302,7 +311,7 @@ async def test_handle_channel_bonus_check_already_claimed_branch_stays_silent(mo
         "ensure_home_snapshot",
         _fake_snapshot,
     )
-    monkeypatch.setattr(channel_bonus, "emit_analytics_event", _fake_emit)
+    monkeypatch.setattr(channel_bonus_results, "emit_analytics_event", _fake_emit)
     monkeypatch.setattr(ChannelBonusService, "claim_bonus_if_subscribed", _fake_claim)
 
     callback = DummyCallback(
