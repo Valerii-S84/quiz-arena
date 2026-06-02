@@ -8,7 +8,7 @@ import pytest
 from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
 from aiogram.methods import GetChatMember
 
-from app.services import channel_bonus
+from app.services import channel_bonus, channel_bonus_subscription
 from app.services.channel_bonus import ChannelBonusService
 from tests.bot.helpers import DummyBot
 from tests.type_helpers import AsyncSessionStub
@@ -283,7 +283,7 @@ async def test_claim_bonus_uses_dedicated_checker_bot_token(monkeypatch) -> None
             bonus_check_bot_token="checker-token",
         ),
     )
-    monkeypatch.setattr(channel_bonus, "Bot", _FakeCheckerBot)
+    monkeypatch.setattr(channel_bonus_subscription, "Bot", _FakeCheckerBot)
     monkeypatch.setattr(channel_bonus.UsersRepo, "get_by_id_for_update", _fake_get_user_for_update)
     monkeypatch.setattr(channel_bonus.EnergyService, "fill_to_free_cap", _fake_fill_to_free_cap)
 
@@ -316,7 +316,7 @@ async def test_claim_bonus_returns_error_when_checker_token_invalid(monkeypatch)
             bonus_check_bot_token="invalid",
         ),
     )
-    monkeypatch.setattr(channel_bonus, "Bot", _InvalidCheckerBot)
+    monkeypatch.setattr(channel_bonus_subscription, "Bot", _InvalidCheckerBot)
 
     session = _Session()
 

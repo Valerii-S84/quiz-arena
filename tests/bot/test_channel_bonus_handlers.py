@@ -6,6 +6,7 @@ from typing import Any, cast
 import pytest
 
 from app.bot.handlers import channel_bonus
+from app.bot.texts.channel_bonus import CHANNEL_BONUS_CHECK_RETRY_TEXT
 from app.bot.texts.de import TEXTS_DE
 from app.services.channel_bonus import ChannelBonusService
 from tests.bot.helpers import DummyCallback, DummyMessage
@@ -227,7 +228,7 @@ async def test_handle_channel_bonus_check_rejects_missing_bot(monkeypatch) -> No
                 "channel_bonus_check_started",
                 "channel_bonus_check_retry_required",
             ],
-            TEXTS_DE["msg.channel.bonus.check.retry"],
+            CHANNEL_BONUS_CHECK_RETRY_TEXT,
         ),
         (
             ChannelBonusService.STATUS_CHECK_ERROR,

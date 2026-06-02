@@ -6,6 +6,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message
 
 from app.bot.keyboards.channel_bonus import build_channel_bonus_keyboard
+from app.bot.texts.channel_bonus import CHANNEL_BONUS_CHECK_RETRY_TEXT
 from app.bot.texts.de import TEXTS_DE
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.session import SessionLocal
@@ -154,7 +155,7 @@ async def handle_channel_bonus_check(callback: CallbackQuery) -> None:
     elif claim_result.status == ChannelBonusService.STATUS_NOT_SUBSCRIBED:
         await callback.message.answer(TEXTS_DE["msg.channel.bonus.not_subscribed"])
     elif claim_result.status == ChannelBonusService.STATUS_CHECK_RETRY:
-        await callback.message.answer(TEXTS_DE["msg.channel.bonus.check.retry"])
+        await callback.message.answer(CHANNEL_BONUS_CHECK_RETRY_TEXT)
     elif claim_result.status == ChannelBonusService.STATUS_CHECK_ERROR:
         await callback.message.answer(TEXTS_DE["msg.channel.bonus.check.error"])
     await callback.answer()
