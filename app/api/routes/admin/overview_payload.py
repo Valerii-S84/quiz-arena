@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.routes.admin.overview_feature_usage import build_feature_usage_payload
+from app.api.routes.admin.overview_language import fetch_user_language_distribution
 from app.api.routes.admin.overview_payload_conversion import (
     build_conversion_kpis,
     load_conversion_snapshot,
@@ -20,7 +21,6 @@ from app.api.routes.admin.overview_series import (
     fetch_hourly_activity_series,
     fetch_revenue_series,
     fetch_top_products,
-    fetch_user_language_distribution,
     fetch_users_series,
 )
 from app.api.routes.admin.overview_streak_metrics import count_users_reaching_streak_threshold
