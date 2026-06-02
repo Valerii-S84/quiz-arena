@@ -7,7 +7,7 @@ from uuid import UUID
 
 import pytest
 
-from app.bot.handlers import promo
+from app.bot.handlers import promo, promo_redeem
 from app.bot.texts.de import TEXTS_DE
 from app.economy.promo.errors import PromoInvalidError
 from app.economy.promo.types import PromoRedeemResult
@@ -35,6 +35,18 @@ class _PromoMessage(DummyMessage):
             )
 
 
+class _State:
+    def __init__(self) -> None:
+        self.set_states: list[object] = []
+        self.clear_calls = 0
+
+    async def set_state(self, state: object) -> None:
+        self.set_states.append(state)
+
+    async def clear(self) -> None:
+        self.clear_calls += 1
+
+
 @pytest.mark.asyncio
 async def test_redeem_promo_from_text_handles_missing_user(monkeypatch) -> None:
     message = _PromoMessage(text="/promo CHIK", from_user=None)
@@ -47,40 +59,54 @@ async def test_redeem_promo_from_text_handles_missing_user(monkeypatch) -> None:
 @pytest.mark.asyncio
 async def test_redeem_promo_from_text_prompts_when_code_missing() -> None:
     message = _PromoMessage(text="/promo", from_user=SimpleNamespace(id=1))
+    state = _State()
 
-    await promo._redeem_promo_from_text(message)
+    await promo._redeem_promo_from_text(message, state=state)  # type: ignore[arg-type]
 
     assert message.answers[0].text == TEXTS_DE["msg.promo.input.hint"]
-    assert "reply_markup" not in message.answers[0].kwargs
+    assert message.answers[0].kwargs["reply_markup"].inline_keyboard[0][0].callback_data == (
+        "promo:cancel"
+    )
+    assert state.set_states == [promo.PromoCode.waiting_for_code]
 
 
 @pytest.mark.asyncio
 async def test_prompt_for_promo_input_does_not_use_force_reply() -> None:
     message = _PromoMessage(text="/promo", from_user=SimpleNamespace(id=1))
+    state = _State()
 
-    await promo._prompt_for_promo_input(message)
+    await promo._prompt_for_promo_input(message, state)  # type: ignore[arg-type]
 
     assert message.answers[0].text == TEXTS_DE["msg.promo.input.hint"]
-    assert "reply_markup" not in message.answers[0].kwargs
+    assert message.answers[0].kwargs["reply_markup"].inline_keyboard[0][0].callback_data == (
+        "promo:cancel"
+    )
+    assert state.set_states == [promo.PromoCode.waiting_for_code]
 
 
 @pytest.mark.asyncio
 async def test_handle_promo_open_prompts_for_accessible_callback_message(monkeypatch) -> None:
     monkeypatch.setattr(promo, "Message", DummyMessage)
+    state = _State()
     callback = DummyCallback(
         data="promo:open",
         from_user=SimpleNamespace(id=1),
         message=DummyMessage(),
     )
 
-    await promo.handle_promo_open(callback)
+    await promo.handle_promo_open(callback, state=state)  # type: ignore[arg-type]
 
     assert callback.message.answers[0].text == TEXTS_DE["msg.promo.input.hint"]
+    assert callback.message.answers[0].kwargs["reply_markup"].inline_keyboard[0][
+        0
+    ].callback_data == ("promo:cancel")
+    assert state.set_states == [promo.PromoCode.waiting_for_code]
     assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 
 @pytest.mark.asyncio
 async def test_handle_promo_open_ignores_inaccessible_callback_message() -> None:
+    state = _State()
     callback = DummyCallback(
         data="promo:open",
         from_user=SimpleNamespace(id=1),
@@ -88,27 +114,32 @@ async def test_handle_promo_open_ignores_inaccessible_callback_message() -> None
     )
     callback.message = cast(Any, object())
 
-    await promo.handle_promo_open(callback)
+    await promo.handle_promo_open(callback, state=state)  # type: ignore[arg-type]
 
+    assert state.set_states == []
     assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 
 @pytest.mark.asyncio
-async def test_handle_promo_reply_ignores_non_promo_replies() -> None:
-    message = _PromoMessage(text="DIE", from_user=SimpleNamespace(id=1))
-    message.reply_to_message = SimpleNamespace(
-        from_user=SimpleNamespace(is_bot=True),
-        text="der Schrank -> ?",
+async def test_handle_promo_cancel_clears_state_and_returns_to_shop(monkeypatch) -> None:
+    monkeypatch.setattr(promo, "Message", DummyMessage)
+    state = _State()
+    callback = DummyCallback(
+        data="promo:cancel",
+        from_user=SimpleNamespace(id=1),
+        message=DummyMessage(),
     )
 
-    await promo.handle_promo_reply(message)  # type: ignore[arg-type]
+    await promo.handle_promo_cancel(callback, state=state)  # type: ignore[arg-type]
 
-    assert message.answers == []
+    assert state.clear_calls == 1
+    assert callback.message.answers[0].text == TEXTS_DE["msg.promo.cancelled"]
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 
 @pytest.mark.asyncio
 async def test_redeem_promo_from_text_handles_invalid_code(monkeypatch) -> None:
-    monkeypatch.setattr(promo, "SessionLocal", DummySessionLocal())
+    monkeypatch.setattr(promo_redeem, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
         return SimpleNamespace(user_id=55)
@@ -116,8 +147,10 @@ async def test_redeem_promo_from_text_handles_invalid_code(monkeypatch) -> None:
     async def _fake_redeem(*args, **kwargs):
         raise PromoInvalidError()
 
-    monkeypatch.setattr(promo.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(promo.PromoService, "redeem", _fake_redeem)
+    monkeypatch.setattr(
+        promo_redeem.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot
+    )
+    monkeypatch.setattr(promo_redeem.PromoService, "redeem", _fake_redeem)
 
     message = _PromoMessage(text="/promo BADCODE", from_user=SimpleNamespace(id=1))
     await promo._redeem_promo_from_text(message)
@@ -127,7 +160,7 @@ async def test_redeem_promo_from_text_handles_invalid_code(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_redeem_promo_from_text_handles_premium_grant(monkeypatch) -> None:
-    monkeypatch.setattr(promo, "SessionLocal", DummySessionLocal())
+    monkeypatch.setattr(promo_redeem, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
         return SimpleNamespace(user_id=77)
@@ -141,8 +174,10 @@ async def test_redeem_promo_from_text_handles_premium_grant(monkeypatch) -> None
             premium_ends_at=datetime.now(timezone.utc),
         )
 
-    monkeypatch.setattr(promo.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(promo.PromoService, "redeem", _fake_redeem)
+    monkeypatch.setattr(
+        promo_redeem.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot
+    )
+    monkeypatch.setattr(promo_redeem.PromoService, "redeem", _fake_redeem)
 
     message = _PromoMessage(text="/promo BONUS", from_user=SimpleNamespace(id=2))
     await promo._redeem_promo_from_text(message)
@@ -153,7 +188,7 @@ async def test_redeem_promo_from_text_handles_premium_grant(monkeypatch) -> None
 
 @pytest.mark.asyncio
 async def test_redeem_promo_from_text_handles_discount_success(monkeypatch) -> None:
-    monkeypatch.setattr(promo, "SessionLocal", DummySessionLocal())
+    monkeypatch.setattr(promo_redeem, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
         return SimpleNamespace(user_id=99)
@@ -168,8 +203,10 @@ async def test_redeem_promo_from_text_handles_discount_success(monkeypatch) -> N
             reserved_until=datetime.now(timezone.utc),
         )
 
-    monkeypatch.setattr(promo.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(promo.PromoService, "redeem", _fake_redeem)
+    monkeypatch.setattr(
+        promo_redeem.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot
+    )
+    monkeypatch.setattr(promo_redeem.PromoService, "redeem", _fake_redeem)
 
     message = _PromoMessage(text="/promo SALE25", from_user=SimpleNamespace(id=3))
     await promo._redeem_promo_from_text(message)
@@ -180,7 +217,7 @@ async def test_redeem_promo_from_text_handles_discount_success(monkeypatch) -> N
 
 @pytest.mark.asyncio
 async def test_redeem_promo_from_text_marks_command_source(monkeypatch) -> None:
-    monkeypatch.setattr(promo, "SessionLocal", DummySessionLocal())
+    monkeypatch.setattr(promo_redeem, "SessionLocal", DummySessionLocal())
     captured: dict[str, object] = {}
 
     async def _fake_home_snapshot(session, *, telegram_user):
@@ -197,8 +234,10 @@ async def test_redeem_promo_from_text_marks_command_source(monkeypatch) -> None:
             reserved_until=datetime.now(timezone.utc),
         )
 
-    monkeypatch.setattr(promo.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(promo.PromoService, "redeem", _fake_redeem)
+    monkeypatch.setattr(
+        promo_redeem.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot
+    )
+    monkeypatch.setattr(promo_redeem.PromoService, "redeem", _fake_redeem)
 
     message = _PromoMessage(text="/promo SALE15", from_user=SimpleNamespace(id=5))
     await promo._redeem_promo_from_text(message)
@@ -207,9 +246,12 @@ async def test_redeem_promo_from_text_marks_command_source(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_redeem_promo_from_reply_marks_button_source(monkeypatch) -> None:
-    monkeypatch.setattr(promo, "SessionLocal", DummySessionLocal())
+async def test_redeem_promo_from_waiting_state_marks_button_source_and_clears_state(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(promo_redeem, "SessionLocal", DummySessionLocal())
     captured: dict[str, object] = {}
+    state = _State()
 
     async def _fake_home_snapshot(session, *, telegram_user):
         return SimpleNamespace(user_id=16)
@@ -225,24 +267,31 @@ async def test_redeem_promo_from_reply_marks_button_source(monkeypatch) -> None:
             reserved_until=datetime.now(timezone.utc),
         )
 
-    monkeypatch.setattr(promo.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(promo.PromoService, "redeem", _fake_redeem)
+    monkeypatch.setattr(
+        promo_redeem.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot
+    )
+    monkeypatch.setattr(promo_redeem.PromoService, "redeem", _fake_redeem)
 
     message = _PromoMessage(
         text="SALE15",
         from_user=SimpleNamespace(id=6),
-        reply_to_promo_prompt=True,
     )
-    await promo._redeem_promo_from_text(message)
+    await promo._redeem_promo_from_text(
+        message,
+        state=state,  # type: ignore[arg-type]
+        allow_plain_text=True,
+        from_waiting_state=True,
+    )
 
     assert captured["source"] == "BUTTON"
+    assert state.clear_calls == 1
 
 
 @pytest.mark.asyncio
 async def test_redeem_promo_from_text_accepts_discount_targets_that_are_now_saleable(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(promo, "SessionLocal", DummySessionLocal())
+    monkeypatch.setattr(promo_redeem, "SessionLocal", DummySessionLocal())
 
     async def _fake_home_snapshot(session, *, telegram_user):
         return SimpleNamespace(user_id=77)
@@ -257,8 +306,10 @@ async def test_redeem_promo_from_text_accepts_discount_targets_that_are_now_sale
             reserved_until=datetime.now(timezone.utc),
         )
 
-    monkeypatch.setattr(promo.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(promo.PromoService, "redeem", _fake_redeem)
+    monkeypatch.setattr(
+        promo_redeem.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot
+    )
+    monkeypatch.setattr(promo_redeem.PromoService, "redeem", _fake_redeem)
 
     message = _PromoMessage(text="/promo YEAR25", from_user=SimpleNamespace(id=7))
     await promo._redeem_promo_from_text(message)

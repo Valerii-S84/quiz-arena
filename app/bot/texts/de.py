@@ -1,3 +1,5 @@
+from app.bot.texts.promo_de import PROMO_TEXTS_DE
+
 TEXTS_DE: dict[str, str] = {
     "msg.home.title": "🎮 QUIZ ARENA",
     "msg.home.hint": "Lerne Deutsch – spiele, fordere Freunde heraus und steig auf!",
@@ -208,16 +210,5 @@ TEXTS_DE: dict[str, str] = {
     "msg.referral.reward.monthly_cap": "Monatslimit erreicht. Neue Belohnungen folgen naechsten Monat.",
     "msg.referral.rejected": "❌ Ein eingeladener Freund wurde nicht anerkannt.\nGrund: Aktivitaet nicht ausreichend / Regelverstoss erkannt.",
     "msg.referral.prompt.after_game": "🔥 Gut gespielt!\n\n👥 Lad einen Freund ein - hol dir eine Belohnung:",
-    "msg.promo.reply_prefix": "🎟 Promo-Code",
-    "msg.promo.input.hint": "🎟 Promo-Code\nSende deinen Code jetzt als Antwort oder mit /promo CODE.\nBeispiel: /promo WILLKOMMEN-50",
-    "msg.promo.success.grant": "✅ Promo-Code aktiviert.",
-    "msg.promo.success.grant.details": "Aktiviert: {premium_days} Tage Premium bis {premium_ends_at} (Berlin).",
-    "msg.promo.success.discount": "✅ Promo-Code aktiviert.",
-    "msg.promo.success.discount.details": "Aktiviert: {discount_label} fuer {scope_label} bis {reserved_until} (Berlin).",
-    "msg.promo.discount.unavailable": "⚠️ Das Promo-Angebot ist derzeit nicht verfuegbar.",
-    "msg.promo.error.invalid": "❌ Promo-Code ungültig oder nicht aktiv. Prüfe den Code und versuche es erneut.",
-    "msg.promo.error.expired": "❌ Dieser Promo-Code ist abgelaufen.",
-    "msg.promo.error.used": "ℹ️ Diesen Promo-Code hast du bereits verwendet.",
-    "msg.promo.error.not_applicable": "❌ Dieser Promo-Code gilt nicht für dieses Produkt.",
-    "msg.promo.error.rate_limited": "⏳ Zu viele Versuche. Bitte versuche es später erneut.",
+    **PROMO_TEXTS_DE,
 }

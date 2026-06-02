@@ -1,184 +1,58 @@
 from __future__ import annotations
 
-import re
-from datetime import datetime, timezone
-
 from aiogram import F, Router
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from app.bot.handlers.promo_view_helpers import (
-    format_berlin_time,
-    resolve_discount_label,
-    resolve_scope_label,
-)
-from app.bot.keyboards.promo import build_promo_discount_keyboard
+from app.bot.handlers.promo_input import PromoCode
+from app.bot.handlers.promo_prompt import prompt_for_promo_input as _prompt_for_promo_input
+from app.bot.handlers.promo_redeem import redeem_promo_from_text as _redeem_promo_from_text
 from app.bot.keyboards.shop import build_shop_keyboard
 from app.bot.texts.de import TEXTS_DE
-from app.db.session import SessionLocal
-from app.economy.promo.errors import (
-    PromoAlreadyUsedError,
-    PromoExpiredError,
-    PromoIdempotencyConflictError,
-    PromoInvalidError,
-    PromoNotApplicableError,
-    PromoRateLimitedError,
-)
-from app.economy.promo.service import PromoService
-from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="promo")
-PROMO_INPUT_RE = re.compile(r"^/?promo\s+(.+)$", re.IGNORECASE)
-
-
-def _is_reply_to_promo_prompt(message: Message) -> bool:
-    if message.reply_to_message is None or message.reply_to_message.from_user is None:
-        return False
-    if not message.reply_to_message.from_user.is_bot:
-        return False
-    reply_text = message.reply_to_message.text or ""
-    return reply_text.startswith(TEXTS_DE["msg.promo.reply_prefix"])
-
-
-def _extract_promo_code(message: Message) -> str | None:
-    text = (message.text or "").strip()
-    if not text:
-        return None
-
-    match = PROMO_INPUT_RE.match(text)
-    if match is not None:
-        promo_code = match.group(1).strip()
-        return promo_code or None
-
-    if _is_reply_to_promo_prompt(message):
-        # Ignore bot commands in reply flow to prevent accidental promo attempts.
-        if text.startswith("/") and PROMO_INPUT_RE.match(text) is None:
-            return None
-        return text
-
-    return None
-
-
-def _resolve_attempt_source(message: Message) -> str:
-    text = (message.text or "").strip()
-    if PROMO_INPUT_RE.match(text) is not None:
-        return "COMMAND"
-    if _is_reply_to_promo_prompt(message):
-        return "BUTTON"
-    return "COMMAND"
-
-
-async def _prompt_for_promo_input(message: Message) -> None:
-    await message.answer(TEXTS_DE["msg.promo.input.hint"])
 
 
 @router.callback_query(F.data == "promo:open")
-async def handle_promo_open(callback: CallbackQuery) -> None:
+async def handle_promo_open(callback: CallbackQuery, state: FSMContext | None = None) -> None:
     if isinstance(callback.message, Message):
-        await _prompt_for_promo_input(callback.message)
+        await _prompt_for_promo_input(callback.message, state)
+    await callback.answer()
+
+
+@router.callback_query(F.data == "promo:cancel")
+async def handle_promo_cancel(callback: CallbackQuery, state: FSMContext | None = None) -> None:
+    if state is not None:
+        await state.clear()
+    if isinstance(callback.message, Message):
+        await callback.message.answer(
+            TEXTS_DE["msg.promo.cancelled"],
+            reply_markup=build_shop_keyboard(),
+        )
     await callback.answer()
 
 
 @router.message(Command("promo"))
-async def handle_promo_command(message: Message) -> None:
-    await _redeem_promo_from_text(message)
+async def handle_promo_command(message: Message, state: FSMContext | None = None) -> None:
+    await _redeem_promo_from_text(message, state=state)
 
 
-@router.message(F.reply_to_message)
-async def handle_promo_reply(message: Message) -> None:
-    if not _is_reply_to_promo_prompt(message):
-        return
-    await _redeem_promo_from_text(message)
+@router.message(StateFilter(PromoCode.waiting_for_code), Command("cancel"))
+async def handle_promo_cancel_command(
+    message: Message,
+    state: FSMContext | None = None,
+) -> None:
+    if state is not None:
+        await state.clear()
+    await message.answer(TEXTS_DE["msg.promo.cancelled"], reply_markup=build_shop_keyboard())
 
 
-async def _redeem_promo_from_text(message: Message) -> None:
-    if message.from_user is None:
-        await message.answer(TEXTS_DE["msg.system.error"], reply_markup=build_shop_keyboard())
-        return
-
-    promo_code = _extract_promo_code(message)
-    if promo_code is None:
-        await _prompt_for_promo_input(message)
-        return
-
-    now_utc = datetime.now(timezone.utc)
-
-    try:
-        async with SessionLocal.begin() as session:
-            snapshot = await UserOnboardingService.ensure_home_snapshot(
-                session,
-                telegram_user=message.from_user,
-            )
-            result = await PromoService.redeem(
-                session,
-                user_id=snapshot.user_id,
-                promo_code=promo_code,
-                idempotency_key=f"promo:{snapshot.user_id}:{message.message_id}",
-                source=_resolve_attempt_source(message),
-                now_utc=now_utc,
-            )
-    except PromoInvalidError:
-        await message.answer(
-            TEXTS_DE["msg.promo.error.invalid"], reply_markup=build_shop_keyboard()
-        )
-        return
-    except PromoExpiredError:
-        await message.answer(
-            TEXTS_DE["msg.promo.error.expired"], reply_markup=build_shop_keyboard()
-        )
-        return
-    except (PromoAlreadyUsedError, PromoIdempotencyConflictError):
-        await message.answer(TEXTS_DE["msg.promo.error.used"], reply_markup=build_shop_keyboard())
-        return
-    except PromoNotApplicableError:
-        await message.answer(
-            TEXTS_DE["msg.promo.error.not_applicable"],
-            reply_markup=build_shop_keyboard(),
-        )
-        return
-    except PromoRateLimitedError:
-        await message.answer(
-            TEXTS_DE["msg.promo.error.rate_limited"], reply_markup=build_shop_keyboard()
-        )
-        return
-
-    if result.result_type == "PREMIUM_GRANT":
-        await message.answer(
-            TEXTS_DE["msg.promo.success.grant"], reply_markup=build_shop_keyboard()
-        )
-        await message.answer(
-            TEXTS_DE["msg.promo.success.grant.details"].format(
-                premium_days=result.premium_days or 0,
-                premium_ends_at=format_berlin_time(result.premium_ends_at),
-            )
-        )
-        return
-
-    discount_keyboard = build_promo_discount_keyboard(
-        redemption_id=result.redemption_id,
-        target_scope=result.target_scope,
-        discount_type=result.discount_type,
-        discount_value=result.discount_value,
-        applicable_products=result.applicable_products,
-    )
-    if discount_keyboard is None:
-        await message.answer(
-            TEXTS_DE["msg.promo.discount.unavailable"],
-            reply_markup=build_shop_keyboard(),
-        )
-        return
-
-    await message.answer(
-        TEXTS_DE["msg.promo.success.discount"],
-        reply_markup=discount_keyboard,
-    )
-    await message.answer(
-        TEXTS_DE["msg.promo.success.discount.details"].format(
-            discount_label=resolve_discount_label(result),
-            scope_label=resolve_scope_label(
-                result.target_scope,
-                applicable_products=result.applicable_products,
-            ),
-            reserved_until=format_berlin_time(result.reserved_until),
-        )
+@router.message(StateFilter(PromoCode.waiting_for_code), F.text)
+async def handle_promo_code_input(message: Message, state: FSMContext | None = None) -> None:
+    await _redeem_promo_from_text(
+        message,
+        state=state,
+        allow_plain_text=True,
+        from_waiting_state=True,
     )
