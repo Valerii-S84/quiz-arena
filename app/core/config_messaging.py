@@ -34,6 +34,7 @@ class MessagingSettingsMixin:
         default=False,
         alias="TELEGRAM_DEBUG_TRACE_ENABLED",
     )
+    promo_code_wait_ttl_seconds: int = Field(default=900, alias="PROMO_CODE_WAIT_TTL_SECONDS")
     friend_challenge_ttl_seconds: int = Field(default=86_400, alias="FRIEND_CHALLENGE_TTL_SECONDS")
     friend_challenge_last_chance_seconds: int = Field(
         default=7_200,

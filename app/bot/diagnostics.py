@@ -9,6 +9,7 @@ import structlog
 from aiogram import Bot, Dispatcher
 from aiogram.types import CallbackQuery, ForceReply, Message, Update
 
+from app.bot.diagnostic_sanitizers import payload_metadata, scalar_metadata
 from app.bot.texts.de import TEXTS_DE
 from app.core.config import get_settings
 
@@ -34,7 +35,7 @@ async def _traced_send_message(
         logging.warning(
             "PROMO_OUTGOING chat_id=%s text=%r markup=%s\nSTACK:\n%s",
             chat_id,
-            text,
+            payload_metadata(text),
             type(reply_markup).__name__ if reply_markup else None,
             "".join(traceback.format_stack(limit=25)),
         )
@@ -121,7 +122,7 @@ async def _state_snapshot(
     safe_data: dict[str, object] = {}
     for key, value in data.items():
         if isinstance(value, (str, int, float, bool, type(None))):
-            safe_data[key] = value
+            safe_data[key] = scalar_metadata(value)
     return await context.get_state(), safe_data
 
 
@@ -153,12 +154,12 @@ async def log_update_trace(
         update_type=trace.update_type,
         user_id=trace.user_id,
         chat_id=trace.chat_id,
-        message_text=trace.message_text,
-        callback_data=trace.callback_data,
+        message_text_metadata=payload_metadata(trace.message_text),
+        callback_data_metadata=payload_metadata(trace.callback_data),
         state=state,
         fsm_data=data,
         reply_to_message_id=trace.reply_to_message_id,
-        reply_to_text=trace.reply_to_text,
+        reply_to_text_metadata=payload_metadata(trace.reply_to_text),
         reply_to_is_bot=trace.reply_to_is_bot,
         reply_to_is_promo_prompt=trace.reply_to_is_promo_prompt,
     )

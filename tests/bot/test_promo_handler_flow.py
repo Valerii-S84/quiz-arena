@@ -6,8 +6,9 @@ from typing import Any, cast
 from uuid import UUID
 
 import pytest
+from aiogram.dispatcher.event.bases import SkipHandler
 
-from app.bot.handlers import promo, promo_redeem
+from app.bot.handlers import promo, promo_input, promo_redeem
 from app.bot.texts.de import TEXTS_DE
 from app.economy.promo.errors import PromoInvalidError
 from app.economy.promo.types import PromoRedeemResult
@@ -39,12 +40,21 @@ class _State:
     def __init__(self) -> None:
         self.set_states: list[object] = []
         self.clear_calls = 0
+        self.data: dict[str, object] = {}
 
     async def set_state(self, state: object) -> None:
         self.set_states.append(state)
 
+    async def update_data(self, data: dict[str, object]) -> dict[str, object]:
+        self.data.update(data)
+        return dict(self.data)
+
+    async def get_data(self) -> dict[str, object]:
+        return dict(self.data)
+
     async def clear(self) -> None:
         self.clear_calls += 1
+        self.data.clear()
 
 
 @pytest.mark.asyncio
@@ -82,6 +92,64 @@ async def test_prompt_for_promo_input_does_not_use_force_reply() -> None:
         "promo:cancel"
     )
     assert state.set_states == [promo.PromoCode.waiting_for_code]
+    assert isinstance(state.data[promo_input.PROMO_WAIT_STARTED_AT_KEY], int)
+
+
+@pytest.mark.asyncio
+async def test_handle_promo_waiting_command_passthrough_clears_and_skips() -> None:
+    message = _PromoMessage(text="/referral", from_user=SimpleNamespace(id=1))
+    state = _State()
+    state.data[promo_input.PROMO_WAIT_STARTED_AT_KEY] = 9_999_999_999
+
+    with pytest.raises(SkipHandler):
+        await promo.handle_promo_waiting_command_passthrough(  # type: ignore[arg-type]
+            message,
+            state=state,
+        )
+
+    assert state.clear_calls == 1
+    assert state.data == {}
+    assert message.answers == []
+
+
+@pytest.mark.asyncio
+async def test_handle_promo_code_input_ignores_expired_waiting_state(monkeypatch) -> None:
+    message = _PromoMessage(text="SALE15", from_user=SimpleNamespace(id=1))
+    state = _State()
+    state.data[promo_input.PROMO_WAIT_STARTED_AT_KEY] = 0
+    called = False
+
+    async def _fake_redeem(*args, **kwargs) -> None:
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(promo, "_redeem_promo_from_text", _fake_redeem)
+
+    await promo.handle_promo_code_input(message, state=state)  # type: ignore[arg-type]
+
+    assert called is False
+    assert state.clear_calls == 1
+    assert message.answers == []
+
+
+@pytest.mark.asyncio
+async def test_handle_promo_code_input_accepts_unexpired_waiting_state(monkeypatch) -> None:
+    message = _PromoMessage(text="SALE15", from_user=SimpleNamespace(id=1))
+    state = _State()
+    state.data[promo_input.PROMO_WAIT_STARTED_AT_KEY] = 9_999_999_999
+    captured: dict[str, object] = {}
+
+    async def _fake_redeem(*args, **kwargs) -> None:
+        captured.update(kwargs)
+
+    monkeypatch.setattr(promo, "_redeem_promo_from_text", _fake_redeem)
+
+    await promo.handle_promo_code_input(message, state=state)  # type: ignore[arg-type]
+
+    assert captured["state"] is state
+    assert captured["allow_plain_text"] is True
+    assert captured["from_waiting_state"] is True
+    assert state.clear_calls == 0
 
 
 @pytest.mark.asyncio

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from aiogram import F, Router
+from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from app.bot.handlers.promo_input import PromoCode
+from app.bot.handlers.promo_input import PromoCode, promo_waiting_is_expired
 from app.bot.handlers.promo_prompt import prompt_for_promo_input as _prompt_for_promo_input
 from app.bot.handlers.promo_redeem import redeem_promo_from_text as _redeem_promo_from_text
 from app.bot.keyboards.shop import build_shop_keyboard
@@ -48,8 +49,21 @@ async def handle_promo_cancel_command(
     await message.answer(TEXTS_DE["msg.promo.cancelled"], reply_markup=build_shop_keyboard())
 
 
+@router.message(StateFilter(PromoCode.waiting_for_code), F.text.startswith("/"))
+async def handle_promo_waiting_command_passthrough(
+    message: Message,
+    state: FSMContext | None = None,
+) -> None:
+    if state is not None:
+        await state.clear()
+    raise SkipHandler()
+
+
 @router.message(StateFilter(PromoCode.waiting_for_code), F.text)
 async def handle_promo_code_input(message: Message, state: FSMContext | None = None) -> None:
+    if state is not None and await promo_waiting_is_expired(state):
+        await state.clear()
+        return
     await _redeem_promo_from_text(
         message,
         state=state,
