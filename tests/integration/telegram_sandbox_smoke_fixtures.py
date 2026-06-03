@@ -84,6 +84,8 @@ def _callback_update(
     telegram_user_id: int,
     callback_query_id: str,
     data: str,
+    message_id: int | None = None,
+    message_text: str = "callback source",
 ) -> dict[str, object]:
     return {
         "update_id": update_id,
@@ -93,10 +95,10 @@ def _callback_update(
             "chat_instance": f"chat-instance-{telegram_user_id}",
             "data": data,
             "message": {
-                "message_id": 10_000 + update_id,
+                "message_id": message_id or 10_000 + update_id,
                 "date": int(datetime.now(UTC).timestamp()),
                 "chat": _private_chat_payload(telegram_user_id),
-                "text": "callback source",
+                "text": message_text,
             },
         },
     }

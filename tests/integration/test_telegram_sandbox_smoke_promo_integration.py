@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import cast
 
 import pytest
+from aiogram.types import InlineKeyboardMarkup
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 
@@ -79,8 +81,30 @@ async def test_telegram_webhook_promo_button_state_accepts_plain_text_once(
             _callback_update(
                 update_id=1_000_012,
                 telegram_user_id=telegram_user_id,
+                callback_query_id="cb-smoke-shop-open-1",
+                data="shop:open",
+            ),
+        )
+        await queue.drain()
+
+        shop_message = bot_api.sent_messages[-1]
+        shop_markup = cast(InlineKeyboardMarkup, shop_message["reply_markup"])
+        promo_callback_data = next(
+            button.callback_data
+            for row in shop_markup.inline_keyboard
+            for button in row
+            if button.callback_data and button.callback_data.startswith("promo:open:")
+        )
+
+        await _post_webhook_update(
+            client,
+            _callback_update(
+                update_id=1_000_013,
+                telegram_user_id=telegram_user_id,
                 callback_query_id="cb-smoke-promo-open-1",
-                data="promo:open",
+                data=promo_callback_data,
+                message_id=cast(int, shop_message["message_id"]),
+                message_text=str(shop_message["text"]),
             ),
         )
         await queue.drain()
@@ -90,7 +114,7 @@ async def test_telegram_webhook_promo_button_state_accepts_plain_text_once(
         await _post_webhook_update(
             client,
             _message_update(
-                update_id=1_000_013,
+                update_id=1_000_014,
                 telegram_user_id=telegram_user_id,
                 message_id=113,
                 text="STATE-50",
@@ -102,7 +126,7 @@ async def test_telegram_webhook_promo_button_state_accepts_plain_text_once(
         await _post_webhook_update(
             client,
             _message_update(
-                update_id=1_000_014,
+                update_id=1_000_015,
                 telegram_user_id=telegram_user_id,
                 message_id=114,
                 text="STATE-50",
@@ -110,7 +134,7 @@ async def test_telegram_webhook_promo_button_state_accepts_plain_text_once(
         )
         await queue.drain()
 
-    assert bot_api.sent_messages[1]["text"] == TEXTS_DE["msg.promo.success.discount"]
+    assert bot_api.sent_messages[2]["text"] == TEXTS_DE["msg.promo.success.discount"]
     assert len(bot_api.sent_messages) == sent_after_redeem
 
     async with SessionLocal.begin() as session:

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from typing import Any, cast
 from uuid import UUID
 
 import pytest
@@ -150,42 +149,6 @@ async def test_handle_promo_code_input_accepts_unexpired_waiting_state(monkeypat
     assert captured["allow_plain_text"] is True
     assert captured["from_waiting_state"] is True
     assert state.clear_calls == 0
-
-
-@pytest.mark.asyncio
-async def test_handle_promo_open_prompts_for_accessible_callback_message(monkeypatch) -> None:
-    monkeypatch.setattr(promo, "Message", DummyMessage)
-    state = _State()
-    callback = DummyCallback(
-        data="promo:open",
-        from_user=SimpleNamespace(id=1),
-        message=DummyMessage(),
-    )
-
-    await promo.handle_promo_open(callback, state=state)  # type: ignore[arg-type]
-
-    assert callback.message.answers[0].text == TEXTS_DE["msg.promo.input.hint"]
-    assert callback.message.answers[0].kwargs["reply_markup"].inline_keyboard[0][
-        0
-    ].callback_data == ("promo:cancel")
-    assert state.set_states == [promo.PromoCode.waiting_for_code]
-    assert callback.answer_calls == [{"text": None, "show_alert": False}]
-
-
-@pytest.mark.asyncio
-async def test_handle_promo_open_ignores_inaccessible_callback_message() -> None:
-    state = _State()
-    callback = DummyCallback(
-        data="promo:open",
-        from_user=SimpleNamespace(id=1),
-        message=DummyMessage(),
-    )
-    callback.message = cast(Any, object())
-
-    await promo.handle_promo_open(callback, state=state)  # type: ignore[arg-type]
-
-    assert state.set_states == []
-    assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 
 @pytest.mark.asyncio

@@ -8,10 +8,13 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
 
+from app.bot.promo_callbacks import generate_promo_menu_nonce
 from app.core.config import get_settings
 
 PROMO_INPUT_RE = re.compile(r"^/?promo\s+(.+)$", re.IGNORECASE)
 PROMO_WAIT_STARTED_AT_KEY = "promo_wait_started_at"
+PROMO_MENU_NONCE_KEY = "promo_menu_nonce"
+PROMO_MENU_MESSAGE_ID_KEY = "promo_menu_message_id"
 
 
 class PromoCode(StatesGroup):
@@ -48,6 +51,24 @@ async def mark_promo_waiting_started(state: FSMContext) -> None:
     await state.update_data({PROMO_WAIT_STARTED_AT_KEY: _utc_timestamp()})
 
 
+async def issue_promo_menu_nonce(state: FSMContext | None) -> str:
+    nonce = generate_promo_menu_nonce()
+    if state is not None:
+        await state.update_data({PROMO_MENU_NONCE_KEY: nonce})
+    return nonce
+
+
+async def remember_promo_menu_message_id(
+    state: FSMContext | None,
+    message: object,
+) -> None:
+    if state is None:
+        return
+    message_id = _coerce_int(getattr(message, "message_id", None))
+    if message_id is not None:
+        await state.update_data({PROMO_MENU_MESSAGE_ID_KEY: message_id})
+
+
 async def promo_waiting_is_expired(state: FSMContext) -> bool:
     started_at = _coerce_timestamp((await state.get_data()).get(PROMO_WAIT_STARTED_AT_KEY))
     if started_at is None:
@@ -58,6 +79,19 @@ async def promo_waiting_is_expired(state: FSMContext) -> bool:
 
 def _utc_timestamp() -> int:
     return int(datetime.now(timezone.utc).timestamp())
+
+
+def _coerce_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
 
 
 def _coerce_timestamp(value: Any) -> int | None:
