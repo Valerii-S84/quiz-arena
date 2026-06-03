@@ -12,6 +12,7 @@ from app.db.models.energy_state import EnergyState
 from app.db.models.streak_state import StreakState
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
+from app.economy.energy.constants import ENERGY_REGEN_INTERVAL_SEC
 from tests.bot.helpers import DummyMessage
 from tests.integration.stable_ids import stable_telegram_user_id
 
@@ -52,7 +53,7 @@ async def _create_user_with_home_state(
                 free_energy=10,
                 paid_energy=0,
                 free_cap=10,
-                regen_interval_sec=1800,
+                regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
                 last_regen_at=now_utc,
                 last_daily_topup_local_date=_berlin_date(now_utc),
                 version=0,

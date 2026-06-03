@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
-from app.economy.energy.constants import FREE_ENERGY_CAP
+from app.economy.energy.constants import ENERGY_REGEN_INTERVAL_SEC, FREE_ENERGY_CAP
 from app.economy.energy.rules import (
     apply_daily_topup,
     apply_regen,
@@ -29,7 +29,7 @@ def snapshot(
         free_energy=free_energy,
         paid_energy=paid_energy,
         free_cap=FREE_ENERGY_CAP,
-        regen_interval_sec=1800,
+        regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
         last_regen_at=last_regen_at or datetime(2026, 2, 17, 12, 0, tzinfo=UTC),
         last_daily_topup_local_date=last_daily_topup_local_date,
     )
@@ -76,7 +76,7 @@ def test_transition_low_to_empty_on_consume() -> None:
 def test_transition_empty_to_low_on_regen_tick() -> None:
     now_utc = datetime(2026, 2, 17, 13, 0, tzinfo=UTC)
     state_before = snapshot(
-        free_energy=0, paid_energy=0, last_regen_at=now_utc - timedelta(minutes=30)
+        free_energy=0, paid_energy=0, last_regen_at=now_utc - timedelta(hours=3)
     )
 
     state_after, ticks = apply_regen(state_before, now_utc=now_utc, premium_active=False)
@@ -97,7 +97,7 @@ def test_transition_empty_to_available_on_paid_credit() -> None:
 def test_transition_low_to_available_on_regen_tick() -> None:
     now_utc = datetime(2026, 2, 17, 13, 0, tzinfo=UTC)
     state_before = snapshot(
-        free_energy=3, paid_energy=0, last_regen_at=now_utc - timedelta(minutes=30)
+        free_energy=3, paid_energy=0, last_regen_at=now_utc - timedelta(hours=3)
     )
 
     state_after, ticks = apply_regen(state_before, now_utc=now_utc, premium_active=False)
@@ -151,20 +151,27 @@ def test_no_negative_energy_on_consume_when_empty() -> None:
 
 def test_regen_uses_elapsed_full_ticks_only() -> None:
     last_regen = datetime(2026, 2, 17, 12, 0, tzinfo=UTC)
-    now_utc = last_regen + timedelta(minutes=89)
+    now_utc = last_regen + timedelta(hours=8, minutes=59)
 
-    assert regen_ticks(last_regen, now_utc, 1800) == 2
+    assert regen_ticks(last_regen, now_utc, ENERGY_REGEN_INTERVAL_SEC) == 2
+
+
+def test_regen_returns_zero_before_full_interval() -> None:
+    last_regen = datetime(2026, 2, 17, 12, 0, tzinfo=UTC)
+    now_utc = last_regen + timedelta(hours=2, minutes=59)
+
+    assert regen_ticks(last_regen, now_utc, ENERGY_REGEN_INTERVAL_SEC) == 0
 
 
 def test_regen_does_not_increase_free_energy_when_premium_active() -> None:
     now_utc = datetime(2026, 2, 17, 13, 0, tzinfo=UTC)
     state_before = snapshot(
-        free_energy=10, paid_energy=5, last_regen_at=now_utc - timedelta(hours=2)
+        free_energy=10, paid_energy=5, last_regen_at=now_utc - timedelta(hours=6)
     )
 
     state_after, ticks = apply_regen(state_before, now_utc=now_utc, premium_active=True)
 
-    assert ticks == 4
+    assert ticks == 2
     assert state_after.free_energy == 10
     assert state_after.last_regen_at == now_utc
 

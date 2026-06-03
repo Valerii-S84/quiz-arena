@@ -11,7 +11,11 @@ from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.ledger_repo import LedgerRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.streak_repo import StreakRepo
-from app.economy.energy.constants import FREE_ENERGY_CAP, FREE_ENERGY_START
+from app.economy.energy.constants import (
+    ENERGY_REGEN_INTERVAL_SEC,
+    FREE_ENERGY_CAP,
+    FREE_ENERGY_START,
+)
 from app.economy.energy.time import berlin_local_date
 from app.economy.purchases.errors import (
     PurchaseNotFoundError,
@@ -54,6 +58,7 @@ async def _debit_paid_energy_wallet(
             local_date_berlin=berlin_local_date(now_utc),
             free_energy_start=FREE_ENERGY_START,
             free_energy_cap=FREE_ENERGY_CAP,
+            regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
         )
 
     debit_amount = min(amount, state.paid_energy)

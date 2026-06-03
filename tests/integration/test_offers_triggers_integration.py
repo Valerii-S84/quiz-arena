@@ -12,7 +12,7 @@ from app.db.models.offers_impressions import OfferImpression
 from app.db.models.streak_state import StreakState
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
-from app.economy.energy.constants import BERLIN_TIMEZONE
+from app.economy.energy.constants import BERLIN_TIMEZONE, ENERGY_REGEN_INTERVAL_SEC
 from app.economy.offers.constants import OFFER_NOT_SHOW_DISMISS_REASON, TRG_ENERGY_ZERO
 from app.economy.offers.service import OfferService
 from tests.integration.stable_ids import stable_telegram_user_id
@@ -49,7 +49,7 @@ async def _create_user_with_state(
                 free_energy=free_energy,
                 paid_energy=paid_energy,
                 free_cap=10,
-                regen_interval_sec=1800,
+                regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
                 last_regen_at=now_utc,
                 last_daily_topup_local_date=_berlin_date(now_utc),
                 version=0,

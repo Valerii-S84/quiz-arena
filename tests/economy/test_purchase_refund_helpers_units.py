@@ -63,12 +63,14 @@ async def test_debit_paid_energy_wallet_creates_empty_state_without_negative_deb
         local_date_berlin,
         free_energy_start: int,
         free_energy_cap: int,
+        regen_interval_sec: int,
     ):
         assert user_id == 7
         assert now_utc == NOW
         assert local_date_berlin.isoformat() == "2026-04-28"
         assert free_energy_start >= 0
         assert free_energy_cap >= 0
+        assert regen_interval_sec > 0
         return created_state
 
     monkeypatch.setattr(
