@@ -8,6 +8,7 @@ import pytest
 
 import app.economy.energy.energy_consume_quiz as energy_consume_quiz
 from app.db.models.ledger_entries import LedgerEntry
+from app.economy.energy.constants import ENERGY_REGEN_INTERVAL_SEC
 from app.economy.energy.types import EnergyBucketState
 from tests.type_helpers import AsyncSessionStub
 
@@ -33,7 +34,7 @@ def _energy_state(
         free_energy=free_energy,
         paid_energy=paid_energy,
         free_cap=10,
-        regen_interval_sec=1800,
+        regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
         last_regen_at=NOW_UTC,
         last_daily_topup_local_date=last_daily_topup_local_date or NOW_UTC.date(),
         version=0,

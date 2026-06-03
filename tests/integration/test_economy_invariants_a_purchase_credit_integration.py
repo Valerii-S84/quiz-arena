@@ -11,6 +11,7 @@ from app.db.models.ledger_entries import LedgerEntry
 from app.db.repo.energy_repo import EnergyRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.session import SessionLocal
+from app.economy.energy.constants import ENERGY_REGEN_INTERVAL_SEC
 from app.economy.energy.time import berlin_local_date
 from app.economy.purchases.service import PurchaseService
 from tests.integration.payments_idempotency_fixtures import UTC, _create_user
@@ -192,7 +193,7 @@ async def test_credit_mutates_wallet_only_by_expected_breakdown_delta() -> None:
                 free_energy=7,
                 paid_energy=2,
                 free_cap=10,
-                regen_interval_sec=1800,
+                regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
                 last_regen_at=now_utc,
                 last_daily_topup_local_date=berlin_local_date(now_utc),
                 version=0,

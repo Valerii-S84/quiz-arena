@@ -33,7 +33,7 @@ class EnergyState(Base):
     free_energy: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     paid_energy: Mapped[int] = mapped_column(Integer, nullable=False)
     free_cap: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=10)
-    regen_interval_sec: Mapped[int] = mapped_column(Integer, nullable=False, default=1800)
+    regen_interval_sec: Mapped[int] = mapped_column(Integer, nullable=False, default=10800)
     last_regen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     last_daily_topup_local_date: Mapped[date] = mapped_column(Date, nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

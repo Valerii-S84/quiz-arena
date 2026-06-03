@@ -6,7 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.energy_state import EnergyState
 from app.db.repo.energy_repo import EnergyRepo
-from app.economy.energy.constants import FREE_ENERGY_CAP, FREE_ENERGY_START
+from app.economy.energy.constants import (
+    ENERGY_REGEN_INTERVAL_SEC,
+    FREE_ENERGY_CAP,
+    FREE_ENERGY_START,
+)
 from app.economy.energy.time import berlin_local_date
 from app.economy.energy.types import EnergySnapshot
 
@@ -51,6 +55,7 @@ async def get_or_create_state_for_update(
         local_date_berlin=berlin_local_date(now_utc),
         free_energy_start=FREE_ENERGY_START,
         free_energy_cap=FREE_ENERGY_CAP,
+        regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
     )
 
 
@@ -64,4 +69,5 @@ async def initialize_user_state(
         local_date_berlin=berlin_local_date(now_utc),
         free_energy_start=FREE_ENERGY_START,
         free_energy_cap=FREE_ENERGY_CAP,
+        regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
     )
