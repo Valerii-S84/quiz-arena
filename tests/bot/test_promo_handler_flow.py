@@ -152,6 +152,28 @@ async def test_handle_promo_code_input_accepts_unexpired_waiting_state(monkeypat
 
 
 @pytest.mark.asyncio
+async def test_handle_promo_command_blocks_during_quiz(monkeypatch) -> None:
+    message = _PromoMessage(text="/promo SALE15", from_user=SimpleNamespace(id=1))
+    state = _State()
+    called = False
+
+    async def _active_quiz(*args, **kwargs) -> bool:
+        return True
+
+    async def _fake_redeem(*args, **kwargs) -> None:
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr(promo, "is_user_in_quiz", _active_quiz)
+    monkeypatch.setattr(promo, "_redeem_promo_from_text", _fake_redeem)
+
+    await promo.handle_promo_command(message, state=state)  # type: ignore[arg-type]
+
+    assert called is False
+    assert message.answers == []
+
+
+@pytest.mark.asyncio
 async def test_handle_promo_cancel_clears_state_and_returns_to_shop(monkeypatch) -> None:
     monkeypatch.setattr(promo, "Message", DummyMessage)
     state = _State()

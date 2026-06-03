@@ -67,6 +67,9 @@ async def handle_promo_cancel(callback: CallbackQuery, state: FSMContext | None 
 
 @router.message(Command("promo"))
 async def handle_promo_command(message: Message, state: FSMContext | None = None) -> None:
+    if await is_user_in_quiz(message):
+        logger.warning("BLOCKED_PROMO_DURING_QUIZ user=%s", _event_user_id(message))
+        return
     await _redeem_promo_from_text(message, state=state)
 
 
@@ -108,8 +111,8 @@ async def handle_promo_code_input(message: Message, state: FSMContext | None = N
     )
 
 
-async def is_user_in_quiz(callback: CallbackQuery) -> bool:
-    telegram_user_id = _callback_user_id(callback)
+async def is_user_in_quiz(event: CallbackQuery | Message) -> bool:
+    telegram_user_id = _event_user_id(event)
     if telegram_user_id is None:
         return False
     async with SessionLocal.begin() as session:
@@ -153,7 +156,7 @@ async def _is_valid_promo_source(
 
 
 def _callback_user_id(callback: CallbackQuery) -> int | None:
-    return _coerce_message_id(getattr(callback.from_user, "id", None))
+    return _event_user_id(callback)
 
 
 def _callback_chat_id(callback: CallbackQuery) -> int | None:
@@ -163,6 +166,10 @@ def _callback_chat_id(callback: CallbackQuery) -> int | None:
 
 def _callback_message_id(callback: CallbackQuery) -> int | None:
     return _coerce_message_id(getattr(callback.message, "message_id", None))
+
+
+def _event_user_id(event: CallbackQuery | Message) -> int | None:
+    return _coerce_message_id(getattr(event.from_user, "id", None))
 
 
 def _coerce_message_id(value: object) -> int | None:
