@@ -24,7 +24,6 @@ from app.bot.handlers.start_parsing import (
 from app.bot.handlers.start_tournament_flow import handle_start_tournament_payload
 from app.bot.handlers.start_views import _build_home_text
 from app.bot.keyboards.offers import build_offer_keyboard
-from app.bot.keyboards.shop import build_shop_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.core.config import get_settings
@@ -32,7 +31,6 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.economy.offers.service import OfferLoggingError, OfferService
 from app.game import TournamentServiceFacade
-from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
 
 
@@ -152,27 +150,6 @@ async def handle_start_message(message: Message) -> None:
             TEXTS_DE[offer_selection.text_key],
             reply_markup=build_offer_keyboard(offer_selection),
         )
-
-
-async def handle_shop_open(callback: CallbackQuery) -> None:
-    if callback.from_user is None or callback.message is None:
-        await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
-        return
-
-    async with SessionLocal.begin() as session:
-        snapshot = await UserOnboardingService.ensure_home_snapshot(
-            session,
-            telegram_user=callback.from_user,
-        )
-        channel_bonus_claimed = await ChannelBonusService.is_bonus_claimed(
-            session, user_id=snapshot.user_id
-        )
-
-    await callback.message.answer(
-        TEXTS_DE["msg.shop.title"],
-        reply_markup=build_shop_keyboard(channel_bonus_claimed=channel_bonus_claimed),
-    )
-    await callback.answer()
 
 
 async def handle_home_open(callback: CallbackQuery) -> None:

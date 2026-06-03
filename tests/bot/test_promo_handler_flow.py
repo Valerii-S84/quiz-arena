@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from typing import Any, cast
 from uuid import UUID
 
 import pytest
@@ -153,39 +152,25 @@ async def test_handle_promo_code_input_accepts_unexpired_waiting_state(monkeypat
 
 
 @pytest.mark.asyncio
-async def test_handle_promo_open_prompts_for_accessible_callback_message(monkeypatch) -> None:
-    monkeypatch.setattr(promo, "Message", DummyMessage)
+async def test_handle_promo_command_blocks_during_quiz(monkeypatch) -> None:
+    message = _PromoMessage(text="/promo SALE15", from_user=SimpleNamespace(id=1))
     state = _State()
-    callback = DummyCallback(
-        data="promo:open",
-        from_user=SimpleNamespace(id=1),
-        message=DummyMessage(),
-    )
+    called = False
 
-    await promo.handle_promo_open(callback, state=state)  # type: ignore[arg-type]
+    async def _active_quiz(*args, **kwargs) -> bool:
+        return True
 
-    assert callback.message.answers[0].text == TEXTS_DE["msg.promo.input.hint"]
-    assert callback.message.answers[0].kwargs["reply_markup"].inline_keyboard[0][
-        0
-    ].callback_data == ("promo:cancel")
-    assert state.set_states == [promo.PromoCode.waiting_for_code]
-    assert callback.answer_calls == [{"text": None, "show_alert": False}]
+    async def _fake_redeem(*args, **kwargs) -> None:
+        nonlocal called
+        called = True
 
+    monkeypatch.setattr(promo, "is_user_in_quiz", _active_quiz)
+    monkeypatch.setattr(promo, "_redeem_promo_from_text", _fake_redeem)
 
-@pytest.mark.asyncio
-async def test_handle_promo_open_ignores_inaccessible_callback_message() -> None:
-    state = _State()
-    callback = DummyCallback(
-        data="promo:open",
-        from_user=SimpleNamespace(id=1),
-        message=DummyMessage(),
-    )
-    callback.message = cast(Any, object())
+    await promo.handle_promo_command(message, state=state)  # type: ignore[arg-type]
 
-    await promo.handle_promo_open(callback, state=state)  # type: ignore[arg-type]
-
-    assert state.set_states == []
-    assert callback.answer_calls == [{"text": None, "show_alert": False}]
+    assert called is False
+    assert message.answers == []
 
 
 @pytest.mark.asyncio

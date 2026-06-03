@@ -13,7 +13,7 @@ from app.bot.handlers.promo_view_helpers import (
     resolve_scope_label,
 )
 from app.bot.keyboards.promo import build_promo_discount_keyboard
-from app.bot.keyboards.shop import build_shop_keyboard
+from app.bot.promo_shop import answer_shop_message
 from app.bot.texts.de import TEXTS_DE
 from app.db.session import SessionLocal
 from app.economy.promo.errors import (
@@ -56,7 +56,7 @@ async def redeem_promo_from_text(
 ) -> None:
     telegram_user = message.from_user
     if telegram_user is None:
-        await message.answer(TEXTS_DE["msg.system.error"], reply_markup=build_shop_keyboard())
+        await answer_shop_message(message, state=state, text_key="msg.system.error")
         return
 
     promo_code = extract_promo_code(message, allow_plain_text=allow_plain_text)
@@ -77,7 +77,7 @@ async def redeem_promo_from_text(
         await _answer_promo_error(message, state=state, error=exc)
         return
 
-    await _answer_promo_success(message, result=result)
+    await _answer_promo_success(message, state=state, result=result)
 
 
 async def _redeem_code(
@@ -115,14 +115,17 @@ async def _answer_promo_error(
     if state is not None:
         await state.clear()
     text_key = _PROMO_ERROR_TEXT_KEYS[type(error)]
-    await message.answer(TEXTS_DE[text_key], reply_markup=build_shop_keyboard())
+    await answer_shop_message(message, state=state, text_key=text_key)
 
 
-async def _answer_promo_success(message: Message, *, result: PromoRedeemResult) -> None:
+async def _answer_promo_success(
+    message: Message,
+    *,
+    state: FSMContext | None,
+    result: PromoRedeemResult,
+) -> None:
     if result.result_type == "PREMIUM_GRANT":
-        await message.answer(
-            TEXTS_DE["msg.promo.success.grant"], reply_markup=build_shop_keyboard()
-        )
+        await answer_shop_message(message, state=state, text_key="msg.promo.success.grant")
         await message.answer(
             TEXTS_DE["msg.promo.success.grant.details"].format(
                 premium_days=result.premium_days or 0,
@@ -139,9 +142,10 @@ async def _answer_promo_success(message: Message, *, result: PromoRedeemResult) 
         applicable_products=result.applicable_products,
     )
     if discount_keyboard is None:
-        await message.answer(
-            TEXTS_DE["msg.promo.discount.unavailable"],
-            reply_markup=build_shop_keyboard(),
+        await answer_shop_message(
+            message,
+            state=state,
+            text_key="msg.promo.discount.unavailable",
         )
         return
 
