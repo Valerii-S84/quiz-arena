@@ -70,6 +70,14 @@ class RuntimeSettingsMixin:
         default=15,
         alias="RETENTION_CLEANUP_SCHEDULE_MINUTE_BERLIN",
     )
+    website_analytics_visitor_salt: str = Field(
+        default="",
+        alias="WEBSITE_ANALYTICS_VISITOR_SALT",
+    )
+    website_analytics_rate_limit_per_minute: int = Field(
+        default=180,
+        alias="WEBSITE_ANALYTICS_RATE_LIMIT_PER_MINUTE",
+    )
     internal_api_token: str = Field(alias="INTERNAL_API_TOKEN")
     internal_api_allowlist: str = Field(
         default="127.0.0.1/32,::1/128",

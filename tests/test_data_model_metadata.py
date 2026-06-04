@@ -28,6 +28,7 @@ from app.db.models import (  # noqa: F401
     Referral,
     StreakState,
     User,
+    WebsiteEvent,
 )
 from app.db.models.base import Base
 
@@ -59,6 +60,7 @@ def test_all_m2_tables_registered() -> None:
         "daily_question_sets",
         "reconciliation_runs",
         "promo_code_batches",
+        "website_events",
     }
     assert expected_tables.issubset(set(Base.metadata.tables))
 
@@ -164,6 +166,13 @@ def test_critical_constraints_present() -> None:
     analytics_events = Base.metadata.tables["analytics_events"]
     analytics_events_indexes = {index.name for index in analytics_events.indexes}
     assert "idx_analytics_events_created_at" in analytics_events_indexes
+
+    website_events = Base.metadata.tables["website_events"]
+    website_events_indexes = {index.name for index in website_events.indexes}
+    assert "idx_website_events_created_at" in website_events_indexes
+    assert "idx_website_events_local_date_type" in website_events_indexes
+    assert "idx_website_events_visitor_date" in website_events_indexes
+    assert "idx_website_events_path_date" in website_events_indexes
 
     quiz_questions = Base.metadata.tables["quiz_questions"]
     quiz_questions_indexes = {index.name for index in quiz_questions.indexes}
