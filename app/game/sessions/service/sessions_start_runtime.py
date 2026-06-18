@@ -48,6 +48,7 @@ async def _resolve_start_question(
     now_utc: datetime,
     forced_question_id: str | None,
     preferred_question_level: str | None,
+    recent_question_ids_override: tuple[str, ...] | None,
     resolve_start_progression_state,
     select_level_weighted,
     is_persistent_adaptive_mode,
@@ -83,8 +84,8 @@ async def _resolve_start_question(
             now_utc=now_utc,
         )
 
-    recent_question_ids: list[str] = []
-    if source != "FRIEND_CHALLENGE":
+    recent_question_ids: list[str] = list(recent_question_ids_override or ())
+    if source != "FRIEND_CHALLENGE" and recent_question_ids_override is None:
         recent_question_ids = await QuizAttemptsRepo.get_recent_question_ids_for_mode(
             session,
             user_id=user_id,

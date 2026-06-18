@@ -8,6 +8,7 @@ import statistics
 import time
 from collections import Counter
 from collections.abc import Iterable
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -49,6 +50,10 @@ BASE_USER_ID = 10_000_000
 BASE_TELEGRAM_ID = 90_000_000_000
 BASE_UPDATE_ID = 700_000_000
 WEBHOOK_SECRET = "capacity-audit-secret"
+_CURRENT_QUERY_STEP: ContextVar[str] = ContextVar(
+    "capacity_audit_current_query_step",
+    default="unscoped",
+)
 
 TRUNCATE_TABLES = (
     "daily_metrics",
@@ -99,6 +104,7 @@ class LatencySummary:
 class QuerySummary:
     count: int
     total_ms: float
+    p50_ms: float
     p95_ms: float
     max_ms: float
 
@@ -108,6 +114,7 @@ class QueryDigest:
     statement: str
     count: int
     total_ms: float
+    p50_ms: float
     p95_ms: float
     max_ms: float
 
@@ -136,7 +143,10 @@ class ActiveResult:
     db_lock_waits_active: int
     deadlocks_delta: int
     outbound_calls: dict[str, int]
+    query_steps: dict[str, QuerySummary]
+    query_categories: dict[str, QuerySummary]
     top_queries: list[QueryDigest]
+    top_queries_by_count: list[QueryDigest]
     attempts_created: int
     duplicate_answer_groups: int
     processed_updates: dict[str, int]
@@ -157,6 +167,8 @@ class QueryRecorder:
     def __init__(self) -> None:
         self.timings_ms: list[float] = []
         self._by_statement: dict[str, list[float]] = {}
+        self._by_step: dict[str, list[float]] = {}
+        self._by_category: dict[str, list[float]] = {}
 
     def __enter__(self) -> QueryRecorder:
         event.listen(engine.sync_engine, "before_cursor_execute", self._before)
@@ -178,31 +190,110 @@ class QueryRecorder:
             elapsed_ms = (time.perf_counter() - started_at) * 1000
             self.timings_ms.append(elapsed_ms)
             self._by_statement.setdefault(_compact_statement(statement), []).append(elapsed_ms)
+            self._by_step.setdefault(_CURRENT_QUERY_STEP.get(), []).append(elapsed_ms)
+            self._by_category.setdefault(_classify_statement(statement), []).append(elapsed_ms)
 
     def summary(self) -> QuerySummary:
         return QuerySummary(
             count=len(self.timings_ms),
             total_ms=round(sum(self.timings_ms), 3),
+            p50_ms=round(_percentile(self.timings_ms, 50), 3),
             p95_ms=round(_percentile(self.timings_ms, 95), 3),
             max_ms=round(max(self.timings_ms) if self.timings_ms else 0.0, 3),
         )
 
     def top_queries(self, *, limit: int = 10) -> list[QueryDigest]:
-        ordered = sorted(
-            self._by_statement.items(),
-            key=lambda item: sum(item[1]),
-            reverse=True,
+        return self._digest_items(
+            sorted(
+                self._by_statement.items(),
+                key=lambda item: sum(item[1]),
+                reverse=True,
+            )[:limit]
         )
+
+    def top_queries_by_count(self, *, limit: int = 10) -> list[QueryDigest]:
+        return self._digest_items(
+            sorted(
+                self._by_statement.items(),
+                key=lambda item: (len(item[1]), sum(item[1])),
+                reverse=True,
+            )[:limit]
+        )
+
+    def step_summaries(self) -> dict[str, QuerySummary]:
+        return {step: _query_summary(timings) for step, timings in sorted(self._by_step.items())}
+
+    def category_summaries(self) -> dict[str, QuerySummary]:
+        return {
+            category: _query_summary(timings)
+            for category, timings in sorted(self._by_category.items())
+        }
+
+    @staticmethod
+    def _digest_items(items: list[tuple[str, list[float]]]) -> list[QueryDigest]:
         return [
             QueryDigest(
                 statement=statement,
                 count=len(timings),
                 total_ms=round(sum(timings), 3),
+                p50_ms=round(_percentile(timings, 50), 3),
                 p95_ms=round(_percentile(timings, 95), 3),
                 max_ms=round(max(timings) if timings else 0.0, 3),
             )
-            for statement, timings in ordered[:limit]
+            for statement, timings in items
         ]
+
+
+def _query_summary(timings_ms: list[float]) -> QuerySummary:
+    return QuerySummary(
+        count=len(timings_ms),
+        total_ms=round(sum(timings_ms), 3),
+        p50_ms=round(_percentile(timings_ms, 50), 3),
+        p95_ms=round(_percentile(timings_ms, 95), 3),
+        max_ms=round(max(timings_ms) if timings_ms else 0.0, 3),
+    )
+
+
+class query_step:
+    def __init__(self, name: str) -> None:
+        self._name = name
+        self._token = None
+
+    def __enter__(self) -> None:
+        self._token = _CURRENT_QUERY_STEP.set(self._name)
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        if self._token is not None:
+            _CURRENT_QUERY_STEP.reset(self._token)
+
+
+def _classify_statement(statement: str) -> str:
+    normalized = " ".join(statement.lower().split())
+    if " entitlements" in normalized:
+        return "entitlement_checks"
+    if " energy_state" in normalized or " ledger_entries" in normalized:
+        return "energy_check_update"
+    if "max(streak_state.best_streak)" in normalized:
+        return "leaderboard_statistics_badges"
+    if " tournament_participants" in normalized or " tournaments" in normalized:
+        return "leaderboard_statistics_badges"
+    if " analytics_" in normalized or " daily_metrics" in normalized:
+        return "leaderboard_statistics_badges"
+    if " users" in normalized:
+        return "user_state"
+    if " streak_state" in normalized or " mode_progress" in normalized:
+        return "user_state"
+    if " quiz_questions" in normalized:
+        return "question_pool"
+    if " quiz_attempts" in normalized:
+        return "answer_callback"
+    if " quiz_sessions" in normalized:
+        return "quiz_session"
+    if " referrals" in normalized or " offers_impressions" in normalized:
+        return "post_game_prompts"
+    if " processed_updates" in normalized:
+        return "telegram_update_handling"
+    return "other"
 
 
 def _compact_statement(statement: str) -> str:
@@ -665,58 +756,64 @@ async def service_flow_for_user(index: int) -> None:
     )
     now_utc = datetime.now(UTC)
     async with SessionLocal.begin() as session:
-        snapshot = await UserOnboardingService.ensure_home_snapshot(
-            session,
-            telegram_user=telegram_user,
-        )
-        started = await GameSessionService.start_session(
-            session,
-            user_id=snapshot.user_id,
-            mode_code=MODE_CODE,
-            source=SOURCE,
-            idempotency_key=f"audit:start:{index}",
-            now_utc=now_utc,
-        )
-
-    async with SessionLocal.begin() as session:
-        snapshot = await UserOnboardingService.ensure_home_snapshot(
-            session,
-            telegram_user=telegram_user,
-        )
-        answered = await GameSessionService.submit_answer(
-            session,
-            user_id=snapshot.user_id,
-            session_id=started.session.session_id,
-            selected_option=index % 4,
-            idempotency_key=f"audit:answer:{started.session.session_id}:{index % 4}",
-            now_utc=datetime.now(UTC),
-        )
-        show_bonus = await ChannelBonusService.should_show_post_game_prompt(
-            session,
-            user_id=user_id,
-            idempotent_replay=answered.idempotent_replay,
-        )
-        if not show_bonus:
-            await ReferralService.reserve_post_game_prompt(
+        with query_step("home_snapshot_start"):
+            snapshot = await UserOnboardingService.ensure_home_snapshot(
                 session,
-                user_id=user_id,
-                now_utc=datetime.now(UTC),
+                telegram_user=telegram_user,
+            )
+        with query_step("quiz_open_start_session"):
+            started = await GameSessionService.start_session(
+                session,
+                user_id=snapshot.user_id,
+                mode_code=MODE_CODE,
+                source=SOURCE,
+                idempotency_key=f"audit:start:{index}",
+                now_utc=now_utc,
             )
 
     async with SessionLocal.begin() as session:
-        snapshot = await UserOnboardingService.ensure_home_snapshot(
-            session,
-            telegram_user=telegram_user,
-        )
-        await GameSessionService.start_session(
-            session,
-            user_id=snapshot.user_id,
-            mode_code=answered.mode_code,
-            source=answered.source,
-            idempotency_key=f"audit:start:auto:{index}",
-            now_utc=datetime.now(UTC),
-            preferred_question_level=answered.next_preferred_level,
-        )
+        with query_step("answer_user_touch"):
+            user = await UserOnboardingService.touch_existing_user(
+                session,
+                telegram_user=telegram_user,
+                now_utc=datetime.now(UTC),
+            )
+            if user is None:
+                raise RuntimeError(f"synthetic user missing: index={index}")
+        with query_step("answer_callback_submit"):
+            answered = await GameSessionService.submit_answer(
+                session,
+                user_id=user.id,
+                session_id=started.session.session_id,
+                selected_option=index % 4,
+                idempotency_key=f"audit:answer:{started.session.session_id}:{index % 4}",
+                now_utc=datetime.now(UTC),
+            )
+        with query_step("post_game_prompts"):
+            show_bonus = await ChannelBonusService.should_show_post_game_prompt(
+                session,
+                user_id=user_id,
+                idempotent_replay=answered.idempotent_replay,
+            )
+            if not show_bonus:
+                await ReferralService.reserve_post_game_prompt(
+                    session,
+                    user_id=user_id,
+                    now_utc=datetime.now(UTC),
+                )
+
+    async with SessionLocal.begin() as session:
+        with query_step("next_question_start_session"):
+            await GameSessionService.start_session(
+                session,
+                user_id=user_id,
+                mode_code=answered.mode_code,
+                source=answered.source,
+                idempotency_key=f"audit:start:auto:{index}",
+                now_utc=datetime.now(UTC),
+                preferred_question_level=answered.next_preferred_level,
+                recent_question_ids_override=(answered.question_id,),
+            )
 
 
 async def webhook_flow_for_user(
@@ -767,6 +864,7 @@ async def run_active_stage(
     *,
     flow: str,
     max_concurrency: int,
+    start_index: int = 0,
     bot_api: BotApiStub | None = None,
 ) -> ActiveResult:
     latencies: list[float] = []
@@ -815,12 +913,20 @@ async def run_active_stage(
                     timeout=30.0,
                 ) as client:
                     await asyncio.gather(
-                        *(limited(index, client, queue) for index in range(active_users))
+                        *(
+                            limited(index, client, queue)
+                            for index in range(start_index, start_index + active_users)
+                        )
                     )
             finally:
                 restore()
         else:
-            await asyncio.gather(*(limited(index, None, None) for index in range(active_users)))
+            await asyncio.gather(
+                *(
+                    limited(index, None, None)
+                    for index in range(start_index, start_index + active_users)
+                )
+            )
 
     after_locks = await lock_snapshot()
     return ActiveResult(
@@ -834,7 +940,10 @@ async def run_active_stage(
         outbound_calls=dict(
             bot_api.calls if bot_api is not None else _estimated_service_calls(active_users)
         ),
+        query_steps=recorder.step_summaries(),
+        query_categories=recorder.category_summaries(),
         top_queries=recorder.top_queries(),
+        top_queries_by_count=recorder.top_queries_by_count(),
         attempts_created=await _count_attempts_after(before_attempt_id),
         duplicate_answer_groups=await _count_duplicate_answer_groups(),
         processed_updates=await _processed_update_status_counts_after(before_update_id),
@@ -951,13 +1060,16 @@ async def run_audit(args: argparse.Namespace) -> AuditReport:
         report.notes.append(f"seeded_registered_users={users} seed_ms={seed_ms:.3f}")
 
     bot_api = BotApiStub()
+    active_index_offset = 0
     if args.webhook_smoke_users > 0:
         smoke = await run_active_stage(
             args.webhook_smoke_users,
             flow="webhook",
             max_concurrency=min(args.webhook_smoke_users, args.max_concurrency),
+            start_index=active_index_offset,
             bot_api=bot_api,
         )
+        active_index_offset += args.webhook_smoke_users
         report.active_tests.append(smoke)
         if functional_gate_failed(smoke):
             report.notes.append("Gate stopped after webhook smoke failure.")
@@ -968,8 +1080,10 @@ async def run_audit(args: argparse.Namespace) -> AuditReport:
             active_users,
             flow=args.active_flow,
             max_concurrency=args.max_concurrency,
+            start_index=active_index_offset,
             bot_api=bot_api if args.active_flow == "webhook" else None,
         )
+        active_index_offset += active_users
         report.active_tests.append(result)
         if gate_failed(result, max_p95_ms=args.max_p95_ms):
             report.notes.append(f"Gate stopped at active_users={active_users}.")

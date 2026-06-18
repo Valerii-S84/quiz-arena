@@ -71,6 +71,7 @@ async def start_session(
     arena_attempt_id: UUID | None = None,
     arena_round: int | None = None,
     duel_limit_checked: bool = False,
+    recent_question_ids_override: tuple[str, ...] | None = None,
 ) -> StartSessionResult:
     existing = await QuizSessionsRepo.get_by_idempotency_key(session, idempotency_key)
     local_date = berlin_local_date(now_utc)
@@ -140,6 +141,7 @@ async def start_session(
         now_utc=now_utc,
         forced_question_id=resolved_forced_question_id,
         preferred_question_level=preferred_question_level,
+        recent_question_ids_override=recent_question_ids_override,
         resolve_start_progression_state=resolve_start_progression_state,
         select_level_weighted=select_level_weighted,
         is_persistent_adaptive_mode=_is_persistent_adaptive_mode,

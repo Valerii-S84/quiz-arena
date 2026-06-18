@@ -85,6 +85,43 @@ async def test_continue_regular_mode_after_answer_sends_next_question() -> None:
 
 
 @pytest.mark.asyncio
+async def test_continue_regular_mode_after_answer_uses_known_user_id_without_home_snapshot() -> (
+    None
+):
+    async def _unexpected_home_snapshot(*_args, **_kwargs):
+        pytest.fail("known MENU user_id should avoid home snapshot")
+
+    captured: dict[str, object] = {}
+
+    async def _start_session(*args, **kwargs):
+        del args
+        captured.update(kwargs)
+        return _start_result()
+
+    callback = _callback()
+
+    await play_flow.continue_regular_mode_after_answer(
+        callback,
+        result=_answer_result(),
+        user_id=202,
+        now_utc=datetime(2026, 3, 13, 12, 0, tzinfo=UTC),
+        session_local=_SessionLocal(object()),
+        user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_unexpected_home_snapshot),
+        game_session_service=SimpleNamespace(start_session=_start_session),
+        offer_service=SimpleNamespace(),
+        offer_logging_error=RuntimeError,
+        channel_bonus_service=SimpleNamespace(),
+        build_question_text=lambda **kwargs: (
+            f"energy={kwargs['snapshot_free_energy']}+{kwargs['snapshot_paid_energy']}"
+        ),
+    )
+
+    assert captured["user_id"] == 202
+    assert callback.message.answers[0].text == "energy=18+2"
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
+
+
+@pytest.mark.asyncio
 async def test_continue_regular_mode_after_answer_handles_energy_insufficient() -> None:
     captured: list[dict[str, object]] = []
 

@@ -254,6 +254,54 @@ async def test_handle_answer_starts_next_round_for_regular_mode(monkeypatch) -> 
 
 
 @pytest.mark.asyncio
+async def test_handle_answer_uses_lightweight_user_touch_for_regular_mode(monkeypatch) -> None:
+    monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
+    captured: dict[str, int] = {}
+
+    async def _fake_touch_existing_user(session, *, telegram_user, now_utc):
+        del session, now_utc
+        return SimpleNamespace(id=telegram_user.id + 1000)
+
+    async def _fake_submit_answer(*args, **kwargs):
+        del args
+        captured["submit_user_id"] = kwargs["user_id"]
+        return AnswerSessionResult(
+            session_id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+            question_id="q-main",
+            is_correct=True,
+            current_streak=2,
+            best_streak=8,
+            idempotent_replay=False,
+            mode_code="QUICK_MIX_A1A2",
+            source="MENU",
+            selected_answer_text="die",
+            correct_answer_text="die",
+            next_preferred_level="A2",
+        )
+
+    async def _fake_start_session(*args, **kwargs):
+        del args
+        captured["next_user_id"] = kwargs["user_id"]
+        return _start_result()
+
+    monkeypatch.setattr(
+        gameplay.UserOnboardingService,
+        "touch_existing_user",
+        _fake_touch_existing_user,
+    )
+    monkeypatch.setattr(gameplay.GameSessionService, "submit_answer", _fake_submit_answer)
+    monkeypatch.setattr(gameplay.GameSessionService, "start_session", _fake_start_session)
+
+    callback = DummyCallback(
+        data="answer:123e4567-e89b-12d3-a456-426614174000:0",
+        from_user=SimpleNamespace(id=12),
+    )
+    await gameplay.handle_answer(callback)
+
+    assert captured == {"submit_user_id": 1012, "next_user_id": 1012}
+
+
+@pytest.mark.asyncio
 async def test_handle_answer_shows_referral_prompt_once_when_reserved(monkeypatch) -> None:
     monkeypatch.setattr(gameplay, "SessionLocal", DummySessionLocal())
     emitted_events: list[str] = []

@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.analytics_events import EVENT_SOURCE_SYSTEM, emit_analytics_event
+from app.core.global_best_streak_cache import maybe_update_global_best_streak
 from app.db.models.streak_state import StreakState
 from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.streak_repo import StreakRepo
@@ -127,6 +128,8 @@ class StreakService:
 
         StreakService._apply_snapshot_to_model(state, snapshot, activity_at_utc)
         await session.flush()
+        if snapshot.best_streak > snapshot_before_rollover.best_streak:
+            await maybe_update_global_best_streak(snapshot.best_streak)
         return StreakActivityResult(
             counted_for_streak=counted,
             current_streak=snapshot.current_streak,

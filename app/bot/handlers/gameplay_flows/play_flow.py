@@ -78,6 +78,7 @@ async def continue_regular_mode_after_answer(
     callback: CallbackQuery,
     *,
     result: AnswerSessionResult,
+    user_id: int | None = None,
     now_utc: datetime,
     session_local,
     user_onboarding_service,
@@ -101,6 +102,7 @@ async def continue_regular_mode_after_answer(
     await continue_regular_mode_after_answer_impl(
         callback,
         result=result,
+        user_id=user_id,
         now_utc=now_utc,
         services=services,
     )

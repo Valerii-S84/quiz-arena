@@ -5,13 +5,21 @@ from typing import Sequence
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.quiz_questions import QuizQuestion as QuizQuestionRecord
+from app.db.repo.quiz_questions_repo import QuizQuestionPoolCandidate
 from app.game.questions.runtime_bank_filters import (
+    QuestionSelectionMetadata,
     filter_active_records,
     pick_from_pool,
     select_diverse_record,
 )
 from app.game.questions.runtime_bank_models import to_quiz_question
-from app.game.questions.runtime_bank_pool import _get_pool_ids, _repo, clear_question_pool_cache
+from app.game.questions.runtime_bank_pool import (
+    _get_pool_candidates,
+    _get_question_by_id_cache,
+    _repo,
+    _store_question_by_id_cache,
+    clear_question_pool_cache,
+)
 from app.game.questions.types import QuizQuestion
 
 
@@ -42,29 +50,37 @@ async def _list_active_records_by_id(
 
 async def _pick_diverse_from_pool(
     session: AsyncSession,
-    candidate_ids: Sequence[str],
+    candidate_pool: Sequence[QuizQuestionPoolCandidate],
     *,
     exclude_question_ids: Sequence[str],
     previous_question_ids: Sequence[str],
     selection_seed: str,
 ) -> str | None:
-    if not candidate_ids or not previous_question_ids:
+    if not candidate_pool or not previous_question_ids:
         return None
 
     excluded = set(exclude_question_ids)
-    eligible_ids = [question_id for question_id in candidate_ids if question_id not in excluded]
+    eligible_candidates = [
+        candidate for candidate in candidate_pool if candidate.question_id not in excluded
+    ]
     fallback_to_duplicate = False
-    if not eligible_ids:
-        eligible_ids = list(candidate_ids)
+    if not eligible_candidates:
+        eligible_candidates = list(candidate_pool)
         fallback_to_duplicate = True
 
-    candidate_records = await _list_active_records_by_id(session, eligible_ids)
-    if not candidate_records:
-        return None
-
-    previous_records = await _list_active_records_by_id(session, previous_question_ids)
+    pool_by_id = {candidate.question_id: candidate for candidate in candidate_pool}
+    previous_records: list[QuestionSelectionMetadata] = [
+        candidate
+        for question_id in previous_question_ids
+        if (candidate := pool_by_id.get(question_id))
+    ]
+    loaded_ids = {record.question_id for record in previous_records}
+    missing_previous_ids = [
+        question_id for question_id in previous_question_ids if question_id not in loaded_ids
+    ]
+    previous_records.extend(await _list_active_records_by_id(session, missing_previous_ids))
     selected = select_diverse_record(
-        candidate_records=candidate_records,
+        candidate_records=eligible_candidates,
         previous_records=previous_records,
         selection_seed=selection_seed,
     )
@@ -83,14 +99,15 @@ async def _pick_question_id_from_pool(
     selection_seed: str,
     preferred_levels: tuple[str, ...] | None,
 ) -> str | None:
-    candidate_ids = await _get_pool_ids(
+    candidate_pool = await _get_pool_candidates(
         session,
         mode_code=mode_code,
         preferred_levels=preferred_levels,
     )
+    candidate_ids = tuple(candidate.question_id for candidate in candidate_pool)
     selected_id = await _pick_diverse_from_pool(
         session,
-        candidate_ids,
+        candidate_pool,
         exclude_question_ids=recent_question_ids,
         previous_question_ids=recent_question_ids,
         selection_seed=selection_seed,
@@ -174,6 +191,10 @@ async def _pick_from_mode(
     if selected_id is None:
         return None
 
+    cached = _get_question_by_id_cache(selected_id)
+    if cached is not None:
+        return cached
+
     repo = _repo()
     selected = await repo.get_by_id(session, selected_id)
     if selected is None:
@@ -191,4 +212,6 @@ async def _pick_from_mode(
         selected = await repo.get_by_id(session, retry_selected_id)
         if selected is None:
             return None
-    return to_quiz_question(selected)
+    question = to_quiz_question(selected)
+    _store_question_by_id_cache(question)
+    return question

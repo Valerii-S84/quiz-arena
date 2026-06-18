@@ -15,6 +15,8 @@ class QuizQuestionPoolChange:
     question_id: str
     mode_code: str
     level: str
+    source_file: str
+    category: str
     status: str
     quick_mix_eligible: bool
     updated_at: datetime
@@ -175,6 +177,8 @@ class QuizQuestionsRepo:
                 QuizQuestion.question_id,
                 QuizQuestion.mode_code,
                 QuizQuestion.level,
+                QuizQuestion.source_file,
+                QuizQuestion.category,
                 QuizQuestion.status,
                 QuizQuestion.quick_mix_eligible,
                 QuizQuestion.updated_at,
@@ -188,9 +192,20 @@ class QuizQuestionsRepo:
                 question_id=question_id,
                 mode_code=mode_code,
                 level=level,
+                source_file=source_file,
+                category=category,
                 status=status,
                 quick_mix_eligible=quick_mix_eligible,
                 updated_at=updated_at,
             )
-            for question_id, mode_code, level, status, quick_mix_eligible, updated_at in result.all()
+            for (
+                question_id,
+                mode_code,
+                level,
+                source_file,
+                category,
+                status,
+                quick_mix_eligible,
+                updated_at,
+            ) in result.all()
         ]

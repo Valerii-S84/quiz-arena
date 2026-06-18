@@ -13,6 +13,10 @@ class RuntimeSettingsMixin:
         default=300,
         alias="QUIZ_QUESTION_POOL_CACHE_TTL_SECONDS",
     )
+    global_best_streak_cache_ttl_seconds: int = Field(
+        default=300,
+        alias="GLOBAL_BEST_STREAK_CACHE_TTL_SECONDS",
+    )
     telegram_updates_alert_window_minutes: int = Field(
         default=15,
         alias="TELEGRAM_UPDATES_ALERT_WINDOW_MINUTES",

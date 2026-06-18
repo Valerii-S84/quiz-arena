@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from aiogram.types import User as TelegramUser
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.global_best_streak_cache import get_global_best_streak
 from app.core.referral_codes import generate_referral_code
 from app.db.models.users import User
 from app.db.repo.entitlements_repo import EntitlementsRepo
@@ -36,6 +37,20 @@ class UserOnboardingService:
     @staticmethod
     async def get_by_telegram_user_id(session: AsyncSession, telegram_user_id: int) -> User | None:
         return await UsersRepo.get_by_telegram_user_id(session, telegram_user_id)
+
+    @staticmethod
+    async def touch_existing_user(
+        session: AsyncSession,
+        *,
+        telegram_user: TelegramUser,
+        now_utc: datetime | None = None,
+    ) -> User | None:
+        resolved_now = now_utc or datetime.now(timezone.utc)
+        user = await UsersRepo.get_by_telegram_user_id(session, telegram_user.id)
+        if user is None:
+            return None
+        await UsersRepo.touch_last_seen(session, user.id, resolved_now)
+        return user
 
     @staticmethod
     async def _generate_unique_referral_code(session: AsyncSession) -> str:
@@ -89,7 +104,7 @@ class UserOnboardingService:
         streak_snapshot = await StreakService.sync_rollover(
             session, user_id=user.id, now_utc=now_utc
         )
-        global_best_streak = await UsersRepo.get_global_best_streak(session)
+        global_best_streak = await get_global_best_streak(session)
         premium_active = await EntitlementsRepo.has_active_premium(session, user.id, now_utc)
         daily_cup_badge_unlocked = await has_daily_cup_5_day_badge(session, user_id=user.id)
 

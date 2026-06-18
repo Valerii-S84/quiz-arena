@@ -53,11 +53,13 @@ async def continue_regular_answer(
     result: AnswerSessionResult,
     request: AnswerRequest,
     prompts: PostGamePromptState,
+    user_id: int,
     context: AnswerFlowContext,
 ) -> None:
     await context.branches.continue_regular_mode_after_answer(
         callback,
         result=result,
+        user_id=user_id,
         now_utc=request.now_utc,
         session_local=context.services.session_local,
         user_onboarding_service=context.services.user_onboarding_service,

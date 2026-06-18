@@ -30,6 +30,7 @@ async def continue_regular_mode_after_answer_impl(
     callback: CallbackQuery,
     *,
     result: AnswerSessionResult,
+    user_id: int | None = None,
     now_utc: datetime,
     services: ContinueModeFlowServices,
 ) -> None:
@@ -37,7 +38,7 @@ async def continue_regular_mode_after_answer_impl(
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
 
-    outcome = await _resolve_continue_outcome(callback, result, now_utc, services)
+    outcome = await _resolve_continue_outcome(callback, result, user_id, now_utc, services)
     if outcome.handled:
         return
     if outcome.arena_attempt_completed:
@@ -58,9 +59,19 @@ async def continue_regular_mode_after_answer_impl(
 async def _resolve_continue_outcome(
     callback: CallbackQuery,
     result: AnswerSessionResult,
+    user_id: int | None,
     now_utc: datetime,
     services: ContinueModeFlowServices,
 ) -> ContinueOutcome:
+    if result.source == "MENU" and user_id is not None:
+        return await _resolve_menu_continue_outcome(
+            callback,
+            user_id=user_id,
+            result=result,
+            now_utc=now_utc,
+            services=services,
+        )
+
     async with services.session_local.begin() as session:
         snapshot = await services.user_onboarding_service.ensure_home_snapshot(
             session, telegram_user=callback.from_user
@@ -104,6 +115,57 @@ async def _resolve_continue_with_session(
         )
         await callback.answer()
         return ContinueOutcome(handled=True)
+
+
+async def _resolve_menu_continue_outcome(
+    callback: CallbackQuery,
+    *,
+    user_id: int,
+    result: AnswerSessionResult,
+    now_utc: datetime,
+    services: ContinueModeFlowServices,
+) -> ContinueOutcome:
+    async with services.session_local.begin() as session:
+        try:
+            next_result = await services.game_session_service.start_session(
+                session,
+                user_id=user_id,
+                mode_code=result.mode_code,
+                source=result.source,
+                idempotency_key=f"start:auto:{result.mode_code}:{callback.id}",
+                now_utc=now_utc,
+                preferred_question_level=result.next_preferred_level,
+                recent_question_ids_override=(result.question_id,),
+            )
+        except EnergyInsufficientError:
+            await services.energy_handler(
+                callback,
+                session=session,
+                user_id=user_id,
+                now_utc=now_utc,
+                offer_service=services.offer_service,
+                offer_logging_error=services.offer_logging_error,
+                offer_idempotency_key=f"offer:energy:auto:{callback.id}",
+                channel_bonus_service=services.channel_bonus_service,
+            )
+            await callback.answer()
+            return ContinueOutcome(handled=True)
+
+    return ContinueOutcome(
+        snapshot=_MenuContinueSnapshot(
+            user_id=user_id,
+            free_energy=next_result.energy_free,
+            paid_energy=next_result.energy_paid,
+        ),
+        next_result=next_result,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _MenuContinueSnapshot:
+    user_id: int
+    free_energy: int
+    paid_energy: int
 
 
 def _build_start_kwargs(snapshot, result: AnswerSessionResult, callback_id: str, now_utc: datetime):
