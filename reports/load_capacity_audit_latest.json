@@ -1,0 +1,108 @@
+{
+  "started_at": "2026-06-18T18:25:16.481354+00:00",
+  "database_url_redacted": "postgresql+asyncpg://quiz:***@localhost:5432/quiz_arena_test",
+  "redis_url_redacted": "redis://localhost:6379/15",
+  "registered_scales": [
+    {
+      "users": 1000,
+      "db_size_mb": 16.835,
+      "users_count_ms": 63.186,
+      "user_lookup_p95_ms": 41.204,
+      "global_best_ms": 41.605,
+      "public_stats_ms": 43.578,
+      "question_pool_warm_ms": 56.164,
+      "dispatcher_build_ms": 0.687,
+      "redis_keys": 0,
+      "rss_mb": 185.08
+    },
+    {
+      "users": 10000,
+      "db_size_mb": 22.093,
+      "users_count_ms": 44.581,
+      "user_lookup_p95_ms": 41.652,
+      "global_best_ms": 39.038,
+      "public_stats_ms": 43.964,
+      "question_pool_warm_ms": 49.997,
+      "dispatcher_build_ms": 0.002,
+      "redis_keys": 0,
+      "rss_mb": 194.98
+    },
+    {
+      "users": 100000,
+      "db_size_mb": 73.46,
+      "users_count_ms": 51.966,
+      "user_lookup_p95_ms": 53.956,
+      "global_best_ms": 52.691,
+      "public_stats_ms": 55.423,
+      "question_pool_warm_ms": 47.787,
+      "dispatcher_build_ms": 0.002,
+      "redis_keys": 0,
+      "rss_mb": 200.0
+    }
+  ],
+  "active_tests": [
+    {
+      "active_users": 10,
+      "flow": "webhook",
+      "latency": {
+        "count": 10,
+        "p50_ms": 5622.066,
+        "p95_ms": 5649.436,
+        "max_ms": 5665.752
+      },
+      "errors": 0,
+      "query_summary": {
+        "count": 945,
+        "total_ms": 16787.089,
+        "p95_ms": 77.967,
+        "max_ms": 333.126
+      },
+      "db_lock_waits_active": 0,
+      "deadlocks_delta": 0,
+      "outbound_calls": {
+        "SendMessage": 50,
+        "AnswerCallbackQuery": 20
+      },
+      "attempts_created": 10,
+      "duplicate_answer_groups": 0,
+      "processed_updates": {
+        "PROCESSED": 30
+      },
+      "rss_mb": 223.3
+    },
+    {
+      "active_users": 50,
+      "flow": "service",
+      "latency": {
+        "count": 50,
+        "p50_ms": 9542.215,
+        "p95_ms": 9648.921,
+        "max_ms": 9655.818
+      },
+      "errors": 0,
+      "query_summary": {
+        "count": 3428,
+        "total_ms": 321893.08,
+        "p95_ms": 348.435,
+        "max_ms": 949.935
+      },
+      "db_lock_waits_active": 0,
+      "deadlocks_delta": 0,
+      "outbound_calls": {
+        "estimated_sendMessage": 150,
+        "estimated_answerCallbackQuery": 100
+      },
+      "attempts_created": 50,
+      "duplicate_answer_groups": 0,
+      "processed_updates": {},
+      "rss_mb": 290.43
+    }
+  ],
+  "notes": [
+    "seeded_registered_users=1000 seed_ms=238.146",
+    "seeded_registered_users=10000 seed_ms=1756.218",
+    "seeded_registered_users=100000 seed_ms=16500.165",
+    "Gate stopped at active_users=50.",
+    "explain_hot_queries={\"global_best_streak\": [\"Aggregate  (cost=1283.24..1283.25 rows=1 width=4) (actual time=14.908..14.909 rows=1 loops=1)\", \"  Buffers: shared hit=1033\", \"  ->  Seq Scan on streak_state  (cost=0.00..1233.19 rows=20019 width=4) (actual time=0.009..8.225 rows=100000 loops=1)\", \"        Buffers: shared hit=1033\", \"Planning:\", \"  Buffers: shared hit=135\", \"Planning Time: 0.532 ms\", \"Execution Time: 15.008 ms\"], \"user_lookup\": [\"Index Scan using uq_users_telegram_user_id on users  (cost=0.29..8.30 rows=1 width=136) (actual time=0.025..0.026 rows=1 loops=1)\", \"  Index Cond: (telegram_user_id = '90000000000'::bigint)\", \"  Buffers: shared hit=4\", \"Planning:\", \"  Buffers: shared hit=145\", \"Planning Time: 0.422 ms\", \"Execution Time: 0.046 ms\"], \"recent_attempts\": [\"Limit  (cost=0.30..16.34 rows=1 width=20) (actual time=0.084..0.097 rows=2 loops=1)\", \"  Buffers: shared hit=14\", \"  ->  Nested Loop  (cost=0.30..16.34 rows=1 width=20) (actual time=0.083..0.096 rows=2 loops=1)\", \"        Join Filter: (qa.session_id = qs.id)\", \"        Rows Removed by Join Filter: 45\", \"        Buffers: shared hit=14\", \"        ->  Index Scan Backward using idx_attempts_user_time on quiz_attempts qa  (cost=0.15..8.17 rows=1 width=36) (actual time=0.036..0.042 rows=2 loops=1)\", \"              Index Cond: (user_id = 10000000)\", \"              Buffers: shared hit=7\", \"        ->  Index Scan using idx_sessions_mode on quiz_sessions qs  (cost=0.15..8.17 rows=1 width=16) (actual time=0.012..0.020 rows=24 loops=2)\", \"              Index Cond: ((mode_code)::text = 'QUICK_MIX_A1A2'::text)\", \"              Buffers: shared hit=7\", \"Planning:\", \"  Buffers: shared hit=485\", \"Planning Time: 1.083 ms\", \"Execution Time: 0.118 ms\"]}"
+  ]
+}

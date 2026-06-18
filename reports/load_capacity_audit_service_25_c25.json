@@ -1,0 +1,125 @@
+{
+  "started_at": "2026-06-18T18:31:06.396533+00:00",
+  "database_url_redacted": "postgresql+asyncpg://quiz:***@localhost:5432/quiz_arena_test",
+  "redis_url_redacted": "redis://localhost:6379/15",
+  "registered_scales": [
+    {
+      "users": 100000,
+      "db_size_mb": 73.085,
+      "users_count_ms": 80.486,
+      "user_lookup_p95_ms": 41.449,
+      "global_best_ms": 52.64,
+      "public_stats_ms": 56.198,
+      "question_pool_warm_ms": 53.298,
+      "dispatcher_build_ms": 0.681,
+      "redis_keys": 0,
+      "rss_mb": 197.4
+    }
+  ],
+  "active_tests": [
+    {
+      "active_users": 25,
+      "flow": "service",
+      "latency": {
+        "count": 25,
+        "p50_ms": 4689.729,
+        "p95_ms": 4701.106,
+        "max_ms": 4711.776
+      },
+      "errors": 0,
+      "query_summary": {
+        "count": 1689,
+        "total_ms": 75678.429,
+        "p95_ms": 198.267,
+        "max_ms": 528.184
+      },
+      "db_lock_waits_active": 0,
+      "deadlocks_delta": 0,
+      "outbound_calls": {
+        "estimated_sendMessage": 75,
+        "estimated_answerCallbackQuery": 50
+      },
+      "top_queries": [
+        {
+          "statement": "SELECT quiz_questions.question_id, quiz_questions.mode_code, quiz_questions.source_file, quiz_questions.level, quiz_questions.category, quiz_questions.question_text, quiz_questions.option_1, quiz_questions.option_2, quiz_questions.option_3,",
+          "count": 50,
+          "total_ms": 12775.348,
+          "p95_ms": 459.352,
+          "max_ms": 528.184
+        },
+        {
+          "statement": "SELECT users.id, users.telegram_user_id, users.username, users.first_name, users.language_code, users.timezone, users.referral_code, users.referred_by_user_id, users.status, users.created_at, users.last_seen_at, users.referral_prompt_shown_",
+          "count": 75,
+          "total_ms": 8890.429,
+          "p95_ms": 453.274,
+          "max_ms": 470.892
+        },
+        {
+          "statement": "SELECT entitlements.id, entitlements.user_id, entitlements.entitlement_type, entitlements.scope, entitlements.status, entitlements.starts_at, entitlements.ends_at, entitlements.source_purchase_id, entitlements.idempotency_key, entitlements.",
+          "count": 300,
+          "total_ms": 6253.449,
+          "p95_ms": 39.578,
+          "max_ms": 207.762
+        },
+        {
+          "statement": "SELECT quiz_attempts.question_id FROM quiz_attempts JOIN quiz_sessions ON quiz_attempts.session_id = quiz_sessions.id WHERE quiz_attempts.user_id = $1::BIGINT AND quiz_sessions.mode_code = $2::VARCHAR ORDER BY quiz_attempts.answered_at DESC",
+          "count": 50,
+          "total_ms": 5040.797,
+          "p95_ms": 229.27,
+          "max_ms": 348.725
+        },
+        {
+          "statement": "SELECT quiz_questions.question_id AS quiz_questions_question_id, quiz_questions.mode_code AS quiz_questions_mode_code, quiz_questions.source_file AS quiz_questions_source_file, quiz_questions.level AS quiz_questions_level, quiz_questions.ca",
+          "count": 75,
+          "total_ms": 4344.668,
+          "p95_ms": 302.139,
+          "max_ms": 378.233
+        },
+        {
+          "statement": "SELECT mode_progress.user_id AS mode_progress_user_id, mode_progress.mode_code AS mode_progress_mode_code, mode_progress.preferred_level AS mode_progress_preferred_level, mode_progress.mix_step AS mode_progress_mix_step, mode_progress.corre",
+          "count": 50,
+          "total_ms": 3922.915,
+          "p95_ms": 233.92,
+          "max_ms": 514.635
+        },
+        {
+          "statement": "SELECT energy_state.user_id, energy_state.free_energy, energy_state.paid_energy, energy_state.free_cap, energy_state.regen_interval_sec, energy_state.last_regen_at, energy_state.last_daily_topup_local_date, energy_state.version, energy_stat",
+          "count": 125,
+          "total_ms": 3759.148,
+          "p95_ms": 123.727,
+          "max_ms": 209.664
+        },
+        {
+          "statement": "UPDATE users SET last_seen_at=$1::TIMESTAMP WITH TIME ZONE WHERE users.id = $2::BIGINT",
+          "count": 75,
+          "total_ms": 3650.925,
+          "p95_ms": 173.668,
+          "max_ms": 208.494
+        },
+        {
+          "statement": "UPDATE energy_state SET free_energy=$1::SMALLINT, version=$2::INTEGER, updated_at=$3::TIMESTAMP WITH TIME ZONE WHERE energy_state.user_id = $4::BIGINT",
+          "count": 50,
+          "total_ms": 3358.62,
+          "p95_ms": 238.452,
+          "max_ms": 239.567
+        },
+        {
+          "statement": "INSERT INTO quiz_sessions (id, user_id, mode_code, source, status, energy_cost_total, question_id, daily_run_id, friend_challenge_id, friend_challenge_round, arena_attempt_id, arena_round, started_at, completed_at, local_date_berlin, idempo",
+          "count": 50,
+          "total_ms": 3326.337,
+          "p95_ms": 330.369,
+          "max_ms": 365.57
+        }
+      ],
+      "attempts_created": 25,
+      "duplicate_answer_groups": 0,
+      "processed_updates": {},
+      "rss_mb": 223.15
+    }
+  ],
+  "notes": [
+    "seeded_registered_users=100000 seed_ms=17975.077",
+    "Gate stopped at active_users=25.",
+    "explain_hot_queries={\"global_best_streak\": [\"Aggregate  (cost=2282.00..2282.01 rows=1 width=4) (actual time=14.385..14.385 rows=1 loops=1)\", \"  Buffers: shared hit=1032\", \"  ->  Seq Scan on streak_state  (cost=0.00..2032.00 rows=100000 width=4) (actual time=0.004..7.478 rows=100000 loops=1)\", \"        Buffers: shared hit=1032\", \"Planning:\", \"  Buffers: shared hit=135\", \"Planning Time: 0.530 ms\", \"Execution Time: 14.481 ms\"], \"user_lookup\": [\"Index Scan using uq_users_telegram_user_id on users  (cost=0.29..8.31 rows=1 width=137) (actual time=0.025..0.026 rows=1 loops=1)\", \"  Index Cond: (telegram_user_id = '90000000000'::bigint)\", \"  Buffers: shared hit=4\", \"Planning:\", \"  Buffers: shared hit=149\", \"Planning Time: 0.607 ms\", \"Execution Time: 0.047 ms\"], \"recent_attempts\": [\"Limit  (cost=9.64..9.64 rows=1 width=26) (actual time=0.145..0.148 rows=1 loops=1)\", \"  Buffers: shared hit=10\", \"  ->  Sort  (cost=9.64..9.64 rows=1 width=26) (actual time=0.144..0.147 rows=1 loops=1)\", \"        Sort Key: qa.answered_at DESC\", \"        Sort Method: quicksort  Memory: 25kB\", \"        Buffers: shared hit=10\", \"        ->  Hash Join  (cost=8.18..9.63 rows=1 width=26) (actual time=0.084..0.099 rows=1 loops=1)\", \"              Hash Cond: (qs.id = qa.session_id)\", \"              Buffers: shared hit=7\", \"              ->  Seq Scan on quiz_sessions qs  (cost=0.00..1.34 rows=27 width=16) (actual time=0.008..0.018 rows=50 loops=1)\", \"                    Filter: ((mode_code)::text = 'QUICK_MIX_A1A2'::text)\", \"                    Buffers: shared hit=1\", \"              ->  Hash  (cost=8.17..8.17 rows=1 width=42) (actual time=0.029..0.029 rows=1 loops=1)\", \"                    Buckets: 1024  Batches: 1  Memory Usage: 9kB\", \"                    Buffers: shared hit=6\", \"                    ->  Index Scan Backward using idx_attempts_user_time on quiz_attempts qa  (cost=0.15..8.17 rows=1 width=42) (actual time=0.024..0.024 rows=1 loops=1)\", \"                          Index Cond: (user_id = 10000000)\", \"                          Buffers: shared hit=6\", \"Planning:\", \"  Buffers: shared hit=488\", \"Planning Time: 1.369 ms\", \"Execution Time: 0.176 ms\"]}"
+  ]
+}
