@@ -79,6 +79,68 @@ async def test_select_question_for_mode_reuses_cached_pool_between_calls(
 
 
 @pytest.mark.asyncio
+async def test_select_question_for_mode_derives_preferred_pool_from_cached_full_pool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    list_calls = 0
+
+    async def fake_list_question_ids_all_active(  # noqa: ANN001
+        session,
+        *,
+        exclude_question_ids=None,
+        preferred_levels=None,
+        require_quick_mix_eligible=False,
+    ):
+        return []
+
+    async def fake_list_question_ids_for_mode(  # noqa: ANN001
+        session,
+        *,
+        mode_code,
+        exclude_question_ids=None,
+        preferred_levels=None,
+    ):
+        nonlocal list_calls
+        assert preferred_levels is None
+        list_calls += 1
+        return ["q_a1", "q_a2", "q_b1"]
+
+    records = {
+        "q_a1": _fake_record("q_a1", mode_code="ARTIKEL_SPRINT", level="A1"),
+        "q_a2": _fake_record("q_a2", mode_code="ARTIKEL_SPRINT", level="A2"),
+        "q_b1": _fake_record("q_b1", mode_code="ARTIKEL_SPRINT", level="B1"),
+    }
+    monkeypatch.setattr(
+        "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_all_active",
+        fake_list_question_ids_all_active,
+    )
+    monkeypatch.setattr(
+        "app.game.questions.runtime_bank.QuizQuestionsRepo.list_question_ids_for_mode",
+        fake_list_question_ids_for_mode,
+    )
+    _install_question_record_repo(monkeypatch, records)
+
+    await select_question_for_mode(
+        _Session(),
+        "ARTIKEL_SPRINT",
+        local_date_berlin=date(2026, 2, 19),
+        recent_question_ids=[],
+        selection_seed="seed-cache-full",
+    )
+    selected = await select_question_for_mode(
+        _Session(),
+        "ARTIKEL_SPRINT",
+        local_date_berlin=date(2026, 2, 19),
+        recent_question_ids=[],
+        selection_seed="seed-cache-preferred",
+        preferred_level="A1",
+    )
+
+    assert selected.level == "A1"
+    assert list_calls == 1
+
+
+@pytest.mark.asyncio
 async def test_select_question_for_mode_refreshes_stale_cache_if_selected_id_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -139,10 +201,10 @@ async def test_select_question_for_mode_refresh_uses_incremental_changes(
 ) -> None:
     full_load_calls = 0
     incremental_calls = 0
-    monotonic_values = iter([0.0, 0.0, 2.0, 2.0, 2.0, 2.0])
+    clock = {"now": 0.0}
 
     def fake_monotonic() -> float:
-        return next(monotonic_values, 2.0)
+        return clock["now"]
 
     async def fake_list_question_ids_all_active(  # noqa: ANN001
         session,
@@ -220,6 +282,7 @@ async def test_select_question_for_mode_refresh_uses_incremental_changes(
         recent_question_ids=[],
         selection_seed="seed-incremental-refresh",
     )
+    clock["now"] = 2.0
     second = await select_question_for_mode(
         _Session(),
         "ARTIKEL_SPRINT",

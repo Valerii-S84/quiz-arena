@@ -14,6 +14,7 @@ from app.game.questions.runtime_bank_filters import (
 )
 from app.game.questions.runtime_bank_models import to_quiz_question
 from app.game.questions.runtime_bank_pool import (
+    _get_pool_ids,
     _get_pool_candidates,
     _get_pool_question,
     _get_question_by_id_cache,
@@ -100,6 +101,18 @@ async def _pick_question_id_from_pool(
     selection_seed: str,
     preferred_levels: tuple[str, ...] | None,
 ) -> str | None:
+    if not recent_question_ids:
+        candidate_ids = await _get_pool_ids(
+            session,
+            mode_code=mode_code,
+            preferred_levels=preferred_levels,
+        )
+        return _pick_from_pool(
+            candidate_ids,
+            exclude_question_ids=(),
+            selection_seed=selection_seed,
+        )
+
     candidate_pool = await _get_pool_candidates(
         session,
         mode_code=mode_code,

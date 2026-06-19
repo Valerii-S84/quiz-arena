@@ -134,6 +134,65 @@ def _pool_includes_question(
     )
 
 
+def _fresh_cached_pool_entry(
+    cache_key: tuple[str, tuple[str, ...] | None],
+    *,
+    ttl_seconds: int,
+    now_mono: float,
+) -> _PoolCacheEntry | None:
+    cached = _QUESTION_POOL_CACHE.get(cache_key)
+    if cached is None:
+        return None
+    if (now_mono - cached.loaded_at_mono) > ttl_seconds:
+        return None
+    return cached
+
+
+def _derive_preferred_pool_entry(
+    full_entry: _PoolCacheEntry,
+    *,
+    preferred_levels: tuple[str, ...],
+    loaded_at_mono: float,
+) -> _PoolCacheEntry:
+    preferred_ids = tuple(
+        question_id
+        for question_id in full_entry.question_ids
+        if full_entry.candidates_by_id[question_id].level in preferred_levels
+    )
+    return _PoolCacheEntry(
+        loaded_at_mono=loaded_at_mono,
+        question_ids=preferred_ids,
+        candidates_by_id={
+            question_id: full_entry.candidates_by_id[question_id] for question_id in preferred_ids
+        },
+        updated_at_watermark=full_entry.updated_at_watermark,
+    )
+
+
+def _derive_preferred_pool_entry_from_cache(
+    *,
+    mode_code: str,
+    preferred_levels: tuple[str, ...] | None,
+    ttl_seconds: int,
+    now_mono: float,
+) -> _PoolCacheEntry | None:
+    if preferred_levels is None:
+        return None
+    full_cache_key = (_pool_cache_scope(mode_code), None)
+    full_entry = _fresh_cached_pool_entry(
+        full_cache_key,
+        ttl_seconds=ttl_seconds,
+        now_mono=now_mono,
+    )
+    if full_entry is None:
+        return None
+    return _derive_preferred_pool_entry(
+        full_entry,
+        preferred_levels=preferred_levels,
+        loaded_at_mono=now_mono,
+    )
+
+
 async def _load_pool_ids(
     session: AsyncSession,
     *,
@@ -314,11 +373,29 @@ async def _get_pool_entry(
     cached = _QUESTION_POOL_CACHE.get(cache_key)
     if cached is not None and (now_mono - cached.loaded_at_mono) <= ttl_seconds:
         return cached
+    derived_entry = _derive_preferred_pool_entry_from_cache(
+        mode_code=mode_code,
+        preferred_levels=preferred_levels,
+        ttl_seconds=ttl_seconds,
+        now_mono=now_mono,
+    )
+    if derived_entry is not None:
+        _QUESTION_POOL_CACHE[cache_key] = derived_entry
+        return derived_entry
 
     async with _QUESTION_POOL_CACHE_LOCK:
         cached = _QUESTION_POOL_CACHE.get(cache_key)
         if cached is not None and (now_mono - cached.loaded_at_mono) <= ttl_seconds:
             return cached
+        derived_entry = _derive_preferred_pool_entry_from_cache(
+            mode_code=mode_code,
+            preferred_levels=preferred_levels,
+            ttl_seconds=ttl_seconds,
+            now_mono=now_mono,
+        )
+        if derived_entry is not None:
+            _QUESTION_POOL_CACHE[cache_key] = derived_entry
+            return derived_entry
 
         updated_entry = (
             await _build_incremental_pool_entry(
