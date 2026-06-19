@@ -35,6 +35,7 @@ from app.db.models.quiz_questions import QuizQuestion
 from app.db.models.quiz_sessions import QuizSession
 from app.db.models.streak_state import StreakState
 from app.db.models.users import User
+from app.db.repo.entitlements_repo import entitlement_request_cache
 from app.db.session import SessionLocal, engine
 from app.economy.referrals.service import ReferralService
 from app.game.questions.runtime_bank import clear_question_pool_cache
@@ -158,6 +159,8 @@ class AuditReport:
     started_at: str
     database_url_redacted: str
     redis_url_redacted: str
+    app_env: str
+    db_pool_class: str
     registered_scales: list[ScaleResult] = field(default_factory=list)
     active_tests: list[ActiveResult] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -525,6 +528,16 @@ async def assert_safe_target() -> None:
     settings = get_settings()
     if "test" not in settings.database_url:
         raise RuntimeError("DATABASE_URL must point to an isolated test database")
+    if _db_pool_class() == "NullPool":
+        raise RuntimeError(
+            "load_capacity_audit active stages require a pooled DB engine. "
+            "APP_ENV=test uses NullPool and measures connection churn; use APP_ENV=load "
+            "with an isolated test DATABASE_URL instead."
+        )
+
+
+def _db_pool_class() -> str:
+    return type(engine.sync_engine.pool).__name__
 
 
 async def truncate_test_db() -> None:
@@ -756,64 +769,75 @@ async def service_flow_for_user(index: int) -> None:
     )
     now_utc = datetime.now(UTC)
     async with SessionLocal.begin() as session:
-        with query_step("home_snapshot_start"):
-            snapshot = await UserOnboardingService.ensure_home_snapshot(
+        with query_step("start_user_lookup"):
+            resolved_user_id = await UserOnboardingService.get_existing_user_id_by_telegram_user_id(
                 session,
-                telegram_user=telegram_user,
+                telegram_user.id,
             )
+            if resolved_user_id is None:
+                snapshot = await UserOnboardingService.ensure_home_snapshot(
+                    session,
+                    telegram_user=telegram_user,
+                )
+                user_id = int(snapshot.user_id)
+            else:
+                user_id = int(resolved_user_id)
         with query_step("quiz_open_start_session"):
             started = await GameSessionService.start_session(
                 session,
-                user_id=snapshot.user_id,
+                user_id=user_id,
                 mode_code=MODE_CODE,
                 source=SOURCE,
                 idempotency_key=f"audit:start:{index}",
                 now_utc=now_utc,
             )
 
-    async with SessionLocal.begin() as session:
-        with query_step("answer_user_touch"):
-            user = await UserOnboardingService.touch_existing_user(
-                session,
-                telegram_user=telegram_user,
-                now_utc=datetime.now(UTC),
-            )
-            if user is None:
-                raise RuntimeError(f"synthetic user missing: index={index}")
-        with query_step("answer_callback_submit"):
-            answered = await GameSessionService.submit_answer(
-                session,
-                user_id=user.id,
-                session_id=started.session.session_id,
-                selected_option=index % 4,
-                idempotency_key=f"audit:answer:{started.session.session_id}:{index % 4}",
-                now_utc=datetime.now(UTC),
-            )
-        with query_step("post_game_prompts"):
-            show_bonus = await ChannelBonusService.should_show_post_game_prompt(
-                session,
-                user_id=user_id,
-                idempotent_replay=answered.idempotent_replay,
-            )
-            if not show_bonus:
-                await ReferralService.reserve_post_game_prompt(
+    answer_now = datetime.now(UTC)
+    with entitlement_request_cache():
+        async with SessionLocal.begin() as session:
+            with query_step("answer_user_touch"):
+                user = await UserOnboardingService.touch_existing_user(
+                    session,
+                    telegram_user=telegram_user,
+                    now_utc=answer_now,
+                )
+                if user is None:
+                    raise RuntimeError(f"synthetic user missing: index={index}")
+            with query_step("answer_callback_submit"):
+                answered = await GameSessionService.submit_answer(
+                    session,
+                    user_id=user.id,
+                    session_id=started.session.session_id,
+                    selected_option=index % 4,
+                    idempotency_key=f"audit:answer:{started.session.session_id}:{index % 4}",
+                    now_utc=answer_now,
+                )
+            with query_step("post_game_prompts"):
+                show_bonus = await ChannelBonusService.should_show_post_game_prompt(
                     session,
                     user_id=user_id,
-                    now_utc=datetime.now(UTC),
+                    idempotent_replay=answered.idempotent_replay,
                 )
+                if not show_bonus:
+                    await ReferralService.reserve_post_game_prompt(
+                        session,
+                        user_id=user_id,
+                        now_utc=answer_now,
+                    )
 
-    async with SessionLocal.begin() as session:
-        with query_step("next_question_start_session"):
-            await GameSessionService.start_session(
-                session,
-                user_id=user_id,
-                mode_code=answered.mode_code,
-                source=answered.source,
-                idempotency_key=f"audit:start:auto:{index}",
-                now_utc=datetime.now(UTC),
-                preferred_question_level=answered.next_preferred_level,
-                recent_question_ids_override=(answered.question_id,),
-            )
+        async with SessionLocal.begin() as session:
+            with query_step("next_question_start_session"):
+                await GameSessionService.start_session(
+                    session,
+                    user_id=user_id,
+                    mode_code=answered.mode_code,
+                    source=answered.source,
+                    idempotency_key=f"audit:start:auto:{index}",
+                    now_utc=answer_now,
+                    preferred_question_level=answered.next_preferred_level,
+                    preferred_question_mix_step=answered.next_preferred_mix_step,
+                    recent_question_ids_override=(answered.question_id,),
+                )
 
 
 async def webhook_flow_for_user(
@@ -1047,6 +1071,8 @@ async def run_audit(args: argparse.Namespace) -> AuditReport:
         started_at=datetime.now(UTC).isoformat(),
         database_url_redacted=_redact_url(str(engine.url)),
         redis_url_redacted=_redact_url(get_settings().redis_url),
+        app_env=get_settings().app_env,
+        db_pool_class=_db_pool_class(),
     )
 
     existing_users = 0

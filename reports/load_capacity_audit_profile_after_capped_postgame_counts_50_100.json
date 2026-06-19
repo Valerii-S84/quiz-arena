@@ -1,0 +1,585 @@
+{
+  "started_at": "2026-06-18T20:52:15.197646+00:00",
+  "database_url_redacted": "postgresql+asyncpg://quiz:***@localhost:5432/quiz_arena_test",
+  "redis_url_redacted": "redis://localhost:6379/15",
+  "registered_scales": [
+    {
+      "users": 100000,
+      "db_size_mb": 73.108,
+      "users_count_ms": 38.888,
+      "user_lookup_p95_ms": 4.53,
+      "global_best_ms": 14.402,
+      "public_stats_ms": 14.463,
+      "question_pool_warm_ms": 35.111,
+      "dispatcher_build_ms": 0.614,
+      "redis_keys": 0,
+      "rss_mb": 197.18
+    }
+  ],
+  "active_tests": [
+    {
+      "active_users": 50,
+      "flow": "service",
+      "latency": {
+        "count": 50,
+        "p50_ms": 1517.753,
+        "p95_ms": 1748.55,
+        "max_ms": 1782.631
+      },
+      "errors": 0,
+      "query_summary": {
+        "count": 1181,
+        "total_ms": 14067.211,
+        "p50_ms": 9.806,
+        "p95_ms": 21.418,
+        "max_ms": 281.436
+      },
+      "db_lock_waits_active": 0,
+      "deadlocks_delta": 0,
+      "outbound_calls": {
+        "estimated_sendMessage": 150,
+        "estimated_answerCallbackQuery": 100
+      },
+      "query_steps": {
+        "answer_callback_submit": {
+          "count": 420,
+          "total_ms": 4312.505,
+          "p50_ms": 10.029,
+          "p95_ms": 17.494,
+          "max_ms": 23.361
+        },
+        "answer_user_touch": {
+          "count": 50,
+          "total_ms": 864.594,
+          "p50_ms": 16.38,
+          "p95_ms": 25.746,
+          "max_ms": 40.871
+        },
+        "next_question_start_session": {
+          "count": 257,
+          "total_ms": 3147.835,
+          "p50_ms": 10.63,
+          "p95_ms": 28.086,
+          "max_ms": 48.336
+        },
+        "post_game_prompts": {
+          "count": 50,
+          "total_ms": 504.877,
+          "p50_ms": 9.361,
+          "p95_ms": 15.997,
+          "max_ms": 25.4
+        },
+        "quiz_open_start_session": {
+          "count": 354,
+          "total_ms": 3466.487,
+          "p50_ms": 7.745,
+          "p95_ms": 17.044,
+          "max_ms": 225.028
+        },
+        "start_user_lookup": {
+          "count": 50,
+          "total_ms": 1770.914,
+          "p50_ms": 13.357,
+          "p95_ms": 230.118,
+          "max_ms": 281.436
+        }
+      },
+      "query_categories": {
+        "answer_callback": {
+          "count": 138,
+          "total_ms": 1320.509,
+          "p50_ms": 8.801,
+          "p95_ms": 16.648,
+          "max_ms": 23.278
+        },
+        "energy_check_update": {
+          "count": 200,
+          "total_ms": 1945.517,
+          "p50_ms": 8.284,
+          "p95_ms": 16.814,
+          "max_ms": 124.135
+        },
+        "entitlement_checks": {
+          "count": 150,
+          "total_ms": 1458.533,
+          "p50_ms": 8.682,
+          "p95_ms": 16.975,
+          "max_ms": 24.751
+        },
+        "question_pool": {
+          "count": 11,
+          "total_ms": 209.334,
+          "p50_ms": 13.651,
+          "p95_ms": 37.841,
+          "max_ms": 46.615
+        },
+        "quiz_session": {
+          "count": 350,
+          "total_ms": 4004.377,
+          "p50_ms": 9.492,
+          "p95_ms": 24.035,
+          "max_ms": 225.028
+        },
+        "user_state": {
+          "count": 332,
+          "total_ms": 5128.941,
+          "p50_ms": 11.533,
+          "p95_ms": 22.8,
+          "max_ms": 281.436
+        }
+      },
+      "top_queries": [
+        {
+          "statement": "SELECT users.id FROM users WHERE users.telegram_user_id = $1::BIGINT",
+          "count": 50,
+          "total_ms": 1770.914,
+          "p50_ms": 13.357,
+          "p95_ms": 230.118,
+          "max_ms": 281.436
+        },
+        {
+          "statement": "SELECT quiz_sessions.id FROM quiz_sessions WHERE quiz_sessions.idempotency_key = $1::VARCHAR",
+          "count": 100,
+          "total_ms": 1644.331,
+          "p50_ms": 12.878,
+          "p95_ms": 30.86,
+          "max_ms": 225.028
+        },
+        {
+          "statement": "INSERT INTO ledger_entries (user_id, purchase_id, entry_type, asset, direction, amount, balance_after, source, idempotency_key, metadata, created_at) VALUES ($1::BIGINT, $2::UUID, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::INTEGER, $7::INTE",
+          "count": 100,
+          "total_ms": 1075.47,
+          "p50_ms": 8.591,
+          "p95_ms": 19.471,
+          "max_ms": 124.135
+        },
+        {
+          "statement": "SELECT energy_state.user_id, energy_state.free_energy, energy_state.paid_energy, energy_state.free_cap, energy_state.regen_interval_sec, energy_state.last_regen_at, energy_state.last_daily_topup_local_date, energy_state.version, energy_stat",
+          "count": 100,
+          "total_ms": 959.004,
+          "p50_ms": 8.272,
+          "p95_ms": 17.135,
+          "max_ms": 24.751
+        },
+        {
+          "statement": "INSERT INTO quiz_sessions (id, user_id, mode_code, source, status, energy_cost_total, question_id, daily_run_id, friend_challenge_id, friend_challenge_round, arena_attempt_id, arena_round, started_at, completed_at, local_date_berlin, idempo",
+          "count": 100,
+          "total_ms": 894.709,
+          "p50_ms": 8.332,
+          "p95_ms": 16.548,
+          "max_ms": 22.127
+        },
+        {
+          "statement": "UPDATE energy_state SET free_energy=$1::SMALLINT, version=$2::INTEGER, updated_at=$3::TIMESTAMP WITH TIME ZONE WHERE energy_state.user_id = $4::BIGINT",
+          "count": 100,
+          "total_ms": 870.047,
+          "p50_ms": 8.065,
+          "p95_ms": 14.198,
+          "max_ms": 23.393
+        },
+        {
+          "statement": "UPDATE users SET last_seen_at=$1::TIMESTAMP WITH TIME ZONE WHERE users.telegram_user_id = $2::BIGINT RETURNING users.id, users.telegram_user_id, users.username, users.first_name, users.language_code, users.timezone, users.referral_code, use",
+          "count": 50,
+          "total_ms": 864.594,
+          "p50_ms": 16.38,
+          "p95_ms": 25.746,
+          "max_ms": 40.871
+        },
+        {
+          "statement": "SELECT mode_progress.user_id AS mode_progress_user_id, mode_progress.mode_code AS mode_progress_mode_code, mode_progress.preferred_level AS mode_progress_preferred_level, mode_progress.mix_step AS mode_progress_mix_step, mode_progress.corre",
+          "count": 50,
+          "total_ms": 525.278,
+          "p50_ms": 8.147,
+          "p95_ms": 21.116,
+          "max_ms": 21.742
+        },
+        {
+          "statement": "SELECT count(*) AS count_1 FROM (SELECT quiz_sessions.id AS id FROM quiz_sessions WHERE quiz_sessions.user_id = $1::BIGINT AND quiz_sessions.status = $2::VARCHAR LIMIT $3::INTEGER) AS anon_1",
+          "count": 50,
+          "total_ms": 504.877,
+          "p50_ms": 9.361,
+          "p95_ms": 15.997,
+          "max_ms": 25.4
+        },
+        {
+          "statement": "INSERT INTO quiz_attempts (session_id, user_id, question_id, is_correct, answered_at, response_ms, idempotency_key) VALUES ($1::UUID, $2::BIGINT, $3::VARCHAR, $4::BOOLEAN, $5::TIMESTAMP WITH TIME ZONE, $6::INTEGER, $7::VARCHAR) RETURNING qu",
+          "count": 50,
+          "total_ms": 501.634,
+          "p50_ms": 8.609,
+          "p95_ms": 17.337,
+          "max_ms": 18.663
+        }
+      ],
+      "top_queries_by_count": [
+        {
+          "statement": "SELECT quiz_sessions.id FROM quiz_sessions WHERE quiz_sessions.idempotency_key = $1::VARCHAR",
+          "count": 100,
+          "total_ms": 1644.331,
+          "p50_ms": 12.878,
+          "p95_ms": 30.86,
+          "max_ms": 225.028
+        },
+        {
+          "statement": "INSERT INTO ledger_entries (user_id, purchase_id, entry_type, asset, direction, amount, balance_after, source, idempotency_key, metadata, created_at) VALUES ($1::BIGINT, $2::UUID, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::INTEGER, $7::INTE",
+          "count": 100,
+          "total_ms": 1075.47,
+          "p50_ms": 8.591,
+          "p95_ms": 19.471,
+          "max_ms": 124.135
+        },
+        {
+          "statement": "SELECT energy_state.user_id, energy_state.free_energy, energy_state.paid_energy, energy_state.free_cap, energy_state.regen_interval_sec, energy_state.last_regen_at, energy_state.last_daily_topup_local_date, energy_state.version, energy_stat",
+          "count": 100,
+          "total_ms": 959.004,
+          "p50_ms": 8.272,
+          "p95_ms": 17.135,
+          "max_ms": 24.751
+        },
+        {
+          "statement": "INSERT INTO quiz_sessions (id, user_id, mode_code, source, status, energy_cost_total, question_id, daily_run_id, friend_challenge_id, friend_challenge_round, arena_attempt_id, arena_round, started_at, completed_at, local_date_berlin, idempo",
+          "count": 100,
+          "total_ms": 894.709,
+          "p50_ms": 8.332,
+          "p95_ms": 16.548,
+          "max_ms": 22.127
+        },
+        {
+          "statement": "UPDATE energy_state SET free_energy=$1::SMALLINT, version=$2::INTEGER, updated_at=$3::TIMESTAMP WITH TIME ZONE WHERE energy_state.user_id = $4::BIGINT",
+          "count": 100,
+          "total_ms": 870.047,
+          "p50_ms": 8.065,
+          "p95_ms": 14.198,
+          "max_ms": 23.393
+        },
+        {
+          "statement": "SELECT users.id FROM users WHERE users.telegram_user_id = $1::BIGINT",
+          "count": 50,
+          "total_ms": 1770.914,
+          "p50_ms": 13.357,
+          "p95_ms": 230.118,
+          "max_ms": 281.436
+        },
+        {
+          "statement": "UPDATE users SET last_seen_at=$1::TIMESTAMP WITH TIME ZONE WHERE users.telegram_user_id = $2::BIGINT RETURNING users.id, users.telegram_user_id, users.username, users.first_name, users.language_code, users.timezone, users.referral_code, use",
+          "count": 50,
+          "total_ms": 864.594,
+          "p50_ms": 16.38,
+          "p95_ms": 25.746,
+          "max_ms": 40.871
+        },
+        {
+          "statement": "SELECT mode_progress.user_id AS mode_progress_user_id, mode_progress.mode_code AS mode_progress_mode_code, mode_progress.preferred_level AS mode_progress_preferred_level, mode_progress.mix_step AS mode_progress_mix_step, mode_progress.corre",
+          "count": 50,
+          "total_ms": 525.278,
+          "p50_ms": 8.147,
+          "p95_ms": 21.116,
+          "max_ms": 21.742
+        },
+        {
+          "statement": "SELECT count(*) AS count_1 FROM (SELECT quiz_sessions.id AS id FROM quiz_sessions WHERE quiz_sessions.user_id = $1::BIGINT AND quiz_sessions.status = $2::VARCHAR LIMIT $3::INTEGER) AS anon_1",
+          "count": 50,
+          "total_ms": 504.877,
+          "p50_ms": 9.361,
+          "p95_ms": 15.997,
+          "max_ms": 25.4
+        },
+        {
+          "statement": "INSERT INTO quiz_attempts (session_id, user_id, question_id, is_correct, answered_at, response_ms, idempotency_key) VALUES ($1::UUID, $2::BIGINT, $3::VARCHAR, $4::BOOLEAN, $5::TIMESTAMP WITH TIME ZONE, $6::INTEGER, $7::VARCHAR) RETURNING qu",
+          "count": 50,
+          "total_ms": 501.634,
+          "p50_ms": 8.609,
+          "p95_ms": 17.337,
+          "max_ms": 18.663
+        }
+      ],
+      "attempts_created": 50,
+      "duplicate_answer_groups": 0,
+      "processed_updates": {},
+      "rss_mb": 197.18
+    },
+    {
+      "active_users": 100,
+      "flow": "service",
+      "latency": {
+        "count": 100,
+        "p50_ms": 1900.45,
+        "p95_ms": 2208.597,
+        "max_ms": 2235.443
+      },
+      "errors": 0,
+      "query_summary": {
+        "count": 2348,
+        "total_ms": 20872.88,
+        "p50_ms": 7.339,
+        "p95_ms": 15.209,
+        "max_ms": 155.967
+      },
+      "db_lock_waits_active": 0,
+      "deadlocks_delta": 0,
+      "outbound_calls": {
+        "estimated_sendMessage": 300,
+        "estimated_answerCallbackQuery": 200
+      },
+      "query_steps": {
+        "answer_callback_submit": {
+          "count": 828,
+          "total_ms": 6268.105,
+          "p50_ms": 6.838,
+          "p95_ms": 14.449,
+          "max_ms": 25.037
+        },
+        "answer_user_touch": {
+          "count": 100,
+          "total_ms": 1363.977,
+          "p50_ms": 13.481,
+          "p95_ms": 19.121,
+          "max_ms": 24.144
+        },
+        "next_question_start_session": {
+          "count": 520,
+          "total_ms": 4222.834,
+          "p50_ms": 7.252,
+          "p95_ms": 14.856,
+          "max_ms": 26.496
+        },
+        "post_game_prompts": {
+          "count": 100,
+          "total_ms": 715.1,
+          "p50_ms": 6.488,
+          "p95_ms": 14.714,
+          "max_ms": 17.317
+        },
+        "quiz_open_start_session": {
+          "count": 700,
+          "total_ms": 6403.285,
+          "p50_ms": 7.486,
+          "p95_ms": 13.696,
+          "max_ms": 145.977
+        },
+        "start_user_lookup": {
+          "count": 100,
+          "total_ms": 1899.579,
+          "p50_ms": 12.188,
+          "p95_ms": 29.116,
+          "max_ms": 155.967
+        }
+      },
+      "query_categories": {
+        "answer_callback": {
+          "count": 275,
+          "total_ms": 2081.576,
+          "p50_ms": 6.819,
+          "p95_ms": 15.088,
+          "max_ms": 18.596
+        },
+        "energy_check_update": {
+          "count": 400,
+          "total_ms": 3224.398,
+          "p50_ms": 7.287,
+          "p95_ms": 11.11,
+          "max_ms": 145.233
+        },
+        "entitlement_checks": {
+          "count": 300,
+          "total_ms": 2581.123,
+          "p50_ms": 6.948,
+          "p95_ms": 11.355,
+          "max_ms": 145.977
+        },
+        "question_pool": {
+          "count": 20,
+          "total_ms": 202.591,
+          "p50_ms": 10.879,
+          "p95_ms": 15.802,
+          "max_ms": 26.496
+        },
+        "quiz_session": {
+          "count": 700,
+          "total_ms": 5977.935,
+          "p50_ms": 7.272,
+          "p95_ms": 15.449,
+          "max_ms": 74.927
+        },
+        "user_state": {
+          "count": 653,
+          "total_ms": 6805.257,
+          "p50_ms": 8.45,
+          "p95_ms": 16.752,
+          "max_ms": 155.967
+        }
+      },
+      "top_queries": [
+        {
+          "statement": "SELECT quiz_sessions.id FROM quiz_sessions WHERE quiz_sessions.idempotency_key = $1::VARCHAR",
+          "count": 200,
+          "total_ms": 2307.878,
+          "p50_ms": 9.673,
+          "p95_ms": 18.352,
+          "max_ms": 74.927
+        },
+        {
+          "statement": "SELECT users.id FROM users WHERE users.telegram_user_id = $1::BIGINT",
+          "count": 100,
+          "total_ms": 1899.579,
+          "p50_ms": 12.188,
+          "p95_ms": 29.116,
+          "max_ms": 155.967
+        },
+        {
+          "statement": "SELECT energy_state.user_id, energy_state.free_energy, energy_state.paid_energy, energy_state.free_cap, energy_state.regen_interval_sec, energy_state.last_regen_at, energy_state.last_daily_topup_local_date, energy_state.version, energy_stat",
+          "count": 200,
+          "total_ms": 1863.986,
+          "p50_ms": 6.909,
+          "p95_ms": 11.355,
+          "max_ms": 145.977
+        },
+        {
+          "statement": "INSERT INTO ledger_entries (user_id, purchase_id, entry_type, asset, direction, amount, balance_after, source, idempotency_key, metadata, created_at) VALUES ($1::BIGINT, $2::UUID, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::INTEGER, $7::INTE",
+          "count": 200,
+          "total_ms": 1746.827,
+          "p50_ms": 7.169,
+          "p95_ms": 10.925,
+          "max_ms": 145.233
+        },
+        {
+          "statement": "UPDATE energy_state SET free_energy=$1::SMALLINT, version=$2::INTEGER, updated_at=$3::TIMESTAMP WITH TIME ZONE WHERE energy_state.user_id = $4::BIGINT",
+          "count": 200,
+          "total_ms": 1477.57,
+          "p50_ms": 7.311,
+          "p95_ms": 11.427,
+          "max_ms": 15.271
+        },
+        {
+          "statement": "INSERT INTO quiz_sessions (id, user_id, mode_code, source, status, energy_cost_total, question_id, daily_run_id, friend_challenge_id, friend_challenge_round, arena_attempt_id, arena_round, started_at, completed_at, local_date_berlin, idempo",
+          "count": 200,
+          "total_ms": 1430.407,
+          "p50_ms": 6.909,
+          "p95_ms": 12.499,
+          "max_ms": 15.048
+        },
+        {
+          "statement": "UPDATE users SET last_seen_at=$1::TIMESTAMP WITH TIME ZONE WHERE users.telegram_user_id = $2::BIGINT RETURNING users.id, users.telegram_user_id, users.username, users.first_name, users.language_code, users.timezone, users.referral_code, use",
+          "count": 100,
+          "total_ms": 1363.977,
+          "p50_ms": 13.481,
+          "p95_ms": 19.121,
+          "max_ms": 24.144
+        },
+        {
+          "statement": "SELECT mode_progress.user_id AS mode_progress_user_id, mode_progress.mode_code AS mode_progress_mode_code, mode_progress.preferred_level AS mode_progress_preferred_level, mode_progress.mix_step AS mode_progress_mix_step, mode_progress.corre",
+          "count": 100,
+          "total_ms": 827.391,
+          "p50_ms": 7.951,
+          "p95_ms": 14.886,
+          "max_ms": 16.244
+        },
+        {
+          "statement": "SELECT quiz_sessions.id, quiz_sessions.user_id, quiz_sessions.mode_code, quiz_sessions.source, quiz_sessions.status, quiz_sessions.energy_cost_total, quiz_sessions.question_id, quiz_sessions.daily_run_id, quiz_sessions.friend_challenge_id, ",
+          "count": 100,
+          "total_ms": 783.322,
+          "p50_ms": 6.93,
+          "p95_ms": 16.688,
+          "max_ms": 18.967
+        },
+        {
+          "statement": "SELECT quiz_attempts.question_id FROM quiz_attempts JOIN quiz_sessions ON quiz_attempts.session_id = quiz_sessions.id WHERE quiz_attempts.user_id = $1::BIGINT AND quiz_sessions.mode_code = $2::VARCHAR ORDER BY quiz_attempts.answered_at DESC",
+          "count": 100,
+          "total_ms": 769.469,
+          "p50_ms": 7.1,
+          "p95_ms": 14.375,
+          "max_ms": 16.853
+        }
+      ],
+      "top_queries_by_count": [
+        {
+          "statement": "SELECT quiz_sessions.id FROM quiz_sessions WHERE quiz_sessions.idempotency_key = $1::VARCHAR",
+          "count": 200,
+          "total_ms": 2307.878,
+          "p50_ms": 9.673,
+          "p95_ms": 18.352,
+          "max_ms": 74.927
+        },
+        {
+          "statement": "SELECT energy_state.user_id, energy_state.free_energy, energy_state.paid_energy, energy_state.free_cap, energy_state.regen_interval_sec, energy_state.last_regen_at, energy_state.last_daily_topup_local_date, energy_state.version, energy_stat",
+          "count": 200,
+          "total_ms": 1863.986,
+          "p50_ms": 6.909,
+          "p95_ms": 11.355,
+          "max_ms": 145.977
+        },
+        {
+          "statement": "INSERT INTO ledger_entries (user_id, purchase_id, entry_type, asset, direction, amount, balance_after, source, idempotency_key, metadata, created_at) VALUES ($1::BIGINT, $2::UUID, $3::VARCHAR, $4::VARCHAR, $5::VARCHAR, $6::INTEGER, $7::INTE",
+          "count": 200,
+          "total_ms": 1746.827,
+          "p50_ms": 7.169,
+          "p95_ms": 10.925,
+          "max_ms": 145.233
+        },
+        {
+          "statement": "UPDATE energy_state SET free_energy=$1::SMALLINT, version=$2::INTEGER, updated_at=$3::TIMESTAMP WITH TIME ZONE WHERE energy_state.user_id = $4::BIGINT",
+          "count": 200,
+          "total_ms": 1477.57,
+          "p50_ms": 7.311,
+          "p95_ms": 11.427,
+          "max_ms": 15.271
+        },
+        {
+          "statement": "INSERT INTO quiz_sessions (id, user_id, mode_code, source, status, energy_cost_total, question_id, daily_run_id, friend_challenge_id, friend_challenge_round, arena_attempt_id, arena_round, started_at, completed_at, local_date_berlin, idempo",
+          "count": 200,
+          "total_ms": 1430.407,
+          "p50_ms": 6.909,
+          "p95_ms": 12.499,
+          "max_ms": 15.048
+        },
+        {
+          "statement": "SELECT users.id FROM users WHERE users.telegram_user_id = $1::BIGINT",
+          "count": 100,
+          "total_ms": 1899.579,
+          "p50_ms": 12.188,
+          "p95_ms": 29.116,
+          "max_ms": 155.967
+        },
+        {
+          "statement": "UPDATE users SET last_seen_at=$1::TIMESTAMP WITH TIME ZONE WHERE users.telegram_user_id = $2::BIGINT RETURNING users.id, users.telegram_user_id, users.username, users.first_name, users.language_code, users.timezone, users.referral_code, use",
+          "count": 100,
+          "total_ms": 1363.977,
+          "p50_ms": 13.481,
+          "p95_ms": 19.121,
+          "max_ms": 24.144
+        },
+        {
+          "statement": "SELECT mode_progress.user_id AS mode_progress_user_id, mode_progress.mode_code AS mode_progress_mode_code, mode_progress.preferred_level AS mode_progress_preferred_level, mode_progress.mix_step AS mode_progress_mix_step, mode_progress.corre",
+          "count": 100,
+          "total_ms": 827.391,
+          "p50_ms": 7.951,
+          "p95_ms": 14.886,
+          "max_ms": 16.244
+        },
+        {
+          "statement": "SELECT quiz_sessions.id, quiz_sessions.user_id, quiz_sessions.mode_code, quiz_sessions.source, quiz_sessions.status, quiz_sessions.energy_cost_total, quiz_sessions.question_id, quiz_sessions.daily_run_id, quiz_sessions.friend_challenge_id, ",
+          "count": 100,
+          "total_ms": 783.322,
+          "p50_ms": 6.93,
+          "p95_ms": 16.688,
+          "max_ms": 18.967
+        },
+        {
+          "statement": "SELECT quiz_attempts.question_id FROM quiz_attempts JOIN quiz_sessions ON quiz_attempts.session_id = quiz_sessions.id WHERE quiz_attempts.user_id = $1::BIGINT AND quiz_sessions.mode_code = $2::VARCHAR ORDER BY quiz_attempts.answered_at DESC",
+          "count": 100,
+          "total_ms": 769.469,
+          "p50_ms": 7.1,
+          "p95_ms": 14.375,
+          "max_ms": 16.853
+        }
+      ],
+      "attempts_created": 100,
+      "duplicate_answer_groups": 0,
+      "processed_updates": {},
+      "rss_mb": 197.53
+    }
+  ],
+  "notes": [
+    "seeded_registered_users=100000 seed_ms=17365.552",
+    "explain_hot_queries={\"global_best_streak\": [\"Aggregate  (cost=2255.47..2255.49 rows=1 width=4) (actual time=13.540..13.541 rows=1 loops=1)\", \"  Buffers: shared hit=1037\", \"  ->  Seq Scan on streak_state  (cost=0.00..2011.78 rows=97478 width=4) (actual time=0.012..7.138 rows=100000 loops=1)\", \"        Buffers: shared hit=1037\", \"Planning:\", \"  Buffers: shared hit=15\", \"Planning Time: 0.145 ms\", \"Execution Time: 13.562 ms\"], \"user_lookup\": [\"Index Scan using uq_users_telegram_user_id on users  (cost=0.29..8.31 rows=1 width=129) (actual time=0.011..0.012 rows=1 loops=1)\", \"  Index Cond: (telegram_user_id = '90000000000'::bigint)\", \"  Buffers: shared hit=3\", \"Planning Time: 0.071 ms\", \"Execution Time: 0.022 ms\"], \"recent_attempts\": [\"Limit  (cost=0.43..16.48 rows=1 width=26) (actual time=0.035..0.037 rows=1 loops=1)\", \"  Buffers: shared hit=9\", \"  ->  Nested Loop  (cost=0.43..16.48 rows=1 width=26) (actual time=0.035..0.036 rows=1 loops=1)\", \"        Buffers: shared hit=9\", \"        ->  Index Scan Backward using idx_attempts_user_time on quiz_attempts qa  (cost=0.15..8.17 rows=1 width=42) (actual time=0.029..0.030 rows=1 loops=1)\", \"              Index Cond: (user_id = 10000000)\", \"              Buffers: shared hit=6\", \"        ->  Index Scan using quiz_sessions_pkey on quiz_sessions qs  (cost=0.28..8.29 rows=1 width=16) (actual time=0.004..0.004 rows=1 loops=1)\", \"              Index Cond: (id = qa.session_id)\", \"              Filter: ((mode_code)::text = 'QUICK_MIX_A1A2'::text)\", \"              Buffers: shared hit=3\", \"Planning:\", \"  Buffers: shared hit=18\", \"Planning Time: 0.273 ms\", \"Execution Time: 0.054 ms\"]}"
+  ]
+}
