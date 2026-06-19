@@ -8,11 +8,14 @@ import statistics
 import time
 from collections import Counter
 from collections.abc import Iterable
+from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
+from urllib.parse import urlparse
 
 import redis.asyncio as redis
 from aiogram import Bot
@@ -22,6 +25,7 @@ from aiogram.types import Message as TelegramMessage
 from aiogram.types import User as TelegramUser
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event, func, insert, select, text
+from sqlalchemy.engine import make_url
 
 from app.api.routes import telegram_webhook
 from app.bot.application import build_dispatcher
@@ -51,9 +55,34 @@ BASE_USER_ID = 10_000_000
 BASE_TELEGRAM_ID = 90_000_000_000
 BASE_UPDATE_ID = 700_000_000
 WEBHOOK_SECRET = "capacity-audit-secret"
+LOAD_DATABASE_NAME = "quiz_arena_test"
+LOAD_REDIS_DB = 15
+LOCAL_REDIS_HOSTS = frozenset({"localhost", "127.0.0.1"})
+PRODUCTION_URL_MARKERS = ("prod", "production", "deutchquizarena")
+FULL_SERVICE_FLOW = "full_service_flow"
+SERVICE_FLOW_ALIAS = "service"
+ACTIVE_FLOW_CHOICES = (
+    "quiz_open_only",
+    "answer_visible_only",
+    "next_question_only",
+    FULL_SERVICE_FLOW,
+    SERVICE_FLOW_ALIAS,
+    "webhook",
+)
+ONE_SECOND_GATE_FLOWS = frozenset(
+    {
+        "quiz_open_only",
+        "answer_visible_only",
+        "next_question_only",
+    }
+)
 _CURRENT_QUERY_STEP: ContextVar[str] = ContextVar(
     "capacity_audit_current_query_step",
     default="unscoped",
+)
+_CURRENT_STEP_RECORDER: ContextVar["StepRecorder | None"] = ContextVar(
+    "capacity_audit_current_step_recorder",
+    default=None,
 )
 
 TRUNCATE_TABLES = (
@@ -141,6 +170,8 @@ class ActiveResult:
     latency: LatencySummary
     errors: int
     query_summary: QuerySummary
+    sql_per_user: float
+    wall_steps: dict[str, QuerySummary]
     db_lock_waits_active: int
     deadlocks_delta: int
     outbound_calls: dict[str, int]
@@ -151,6 +182,7 @@ class ActiveResult:
     attempts_created: int
     duplicate_answer_groups: int
     processed_updates: dict[str, int]
+    cpu_time_ms: float
     rss_mb: float
 
 
@@ -164,6 +196,12 @@ class AuditReport:
     registered_scales: list[ScaleResult] = field(default_factory=list)
     active_tests: list[ActiveResult] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class PreparedFlowContext:
+    started_sessions: dict[int, Any] = field(default_factory=dict)
+    answered_sessions: dict[int, tuple[int, Any]] = field(default_factory=dict)
 
 
 class QueryRecorder:
@@ -257,15 +295,40 @@ def _query_summary(timings_ms: list[float]) -> QuerySummary:
     )
 
 
+class StepRecorder:
+    def __init__(self) -> None:
+        self._by_step: dict[str, list[float]] = {}
+        self._token = None
+
+    def __enter__(self) -> StepRecorder:
+        self._token = _CURRENT_STEP_RECORDER.set(self)
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        if self._token is not None:
+            _CURRENT_STEP_RECORDER.reset(self._token)
+
+    def record(self, step: str, elapsed_ms: float) -> None:
+        self._by_step.setdefault(step, []).append(elapsed_ms)
+
+    def summaries(self) -> dict[str, QuerySummary]:
+        return {step: _query_summary(timings) for step, timings in sorted(self._by_step.items())}
+
+
 class query_step:
     def __init__(self, name: str) -> None:
         self._name = name
         self._token = None
+        self._started_at = 0.0
 
     def __enter__(self) -> None:
         self._token = _CURRENT_QUERY_STEP.set(self._name)
+        self._started_at = time.perf_counter()
 
     def __exit__(self, exc_type, exc, tb) -> None:
+        recorder = _CURRENT_STEP_RECORDER.get()
+        if recorder is not None:
+            recorder.record(self._name, (time.perf_counter() - self._started_at) * 1000)
         if self._token is not None:
             _CURRENT_QUERY_STEP.reset(self._token)
 
@@ -523,11 +586,55 @@ def install_webhook_mocks(bot_api: BotApiStub) -> tuple[InProcessUpdateQueue, ca
     return queue, restore
 
 
-async def assert_safe_target() -> None:
+def _contains_production_marker(*values: object) -> bool:
+    joined = " ".join(str(value or "").lower() for value in values)
+    return any(marker in joined for marker in PRODUCTION_URL_MARKERS)
+
+
+def _assert_safe_load_database_url(database_url: str) -> None:
+    parsed = make_url(database_url)
+    database_name = parsed.database or ""
+    if database_name != LOAD_DATABASE_NAME:
+        raise RuntimeError(
+            "DATABASE_URL must point exactly to the isolated load-test database "
+            f"{LOAD_DATABASE_NAME!r}."
+        )
+    if _contains_production_marker(parsed.host, parsed.database, parsed.username):
+        raise RuntimeError("DATABASE_URL looks production-like; refusing destructive load setup.")
     assert_safe_integration_db(str(engine.url))
+
+
+def _redis_db_number(redis_url: str) -> int:
+    parsed = urlparse(redis_url)
+    raw_path = parsed.path.lstrip("/")
+    if not raw_path:
+        return 0
+    try:
+        return int(raw_path.split("/", maxsplit=1)[0])
+    except ValueError as exc:
+        raise RuntimeError("REDIS_URL must include a numeric DB path for load tests.") from exc
+
+
+def _assert_safe_load_redis_url(redis_url: str) -> None:
+    parsed = urlparse(redis_url)
+    host = parsed.hostname or ""
+    redis_db = _redis_db_number(redis_url)
+    if _contains_production_marker(parsed.hostname, parsed.username, parsed.path):
+        raise RuntimeError("REDIS_URL looks production-like; refusing destructive load setup.")
+    if host not in LOCAL_REDIS_HOSTS:
+        raise RuntimeError("REDIS_URL for load tests must use localhost or 127.0.0.1.")
+    if redis_db == 0:
+        raise RuntimeError("REDIS_URL DB 0 is forbidden for destructive load tests.")
+    if redis_db != LOAD_REDIS_DB:
+        raise RuntimeError(f"REDIS_URL must use DB {LOAD_REDIS_DB} for load tests.")
+
+
+async def assert_safe_target() -> None:
     settings = get_settings()
-    if "test" not in settings.database_url:
-        raise RuntimeError("DATABASE_URL must point to an isolated test database")
+    if settings.app_env != "load":
+        raise RuntimeError("APP_ENV must be 'load' for load_capacity_audit.")
+    _assert_safe_load_database_url(settings.database_url)
+    _assert_safe_load_redis_url(settings.redis_url)
     if _db_pool_class() == "NullPool":
         raise RuntimeError(
             "load_capacity_audit active stages require a pooled DB engine. "
@@ -759,16 +866,178 @@ async def measure_registered_scale(users: int) -> ScaleResult:
     )
 
 
-async def service_flow_for_user(index: int) -> None:
-    user_id = BASE_USER_ID + index
-    telegram_user = SimpleNamespace(
+def _normalize_active_flow(flow: str) -> str:
+    return FULL_SERVICE_FLOW if flow == SERVICE_FLOW_ALIAS else flow
+
+
+def _telegram_user_for_index(index: int) -> SimpleNamespace:
+    return SimpleNamespace(
         id=BASE_TELEGRAM_ID + index,
         username=None,
         first_name=f"Capacity{index}",
         language_code="de",
     )
+
+
+@asynccontextmanager
+async def measured_session(acquire_step: str):
+    async with SessionLocal.begin() as session:
+        with query_step(acquire_step):
+            await session.connection()
+        yield session
+
+
+async def _prepare_started_session(index: int, *, idempotency_prefix: str) -> Any:
     now_utc = datetime.now(UTC)
     async with SessionLocal.begin() as session:
+        return await GameSessionService.start_session(
+            session,
+            user_id=BASE_USER_ID + index,
+            mode_code=MODE_CODE,
+            source=SOURCE,
+            idempotency_key=f"{idempotency_prefix}:start:{index}",
+            now_utc=now_utc,
+        )
+
+
+async def _prepare_answered_session(index: int, *, idempotency_prefix: str) -> tuple[int, Any]:
+    started = await _prepare_started_session(index, idempotency_prefix=idempotency_prefix)
+    answer_now = datetime.now(UTC)
+    async with SessionLocal.begin() as session:
+        return await GameSessionService.submit_answer_for_telegram_user(
+            session,
+            telegram_user_id=BASE_TELEGRAM_ID + index,
+            session_id=started.session.session_id,
+            selected_option=index % 4,
+            idempotency_key=f"{idempotency_prefix}:answer:{started.session.session_id}:{index}",
+            now_utc=answer_now,
+        )
+
+
+async def prepare_active_flow_context(
+    *,
+    flow: str,
+    start_index: int,
+    active_users: int,
+) -> PreparedFlowContext:
+    context = PreparedFlowContext()
+    if flow == "answer_visible_only":
+        for index in range(start_index, start_index + active_users):
+            context.started_sessions[index] = await _prepare_started_session(
+                index,
+                idempotency_prefix="audit:setup:answer-visible",
+            )
+    elif flow == "next_question_only":
+        for index in range(start_index, start_index + active_users):
+            context.answered_sessions[index] = await _prepare_answered_session(
+                index,
+                idempotency_prefix="audit:setup:next-question",
+            )
+    return context
+
+
+def _build_answer_visible_payload(answered: Any) -> str:
+    state = "correct" if answered.is_correct else "incorrect"
+    return "\n".join(
+        item
+        for item in (
+            state,
+            answered.selected_answer_text,
+            answered.correct_answer_text,
+        )
+        if item is not None
+    )
+
+
+def _build_question_payload(started: Any) -> tuple[str, tuple[str, ...]]:
+    return (started.session.text, tuple(started.session.options))
+
+
+async def quiz_open_only_flow_for_user(index: int) -> None:
+    user_id = BASE_USER_ID + index
+    telegram_user = _telegram_user_for_index(index)
+    now_utc = datetime.now(UTC)
+
+    async with measured_session("quiz_open_user_lookup_db_acquire") as session:
+        with query_step("quiz_open_user_lookup"):
+            resolved_user_id = await UserOnboardingService.get_existing_user_id_by_telegram_user_id(
+                session,
+                telegram_user.id,
+            )
+            if resolved_user_id is None:
+                snapshot = await UserOnboardingService.ensure_home_snapshot(
+                    session,
+                    telegram_user=telegram_user,
+                )
+                user_id = int(snapshot.user_id)
+            else:
+                user_id = int(resolved_user_id)
+
+    async with measured_session("quiz_open_start_db_acquire") as session:
+        with query_step("quiz_open_start_session"):
+            started = await GameSessionService.start_session(
+                session,
+                user_id=user_id,
+                mode_code=MODE_CODE,
+                source=SOURCE,
+                idempotency_key=f"audit:quiz-open:start:{index}",
+                now_utc=now_utc,
+            )
+        with query_step("quiz_open_prepare_response"):
+            _build_question_payload(started)
+
+
+async def answer_visible_only_flow_for_user(
+    index: int,
+    *,
+    context: PreparedFlowContext,
+) -> None:
+    started = context.started_sessions[index]
+    answer_now = datetime.now(UTC)
+    async with measured_session("answer_visible_db_acquire") as session:
+        with query_step("answer_visible_submit"):
+            _, answered = await GameSessionService.submit_answer_for_telegram_user(
+                session,
+                telegram_user_id=BASE_TELEGRAM_ID + index,
+                session_id=started.session.session_id,
+                selected_option=index % 4,
+                idempotency_key=f"audit:answer-visible:{started.session.session_id}:{index}",
+                now_utc=answer_now,
+            )
+        with query_step("answer_visible_prepare_response"):
+            _build_answer_visible_payload(answered)
+
+
+async def next_question_only_flow_for_user(
+    index: int,
+    *,
+    context: PreparedFlowContext,
+) -> None:
+    user_id, answered = context.answered_sessions[index]
+    now_utc = datetime.now(UTC)
+    async with measured_session("next_question_db_acquire") as session:
+        with query_step("next_question_start_session"):
+            started = await GameSessionService.start_session(
+                session,
+                user_id=user_id,
+                mode_code=answered.mode_code,
+                source=answered.source,
+                idempotency_key=f"audit:next-question:start:{index}",
+                now_utc=now_utc,
+                preferred_question_level=answered.next_preferred_level,
+                preferred_question_mix_step=answered.next_preferred_mix_step,
+                recent_question_ids_override=(answered.question_id,),
+                idempotency_prechecked=not answered.idempotent_replay,
+            )
+        with query_step("next_question_prepare_response"):
+            _build_question_payload(started)
+
+
+async def service_flow_for_user(index: int) -> None:
+    user_id = BASE_USER_ID + index
+    telegram_user = _telegram_user_for_index(index)
+    now_utc = datetime.now(UTC)
+    async with measured_session("full_service_user_lookup_db_acquire") as session:
         with query_step("start_user_lookup"):
             resolved_user_id = await UserOnboardingService.get_existing_user_id_by_telegram_user_id(
                 session,
@@ -782,6 +1051,8 @@ async def service_flow_for_user(index: int) -> None:
                 user_id = int(snapshot.user_id)
             else:
                 user_id = int(resolved_user_id)
+
+    async with measured_session("full_service_quiz_open_db_acquire") as session:
         with query_step("quiz_open_start_session"):
             started = await GameSessionService.start_session(
                 session,
@@ -794,19 +1065,11 @@ async def service_flow_for_user(index: int) -> None:
 
     answer_now = datetime.now(UTC)
     with entitlement_request_cache():
-        async with SessionLocal.begin() as session:
-            with query_step("answer_user_touch"):
-                user = await UserOnboardingService.touch_existing_user(
-                    session,
-                    telegram_user=telegram_user,
-                    now_utc=answer_now,
-                )
-                if user is None:
-                    raise RuntimeError(f"synthetic user missing: index={index}")
+        async with measured_session("full_service_answer_db_acquire") as session:
             with query_step("answer_callback_submit"):
-                answered = await GameSessionService.submit_answer(
+                user_id, answered = await GameSessionService.submit_answer_for_telegram_user(
                     session,
-                    user_id=user.id,
+                    telegram_user_id=telegram_user.id,
                     session_id=started.session.session_id,
                     selected_option=index % 4,
                     idempotency_key=f"audit:answer:{started.session.session_id}:{index % 4}",
@@ -825,7 +1088,7 @@ async def service_flow_for_user(index: int) -> None:
                         now_utc=answer_now,
                     )
 
-        async with SessionLocal.begin() as session:
+        async with measured_session("full_service_next_question_db_acquire") as session:
             with query_step("next_question_start_session"):
                 await GameSessionService.start_session(
                     session,
@@ -837,6 +1100,7 @@ async def service_flow_for_user(index: int) -> None:
                     preferred_question_level=answered.next_preferred_level,
                     preferred_question_mix_step=answered.next_preferred_mix_step,
                     recent_question_ids_override=(answered.question_id,),
+                    idempotency_prechecked=not answered.idempotent_replay,
                 )
 
 
@@ -891,6 +1155,12 @@ async def run_active_stage(
     start_index: int = 0,
     bot_api: BotApiStub | None = None,
 ) -> ActiveResult:
+    resolved_flow = _normalize_active_flow(flow)
+    prepared_context = await prepare_active_flow_context(
+        flow=resolved_flow,
+        start_index=start_index,
+        active_users=active_users,
+    )
     latencies: list[float] = []
     errors = 0
     before_locks = await lock_snapshot()
@@ -903,7 +1173,7 @@ async def run_active_stage(
         nonlocal errors
         started_at = time.perf_counter()
         try:
-            if flow == "webhook":
+            if resolved_flow == "webhook":
                 if client is None or queue is None or bot_api is None:
                     raise RuntimeError("webhook flow is not configured")
                 await webhook_flow_for_user(
@@ -912,6 +1182,12 @@ async def run_active_stage(
                     queue=queue,
                     bot_api=bot_api,
                 )
+            elif resolved_flow == "quiz_open_only":
+                await quiz_open_only_flow_for_user(index)
+            elif resolved_flow == "answer_visible_only":
+                await answer_visible_only_flow_for_user(index, context=prepared_context)
+            elif resolved_flow == "next_question_only":
+                await next_question_only_flow_for_user(index, context=prepared_context)
             else:
                 await service_flow_for_user(index)
         except Exception:
@@ -925,8 +1201,9 @@ async def run_active_stage(
         async with semaphore:
             await run_one(index, client, queue)
 
-    with QueryRecorder() as recorder:
-        if flow == "webhook":
+    cpu_started_at = time.process_time()
+    with QueryRecorder() as recorder, StepRecorder() as step_recorder:
+        if resolved_flow == "webhook":
             if bot_api is None:
                 raise RuntimeError("bot_api is required for webhook flow")
             queue, restore = install_webhook_mocks(bot_api)
@@ -951,18 +1228,24 @@ async def run_active_stage(
                     for index in range(start_index, start_index + active_users)
                 )
             )
+    cpu_time_ms = (time.process_time() - cpu_started_at) * 1000
 
     after_locks = await lock_snapshot()
+    query_summary = recorder.summary()
     return ActiveResult(
         active_users=active_users,
-        flow=flow,
+        flow=resolved_flow,
         latency=_latency_summary(latencies),
         errors=errors,
-        query_summary=recorder.summary(),
+        query_summary=query_summary,
+        sql_per_user=round(query_summary.count / max(1, active_users), 3),
+        wall_steps=step_recorder.summaries(),
         db_lock_waits_active=after_locks["lock_waits_active"],
         deadlocks_delta=after_locks["deadlocks_total"] - before_locks["deadlocks_total"],
         outbound_calls=dict(
-            bot_api.calls if bot_api is not None else _estimated_service_calls(active_users)
+            bot_api.calls
+            if bot_api is not None
+            else _estimated_service_calls(active_users, flow=resolved_flow)
         ),
         query_steps=recorder.step_summaries(),
         query_categories=recorder.category_summaries(),
@@ -971,11 +1254,28 @@ async def run_active_stage(
         attempts_created=await _count_attempts_after(before_attempt_id),
         duplicate_answer_groups=await _count_duplicate_answer_groups(),
         processed_updates=await _processed_update_status_counts_after(before_update_id),
+        cpu_time_ms=round(cpu_time_ms, 3),
         rss_mb=_rss_mb(),
     )
 
 
-def _estimated_service_calls(active_users: int) -> Counter[str]:
+def _estimated_service_calls(active_users: int, *, flow: str) -> Counter[str]:
+    if flow == "quiz_open_only":
+        return Counter(
+            {
+                "estimated_sendMessage": active_users,
+                "estimated_answerCallbackQuery": active_users,
+            }
+        )
+    if flow == "answer_visible_only":
+        return Counter(
+            {
+                "estimated_sendMessage": active_users,
+                "estimated_answerCallbackQuery": active_users,
+            }
+        )
+    if flow == "next_question_only":
+        return Counter({"estimated_sendMessage": active_users})
     return Counter(
         {
             "estimated_sendMessage": active_users * 3,
@@ -1049,12 +1349,9 @@ async def explain_hot_queries() -> dict[str, list[str]]:
 
 
 def gate_failed(result: ActiveResult, *, max_p95_ms: float) -> bool:
-    return (
-        result.errors > 0
-        or result.duplicate_answer_groups > 0
-        or result.deadlocks_delta > 0
-        or result.latency.p95_ms > max_p95_ms
-    )
+    if result.errors > 0 or result.duplicate_answer_groups > 0 or result.deadlocks_delta > 0:
+        return True
+    return result.flow in ONE_SECOND_GATE_FLOWS and result.latency.p95_ms > max_p95_ms
 
 
 def functional_gate_failed(result: ActiveResult) -> bool:
@@ -1101,19 +1398,31 @@ async def run_audit(args: argparse.Namespace) -> AuditReport:
             report.notes.append("Gate stopped after webhook smoke failure.")
             return report
 
-    for active_users in args.active_users:
-        result = await run_active_stage(
-            active_users,
-            flow=args.active_flow,
-            max_concurrency=args.max_concurrency,
-            start_index=active_index_offset,
-            bot_api=bot_api if args.active_flow == "webhook" else None,
-        )
-        active_index_offset += active_users
-        report.active_tests.append(result)
-        if gate_failed(result, max_p95_ms=args.max_p95_ms):
-            report.notes.append(f"Gate stopped at active_users={active_users}.")
-            break
+    report.notes.append(
+        "one_second_gate_flows="
+        + ",".join(sorted(ONE_SECOND_GATE_FLOWS))
+        + f" max_p95_ms={args.max_p95_ms:.3f}"
+    )
+    report.notes.append(f"informational_flows={FULL_SERVICE_FLOW}")
+
+    for active_flow in args.active_flows:
+        for active_users in args.active_users:
+            result = await run_active_stage(
+                active_users,
+                flow=active_flow,
+                max_concurrency=args.max_concurrency,
+                start_index=active_index_offset,
+                bot_api=bot_api if active_flow == "webhook" else None,
+            )
+            active_index_offset += active_users
+            report.active_tests.append(result)
+            if gate_failed(result, max_p95_ms=args.max_p95_ms):
+                report.notes.append(
+                    f"Gate failed at flow={result.flow} active_users={active_users}."
+                )
+                if args.stop_on_gate_failure:
+                    report.notes.append("Gate stopped because stop_on_gate_failure=true.")
+                    return report
 
     report.notes.append("explain_hot_queries=" + json.dumps(await explain_hot_queries()))
     return report
@@ -1123,26 +1432,68 @@ def _parse_int_list(raw_value: str) -> list[int]:
     return [int(item.strip()) for item in raw_value.split(",") if item.strip()]
 
 
+def _parse_active_flow_list(raw_value: str) -> list[str]:
+    flows = [item.strip() for item in raw_value.split(",") if item.strip()]
+    if not flows:
+        raise ValueError("active flow list must not be empty")
+    invalid = [flow for flow in flows if flow not in ACTIVE_FLOW_CHOICES]
+    if invalid:
+        raise ValueError(
+            "unknown active flow(s): "
+            + ", ".join(invalid)
+            + "; choices: "
+            + ", ".join(ACTIVE_FLOW_CHOICES)
+        )
+    return [_normalize_active_flow(flow) for flow in flows]
+
+
 def _json_default(value: object) -> object:
     if hasattr(value, "__dataclass_fields__"):
         return asdict(value)
     return str(value)
 
 
+def _install_load_event_loop_policy() -> None:
+    if get_settings().app_env != "load":
+        return
+    try:
+        import uvloop
+    except ImportError:
+        return
+    uvloop.install()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run local synthetic capacity audit.")
     parser.add_argument("--registered-scales", default="1000,10000,100000")
-    parser.add_argument("--active-users", default="50,100,250,500,1000")
-    parser.add_argument("--active-flow", choices=("service", "webhook"), default="service")
-    parser.add_argument("--webhook-smoke-users", type=int, default=10)
+    parser.add_argument("--active-users", default="100")
+    parser.add_argument(
+        "--active-flow",
+        choices=ACTIVE_FLOW_CHOICES,
+        default=None,
+        help="Compatibility single-flow selector. Overrides --active-flows when set.",
+    )
+    parser.add_argument(
+        "--active-flows",
+        default="quiz_open_only,answer_visible_only,next_question_only,full_service_flow",
+    )
+    parser.add_argument("--webhook-smoke-users", type=int, default=0)
     parser.add_argument("--max-concurrency", type=int, default=100)
-    parser.add_argument("--max-p95-ms", type=float, default=2000.0)
+    parser.add_argument("--max-p95-ms", type=float, default=1000.0)
     parser.add_argument("--questions", type=int, default=5000)
     parser.add_argument("--output", default="reports/load_capacity_audit_latest.json")
+    parser.add_argument("--stop-on-gate-failure", action="store_true")
     args = parser.parse_args()
     args.registered_scales = _parse_int_list(args.registered_scales)
     args.active_users = _parse_int_list(args.active_users)
+    try:
+        args.active_flows = _parse_active_flow_list(
+            args.active_flow if args.active_flow is not None else args.active_flows
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
 
+    _install_load_event_loop_policy()
     report = asyncio.run(run_audit(args))
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
