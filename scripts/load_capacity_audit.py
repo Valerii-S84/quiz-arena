@@ -84,6 +84,14 @@ _CURRENT_STEP_RECORDER: ContextVar["StepRecorder | None"] = ContextVar(
     "capacity_audit_current_step_recorder",
     default=None,
 )
+_CURRENT_FLOW_USER_INDEX: ContextVar[int | None] = ContextVar(
+    "capacity_audit_current_flow_user_index",
+    default=None,
+)
+_CURRENT_ACTIVE_DIAGNOSTICS: ContextVar["ActiveDiagnostics | None"] = ContextVar(
+    "capacity_audit_current_active_diagnostics",
+    default=None,
+)
 
 TRUNCATE_TABLES = (
     "daily_metrics",
@@ -184,6 +192,7 @@ class ActiveResult:
     processed_updates: dict[str, int]
     cpu_time_ms: float
     rss_mb: float
+    diagnostics: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -204,12 +213,20 @@ class PreparedFlowContext:
     answered_sessions: dict[int, tuple[int, Any]] = field(default_factory=dict)
 
 
+@dataclass(slots=True)
+class ActiveDiagnostics:
+    pool_waits_ms: dict[int, float] = field(default_factory=dict)
+    db_holds_ms: dict[int, float] = field(default_factory=dict)
+    acquire_waves: dict[int, int] = field(default_factory=dict)
+
+
 class QueryRecorder:
     def __init__(self) -> None:
         self.timings_ms: list[float] = []
         self._by_statement: dict[str, list[float]] = {}
         self._by_step: dict[str, list[float]] = {}
         self._by_category: dict[str, list[float]] = {}
+        self._by_user: dict[int, list[float]] = {}
 
     def __enter__(self) -> QueryRecorder:
         event.listen(engine.sync_engine, "before_cursor_execute", self._before)
@@ -233,6 +250,9 @@ class QueryRecorder:
             self._by_statement.setdefault(_compact_statement(statement), []).append(elapsed_ms)
             self._by_step.setdefault(_CURRENT_QUERY_STEP.get(), []).append(elapsed_ms)
             self._by_category.setdefault(_classify_statement(statement), []).append(elapsed_ms)
+            user_index = _CURRENT_FLOW_USER_INDEX.get()
+            if user_index is not None:
+                self._by_user.setdefault(user_index, []).append(elapsed_ms)
 
     def summary(self) -> QuerySummary:
         return QuerySummary(
@@ -269,6 +289,9 @@ class QueryRecorder:
             category: _query_summary(timings)
             for category, timings in sorted(self._by_category.items())
         }
+
+    def user_sql_totals(self) -> dict[int, float]:
+        return {user_index: sum(timings) for user_index, timings in self._by_user.items()}
 
     @staticmethod
     def _digest_items(items: list[tuple[str, list[float]]]) -> list[QueryDigest]:
@@ -881,10 +904,45 @@ def _telegram_user_for_index(index: int) -> SimpleNamespace:
 
 @asynccontextmanager
 async def measured_session(acquire_step: str):
+    acquired_at = 0.0
     async with SessionLocal.begin() as session:
+        acquire_started_at = time.perf_counter()
         with query_step(acquire_step):
             await session.connection()
-        yield session
+        _record_pool_wait((time.perf_counter() - acquire_started_at) * 1000)
+        acquired_at = time.perf_counter()
+        try:
+            yield session
+        finally:
+            pass
+    hold_ms = (time.perf_counter() - acquired_at) * 1000
+    _record_wall_step(acquire_step.removesuffix("_db_acquire") + "_db_hold", hold_ms)
+    _record_db_hold(hold_ms)
+
+
+def _record_wall_step(step: str, elapsed_ms: float) -> None:
+    recorder = _CURRENT_STEP_RECORDER.get()
+    if recorder is not None:
+        recorder.record(step, elapsed_ms)
+
+
+def _record_pool_wait(pool_wait_ms: float) -> None:
+    diagnostics = _CURRENT_ACTIVE_DIAGNOSTICS.get()
+    user_index = _CURRENT_FLOW_USER_INDEX.get()
+    if diagnostics is None or user_index is None:
+        return
+    diagnostics.pool_waits_ms[user_index] = (
+        diagnostics.pool_waits_ms.get(user_index, 0.0) + pool_wait_ms
+    )
+    diagnostics.acquire_waves[user_index] = diagnostics.acquire_waves.get(user_index, 0) + 1
+
+
+def _record_db_hold(hold_ms: float) -> None:
+    diagnostics = _CURRENT_ACTIVE_DIAGNOSTICS.get()
+    user_index = _CURRENT_FLOW_USER_INDEX.get()
+    if diagnostics is None or user_index is None:
+        return
+    diagnostics.db_holds_ms[user_index] = diagnostics.db_holds_ms.get(user_index, 0.0) + hold_ms
 
 
 async def _prepare_started_session(index: int, *, idempotency_prefix: str) -> Any:
@@ -958,7 +1016,7 @@ async def quiz_open_only_flow_for_user(index: int) -> None:
     telegram_user = _telegram_user_for_index(index)
     now_utc = datetime.now(UTC)
 
-    async with measured_session("quiz_open_user_lookup_db_acquire") as session:
+    async with measured_session("quiz_open_db_acquire") as session:
         with query_step("quiz_open_user_lookup"):
             resolved_user_id = await UserOnboardingService.get_existing_user_id_by_telegram_user_id(
                 session,
@@ -973,7 +1031,6 @@ async def quiz_open_only_flow_for_user(index: int) -> None:
             else:
                 user_id = int(resolved_user_id)
 
-    async with measured_session("quiz_open_start_db_acquire") as session:
         with query_step("quiz_open_start_session"):
             started = await GameSessionService.start_session(
                 session,
@@ -1172,6 +1229,7 @@ async def run_active_stage(
     async def run_one(index: int, client: AsyncClient | None, queue: InProcessUpdateQueue | None):
         nonlocal errors
         started_at = time.perf_counter()
+        user_token = _CURRENT_FLOW_USER_INDEX.set(index)
         try:
             if resolved_flow == "webhook":
                 if client is None or queue is None or bot_api is None:
@@ -1194,6 +1252,7 @@ async def run_active_stage(
             errors += 1
         finally:
             latencies.append((time.perf_counter() - started_at) * 1000)
+            _CURRENT_FLOW_USER_INDEX.reset(user_token)
 
     semaphore = asyncio.Semaphore(max(1, min(max_concurrency, active_users)))
 
@@ -1202,32 +1261,50 @@ async def run_active_stage(
             await run_one(index, client, queue)
 
     cpu_started_at = time.process_time()
-    with QueryRecorder() as recorder, StepRecorder() as step_recorder:
-        if resolved_flow == "webhook":
-            if bot_api is None:
-                raise RuntimeError("bot_api is required for webhook flow")
-            queue, restore = install_webhook_mocks(bot_api)
-            try:
-                async with AsyncClient(
-                    transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
-                    base_url="http://testserver",
-                    timeout=30.0,
-                ) as client:
-                    await asyncio.gather(
-                        *(
-                            limited(index, client, queue)
-                            for index in range(start_index, start_index + active_users)
+    active_diagnostics = ActiveDiagnostics()
+    diagnostics_token = _CURRENT_ACTIVE_DIAGNOSTICS.set(active_diagnostics)
+    pool_samples: list[int] = []
+    stop_pool_sampling = asyncio.Event()
+    pool_sampler = asyncio.create_task(
+        _sample_checked_out_db_connections(stop_pool_sampling, pool_samples)
+    )
+    try:
+        with QueryRecorder() as recorder, StepRecorder() as step_recorder:
+            if resolved_flow == "webhook":
+                if bot_api is None:
+                    raise RuntimeError("bot_api is required for webhook flow")
+                queue, restore = install_webhook_mocks(bot_api)
+                try:
+                    async with AsyncClient(
+                        transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
+                        base_url="http://testserver",
+                        timeout=30.0,
+                    ) as client:
+                        await asyncio.gather(
+                            *(
+                                limited(index, client, queue)
+                                for index in range(start_index, start_index + active_users)
+                            )
                         )
+                finally:
+                    restore()
+            else:
+                await asyncio.gather(
+                    *(
+                        limited(index, None, None)
+                        for index in range(start_index, start_index + active_users)
                     )
-            finally:
-                restore()
-        else:
-            await asyncio.gather(
-                *(
-                    limited(index, None, None)
-                    for index in range(start_index, start_index + active_users)
                 )
+            diagnostics = _build_active_diagnostics(
+                active_diagnostics,
+                user_sql_totals=recorder.user_sql_totals(),
+                peak_db_connections=max(pool_samples, default=0),
+                active_users=active_users,
             )
+    finally:
+        stop_pool_sampling.set()
+        await pool_sampler
+        _CURRENT_ACTIVE_DIAGNOSTICS.reset(diagnostics_token)
     cpu_time_ms = (time.process_time() - cpu_started_at) * 1000
 
     after_locks = await lock_snapshot()
@@ -1256,7 +1333,61 @@ async def run_active_stage(
         processed_updates=await _processed_update_status_counts_after(before_update_id),
         cpu_time_ms=round(cpu_time_ms, 3),
         rss_mb=_rss_mb(),
+        diagnostics=diagnostics,
     )
+
+
+async def _sample_checked_out_db_connections(
+    stop_event: asyncio.Event,
+    samples: list[int],
+) -> None:
+    while not stop_event.is_set():
+        samples.append(_checked_out_db_connections())
+        await asyncio.sleep(0.005)
+    samples.append(_checked_out_db_connections())
+
+
+def _checked_out_db_connections() -> int:
+    checkedout = getattr(engine.sync_engine.pool, "checkedout", None)
+    if callable(checkedout):
+        return int(checkedout())
+    return 0
+
+
+def _build_active_diagnostics(
+    active_diagnostics: ActiveDiagnostics,
+    *,
+    user_sql_totals: dict[int, float],
+    peak_db_connections: int,
+    active_users: int,
+) -> dict[str, Any]:
+    pool_waits = [active_diagnostics.pool_waits_ms.get(index, 0.0) for index in range(active_users)]
+    db_holds = [active_diagnostics.db_holds_ms.get(index, 0.0) for index in range(active_users)]
+    sql_totals = [user_sql_totals.get(index, 0.0) for index in range(active_users)]
+    non_sql_inside = [
+        max(0.0, db_hold_ms - sql_ms)
+        for db_hold_ms, sql_ms in zip(db_holds, sql_totals, strict=True)
+    ]
+    acquire_waves = [
+        float(active_diagnostics.acquire_waves.get(index, 0)) for index in range(active_users)
+    ]
+    return {
+        "pool_wait_time": _summary_dict(pool_waits),
+        "db_hold_time": _summary_dict(db_holds),
+        "sql_time": _summary_dict(sql_totals),
+        "non_sql_inside_db_session": _summary_dict(non_sql_inside),
+        "acquire_waves_per_user": _summary_dict(acquire_waves),
+        "peak_db_connections": peak_db_connections,
+    }
+
+
+def _summary_dict(values: list[float]) -> dict[str, float]:
+    return {
+        "count": float(len(values)),
+        "p50_ms": round(_percentile(values, 50), 3),
+        "p95_ms": round(_percentile(values, 95), 3),
+        "max_ms": round(max(values) if values else 0.0, 3),
+    }
 
 
 def _estimated_service_calls(active_users: int, *, flow: str) -> Counter[str]:
