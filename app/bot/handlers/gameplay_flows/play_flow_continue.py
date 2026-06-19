@@ -135,6 +135,7 @@ async def _resolve_menu_continue_outcome(
                 idempotency_key=f"start:auto:{result.mode_code}:{callback.id}",
                 now_utc=now_utc,
                 preferred_question_level=result.next_preferred_level,
+                preferred_question_mix_step=result.next_preferred_mix_step,
                 recent_question_ids_override=(result.question_id,),
             )
         except EnergyInsufficientError:
@@ -176,6 +177,7 @@ def _build_start_kwargs(snapshot, result: AnswerSessionResult, callback_id: str,
         "idempotency_key": f"start:auto:{result.mode_code}:{callback_id}",
         "now_utc": now_utc,
         "preferred_question_level": result.next_preferred_level,
+        "preferred_question_mix_step": result.next_preferred_mix_step,
     }
 
 

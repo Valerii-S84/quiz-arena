@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable
 from time import monotonic
 
 import redis.asyncio as redis
@@ -150,13 +151,15 @@ end
 return current
 """
     try:
-        await client.eval(
+        eval_result = client.eval(
             script,
             1,
             GLOBAL_BEST_STREAK_CACHE_KEY,
             str(candidate),
             str(ttl_seconds),
         )
+        if isinstance(eval_result, Awaitable):
+            await eval_result
     except Exception:
         return
 

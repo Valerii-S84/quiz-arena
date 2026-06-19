@@ -66,6 +66,31 @@ def _store_question_by_id_cache(question: QuizQuestion) -> None:
     )
 
 
+def _question_from_pool_candidate(candidate: QuizQuestionPoolCandidate) -> QuizQuestion | None:
+    if (
+        candidate.question_text is None
+        or candidate.option_1 is None
+        or candidate.option_2 is None
+        or candidate.option_3 is None
+        or candidate.option_4 is None
+        or candidate.correct_option_id is None
+    ):
+        return None
+    return QuizQuestion(
+        question_id=candidate.question_id,
+        text=candidate.question_text,
+        options=(
+            candidate.option_1,
+            candidate.option_2,
+            candidate.option_3,
+            candidate.option_4,
+        ),
+        correct_option=candidate.correct_option_id,
+        level=candidate.level,
+        category=candidate.category,
+    )
+
+
 def _pool_cache_scope(mode_code: str) -> str:
     return QUICK_MIX_SCOPE_CODE if mode_code == QUICK_MIX_MODE_CODE else mode_code
 
@@ -184,6 +209,7 @@ async def _build_incremental_pool_entry(
         return _PoolCacheEntry(
             loaded_at_mono=monotonic(),
             question_ids=cached.question_ids,
+            candidates_by_id=cached.candidates_by_id,
             updated_at_watermark=cached.updated_at_watermark,
         )
 
@@ -207,6 +233,12 @@ async def _build_incremental_pool_entry(
                 level=change.level,
                 source_file=source_file,
                 category=category,
+                question_text=getattr(change, "question_text", None),
+                option_1=getattr(change, "option_1", None),
+                option_2=getattr(change, "option_2", None),
+                option_3=getattr(change, "option_3", None),
+                option_4=getattr(change, "option_4", None),
+                correct_option_id=getattr(change, "correct_option_id", None),
             )
         else:
             refreshed_candidates.pop(change.question_id, None)
@@ -250,6 +282,24 @@ async def _get_pool_candidates(
         preferred_levels=preferred_levels,
     )
     return tuple(entry.candidates_by_id[question_id] for question_id in entry.question_ids)
+
+
+async def _get_pool_question(
+    session: AsyncSession,
+    *,
+    mode_code: str,
+    preferred_levels: tuple[str, ...] | None,
+    question_id: str,
+) -> QuizQuestion | None:
+    entry = await _get_pool_entry(
+        session,
+        mode_code=mode_code,
+        preferred_levels=preferred_levels,
+    )
+    candidate = entry.candidates_by_id.get(question_id)
+    if candidate is None:
+        return None
+    return _question_from_pool_candidate(candidate)
 
 
 async def _get_pool_entry(

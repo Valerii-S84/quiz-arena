@@ -24,9 +24,12 @@ class QuizSessionsRepo:
     async def get_by_idempotency_key(
         session: AsyncSession, idempotency_key: str
     ) -> QuizSession | None:
-        stmt = select(QuizSession).where(QuizSession.idempotency_key == idempotency_key)
+        stmt = select(QuizSession.id).where(QuizSession.idempotency_key == idempotency_key)
         result = await session.execute(stmt)
-        return result.scalar_one_or_none()
+        session_id = result.scalar_one_or_none()
+        if session_id is None:
+            return None
+        return await session.get(QuizSession, session_id)
 
     @staticmethod
     async def get_by_friend_challenge_round_user(
@@ -127,11 +130,28 @@ class QuizSessionsRepo:
         return quiz_session
 
     @staticmethod
-    async def count_completed_for_user(session: AsyncSession, *, user_id: int) -> int:
-        stmt = select(func.count(QuizSession.id)).where(
-            QuizSession.user_id == user_id,
-            QuizSession.status == "COMPLETED",
-        )
+    async def count_completed_for_user(
+        session: AsyncSession,
+        *,
+        user_id: int,
+        cap: int | None = None,
+    ) -> int:
+        if cap is not None:
+            capped_completed = (
+                select(QuizSession.id)
+                .where(
+                    QuizSession.user_id == user_id,
+                    QuizSession.status == "COMPLETED",
+                )
+                .limit(max(1, int(cap)))
+                .subquery()
+            )
+            stmt = select(func.count()).select_from(capped_completed)
+        else:
+            stmt = select(func.count(QuizSession.id)).where(
+                QuizSession.user_id == user_id,
+                QuizSession.status == "COMPLETED",
+            )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
 

@@ -15,6 +15,7 @@ from app.game.questions.runtime_bank_filters import (
 from app.game.questions.runtime_bank_models import to_quiz_question
 from app.game.questions.runtime_bank_pool import (
     _get_pool_candidates,
+    _get_pool_question,
     _get_question_by_id_cache,
     _repo,
     _store_question_by_id_cache,
@@ -144,7 +145,7 @@ async def _select_candidate_id_once(
     selection_seed: str,
     preferred_level: str | None,
     allowed_levels: Sequence[str] | None,
-) -> str | None:
+) -> tuple[str | None, tuple[str, ...] | None]:
     allowed_levels_normalized = _allowed_levels_tuple(allowed_levels)
     preferred_levels = (
         (preferred_level,) if preferred_level is not None else allowed_levels_normalized
@@ -156,6 +157,7 @@ async def _select_candidate_id_once(
         selection_seed=selection_seed,
         preferred_levels=preferred_levels,
     )
+    selected_preferred_levels = preferred_levels
     if (
         selected_id is None
         and preferred_levels is not None
@@ -168,7 +170,8 @@ async def _select_candidate_id_once(
             selection_seed=selection_seed,
             preferred_levels=allowed_levels_normalized,
         )
-    return selected_id
+        selected_preferred_levels = allowed_levels_normalized
+    return selected_id, selected_preferred_levels
 
 
 async def _pick_from_mode(
@@ -180,7 +183,7 @@ async def _pick_from_mode(
     preferred_level: str | None,
     allowed_levels: Sequence[str] | None = None,
 ) -> QuizQuestion | None:
-    selected_id = await _select_candidate_id_once(
+    selected_id, selected_preferred_levels = await _select_candidate_id_once(
         session,
         mode_code=mode_code,
         recent_question_ids=recent_question_ids,
@@ -195,11 +198,21 @@ async def _pick_from_mode(
     if cached is not None:
         return cached
 
+    pool_question = await _get_pool_question(
+        session,
+        mode_code=mode_code,
+        preferred_levels=selected_preferred_levels,
+        question_id=selected_id,
+    )
+    if pool_question is not None:
+        _store_question_by_id_cache(pool_question)
+        return pool_question
+
     repo = _repo()
     selected = await repo.get_by_id(session, selected_id)
     if selected is None:
         clear_question_pool_cache()
-        retry_selected_id = await _select_candidate_id_once(
+        retry_selected_id, _ = await _select_candidate_id_once(
             session,
             mode_code=mode_code,
             recent_question_ids=recent_question_ids,

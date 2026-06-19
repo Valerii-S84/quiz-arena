@@ -17,6 +17,12 @@ class QuizQuestionPoolChange:
     level: str
     source_file: str
     category: str
+    question_text: str
+    option_1: str
+    option_2: str
+    option_3: str
+    option_4: str
+    correct_option_id: int
     status: str
     quick_mix_eligible: bool
     updated_at: datetime
@@ -28,6 +34,12 @@ class QuizQuestionPoolCandidate:
     level: str
     source_file: str
     category: str
+    question_text: str | None = None
+    option_1: str | None = None
+    option_2: str | None = None
+    option_3: str | None = None
+    option_4: str | None = None
+    correct_option_id: int | None = None
 
 
 class QuizQuestionsRepo:
@@ -94,6 +106,12 @@ class QuizQuestionsRepo:
                 QuizQuestion.level,
                 QuizQuestion.source_file,
                 QuizQuestion.category,
+                QuizQuestion.question_text,
+                QuizQuestion.option_1,
+                QuizQuestion.option_2,
+                QuizQuestion.option_3,
+                QuizQuestion.option_4,
+                QuizQuestion.correct_option_id,
             )
             .where(
                 QuizQuestion.mode_code == mode_code,
@@ -112,8 +130,25 @@ class QuizQuestionsRepo:
                 level=level,
                 source_file=source_file,
                 category=category,
+                question_text=question_text,
+                option_1=option_1,
+                option_2=option_2,
+                option_3=option_3,
+                option_4=option_4,
+                correct_option_id=correct_option_id,
             )
-            for question_id, level, source_file, category in result.all()
+            for (
+                question_id,
+                level,
+                source_file,
+                category,
+                question_text,
+                option_1,
+                option_2,
+                option_3,
+                option_4,
+                correct_option_id,
+            ) in result.all()
         ]
 
     @staticmethod
@@ -130,6 +165,12 @@ class QuizQuestionsRepo:
                 QuizQuestion.level,
                 QuizQuestion.source_file,
                 QuizQuestion.category,
+                QuizQuestion.question_text,
+                QuizQuestion.option_1,
+                QuizQuestion.option_2,
+                QuizQuestion.option_3,
+                QuizQuestion.option_4,
+                QuizQuestion.correct_option_id,
             )
             .where(QuizQuestion.status == "ACTIVE")
             .order_by(QuizQuestion.question_id.asc())
@@ -147,8 +188,25 @@ class QuizQuestionsRepo:
                 level=level,
                 source_file=source_file,
                 category=category,
+                question_text=question_text,
+                option_1=option_1,
+                option_2=option_2,
+                option_3=option_3,
+                option_4=option_4,
+                correct_option_id=correct_option_id,
             )
-            for question_id, level, source_file, category in result.all()
+            for (
+                question_id,
+                level,
+                source_file,
+                category,
+                question_text,
+                option_1,
+                option_2,
+                option_3,
+                option_4,
+                correct_option_id,
+            ) in result.all()
         ]
 
     @staticmethod
@@ -179,6 +237,12 @@ class QuizQuestionsRepo:
                 QuizQuestion.level,
                 QuizQuestion.source_file,
                 QuizQuestion.category,
+                QuizQuestion.question_text,
+                QuizQuestion.option_1,
+                QuizQuestion.option_2,
+                QuizQuestion.option_3,
+                QuizQuestion.option_4,
+                QuizQuestion.correct_option_id,
                 QuizQuestion.status,
                 QuizQuestion.quick_mix_eligible,
                 QuizQuestion.updated_at,
@@ -194,6 +258,12 @@ class QuizQuestionsRepo:
                 level=level,
                 source_file=source_file,
                 category=category,
+                question_text=question_text,
+                option_1=option_1,
+                option_2=option_2,
+                option_3=option_3,
+                option_4=option_4,
+                correct_option_id=correct_option_id,
                 status=status,
                 quick_mix_eligible=quick_mix_eligible,
                 updated_at=updated_at,
@@ -204,6 +274,12 @@ class QuizQuestionsRepo:
                 level,
                 source_file,
                 category,
+                question_text,
+                option_1,
+                option_2,
+                option_3,
+                option_4,
+                correct_option_id,
                 status,
                 quick_mix_eligible,
                 updated_at,

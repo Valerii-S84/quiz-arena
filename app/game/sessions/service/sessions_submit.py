@@ -32,22 +32,11 @@ async def submit_answer(
     if selected_option < 0 or selected_option > 3:
         raise InvalidAnswerOptionError
 
-    existing_attempt = await QuizAttemptsRepo.get_by_idempotency_key(session, idempotency_key)
-    if existing_attempt is not None:
-        replay_session = await QuizSessionsRepo.get_by_id(session, existing_attempt.session_id)
-        return await build_replay_answer_result(
-            session,
-            user_id=user_id,
-            replay_session=replay_session,
-            replay_attempt=existing_attempt,
-            now_utc=now_utc,
-        )
-
     quiz_session = await QuizSessionsRepo.get_by_id_for_update(session, session_id)
     if quiz_session is None or quiz_session.user_id != user_id:
         raise SessionNotFoundError
 
-    if quiz_session.source == "DAILY_CHALLENGE" and quiz_session.status != "STARTED":
+    if quiz_session.status != "STARTED":
         replay_attempt = await QuizAttemptsRepo.get_latest_for_session(
             session,
             session_id=quiz_session.id,
@@ -129,14 +118,16 @@ async def submit_answer(
         activity_at_utc=now_utc,
     )
     next_preferred_level = None
+    next_preferred_mix_step = None
     if _is_persistent_adaptive_mode(mode_code=quiz_session.mode_code):
-        advanced_level, _, _ = await check_and_advance(
+        advanced_level, mix_step, _ = await check_and_advance(
             user_id=user_id,
             mode=quiz_session.mode_code,
             db=session,
             now_utc=now_utc,
         )
         next_preferred_level = advanced_level
+        next_preferred_mix_step = mix_step
 
     return AnswerSessionResult(
         session_id=quiz_session.id,
@@ -151,6 +142,7 @@ async def submit_answer(
         correct_answer_text=question.options[question.correct_option],
         question_level=question.level,
         next_preferred_level=next_preferred_level,
+        next_preferred_mix_step=next_preferred_mix_step,
         friend_challenge=friend_snapshot,
         friend_challenge_answered_round=quiz_session.friend_challenge_round,
         friend_challenge_round_completed=friend_round_completed,

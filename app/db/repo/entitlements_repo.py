@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
@@ -7,6 +11,32 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.entitlements import Entitlement
+
+
+@dataclass(frozen=True, slots=True)
+class _PremiumStatus:
+    active: bool
+    scope: str | None
+
+
+_PREMIUM_STATUS_CACHE: ContextVar[dict[tuple[int, datetime], _PremiumStatus] | None] = ContextVar(
+    "premium_status_cache",
+    default=None,
+)
+
+
+@contextmanager
+def entitlement_request_cache() -> Iterator[None]:
+    existing = _PREMIUM_STATUS_CACHE.get()
+    if existing is not None:
+        yield
+        return
+
+    token = _PREMIUM_STATUS_CACHE.set({})
+    try:
+        yield
+    finally:
+        _PREMIUM_STATUS_CACHE.reset(token)
 
 
 class EntitlementsRepo:
@@ -33,10 +63,8 @@ class EntitlementsRepo:
 
     @staticmethod
     async def has_active_premium(session: AsyncSession, user_id: int, now_utc: datetime) -> bool:
-        entitlement = await EntitlementsRepo._get_active_premium_entitlement(
-            session, user_id, now_utc
-        )
-        return entitlement is not None
+        status = await EntitlementsRepo._get_active_premium_status(session, user_id, now_utc)
+        return status.active
 
     @staticmethod
     async def get_active_premium_scope(
@@ -44,10 +72,38 @@ class EntitlementsRepo:
         user_id: int,
         now_utc: datetime,
     ) -> str | None:
-        entitlement = await EntitlementsRepo._get_active_premium_entitlement(
-            session, user_id, now_utc
+        status = await EntitlementsRepo._get_active_premium_status(session, user_id, now_utc)
+        return status.scope
+
+    @staticmethod
+    async def _get_active_premium_status(
+        session: AsyncSession,
+        user_id: int,
+        now_utc: datetime,
+    ) -> _PremiumStatus:
+        cache = _PREMIUM_STATUS_CACHE.get()
+        cache_key = (int(user_id), now_utc)
+        if cache is not None and cache_key in cache:
+            return cache[cache_key]
+
+        stmt = select(Entitlement.scope).where(
+            and_(
+                Entitlement.user_id == user_id,
+                Entitlement.entitlement_type == "PREMIUM",
+                Entitlement.status == "ACTIVE",
+                Entitlement.starts_at <= now_utc,
+                or_(Entitlement.ends_at.is_(None), Entitlement.ends_at > now_utc),
+            )
         )
-        return entitlement.scope if entitlement is not None else None
+        result = await session.execute(stmt)
+        scope = result.scalar_one_or_none()
+        status = _PremiumStatus(
+            active=scope is not None,
+            scope=scope,
+        )
+        if cache is not None:
+            cache[cache_key] = status
+        return status
 
     @staticmethod
     async def get_active_premium_for_update(

@@ -8,9 +8,14 @@ from app.game.questions.runtime_bank_seed import stable_index
 
 
 class QuestionSelectionMetadata(Protocol):
-    question_id: str
-    source_file: str
-    category: str
+    @property
+    def question_id(self) -> str: ...
+
+    @property
+    def source_file(self) -> str: ...
+
+    @property
+    def category(self) -> str: ...
 
 
 _MetadataT = TypeVar("_MetadataT", bound=QuestionSelectionMetadata)

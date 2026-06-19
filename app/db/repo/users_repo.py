@@ -31,6 +31,15 @@ class UsersRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_id_by_telegram_user_id(
+        session: AsyncSession, telegram_user_id: int
+    ) -> int | None:
+        stmt = select(User.id).where(User.telegram_user_id == telegram_user_id)
+        result = await session.execute(stmt)
+        user_id = result.scalar_one_or_none()
+        return None if user_id is None else int(user_id)
+
+    @staticmethod
     async def get_by_referral_code(session: AsyncSession, referral_code: str) -> User | None:
         stmt = select(User).where(User.referral_code == referral_code)
         result = await session.execute(stmt)
@@ -79,6 +88,21 @@ class UsersRepo:
         stmt = update(User).where(User.id == user_id).values(last_seen_at=seen_at)
         result = await session.execute(stmt)
         return int(getattr(result, "rowcount", 0) or 0)
+
+    @staticmethod
+    async def touch_last_seen_by_telegram_user_id(
+        session: AsyncSession,
+        telegram_user_id: int,
+        seen_at: datetime,
+    ) -> User | None:
+        stmt = (
+            update(User)
+            .where(User.telegram_user_id == telegram_user_id)
+            .values(last_seen_at=seen_at)
+            .returning(User)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
 
     @staticmethod
     async def get_global_best_streak(session: AsyncSession) -> int:
