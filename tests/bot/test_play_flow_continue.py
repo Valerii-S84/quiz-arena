@@ -51,6 +51,7 @@ def _answer_result() -> AnswerSessionResult:
         mode_code="QUICK_MIX_A1A2",
         source="MENU",
         next_preferred_level="A2",
+        next_preferred_mix_step=1,
     )
 
 
@@ -117,6 +118,8 @@ async def test_continue_regular_mode_after_answer_uses_known_user_id_without_hom
     )
 
     assert captured["user_id"] == 202
+    assert captured["preferred_question_level"] == "A2"
+    assert captured["preferred_question_mix_step"] == 1
     assert callback.message.answers[0].text == "energy=18+2"
     assert callback.answer_calls == [{"text": None, "show_alert": False}]
 

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import global_best_streak_cache
 
@@ -68,15 +70,18 @@ async def test_get_global_best_streak_uses_cached_value(monkeypatch) -> None:
         _unexpected_db_lookup,
     )
 
-    assert await global_best_streak_cache.get_global_best_streak(object()) == 27
+    session = cast(AsyncSession, object())
+    assert await global_best_streak_cache.get_global_best_streak(session) == 27
 
 
 @pytest.mark.asyncio
 async def test_get_global_best_streak_fills_cache_on_miss(monkeypatch) -> None:
     fake = _FakeRedis()
 
-    async def _db_lookup(session):
-        assert session == "session"
+    session = cast(AsyncSession, object())
+
+    async def _db_lookup(db_session: AsyncSession) -> int:
+        assert db_session is session
         return 31
 
     async def _fake_client(settings):
@@ -87,7 +92,7 @@ async def test_get_global_best_streak_fills_cache_on_miss(monkeypatch) -> None:
     monkeypatch.setattr(global_best_streak_cache, "_get_redis_client", _fake_client)
     monkeypatch.setattr(global_best_streak_cache.UsersRepo, "get_global_best_streak", _db_lookup)
 
-    assert await global_best_streak_cache.get_global_best_streak("session") == 31
+    assert await global_best_streak_cache.get_global_best_streak(session) == 31
     assert fake.values[global_best_streak_cache.GLOBAL_BEST_STREAK_CACHE_KEY] == "31"
     assert fake.expiries[global_best_streak_cache.GLOBAL_BEST_STREAK_CACHE_KEY] == 45
 

@@ -27,9 +27,10 @@ async def test_quiz_session_lookups_create_counts_and_duration_queries() -> None
     await QuizSessionsRepo.get_by_id_for_update(lock_session, session_id)
     assert "FOR UPDATE" in compile_statement(lock_session.statement)
 
-    key_session = RecordingSession(_ScalarResult(None))
-    await QuizSessionsRepo.get_by_idempotency_key(key_session, "quiz:key")
+    key_session = RecordingSession(_ScalarResult(session_id), get_result=quiz_session)
+    assert await QuizSessionsRepo.get_by_idempotency_key(key_session, "quiz:key") is quiz_session
     assert "quiz_sessions.idempotency_key = 'quiz:key'" in compile_statement(key_session.statement)
+    assert key_session.get_calls == [(QuizSession, session_id)]
 
     round_session = RecordingSession(_ScalarResult(quiz_session))
     await QuizSessionsRepo.get_by_friend_challenge_round_user(

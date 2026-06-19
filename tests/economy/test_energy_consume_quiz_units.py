@@ -53,13 +53,8 @@ async def test_consume_quiz_debits_free_energy_and_emits_zero_event(
 
     monkeypatch.setattr(
         energy_consume_quiz,
-        "get_or_create_state_for_update",
-        _async_return(state),
-    )
-    monkeypatch.setattr(
-        energy_consume_quiz.EntitlementsRepo,
-        "has_active_premium",
-        _async_return(False),
+        "get_or_create_state_and_premium_status_for_update",
+        _state_and_premium(state, premium_active=False),
     )
     monkeypatch.setattr(
         energy_consume_quiz.LedgerRepo,
@@ -115,13 +110,8 @@ async def test_consume_quiz_does_not_daily_refill_before_debit(
 
     monkeypatch.setattr(
         energy_consume_quiz,
-        "get_or_create_state_for_update",
-        _async_return(state),
-    )
-    monkeypatch.setattr(
-        energy_consume_quiz.EntitlementsRepo,
-        "has_active_premium",
-        _async_return(False),
+        "get_or_create_state_and_premium_status_for_update",
+        _state_and_premium(state, premium_active=False),
     )
     monkeypatch.setattr(
         energy_consume_quiz.LedgerRepo,
@@ -157,13 +147,8 @@ async def test_consume_quiz_premium_bypass_does_not_write_ledger(
 
     monkeypatch.setattr(
         energy_consume_quiz,
-        "get_or_create_state_for_update",
-        _async_return(state),
-    )
-    monkeypatch.setattr(
-        energy_consume_quiz.EntitlementsRepo,
-        "has_active_premium",
-        _async_return(True),
+        "get_or_create_state_and_premium_status_for_update",
+        _state_and_premium(state, premium_active=True),
     )
     monkeypatch.setattr(
         energy_consume_quiz.LedgerRepo,
@@ -194,5 +179,12 @@ async def test_consume_quiz_premium_bypass_does_not_write_ledger(
 def _async_return(value):
     async def _inner(*_args, **_kwargs):
         return value
+
+    return _inner
+
+
+def _state_and_premium(state, *, premium_active: bool):
+    async def _inner(*_args, **_kwargs):
+        return state, premium_active
 
     return _inner

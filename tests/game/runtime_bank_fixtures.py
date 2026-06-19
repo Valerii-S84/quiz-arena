@@ -132,6 +132,12 @@ def _candidate_records(
                 level=record.level,
                 source_file=record.source_file,
                 category=record.category,
+                question_text=record.question_text,
+                option_1=record.option_1,
+                option_2=record.option_2,
+                option_3=record.option_3,
+                option_4=record.option_4,
+                correct_option_id=record.correct_option_id,
             )
         )
     return candidates
