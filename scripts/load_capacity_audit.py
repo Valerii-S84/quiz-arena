@@ -831,6 +831,30 @@ async def lock_snapshot() -> dict[str, int]:
     return {"lock_waits_active": int(lock_waits or 0), "deadlocks_total": int(deadlocks or 0)}
 
 
+def _db_pool_size() -> int:
+    pool_size = getattr(engine.sync_engine.pool, "size", None)
+    if callable(pool_size):
+        return max(0, int(pool_size()))
+    return 0
+
+
+async def prewarm_db_pool() -> int:
+    target_connections = _db_pool_size()
+    if target_connections <= 0:
+        return 0
+
+    connections = []
+    try:
+        for _ in range(target_connections):
+            conn = await engine.connect()
+            await conn.execute(text("SELECT 1"))
+            connections.append(conn)
+    finally:
+        for conn in reversed(connections):
+            await conn.close()
+    return len(connections)
+
+
 async def measure_registered_scale(users: int) -> ScaleResult:
     clear_question_pool_cache()
 
@@ -958,11 +982,38 @@ async def _prepare_started_session(index: int, *, idempotency_prefix: str) -> An
         )
 
 
+async def _submit_answer_for_seeded_telegram_user(
+    session: Any,
+    *,
+    telegram_user_id: int,
+    session_id: Any,
+    selected_option: int,
+    idempotency_key: str,
+    now_utc: datetime,
+) -> tuple[int, Any]:
+    user_id = await UserOnboardingService.get_existing_user_id_by_telegram_user_id(
+        session,
+        telegram_user_id,
+    )
+    if user_id is None:
+        raise RuntimeError(f"load-audit user is not seeded: telegram_user_id={telegram_user_id}")
+
+    answered = await GameSessionService.submit_answer(
+        session,
+        user_id=int(user_id),
+        session_id=session_id,
+        selected_option=selected_option,
+        idempotency_key=idempotency_key,
+        now_utc=now_utc,
+    )
+    return int(user_id), answered
+
+
 async def _prepare_answered_session(index: int, *, idempotency_prefix: str) -> tuple[int, Any]:
     started = await _prepare_started_session(index, idempotency_prefix=idempotency_prefix)
     answer_now = datetime.now(UTC)
     async with SessionLocal.begin() as session:
-        return await GameSessionService.submit_answer_for_telegram_user(
+        return await _submit_answer_for_seeded_telegram_user(
             session,
             telegram_user_id=BASE_TELEGRAM_ID + index,
             session_id=started.session.session_id,
@@ -1053,7 +1104,7 @@ async def answer_visible_only_flow_for_user(
     answer_now = datetime.now(UTC)
     async with measured_session("answer_visible_db_acquire") as session:
         with query_step("answer_visible_submit"):
-            _, answered = await GameSessionService.submit_answer_for_telegram_user(
+            _, answered = await _submit_answer_for_seeded_telegram_user(
                 session,
                 telegram_user_id=BASE_TELEGRAM_ID + index,
                 session_id=started.session.session_id,
@@ -1082,9 +1133,6 @@ async def next_question_only_flow_for_user(
                 idempotency_key=f"audit:next-question:start:{index}",
                 now_utc=now_utc,
                 preferred_question_level=answered.next_preferred_level,
-                preferred_question_mix_step=answered.next_preferred_mix_step,
-                recent_question_ids_override=(answered.question_id,),
-                idempotency_prechecked=not answered.idempotent_replay,
             )
         with query_step("next_question_prepare_response"):
             _build_question_payload(started)
@@ -1124,7 +1172,7 @@ async def service_flow_for_user(index: int) -> None:
     with entitlement_request_cache():
         async with measured_session("full_service_answer_db_acquire") as session:
             with query_step("answer_callback_submit"):
-                user_id, answered = await GameSessionService.submit_answer_for_telegram_user(
+                user_id, answered = await _submit_answer_for_seeded_telegram_user(
                     session,
                     telegram_user_id=telegram_user.id,
                     session_id=started.session.session_id,
@@ -1155,9 +1203,6 @@ async def service_flow_for_user(index: int) -> None:
                     idempotency_key=f"audit:start:auto:{index}",
                     now_utc=answer_now,
                     preferred_question_level=answered.next_preferred_level,
-                    preferred_question_mix_step=answered.next_preferred_mix_step,
-                    recent_question_ids_override=(answered.question_id,),
-                    idempotency_prechecked=not answered.idempotent_replay,
                 )
 
 
@@ -1535,6 +1580,8 @@ async def run_audit(args: argparse.Namespace) -> AuditReport:
         + f" max_p95_ms={args.max_p95_ms:.3f}"
     )
     report.notes.append(f"informational_flows={FULL_SERVICE_FLOW}")
+    prewarmed_connections = await prewarm_db_pool()
+    report.notes.append(f"db_pool_prewarmed_connections={prewarmed_connections}")
 
     for active_flow in args.active_flows:
         for active_users in args.active_users:

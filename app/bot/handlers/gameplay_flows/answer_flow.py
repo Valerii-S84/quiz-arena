@@ -22,14 +22,10 @@ from app.bot.texts.de import TEXTS_DE
 from app.db.repo.entitlements_repo import entitlement_request_cache
 from app.game.sessions.errors import InvalidAnswerOptionError, SessionNotFoundError
 from app.game.sessions.types import AnswerSessionResult
-from app.services.user_onboarding import UserOnboardingService
-
-_ORIGINAL_ENSURE_HOME_SNAPSHOT = UserOnboardingService.ensure_home_snapshot
 
 
 @dataclass(frozen=True, slots=True)
 class SubmittedAnswerState:
-    user_id: int
     result: AnswerSessionResult
     prompts: PostGamePromptState
 
@@ -80,7 +76,6 @@ async def handle_answer(
             result=result,
             request=request,
             prompts=submitted.prompts,
-            user_id=submitted.user_id,
             context=context,
         )
 
@@ -117,24 +112,15 @@ async def _record_answer_and_prompts(
 ) -> SubmittedAnswerState | None:
     services = context.services
     async with services.session_local.begin() as session:
-        user_id = await _resolve_answer_user_id(
+        snapshot = await services.user_onboarding_service.ensure_home_snapshot(
             session,
             telegram_user=callback.from_user,
-            now_utc=request.now_utc,
-            context=context,
         )
-        if user_id is None:
-            await request.message.answer(
-                TEXTS_DE["msg.game.session.not_found"],
-                reply_markup=build_home_keyboard(),
-            )
-            await callback.answer()
-            return None
 
         try:
             result = await services.game_session_service.submit_answer(
                 session,
-                user_id=user_id,
+                user_id=snapshot.user_id,
                 session_id=request.session_id,
                 selected_option=request.selected_option,
                 idempotency_key=f"answer:{callback.id}",
@@ -154,35 +140,9 @@ async def _record_answer_and_prompts(
 
         prompts = await resolve_post_game_prompts(
             session,
-            user_id=user_id,
+            user_id=snapshot.user_id,
             result=result,
             request=request,
             context=context,
         )
-    return SubmittedAnswerState(user_id=user_id, result=result, prompts=prompts)
-
-
-async def _resolve_answer_user_id(
-    session,
-    *,
-    telegram_user,
-    now_utc: datetime,
-    context: AnswerFlowContext,
-) -> int | None:
-    onboarding_service = context.services.user_onboarding_service
-    touch_existing_user = getattr(onboarding_service, "touch_existing_user", None)
-    ensure_home_snapshot = getattr(onboarding_service, "ensure_home_snapshot", None)
-    if (
-        onboarding_service is UserOnboardingService
-        and ensure_home_snapshot is not _ORIGINAL_ENSURE_HOME_SNAPSHOT
-    ):
-        touch_existing_user = None
-    if touch_existing_user is not None:
-        user = await touch_existing_user(session, telegram_user=telegram_user, now_utc=now_utc)
-        return None if user is None else int(user.id)
-
-    snapshot = await onboarding_service.ensure_home_snapshot(
-        session,
-        telegram_user=telegram_user,
-    )
-    return int(snapshot.user_id)
+    return SubmittedAnswerState(result=result, prompts=prompts)

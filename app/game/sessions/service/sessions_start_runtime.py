@@ -13,9 +13,6 @@ from app.game.modes.rules import is_zero_cost_source
 from app.game.questions.types import QuizQuestion
 from app.game.sessions.errors import EnergyInsufficientError, FriendChallengeAccessError
 
-from .levels import _clamp_level_for_mode
-from .progression_config import get_allowed_levels
-
 
 async def _consume_start_energy_if_needed(
     session: AsyncSession,
@@ -52,8 +49,6 @@ async def _resolve_start_question(
     now_utc: datetime,
     forced_question_id: str | None,
     preferred_question_level: str | None,
-    preferred_question_mix_step: int | None,
-    recent_question_ids_override: tuple[str, ...] | None,
     resolve_start_progression_state,
     select_level_weighted,
     is_persistent_adaptive_mode,
@@ -77,31 +72,20 @@ async def _resolve_start_question(
     allowed_levels: tuple[str, ...] | None = None
     mix_step = 0
     if is_persistent_adaptive_mode(mode_code=mode_code):
-        if effective_preferred_level is not None and preferred_question_mix_step is not None:
-            effective_preferred_level = _clamp_level_for_mode(
-                mode_code=mode_code,
-                level=effective_preferred_level,
-            )
-            if effective_preferred_level is None:
-                effective_preferred_level = preferred_question_level
-            assert effective_preferred_level is not None
-            mix_step = max(0, int(preferred_question_mix_step))
-            allowed_levels = get_allowed_levels(effective_preferred_level, mix_step)
-        else:
-            (
-                effective_preferred_level,
-                mix_step,
-                allowed_levels,
-            ) = await resolve_start_progression_state(
-                session,
-                user_id=user_id,
-                mode_code=mode_code,
-                preferred_level_override=effective_preferred_level,
-                now_utc=now_utc,
-            )
+        (
+            effective_preferred_level,
+            mix_step,
+            allowed_levels,
+        ) = await resolve_start_progression_state(
+            session,
+            user_id=user_id,
+            mode_code=mode_code,
+            preferred_level_override=effective_preferred_level,
+            now_utc=now_utc,
+        )
 
-    recent_question_ids: list[str] = list(recent_question_ids_override or ())
-    if source != "FRIEND_CHALLENGE" and recent_question_ids_override is None:
+    recent_question_ids: list[str] = []
+    if source != "FRIEND_CHALLENGE":
         recent_question_ids = await QuizAttemptsRepo.get_recent_question_ids_for_mode(
             session,
             user_id=user_id,

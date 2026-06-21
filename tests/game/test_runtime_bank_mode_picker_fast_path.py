@@ -25,6 +25,7 @@ async def test_pick_question_id_without_recent_uses_pool_ids_fast_path(
         fail_get_pool_candidates,
     )
 
+    candidate_ids = ("q1", "q2", "q3")
     selected = await runtime_bank_mode_picker._pick_question_id_from_pool(
         AsyncSessionStub(),
         mode_code="QUICK_MIX_A1A2",
@@ -33,4 +34,8 @@ async def test_pick_question_id_without_recent_uses_pool_ids_fast_path(
         preferred_levels=("A1",),
     )
 
-    assert selected in {"q1", "q2", "q3"}
+    assert selected == runtime_bank_mode_picker._pick_from_pool(
+        candidate_ids,
+        exclude_question_ids=(),
+        selection_seed="seed",
+    )

@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
-from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
@@ -11,32 +7,9 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.entitlements import Entitlement
-
-
-@dataclass(frozen=True, slots=True)
-class _PremiumStatus:
-    active: bool
-    scope: str | None
-
-
-_PREMIUM_STATUS_CACHE: ContextVar[dict[tuple[int, datetime], _PremiumStatus] | None] = ContextVar(
-    "premium_status_cache",
-    default=None,
-)
-
-
-@contextmanager
-def entitlement_request_cache() -> Iterator[None]:
-    existing = _PREMIUM_STATUS_CACHE.get()
-    if existing is not None:
-        yield
-        return
-
-    token = _PREMIUM_STATUS_CACHE.set({})
-    try:
-        yield
-    finally:
-        _PREMIUM_STATUS_CACHE.reset(token)
+from app.db.repo.entitlements_cache import PremiumStatus as _PremiumStatus
+from app.db.repo.entitlements_cache import entitlement_request_cache  # noqa: F401
+from app.db.repo.entitlements_cache import get_cached_premium_status, store_cached_premium_status
 
 
 class EntitlementsRepo:
@@ -81,10 +54,9 @@ class EntitlementsRepo:
         user_id: int,
         now_utc: datetime,
     ) -> _PremiumStatus:
-        cache = _PREMIUM_STATUS_CACHE.get()
-        cache_key = (int(user_id), now_utc)
-        if cache is not None and cache_key in cache:
-            return cache[cache_key]
+        cached = get_cached_premium_status(user_id, now_utc)
+        if cached is not None:
+            return cached
 
         stmt = select(Entitlement.scope).where(
             and_(
@@ -101,8 +73,7 @@ class EntitlementsRepo:
             active=scope is not None,
             scope=scope,
         )
-        if cache is not None:
-            cache[cache_key] = status
+        store_cached_premium_status(user_id, now_utc, status)
         return status
 
     @staticmethod

@@ -79,10 +79,10 @@ async def test_select_question_for_mode_reuses_cached_pool_between_calls(
 
 
 @pytest.mark.asyncio
-async def test_select_question_for_mode_derives_preferred_pool_from_cached_full_pool(
+async def test_select_question_for_mode_loads_preferred_pool_separately(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    list_calls = 0
+    requested_levels: list[tuple[str, ...] | None] = []
 
     async def fake_list_question_ids_all_active(  # noqa: ANN001
         session,
@@ -100,9 +100,9 @@ async def test_select_question_for_mode_derives_preferred_pool_from_cached_full_
         exclude_question_ids=None,
         preferred_levels=None,
     ):
-        nonlocal list_calls
-        assert preferred_levels is None
-        list_calls += 1
+        requested_levels.append(preferred_levels)
+        if preferred_levels == ("A1",):
+            return ["q_a1"]
         return ["q_a1", "q_a2", "q_b1"]
 
     records = {
@@ -137,7 +137,7 @@ async def test_select_question_for_mode_derives_preferred_pool_from_cached_full_
     )
 
     assert selected.level == "A1"
-    assert list_calls == 1
+    assert requested_levels == [None, ("A1",)]
 
 
 @pytest.mark.asyncio
