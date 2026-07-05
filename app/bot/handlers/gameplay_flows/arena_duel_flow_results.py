@@ -10,7 +10,15 @@ from app.game.arena_duels.analytics import ARENA_EVENT_ARENA_RESULT_SHOWN, build
 from app.game.arena_duels.constants import ARENA_ATTEMPT_RESULT_DRAW, ARENA_ATTEMPT_RESULT_WIN
 from app.game.arena_duels.types import ArenaAttemptCompletionResult, ArenaAttemptResultLine
 
-from .arena_duel_flow_support import format_score_line, resolve_arena_user_label
+from .arena_duel_flow_support import (
+    format_score_line,
+    resolve_arena_user_label,
+    resolve_duel_paywall_text,
+)
+
+CLOSE_LOSS_MAX_TIME_DIFF_MS = 15_000
+CLOSE_LOSS_MIN_SCORE = 4
+CLOSE_LOSS_SCORE_DIFF = 1
 
 
 async def send_arena_completion_result(
@@ -53,21 +61,27 @@ async def send_arena_completion_result(
             user_onboarding_service=user_onboarding_service,
             user_id=opponent_attempt.user_id,
         )
+    close_loss = _is_close_loss(
+        completed_attempt=completed_attempt,
+        opponent_attempt=opponent_attempt,
+    )
+    show_close_loss_paywall = close_loss and opponent_attempt.attempt_id is not None
+    result_text = _build_arena_result_text(
+        completed_attempt=completed_attempt,
+        opponent_attempt=opponent_attempt,
+        opponent_label=opponent_label,
+    )
+    if show_close_loss_paywall:
+        result_text = f"{result_text}\n\n{resolve_duel_paywall_text(context='close_loss')}"
+
     await callback.message.answer(
-        _build_arena_result_text(
-            completed_attempt=completed_attempt,
-            opponent_attempt=opponent_attempt,
-            opponent_label=opponent_label,
-        ),
+        result_text,
         reply_markup=build_arena_result_keyboard(
             user_won=completed_attempt.result == ARENA_ATTEMPT_RESULT_WIN,
             revanche_attempt_id=(
                 None if opponent_attempt.attempt_id is None else str(opponent_attempt.attempt_id)
             ),
-            close_loss=_is_close_loss(
-                completed_attempt=completed_attempt,
-                opponent_attempt=opponent_attempt,
-            ),
+            close_loss=show_close_loss_paywall,
         ),
     )
     await _emit_arena_result_shown(
@@ -132,11 +146,17 @@ def _is_close_loss(
     completed_attempt: ArenaAttemptResultLine,
     opponent_attempt: ArenaAttemptResultLine,
 ) -> bool:
-    return (
-        completed_attempt.result != ARENA_ATTEMPT_RESULT_WIN
-        and completed_attempt.result != ARENA_ATTEMPT_RESULT_DRAW
-        and completed_attempt.score == opponent_attempt.score
-    )
+    if completed_attempt.result == ARENA_ATTEMPT_RESULT_WIN:
+        return False
+    if completed_attempt.result == ARENA_ATTEMPT_RESULT_DRAW:
+        return False
+
+    score_diff = opponent_attempt.score - completed_attempt.score
+    if completed_attempt.score == opponent_attempt.score:
+        time_diff_ms = completed_attempt.time_ms - opponent_attempt.time_ms
+        return 0 < time_diff_ms <= CLOSE_LOSS_MAX_TIME_DIFF_MS
+
+    return score_diff == CLOSE_LOSS_SCORE_DIFF and completed_attempt.score >= CLOSE_LOSS_MIN_SCORE
 
 
 async def _emit_arena_result_shown(

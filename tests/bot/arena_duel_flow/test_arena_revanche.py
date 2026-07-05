@@ -6,6 +6,7 @@ import pytest
 
 from app.bot.handlers import gameplay_callbacks
 from app.bot.handlers.gameplay_flows import arena_revanche_delivery, arena_revanche_flow
+from app.game.arena_duels.errors import ArenaDuelPaymentRequiredError
 
 from .support import (
     OPPONENT_ATTEMPT_ID,
@@ -123,3 +124,35 @@ async def test_arena_revanche_send_dedupes_existing_request_without_push() -> No
 
     assert callback.bot.sent_messages == []
     assert "Revanche gesendet." in require_text(callback.message.answers[0].text)
+
+
+@pytest.mark.asyncio
+async def test_arena_revanche_send_limit_hit_shows_revanche_paywall() -> None:
+    async def prepare(*_args, **_kwargs):
+        raise ArenaDuelPaymentRequiredError
+
+    async def unexpected_record(*_args, **_kwargs):
+        pytest.fail("payment-required Revanche must not record a sent event")
+
+    async def unexpected_cleanup(*_args, **_kwargs):
+        pytest.fail("payment-required Revanche must not cleanup request state")
+
+    callback = make_callback(f"arena:revanche_send:{OPPONENT_ATTEMPT_ID}")
+    await arena_revanche_flow.handle_arena_revanche_send(
+        callback,
+        arena_revanche_send_re=gameplay_callbacks.ARENA_REVANCHE_SEND_RE,
+        parse_uuid_callback=lambda **_kwargs: OPPONENT_ATTEMPT_ID,
+        session_local=SessionLocalStub(),
+        user_onboarding_service=UserServiceWithTelegramStub,
+        prepare_arena_revanche_request=prepare,
+        record_arena_revanche_sent=unexpected_record,
+        cleanup_arena_revanche_request=unexpected_cleanup,
+    )
+
+    response = callback.message.answers[0]
+    assert "Deine freie Revanche ist heute verbraucht." in require_text(response.text)
+    assert callback_data_list(response.kwargs["reply_markup"]) == [
+        "buy:FRIEND_CHALLENGE_5:duel",
+        "buy:PREMIUM_WEEK:duel",
+        "arena:list",
+    ]

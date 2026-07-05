@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Literal
 from uuid import UUID
 
 from aiogram.types import CallbackQuery
@@ -13,6 +14,22 @@ from app.bot.keyboards.duels import (
 from app.bot.texts.de import TEXTS_DE
 from app.game.arena_duels.types import ArenaBaselineStartResult, ArenaChallengerStartResult
 from app.game.sessions.types import StartSessionResult
+
+DuelPaywallContext = Literal[
+    "close_loss",
+    "revanche_limit",
+    "arena_accept_limit",
+    "friend_limit",
+    "beaten_result",
+]
+
+DUEL_PAYWALL_TEXT_KEYS: dict[DuelPaywallContext, str] = {
+    "close_loss": "msg.duels.paywall.close_loss",
+    "revanche_limit": "msg.duels.paywall.revanche_limit",
+    "arena_accept_limit": "msg.duels.paywall.arena_accept_limit",
+    "friend_limit": "msg.duels.paywall.friend_limit",
+    "beaten_result": "msg.duels.paywall.beaten_result",
+}
 
 
 def extract_start_result(result: object | None) -> StartSessionResult | None:
@@ -60,10 +77,14 @@ async def send_arena_guard(callback: CallbackQuery, *, text_key: str, reply_mark
     await callback.answer()
 
 
-async def send_duel_paywall(callback: CallbackQuery) -> None:
+def resolve_duel_paywall_text(*, context: DuelPaywallContext) -> str:
+    return TEXTS_DE[DUEL_PAYWALL_TEXT_KEYS[context]]
+
+
+async def send_duel_paywall(callback: CallbackQuery, *, context: DuelPaywallContext) -> None:
     if callback.message is not None:
         await callback.message.answer(
-            TEXTS_DE["msg.duels.limit.reached"],
+            resolve_duel_paywall_text(context=context),
             reply_markup=build_duel_paywall_keyboard(),
         )
     await callback.answer()

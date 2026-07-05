@@ -140,7 +140,7 @@ async def _start_arena_round(
             guard_text_key = "msg.duels.arena.expired"
 
     if payment_required:
-        await send_duel_paywall(callback)
+        await send_duel_paywall(callback, context="arena_accept_limit")
         return
     if guard_text_key is not None:
         await send_arena_guard(

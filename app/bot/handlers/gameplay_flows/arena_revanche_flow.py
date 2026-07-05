@@ -11,7 +11,6 @@ from app.bot.handlers.gameplay_flows.arena_revanche_delivery import (
 from app.bot.keyboards.duels import (
     build_arena_guard_back_keyboard,
     build_arena_revanche_confirm_keyboard,
-    build_duel_paywall_keyboard,
 )
 from app.bot.texts.de import TEXTS_DE
 from app.game.arena_duels.analytics import (
@@ -24,6 +23,8 @@ from app.game.arena_duels.errors import (
     ArenaDuelNotFoundError,
     ArenaDuelPaymentRequiredError,
 )
+
+from .arena_duel_flow_support import send_duel_paywall
 
 
 async def handle_arena_revanche_confirm(
@@ -123,7 +124,7 @@ async def handle_arena_revanche_send(
             now_utc=datetime.now(timezone.utc),
         )
     except ArenaDuelPaymentRequiredError:
-        await _send_duel_paywall(callback)
+        await send_duel_paywall(callback, context="revanche_limit")
         return
     except (ArenaDuelAccessError, ArenaDuelNotFoundError):
         await _send_revanche_blocked(callback)
@@ -136,15 +137,6 @@ async def handle_arena_revanche_send(
         TEXTS_DE["msg.duels.revanche.sent"].format(opponent_label=opponent_label),
         reply_markup=build_arena_guard_back_keyboard(),
     )
-    await callback.answer()
-
-
-async def _send_duel_paywall(callback: CallbackQuery) -> None:
-    if callback.message is not None:
-        await callback.message.answer(
-            TEXTS_DE["msg.duels.limit.reached"],
-            reply_markup=build_duel_paywall_keyboard(),
-        )
     await callback.answer()
 
 
