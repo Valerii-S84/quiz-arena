@@ -23,7 +23,7 @@ def test_build_promo_discount_keyboard_for_specific_product_scope() -> None:
     assert len(keyboard.inline_keyboard) == 2
     button = keyboard.inline_keyboard[0][0]
     assert button.callback_data == f"buy:PREMIUM_MONTH:promo:{redemption_id.hex}"
-    assert button.text == "Premium Monat (50⭐)"
+    assert button.text == "Arena Pass 30 Tage (50⭐)"
     back_button = keyboard.inline_keyboard[1][0]
     assert back_button.callback_data == "home:open"
 
@@ -50,8 +50,8 @@ def test_build_promo_discount_keyboard_includes_all_saleable_premium_products() 
     assert len(rows) == 5
     texts = [row[0].text for row in rows[:-1]]
     assert texts == [
-        "Premium Woche (27⭐)",
-        "Premium Monat (90⭐)",
-        "Premium Saison (225⭐)",
-        "Premium Jahr (450⭐)",
+        "Arena Pass 7 Tage (27⭐)",
+        "Arena Pass 30 Tage (90⭐)",
+        "Arena Pass Saison (225⭐)",
+        "Arena Pass Jahr (450⭐)",
     ]

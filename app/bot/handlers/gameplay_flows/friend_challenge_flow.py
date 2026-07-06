@@ -4,11 +4,7 @@ from datetime import datetime, timezone
 
 from aiogram.types import CallbackQuery
 
-from app.bot.keyboards.friend_challenge import (
-    build_friend_challenge_limit_keyboard,
-    build_friend_challenge_next_keyboard,
-    build_friend_challenge_share_keyboard,
-)
+from app.bot.keyboards.friend_challenge import build_friend_challenge_next_keyboard
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.game.sessions.errors import (
@@ -16,6 +12,12 @@ from app.game.sessions.errors import (
     FriendChallengeLimitExceededError,
     FriendChallengeNotFoundError,
     FriendChallengePaymentRequiredError,
+)
+
+from .friend_challenge_flow_helpers import (
+    answer_friend_challenge_limit,
+    notify_friend_rematch_opponent,
+    send_friend_challenge_created,
 )
 
 
@@ -57,47 +59,20 @@ async def handle_friend_challenge_create_selected(
                 total_rounds=selected_rounds,
             )
         except (FriendChallengePaymentRequiredError, FriendChallengeLimitExceededError):
-            await callback.message.answer(
-                TEXTS_DE["msg.friend.challenge.limit.reached"],
-                reply_markup=build_friend_challenge_limit_keyboard(),
+            await answer_friend_challenge_limit(
+                callback,
+                paywall_context="friend_create_limit",
             )
-            await callback.answer()
             return
 
-    invite_link = await build_friend_invite_link(callback, invite_token=challenge.invite_token)
-    body_lines = [
-        build_friend_plan_text(total_rounds=challenge.total_rounds),
-        TEXTS_DE["msg.friend.challenge.created.short"],
-    ]
-    ttl_text = build_friend_ttl_text(challenge=challenge, now_utc=now_utc)
-    if ttl_text is not None:
-        body_lines.append(ttl_text)
-    if invite_link is None:
-        body_lines.insert(
-            0,
-            TEXTS_DE["msg.friend.challenge.created.fallback"].format(
-                invite_token=challenge.invite_token
-            ),
-        )
-        await callback.message.answer(
-            "\n".join(body_lines),
-            reply_markup=build_friend_challenge_share_keyboard(
-                invite_link=None,
-                challenge_id=str(challenge.challenge_id),
-            ),
-        )
-    else:
-        body_lines.insert(
-            0,
-            TEXTS_DE["msg.friend.challenge.created"],
-        )
-        await callback.message.answer(
-            "\n".join(body_lines),
-            reply_markup=build_friend_challenge_share_keyboard(
-                invite_link=invite_link,
-                challenge_id=str(challenge.challenge_id),
-            ),
-        )
+    await send_friend_challenge_created(
+        callback,
+        challenge=challenge,
+        now_utc=now_utc,
+        build_friend_invite_link=build_friend_invite_link,
+        build_friend_plan_text=build_friend_plan_text,
+        build_friend_ttl_text=build_friend_ttl_text,
+    )
     await callback.answer()
 
 
@@ -138,11 +113,10 @@ async def handle_friend_challenge_rematch(
                 now_utc=now_utc,
             )
         except FriendChallengePaymentRequiredError:
-            await callback.message.answer(
-                TEXTS_DE["msg.friend.challenge.limit.reached"],
-                reply_markup=build_friend_challenge_limit_keyboard(),
+            await answer_friend_challenge_limit(
+                callback,
+                paywall_context="friend_rematch_limit",
             )
-            await callback.answer()
             return
         except (
             FriendChallengeNotFoundError,
@@ -172,24 +146,12 @@ async def handle_friend_challenge_rematch(
     )
 
     opponent_user_id = friend_opponent_user_id(challenge=rematch, user_id=snapshot.user_id)
-    if opponent_user_id is not None:
-        opponent_label_for_opponent = await resolve_opponent_label(
-            challenge=rematch,
-            user_id=opponent_user_id,
-        )
-        await notify_opponent(
-            callback,
-            opponent_user_id=opponent_user_id,
-            text="\n".join(
-                [
-                    TEXTS_DE["msg.friend.challenge.rematch.invite"].format(
-                        opponent_label=opponent_label_for_opponent
-                    ),
-                    build_friend_plan_text(total_rounds=rematch.total_rounds),
-                ]
-            ),
-            reply_markup=build_friend_challenge_next_keyboard(
-                challenge_id=str(rematch.challenge_id)
-            ),
-        )
+    await notify_friend_rematch_opponent(
+        callback,
+        rematch=rematch,
+        opponent_user_id=opponent_user_id,
+        resolve_opponent_label=resolve_opponent_label,
+        notify_opponent=notify_opponent,
+        build_friend_plan_text=build_friend_plan_text,
+    )
     await callback.answer()

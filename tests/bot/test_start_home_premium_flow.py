@@ -57,4 +57,4 @@ async def test_handle_start_home_menu_shows_premium_flag(monkeypatch) -> None:
     )
     await start.handle_start(message)
 
-    assert "⚡ 8/10 | 💎 Premium aktiv" in (message.answers[0].text or "")
+    assert "⚡ 8/10 | 💎 Arena Pass aktiv" in (message.answers[0].text or "")

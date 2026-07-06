@@ -90,6 +90,6 @@ def build_completed_text(*, place: int, my_points: str, standings_lines: list[st
         "📊 Endtabelle",
         *standings_lines,
         "",
-        "📤 Nutze 'Ergebnis teilen' fuer deinen Share-Link.",
+        "📤 Nutze 'Ergebnis teilen' für deinen Share-Link.",
     ]
     return "\n".join(lines)

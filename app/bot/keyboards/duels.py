@@ -164,7 +164,7 @@ def build_arena_result_keyboard(
             ]
         )
         if close_loss and not user_won:
-            rows.extend(build_duel_monetization_rows())
+            rows.extend(build_duel_monetization_rows(paywall_context="close_loss"))
     else:
         rows.append(
             [

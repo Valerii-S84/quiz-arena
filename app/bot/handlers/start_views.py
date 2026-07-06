@@ -47,7 +47,7 @@ def _build_home_text(
     stats_line = f"Serie: {current_streak} | Beste: {best_streak} | 🏆 Rekord: {global_best_streak}"
     energy_line = f"⚡ {free_energy}/{FREE_ENERGY_CAP}"
     if premium_active:
-        energy_line = f"{energy_line} | 💎 Premium aktiv"
+        energy_line = f"{energy_line} | 💎 Arena Pass aktiv"
 
     lines = [stats_line, energy_line]
     if daily_cup_badge_unlocked:

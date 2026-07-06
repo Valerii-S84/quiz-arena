@@ -10,9 +10,15 @@ from app.game.arena_duels.analytics import ARENA_EVENT_ARENA_RESULT_SHOWN, build
 from app.game.arena_duels.constants import ARENA_ATTEMPT_RESULT_WIN
 from app.game.arena_duels.types import ArenaAttemptCompletionResult, ArenaAttemptResultLine
 
-from .arena_duel_flow_support import build_arena_result_text, format_score_line
-from .arena_duel_flow_support import is_close_loss as _is_close_loss
-from .arena_duel_flow_support import resolve_arena_user_label, resolve_duel_paywall_text
+from .arena_duel_close_loss import format_close_loss_difference
+from .arena_duel_close_loss import is_close_loss as _is_close_loss
+from .arena_duel_flow_support import (
+    build_arena_result_text,
+    format_score_line,
+    resolve_arena_user_label,
+)
+from .arena_duel_paywall import resolve_duel_paywall_text
+from .arena_duel_paywall_events import emit_duel_paywall_shown
 
 
 async def send_arena_completion_result(
@@ -51,7 +57,7 @@ async def send_arena_completion_result(
             user_onboarding_service=user_onboarding_service,
             user_id=opponent_attempt.user_id,
         )
-    await _send_challenger_result_message(
+    show_close_loss_paywall = await _send_challenger_result_message(
         callback,
         completed_attempt=completed_attempt,
         opponent_attempt=opponent_attempt,
@@ -64,6 +70,15 @@ async def send_arena_completion_result(
         action="challenger",
         emit_arena_analytics_event=emit_arena_analytics_event,
     )
+    if show_close_loss_paywall:
+        await emit_duel_paywall_shown(
+            session_local=session_local,
+            completion=completion,
+            completed_attempt=completed_attempt,
+            action="close_loss",
+            paywall_context="close_loss",
+            emit_arena_analytics_event=emit_arena_analytics_event,
+        )
 
 
 async def _send_creator_baseline_message(
@@ -91,9 +106,9 @@ async def _send_challenger_result_message(
     completed_attempt: ArenaAttemptResultLine,
     opponent_attempt: ArenaAttemptResultLine,
     opponent_label: str,
-) -> None:
+) -> bool:
     if callback.message is None:
-        return
+        return False
     show_close_loss_paywall = (
         _is_close_loss(
             completed_attempt=completed_attempt,
@@ -107,7 +122,11 @@ async def _send_challenger_result_message(
         opponent_label=opponent_label,
     )
     if show_close_loss_paywall:
-        result_text = f"{result_text}\n\n{resolve_duel_paywall_text(context='close_loss')}"
+        result_text = (
+            f"{result_text}\n\n"
+            f"{format_close_loss_difference(completed_attempt=completed_attempt, opponent_attempt=opponent_attempt)}\n"
+            f"{resolve_duel_paywall_text(context='close_loss')}"
+        )
 
     await callback.message.answer(
         result_text,
@@ -119,6 +138,7 @@ async def _send_challenger_result_message(
             close_loss=show_close_loss_paywall,
         ),
     )
+    return show_close_loss_paywall
 
 
 async def _emit_arena_result_shown(

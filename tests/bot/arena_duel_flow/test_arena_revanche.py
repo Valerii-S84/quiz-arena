@@ -152,7 +152,7 @@ async def test_arena_revanche_send_limit_hit_shows_revanche_paywall() -> None:
     response = callback.message.answers[0]
     assert "Deine freie Revanche ist heute verbraucht." in require_text(response.text)
     assert callback_data_list(response.kwargs["reply_markup"]) == [
-        "buy:FRIEND_CHALLENGE_5:duel",
-        "buy:PREMIUM_WEEK:duel",
+        "buy:FRIEND_CHALLENGE_5:duel:revanche_limit",
+        "buy:PREMIUM_WEEK:duel:revanche_limit",
         "arena:list",
     ]

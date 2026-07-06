@@ -32,7 +32,7 @@ def test_build_home_text_shows_premium_when_active() -> None:
         daily_cup_badge_unlocked=False,
     )
 
-    assert "⚡ 8/10 | 💎 Premium aktiv" in text
+    assert "⚡ 8/10 | 💎 Arena Pass aktiv" in text
 
 
 def test_build_home_text_shows_zero_streak_without_error() -> None:

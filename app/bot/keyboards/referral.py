@@ -36,7 +36,7 @@ def build_referral_keyboard(
         rows.append(
             [
                 InlineKeyboardButton(
-                    text="Premium Woche",
+                    text="Arena Pass 7 Tage",
                     callback_data="referral:reward:PREMIUM_WEEK",
                 ),
             ]

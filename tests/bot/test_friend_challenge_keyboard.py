@@ -143,8 +143,8 @@ def test_friend_challenge_finished_keyboard_hides_rematch_when_rollout_is_off(
 def test_friend_challenge_limit_keyboard_contains_buy_options_and_back() -> None:
     keyboard = build_friend_challenge_limit_keyboard()
     callbacks = [button.callback_data for row in keyboard.inline_keyboard for button in row]
-    assert "buy:FRIEND_CHALLENGE_5:duel" in callbacks
-    assert "buy:PREMIUM_WEEK:duel" in callbacks
+    assert "buy:FRIEND_CHALLENGE_5:duel:friend_create_limit" in callbacks
+    assert "buy:PREMIUM_WEEK:duel:friend_create_limit" in callbacks
     assert "home:open" in callbacks
 
 

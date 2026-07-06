@@ -1,9 +1,32 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
+
+ArenaPaywallContext = Literal[
+    "close_loss",
+    "beaten_result",
+    "arena_limit",
+    "revanche_limit",
+    "friend_create_limit",
+    "friend_rematch_limit",
+    "daily_cup_prep",
+]
+
+ARENA_PAYWALL_CONTEXTS: frozenset[str] = frozenset(
+    {
+        "close_loss",
+        "beaten_result",
+        "arena_limit",
+        "revanche_limit",
+        "friend_create_limit",
+        "friend_rematch_limit",
+        "daily_cup_prep",
+    }
+)
 
 ARENA_EVENT_DUEL_MENU_OPENED = "duel_menu_opened"
 ARENA_EVENT_DUEL_MODE_SELECTED = "duel_mode_selected"
@@ -63,6 +86,15 @@ def build_arena_event_payload(
     return payload
 
 
+def with_paywall_context(
+    payload: dict[str, object],
+    paywall_context: ArenaPaywallContext | str | None,
+) -> dict[str, object]:
+    if paywall_context is None:
+        return payload
+    return {**payload, "paywall_context": str(paywall_context)}
+
+
 async def emit_arena_analytics_event(
     session,
     *,
@@ -86,6 +118,7 @@ async def emit_arena_analytics_event(
 
 
 __all__ = [
+    "ARENA_PAYWALL_CONTEXTS",
     "ARENA_EVENT_ARENA_DUEL_ACCEPTED",
     "ARENA_EVENT_ARENA_DUEL_COMPLETED",
     "ARENA_EVENT_ARENA_DUEL_CREATED",
@@ -108,6 +141,8 @@ __all__ = [
     "ARENA_EVENT_FRIEND_DUEL_SHARE_CLICKED",
     "ARENA_EVENT_FRIEND_DUEL_STARTED",
     "ARENA_EVENT_PREMIUM_WEEK_CLICKED",
+    "ArenaPaywallContext",
     "build_arena_event_payload",
     "emit_arena_analytics_event",
+    "with_paywall_context",
 ]

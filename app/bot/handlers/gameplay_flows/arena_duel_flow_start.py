@@ -7,29 +7,15 @@ from aiogram.types import CallbackQuery
 
 from app.bot.keyboards.quiz import build_quiz_keyboard
 from app.bot.texts.de import TEXTS_DE
-from app.game.arena_duels.analytics import (
-    ARENA_EVENT_DUEL_LIMIT_HIT,
-    ARENA_EVENT_DUEL_PAYWALL_SHOWN,
-    build_arena_event_payload,
-    emit_arena_analytics_event,
-)
-from app.game.arena_duels.errors import (
-    ArenaDuelAccessError,
-    ArenaDuelAlreadyAttemptedError,
-    ArenaDuelExpiredError,
-    ArenaDuelNotFoundError,
-    ArenaDuelOwnAttemptError,
-    ArenaDuelPaymentRequiredError,
-)
 from app.game.questions.catalog import QUICK_MIX_MODE_CODE
-from app.game.sessions.errors import FriendChallengeAccessError
 
+from .arena_duel_flow_start_runtime import resolve_arena_start_outcome
 from .arena_duel_flow_support import (
     build_arena_guard_keyboard,
     extract_start_result,
     send_arena_guard,
-    send_duel_paywall,
 )
+from .arena_duel_paywall import send_duel_paywall
 
 
 async def handle_arena_start_create(
@@ -97,60 +83,27 @@ async def _start_arena_round(
         return
 
     now_utc = datetime.now(timezone.utc)
-    guard_text_key: str | None = None
-    payment_required = False
-    result: object | None = None
-    async with session_local.begin() as session:
-        snapshot = await user_onboarding_service.ensure_home_snapshot(
-            session,
-            telegram_user=callback.from_user,
-        )
-        try:
-            access_type = await resolve_access_type(
-                session, user_id=snapshot.user_id, now_utc=now_utc
-            )
-            result = await start_arena_round(session, snapshot.user_id, now_utc, access_type)
-        except ArenaDuelPaymentRequiredError:
-            payment_required = True
-            action = _arena_action_from_callback_data(callback.data)
-            await emit_arena_analytics_event(
-                session,
-                event_type=ARENA_EVENT_DUEL_LIMIT_HIT,
-                happened_at=now_utc,
-                user_id=snapshot.user_id,
-                payload=build_arena_event_payload(user_id=snapshot.user_id, action=action),
-            )
-            await emit_arena_analytics_event(
-                session,
-                event_type=ARENA_EVENT_DUEL_PAYWALL_SHOWN,
-                happened_at=now_utc,
-                user_id=snapshot.user_id,
-                payload=build_arena_event_payload(user_id=snapshot.user_id, action=action),
-            )
-        except ArenaDuelOwnAttemptError:
-            guard_text_key = "msg.duels.arena.own"
-        except ArenaDuelAlreadyAttemptedError:
-            guard_text_key = "msg.duels.arena.already_played"
-        except (
-            ArenaDuelExpiredError,
-            ArenaDuelNotFoundError,
-            ArenaDuelAccessError,
-            FriendChallengeAccessError,
-        ):
-            guard_text_key = "msg.duels.arena.expired"
+    outcome = await resolve_arena_start_outcome(
+        callback,
+        session_local=session_local,
+        user_onboarding_service=user_onboarding_service,
+        resolve_access_type=resolve_access_type,
+        start_arena_round=start_arena_round,
+        now_utc=now_utc,
+    )
 
-    if payment_required:
-        await send_duel_paywall(callback, context="arena_accept_limit")
+    if outcome.payment_required:
+        await send_duel_paywall(callback, context="arena_limit")
         return
-    if guard_text_key is not None:
+    if outcome.guard_text_key is not None:
         await send_arena_guard(
             callback,
-            text_key=guard_text_key,
-            reply_markup=build_arena_guard_keyboard(guard_text_key),
+            text_key=outcome.guard_text_key,
+            reply_markup=build_arena_guard_keyboard(outcome.guard_text_key),
         )
         return
 
-    start_result = extract_start_result(result)
+    start_result = extract_start_result(outcome.result)
     if start_result is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
@@ -158,8 +111,8 @@ async def _start_arena_round(
     await callback.message.answer(
         build_question_text(
             source="ARENA_DUEL",
-            snapshot_free_energy=snapshot.free_energy,
-            snapshot_paid_energy=snapshot.paid_energy,
+            snapshot_free_energy=outcome.snapshot.free_energy,
+            snapshot_paid_energy=outcome.snapshot.paid_energy,
             start_result=start_result,
         ),
         reply_markup=build_quiz_keyboard(
@@ -169,11 +122,3 @@ async def _start_arena_round(
         parse_mode="HTML",
     )
     await callback.answer()
-
-
-def _arena_action_from_callback_data(callback_data: str | None) -> str:
-    if callback_data == "arena:start_create":
-        return "create"
-    if callback_data is not None and callback_data.startswith("arena:start_attempt:"):
-        return "accept"
-    return "arena"

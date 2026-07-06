@@ -20,8 +20,8 @@ from .support import (
 
 CLOSE_LOSS_CALLBACKS = [
     f"arena:revanche:{OPPONENT_ATTEMPT_ID}",
-    "buy:FRIEND_CHALLENGE_5:duel",
-    "buy:PREMIUM_WEEK:duel",
+    "buy:FRIEND_CHALLENGE_5:duel:close_loss",
+    "buy:PREMIUM_WEEK:duel:close_loss",
     "arena:list",
 ]
 
@@ -154,6 +154,7 @@ async def test_arena_completion_close_loss_result_has_revanche() -> None:
 
     text = require_text(callback.message.answers[0].text)
     assert "Knapp verloren." in text
+    assert "Nur 4 Sekunden Unterschied." in text
     assert "Willst du sofort eine Revanche?" in text
     assert callback_data_list(callback.message.answers[0].kwargs["reply_markup"]) == (
         CLOSE_LOSS_CALLBACKS
@@ -190,6 +191,7 @@ async def test_arena_completion_one_answer_loss_result_has_revanche() -> None:
     response = callback.message.answers[0]
     text = require_text(response.text)
     assert "Max bleibt vorne." in text
+    assert "Nur 1 Antwort Unterschied." in text
     assert "Willst du sofort eine Revanche?" in text
     assert callback_data_list(response.kwargs["reply_markup"]) == CLOSE_LOSS_CALLBACKS
 

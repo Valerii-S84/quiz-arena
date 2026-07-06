@@ -146,15 +146,15 @@ def test_send_arena_beaten_notification_records_key_after_successful_send(
     assert payload["notification_type"] == ARENA_BEATEN_NOTIFICATION_TYPE
     assert bot.sent_messages[0]["chat_id"] == 110_000_011
     assert "@anna hat dich überholt" in str(bot.sent_messages[0]["text"])
-    assert "Nur 1 richtige Antwort Unterschied." in str(bot.sent_messages[0]["text"])
+    assert "+1 Antwort Unterschied." in str(bot.sent_messages[0]["text"])
     assert "Hol dir deinen Platz zurück?" in str(bot.sent_messages[0]["text"])
     assert "Du:\n6/7 · 00:48" in str(bot.sent_messages[0]["text"])
     assert "@anna:\n7/7 · 00:52" in str(bot.sent_messages[0]["text"])
     keyboard = cast(InlineKeyboardMarkup, bot.sent_messages[0]["reply_markup"])
     assert _callbacks(keyboard) == [
         "arena:revanche:cccccccc-cccc-cccc-cccc-cccccccccccc",
-        "buy:FRIEND_CHALLENGE_5:duel",
-        "buy:PREMIUM_WEEK:duel",
+        "buy:FRIEND_CHALLENGE_5:duel:beaten_result",
+        "buy:PREMIUM_WEEK:duel:beaten_result",
         "arena:list",
     ]
 
@@ -174,12 +174,12 @@ def test_beaten_notification_same_score_time_loss_uses_premium_revanche_moment()
     )
 
     assert "nur wegen der Zeit" in text
-    assert "7 Sekunden Unterschied." in text
+    assert "7 Sekunden schneller." in text
     assert "Revanche?" in text
     assert _callbacks(keyboard) == [
         "arena:revanche:cccccccc-cccc-cccc-cccc-cccccccccccc",
-        "buy:FRIEND_CHALLENGE_5:duel",
-        "buy:PREMIUM_WEEK:duel",
+        "buy:FRIEND_CHALLENGE_5:duel:beaten_result",
+        "buy:PREMIUM_WEEK:duel:beaten_result",
         "arena:list",
     ]
 

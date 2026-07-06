@@ -24,7 +24,7 @@ from app.game.arena_duels.errors import (
     ArenaDuelPaymentRequiredError,
 )
 
-from .arena_duel_flow_support import send_duel_paywall
+from .arena_duel_paywall import send_duel_paywall
 
 
 async def handle_arena_revanche_confirm(

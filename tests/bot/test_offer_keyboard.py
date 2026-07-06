@@ -37,3 +37,21 @@ def test_offer_keyboard_skips_unknown_products_only() -> None:
         "buy:PREMIUM_YEAR:offer:77",
         "buy:PREMIUM_MONTH:offer:77",
     ]
+
+
+def test_offer_keyboard_labels_premium_week_as_arena_pass() -> None:
+    selection = OfferSelection(
+        impression_id=88,
+        offer_code="OFFER_ARENA_PASS_AFTER_TICKETS",
+        trigger_code="TRG_DUEL_TICKET_SECOND_BUY",
+        priority=88,
+        text_key="msg.offer.arena_pass.after_tickets",
+        cta_product_codes=("PREMIUM_WEEK",),
+        idempotent_replay=False,
+    )
+
+    keyboard = build_offer_keyboard(selection)
+    button = keyboard.inline_keyboard[0][0]
+
+    assert button.text == "Arena Pass 7 Tage (29⭐)"
+    assert button.callback_data == "buy:PREMIUM_WEEK:offer:88"

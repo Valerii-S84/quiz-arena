@@ -31,7 +31,7 @@ def build_arena_beaten_notification_keyboard(
             ]
         )
     if action_mode == "premium":
-        rows.extend(build_duel_monetization_rows())
+        rows.extend(build_duel_monetization_rows(paywall_context="beaten_result"))
     rows.append([InlineKeyboardButton(text="🏟 Zur Arena", callback_data=ARENA_LIST_CALLBACK)])
     return InlineKeyboardMarkup(
         inline_keyboard=rows,
@@ -57,10 +57,10 @@ def build_notification_text(
             notification.previous_best_time_ms - notification.new_best_time_ms,
         )
         return (
-            "⚔️ Du wurdest geschlagen - nur wegen der Zeit!\n\n"
+            "⚔️ Du wurdest geschlagen – nur wegen der Zeit!\n\n"
             f"Du:\n{previous_score}\n\n"
             f"{challenger_label}:\n{new_score}\n\n"
-            f"{seconds_diff} Unterschied.\n"
+            f"{seconds_diff} schneller.\n"
             "Revanche?"
         )
     if moment == "close_score":
@@ -69,7 +69,7 @@ def build_notification_text(
             f"{challenger_label} hat dich überholt.\n\n"
             f"Du:\n{previous_score}\n\n"
             f"{challenger_label}:\n{new_score}\n\n"
-            "Nur 1 richtige Antwort Unterschied.\n"
+            "+1 Antwort Unterschied.\n"
             "Hol dir deinen Platz zurück?"
         )
     if moment == "weak":

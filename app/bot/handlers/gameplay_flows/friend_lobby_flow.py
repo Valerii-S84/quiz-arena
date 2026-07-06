@@ -81,7 +81,9 @@ async def handle_friend_challenge_create_selected(
         except (FriendChallengePaymentRequiredError, FriendChallengeLimitExceededError):
             await callback.message.answer(
                 TEXTS_DE["msg.friend.challenge.limit.reached"],
-                reply_markup=build_friend_challenge_limit_keyboard(),
+                reply_markup=build_friend_challenge_limit_keyboard(
+                    paywall_context="friend_create_limit"
+                ),
             )
             await callback.answer()
             return
