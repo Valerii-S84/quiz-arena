@@ -12,8 +12,17 @@ from app.bot.keyboards.duels import (
     build_duel_paywall_keyboard,
 )
 from app.bot.texts.de import TEXTS_DE
-from app.game.arena_duels.types import ArenaBaselineStartResult, ArenaChallengerStartResult
+from app.game.arena_duels.constants import ARENA_ATTEMPT_RESULT_DRAW, ARENA_ATTEMPT_RESULT_WIN
+from app.game.arena_duels.types import (
+    ArenaAttemptResultLine,
+    ArenaBaselineStartResult,
+    ArenaChallengerStartResult,
+)
 from app.game.sessions.types import StartSessionResult
+
+CLOSE_LOSS_MAX_TIME_DIFF_MS = 15_000
+CLOSE_LOSS_MIN_SCORE = 4
+CLOSE_LOSS_SCORE_DIFF = 1
 
 DuelPaywallContext = Literal[
     "close_loss",
@@ -52,6 +61,72 @@ def format_score_line(*, score: int, time_ms: int) -> str:
     total_seconds = max(0, int(round(time_ms / 1000)))
     minutes, seconds = divmod(total_seconds, 60)
     return f"{score}/7 · {minutes:02d}:{seconds:02d}"
+
+
+def build_arena_result_text(
+    *,
+    completed_attempt: ArenaAttemptResultLine,
+    opponent_attempt: ArenaAttemptResultLine,
+    opponent_label: str,
+) -> str:
+    user_score_line = format_score_line(
+        score=completed_attempt.score,
+        time_ms=completed_attempt.time_ms,
+    )
+    opponent_score_line = format_score_line(
+        score=opponent_attempt.score,
+        time_ms=opponent_attempt.time_ms,
+    )
+    if completed_attempt.result == ARENA_ATTEMPT_RESULT_WIN:
+        if completed_attempt.score == opponent_attempt.score:
+            return TEXTS_DE["msg.duels.arena.result.win.time"].format(
+                score=completed_attempt.score,
+                user_score_line=user_score_line,
+                opponent_label=opponent_label,
+                opponent_score_line=opponent_score_line,
+            )
+        return TEXTS_DE["msg.duels.arena.result.win.score"].format(
+            user_score_line=user_score_line,
+            opponent_label=opponent_label,
+            opponent_score_line=opponent_score_line,
+        )
+    if completed_attempt.result == ARENA_ATTEMPT_RESULT_DRAW:
+        return TEXTS_DE["msg.duels.arena.result.draw"].format(
+            score=completed_attempt.score,
+            user_score_line=user_score_line,
+            opponent_label=opponent_label,
+            opponent_score_line=opponent_score_line,
+        )
+    if completed_attempt.score == opponent_attempt.score:
+        return TEXTS_DE["msg.duels.arena.result.loss.time"].format(
+            score=completed_attempt.score,
+            user_score_line=user_score_line,
+            opponent_label=opponent_label,
+            opponent_score_line=opponent_score_line,
+        )
+    return TEXTS_DE["msg.duels.arena.result.loss.score"].format(
+        user_score_line=user_score_line,
+        opponent_label=opponent_label,
+        opponent_score_line=opponent_score_line,
+    )
+
+
+def is_close_loss(
+    *,
+    completed_attempt: ArenaAttemptResultLine,
+    opponent_attempt: ArenaAttemptResultLine,
+) -> bool:
+    if completed_attempt.result == ARENA_ATTEMPT_RESULT_WIN:
+        return False
+    if completed_attempt.result == ARENA_ATTEMPT_RESULT_DRAW:
+        return False
+
+    score_diff = opponent_attempt.score - completed_attempt.score
+    if completed_attempt.score == opponent_attempt.score:
+        time_diff_ms = completed_attempt.time_ms - opponent_attempt.time_ms
+        return 0 < time_diff_ms <= CLOSE_LOSS_MAX_TIME_DIFF_MS
+
+    return score_diff == CLOSE_LOSS_SCORE_DIFF and completed_attempt.score >= CLOSE_LOSS_MIN_SCORE
 
 
 async def resolve_arena_user_label(*, session, user_onboarding_service, user_id: int) -> str:

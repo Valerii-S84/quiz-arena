@@ -11,6 +11,7 @@ from app.game.arena_duels.types import ArenaBeatenNotification
 from app.workers.tasks.arena_duels_notification_content import (
     build_arena_beaten_notification_keyboard,
     build_notification_text,
+    classify_beaten_notification_action_mode,
     format_user_label,
 )
 from app.workers.tasks.arena_duels_notification_payload import notification_payload
@@ -113,6 +114,7 @@ async def _send_notification_message(
             ),
             reply_markup=build_arena_beaten_notification_keyboard(
                 source_attempt_id=str(notification.new_best_attempt_id),
+                action_mode=classify_beaten_notification_action_mode(notification),
             ),
         )
     except Exception:

@@ -7,18 +7,12 @@ from aiogram.types import CallbackQuery
 from app.bot.keyboards.duels import build_arena_published_keyboard, build_arena_result_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.game.arena_duels.analytics import ARENA_EVENT_ARENA_RESULT_SHOWN, build_arena_event_payload
-from app.game.arena_duels.constants import ARENA_ATTEMPT_RESULT_DRAW, ARENA_ATTEMPT_RESULT_WIN
+from app.game.arena_duels.constants import ARENA_ATTEMPT_RESULT_WIN
 from app.game.arena_duels.types import ArenaAttemptCompletionResult, ArenaAttemptResultLine
 
-from .arena_duel_flow_support import (
-    format_score_line,
-    resolve_arena_user_label,
-    resolve_duel_paywall_text,
-)
-
-CLOSE_LOSS_MAX_TIME_DIFF_MS = 15_000
-CLOSE_LOSS_MIN_SCORE = 4
-CLOSE_LOSS_SCORE_DIFF = 1
+from .arena_duel_flow_support import build_arena_result_text, format_score_line
+from .arena_duel_flow_support import is_close_loss as _is_close_loss
+from .arena_duel_flow_support import resolve_arena_user_label, resolve_duel_paywall_text
 
 
 async def send_arena_completion_result(
@@ -37,14 +31,10 @@ async def send_arena_completion_result(
 
     opponent_attempt = getattr(completion, "opponent_attempt", None)
     if opponent_attempt is None:
-        await callback.message.answer(
-            TEXTS_DE["msg.duels.arena.published"].format(
-                score_line=format_score_line(
-                    score=completed_attempt.score,
-                    time_ms=completed_attempt.time_ms,
-                )
-            ),
-            reply_markup=build_arena_published_keyboard(duel_id=str(completion.duel.duel_id)),
+        await _send_creator_baseline_message(
+            callback,
+            completion=completion,
+            completed_attempt=completed_attempt,
         )
         await _emit_arena_result_shown(
             session_local=session_local,
@@ -61,12 +51,57 @@ async def send_arena_completion_result(
             user_onboarding_service=user_onboarding_service,
             user_id=opponent_attempt.user_id,
         )
-    close_loss = _is_close_loss(
+    await _send_challenger_result_message(
+        callback,
         completed_attempt=completed_attempt,
         opponent_attempt=opponent_attempt,
+        opponent_label=opponent_label,
     )
-    show_close_loss_paywall = close_loss and opponent_attempt.attempt_id is not None
-    result_text = _build_arena_result_text(
+    await _emit_arena_result_shown(
+        session_local=session_local,
+        completion=completion,
+        completed_attempt=completed_attempt,
+        action="challenger",
+        emit_arena_analytics_event=emit_arena_analytics_event,
+    )
+
+
+async def _send_creator_baseline_message(
+    callback: CallbackQuery,
+    *,
+    completion: ArenaAttemptCompletionResult,
+    completed_attempt: ArenaAttemptResultLine,
+) -> None:
+    if callback.message is None:
+        return
+    await callback.message.answer(
+        TEXTS_DE["msg.duels.arena.published"].format(
+            score_line=format_score_line(
+                score=completed_attempt.score,
+                time_ms=completed_attempt.time_ms,
+            )
+        ),
+        reply_markup=build_arena_published_keyboard(duel_id=str(completion.duel.duel_id)),
+    )
+
+
+async def _send_challenger_result_message(
+    callback: CallbackQuery,
+    *,
+    completed_attempt: ArenaAttemptResultLine,
+    opponent_attempt: ArenaAttemptResultLine,
+    opponent_label: str,
+) -> None:
+    if callback.message is None:
+        return
+    show_close_loss_paywall = (
+        _is_close_loss(
+            completed_attempt=completed_attempt,
+            opponent_attempt=opponent_attempt,
+        )
+        and opponent_attempt.attempt_id is not None
+    )
+    result_text = build_arena_result_text(
         completed_attempt=completed_attempt,
         opponent_attempt=opponent_attempt,
         opponent_label=opponent_label,
@@ -84,79 +119,6 @@ async def send_arena_completion_result(
             close_loss=show_close_loss_paywall,
         ),
     )
-    await _emit_arena_result_shown(
-        session_local=session_local,
-        completion=completion,
-        completed_attempt=completed_attempt,
-        action="challenger",
-        emit_arena_analytics_event=emit_arena_analytics_event,
-    )
-
-
-def _build_arena_result_text(
-    *,
-    completed_attempt: ArenaAttemptResultLine,
-    opponent_attempt: ArenaAttemptResultLine,
-    opponent_label: str,
-) -> str:
-    user_score_line = format_score_line(
-        score=completed_attempt.score,
-        time_ms=completed_attempt.time_ms,
-    )
-    opponent_score_line = format_score_line(
-        score=opponent_attempt.score,
-        time_ms=opponent_attempt.time_ms,
-    )
-    if completed_attempt.result == ARENA_ATTEMPT_RESULT_WIN:
-        if completed_attempt.score == opponent_attempt.score:
-            return TEXTS_DE["msg.duels.arena.result.win.time"].format(
-                score=completed_attempt.score,
-                user_score_line=user_score_line,
-                opponent_label=opponent_label,
-                opponent_score_line=opponent_score_line,
-            )
-        return TEXTS_DE["msg.duels.arena.result.win.score"].format(
-            user_score_line=user_score_line,
-            opponent_label=opponent_label,
-            opponent_score_line=opponent_score_line,
-        )
-    if completed_attempt.result == ARENA_ATTEMPT_RESULT_DRAW:
-        return TEXTS_DE["msg.duels.arena.result.draw"].format(
-            score=completed_attempt.score,
-            user_score_line=user_score_line,
-            opponent_label=opponent_label,
-            opponent_score_line=opponent_score_line,
-        )
-    if completed_attempt.score == opponent_attempt.score:
-        return TEXTS_DE["msg.duels.arena.result.loss.time"].format(
-            score=completed_attempt.score,
-            user_score_line=user_score_line,
-            opponent_label=opponent_label,
-            opponent_score_line=opponent_score_line,
-        )
-    return TEXTS_DE["msg.duels.arena.result.loss.score"].format(
-        user_score_line=user_score_line,
-        opponent_label=opponent_label,
-        opponent_score_line=opponent_score_line,
-    )
-
-
-def _is_close_loss(
-    *,
-    completed_attempt: ArenaAttemptResultLine,
-    opponent_attempt: ArenaAttemptResultLine,
-) -> bool:
-    if completed_attempt.result == ARENA_ATTEMPT_RESULT_WIN:
-        return False
-    if completed_attempt.result == ARENA_ATTEMPT_RESULT_DRAW:
-        return False
-
-    score_diff = opponent_attempt.score - completed_attempt.score
-    if completed_attempt.score == opponent_attempt.score:
-        time_diff_ms = completed_attempt.time_ms - opponent_attempt.time_ms
-        return 0 < time_diff_ms <= CLOSE_LOSS_MAX_TIME_DIFF_MS
-
-    return score_diff == CLOSE_LOSS_SCORE_DIFF and completed_attempt.score >= CLOSE_LOSS_MIN_SCORE
 
 
 async def _emit_arena_result_shown(
