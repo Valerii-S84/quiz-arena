@@ -8,6 +8,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.db.models.purchases import Purchase
 from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.ledger_repo import LedgerRepo
 from app.db.repo.outbox_events_repo import OutboxEventsRepo
@@ -372,16 +373,36 @@ async def _load_star_reconciliation_candidates(
     session: AsyncSession,
     transaction: TelegramStarTransaction,
 ) -> list[ReconciliationCandidate]:
+    rows = await _load_star_reconciliation_candidate_rows(
+        session,
+        transaction,
+        for_update=False,
+    )
+    return _star_candidate_rows_to_reconciliation_candidates(rows)
+
+
+async def _load_star_reconciliation_candidate_rows(
+    session: AsyncSession,
+    transaction: TelegramStarTransaction,
+    *,
+    for_update: bool,
+) -> list[tuple[Purchase, int]]:
     if not transaction.is_incoming or transaction.transaction_type != "invoice_payment":
         return []
-    rows = await PurchasesRepo.list_stars_reconciliation_candidate_rows(
+    return await PurchasesRepo.list_stars_reconciliation_candidate_rows(
         session,
         transaction_id=transaction.transaction_id,
         invoice_payload=transaction.invoice_payload,
         telegram_user_id=transaction.source_user_id,
         transaction_date=transaction.transaction_date,
         match_window=EXACT_MATCH_WINDOW,
+        for_update=for_update,
     )
+
+
+def _star_candidate_rows_to_reconciliation_candidates(
+    rows: list[tuple[Purchase, int]],
+) -> list[ReconciliationCandidate]:
     return [
         ReconciliationCandidate(
             purchase_id=purchase.id,
@@ -441,6 +462,30 @@ async def _auto_recover_star_transaction_if_exact(
     purchase_id = decision.candidate_purchase_ids[0]
     transaction_id_hash = _stable_payment_review_hash(transaction.transaction_id)
     async with SessionLocal.begin() as session:
+        locked_rows = await _load_star_reconciliation_candidate_rows(
+            session,
+            transaction,
+            for_update=True,
+        )
+        locked_candidates = _star_candidate_rows_to_reconciliation_candidates(locked_rows)
+        locked_decision = classify_star_transaction_dry_run(
+            transaction=transaction,
+            candidates=locked_candidates,
+        )
+        if locked_decision.classification == ALREADY_CREDITED:
+            return "already_credited"
+        if (
+            locked_decision.classification != WOULD_RECOVER_EXACT_MATCH
+            or locked_decision.candidate_purchase_ids != (purchase_id,)
+        ):
+            return "revalidation_failed"
+
+        purchase = _find_locked_purchase(locked_rows, purchase_id=purchase_id)
+        if purchase is None:
+            return "purchase_missing"
+        if purchase.telegram_payment_charge_id not in (None, transaction.transaction_id):
+            return "charge_conflict"
+
         open_review = await OutboxEventsRepo.get_open_by_payload_key(
             session,
             event_type=PAYMENT_STARS_RECONCILIATION_REVIEW_EVENT,
@@ -451,17 +496,10 @@ async def _auto_recover_star_transaction_if_exact(
         if open_review is not None:
             return "open_review_blocked"
 
-        purchase = await PurchasesRepo.get_by_id_for_update(session, purchase_id)
-        if purchase is None:
-            return "purchase_missing"
-        if purchase.status == "CREDITED":
-            return "already_credited"
         if purchase.status not in {"PRECHECKOUT_OK", "INVOICE_SENT", "CREATED", "PAID_UNCREDITED"}:
             return "status_rejected"
         if purchase.invoice_payload != transaction.invoice_payload:
             return "invoice_payload_mismatch"
-        if purchase.telegram_payment_charge_id not in (None, transaction.transaction_id):
-            return "charge_conflict"
 
         charge_purchase = await PurchasesRepo.get_by_telegram_payment_charge_id_for_update(
             session,
@@ -516,6 +554,17 @@ async def _auto_recover_star_transaction_if_exact(
             product_code=purchase.product_code,
         )
         return "auto_recovered"
+
+
+def _find_locked_purchase(
+    rows: list[tuple[Purchase, int]],
+    *,
+    purchase_id: UUID,
+) -> Purchase | None:
+    for purchase, _telegram_user_id in rows:
+        if purchase.id == purchase_id:
+            return purchase
+    return None
 
 
 def _successful_payment_payload_from_star_transaction(

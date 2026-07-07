@@ -95,7 +95,7 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | 2 | Payment-specific observability and alerts | DONE | Successful-payment logs, invariant alerts, recovery logs, and docs passed audit. |
 | 3 | Telegram Stars client and reconciliation dry-run | DONE | Telegram Stars client, conservative dry-run classifier, disabled task wiring, and read-only dry-run runner passed audit. |
 | 4 | Review records / persistent reconciliation findings | DONE | Outbox-based OPEN review events and documented migration deferral passed audit; no new migration added. |
-| 5 | Exact-match auto-recovery behind feature flag | IN_PROGRESS | Strict exact-match auto-recovery under audit; defaults remain disabled/dry-run. |
+| 5 | Exact-match auto-recovery behind feature flag | IN_PROGRESS | Initial auto-recovery patch failed audit; transaction revalidation fix under audit. |
 | 6 | Durable payment inbox / payment events | TODO | Only after prior phases are stable. |
 | 7 | Idempotent asset crediting and stronger DB constraints | TODO | Constraints only after data audit. |
 | 8 | Production smoke and final hardening | TODO | Safe smoke/runbook, no deploy. |
@@ -119,7 +119,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P3D | 3 | Dry-run Stars reconciliation runner without mutations | DONE | `56fa4fb` | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `19 passed`; `pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py` -> `13 passed`; `ruff check app/db/repo/purchases_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/purchases_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | `PASS_WITH_NOTES` | Accepted; persistent checkpoints/review records and dry-run alerts remain tracked for Phase 4. |
 | P4A | 4 | Persist Stars dry-run review findings through existing outbox | DONE | `e34bf1e` | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py` -> `13 passed`; `pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py` -> `13 passed`; `ruff check app/db/repo/outbox_events_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/outbox_events_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | `PASS_WITH_NOTES` | Accepted; best-effort outbox dedupe is not race-proof without a future unique constraint/review table. |
 | P4B | 4 | Document review outbox workflow and migration deferral limits | DONE | `5665a6e` | `rg -n "payments_telegram_stars_reconciliation_review|review_key|transaction_id_hash|raw_payload_stored|candidate_purchase_ids|dedupe|deduplication|OPEN" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md docs/analytics/events_catalog.md` -> required entries present; `rg -n "bot[0-9]+:|TELEGRAM_BOT_TOKEN=.*[0-9A-Za-z_-]{20}|secret-token|bot-token-secret|charge-1|invoice-1" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md docs/analytics/events_catalog.md` -> no matches | `PASS_WITH_NOTES` | Accepted; docs-only patch, no runtime/config/migration changes. |
-| P5 | 5 | Exact-match auto-recovery behind safe flags | AUDIT | Pending | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py tests/economy/test_purchase_credit_service.py` -> `23 passed`; `pytest --capture=no -q tests/integration/test_purchase_premium_integration.py` -> `3 passed`; `ruff check app/db/repo/purchases_repo.py app/db/repo/entitlements_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/purchases_repo.py app/db/repo/entitlements_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | Pending | Pending |
+| P5 | 5 | Exact-match auto-recovery behind safe flags | FAIL | `010067f` | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py tests/economy/test_purchase_credit_service.py` -> `23 passed`; `pytest --capture=no -q tests/integration/test_purchase_premium_integration.py` -> `3 passed`; `ruff check app/db/repo/purchases_repo.py app/db/repo/entitlements_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/purchases_repo.py app/db/repo/entitlements_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | `FAIL` | Blocking issues: exactness was not revalidated inside the recovery transaction, and credited charge conflicts could be counted as success. Fixed in P5-FIX. |
+| P5-FIX | 5 | Revalidate exact-match auto-recovery under lock | AUDIT | Pending | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py tests/economy/test_purchase_credit_service.py` -> `25 passed`; `pytest --capture=no -q tests/integration/test_purchase_premium_integration.py` -> `3 passed`; `ruff check app/db/repo/purchases_repo.py app/db/repo/entitlements_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/purchases_repo.py app/db/repo/entitlements_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | Pending | Pending |
 | P6 | 6 | Durable payment update inbox and replay path | TODO | Pending | Pending | Pending | Pending |
 | P7A | 7 | Idempotent premium entitlement and ledger credit re-entry | TODO | Pending | Pending | Pending | Pending |
 | P7B | 7 | Data-audited DB constraints if approved | TODO | Pending | Pending | Pending | Pending |
@@ -405,6 +406,22 @@ Auditor notes:
 - Literal secret/raw-id scan over changed docs found no matches.
 
 Lead response: Accepted; Phase 4 is closed without a new migration.
+
+### P5 - `010067f` - `feat(payments): auto recover exact Stars payments`
+
+Auditor verdict: `FAIL`
+
+Blocking issues:
+
+- Auto-recovery did not revalidate the full exact-match predicate inside the recovery transaction.
+  The exact decision was made before the transaction, then the transaction only partially rechecked
+  the purchase.
+- A credited purchase with a conflicting `telegram_payment_charge_id` could be reported as
+  `already_credited` before the charge-conflict check ran.
+
+Lead response: Fixed in P5-FIX by re-querying candidate rows with `FOR UPDATE`, reclassifying
+under lock, and adding regression tests for changed locked candidate sets and credited charge
+conflicts.
 
 ## Open owner decisions
 

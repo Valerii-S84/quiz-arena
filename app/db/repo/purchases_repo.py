@@ -262,6 +262,7 @@ class PurchasesRepo:
         transaction_date: datetime,
         match_window: timedelta,
         limit: int = 20,
+        for_update: bool = False,
     ) -> list[tuple[Purchase, int]]:
         match_conditions = [Purchase.telegram_payment_charge_id == transaction_id]
         if invoice_payload:
@@ -282,6 +283,8 @@ class PurchasesRepo:
             .order_by(Purchase.created_at.desc())
             .limit(limit)
         )
+        if for_update:
+            stmt = stmt.with_for_update()
         result = await session.execute(stmt)
         return [(cast(Purchase, row[0]), int(row[1])) for row in result.all()]
 

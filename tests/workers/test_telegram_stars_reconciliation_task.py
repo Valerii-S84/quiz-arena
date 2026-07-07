@@ -145,8 +145,9 @@ async def test_telegram_stars_reconciliation_dry_run_classifies_transactions(
         transaction_date: datetime,
         match_window: timedelta,
         limit: int = 20,
+        for_update: bool = False,
     ):
-        del session, invoice_payload, telegram_user_id, match_window, limit
+        del session, invoice_payload, telegram_user_id, match_window, limit, for_update
         if transaction_id == "charge-missing":
             return []
 
@@ -498,6 +499,145 @@ async def test_telegram_stars_reconciliation_auto_mode_reviews_ambiguous_match(
     assert result["review_findings"] == 1
     assert result["review_events_created"] == 1
     assert review_payloads[0]["reason"] == "AMBIGUOUS_MATCH"
+
+
+@pytest.mark.asyncio
+async def test_telegram_stars_reconciliation_auto_revalidates_locked_candidates(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        payments_reliability_async,
+        "get_settings",
+        lambda: _settings(enabled=True, dry_run=False, auto_recovery_enabled=True),
+    )
+    monkeypatch.setattr(payments_reliability_async, "SessionLocal", _SessionLocal())
+    first = purchase_model(status="PRECHECKOUT_OK", stars_amount=29, invoice_payload="invoice-1")
+    second = purchase_model(status="PRECHECKOUT_OK", stars_amount=29, invoice_payload="invoice-2")
+    for purchase in (first, second):
+        purchase.created_at = datetime(2026, 7, 7, 11, 55, tzinfo=timezone.utc)
+    candidate_calls = 0
+    review_payloads: list[dict[str, object]] = []
+
+    class FakeStarsClient:
+        def __init__(self, *, bot_token: str) -> None:
+            assert bot_token == "bot-token-secret"
+
+        async def get_star_transactions(self, *, limit: int) -> TelegramStarTransactionsPage:
+            del limit
+            return TelegramStarTransactionsPage(transactions=[_transaction()])
+
+    async def _candidate_rows(*_args, **_kwargs):
+        nonlocal candidate_calls
+        candidate_calls += 1
+        return [(first, 270)] if candidate_calls == 1 else [(first, 270), (second, 270)]
+
+    async def _apply_successful_payment(*_args, **_kwargs):
+        raise AssertionError("changed locked candidate set must not auto-credit")
+
+    async def _create_review_once(
+        session: object,
+        *,
+        event_type: str,
+        payload: dict[str, object],
+        payload_key: str,
+        status: str,
+    ):
+        del session, event_type, payload_key, status
+        review_payloads.append(payload)
+        return object(), True
+
+    monkeypatch.setattr(payments_reliability_async, "TelegramStarsClient", FakeStarsClient)
+    monkeypatch.setattr(
+        payments_reliability_async.PurchasesRepo,
+        "list_stars_reconciliation_candidate_rows",
+        _candidate_rows,
+    )
+    monkeypatch.setattr(
+        payments_reliability_async.PurchaseService,
+        "apply_successful_payment",
+        _apply_successful_payment,
+    )
+    monkeypatch.setattr(
+        payments_reliability_async.OutboxEventsRepo,
+        "create_once_by_payload_key",
+        _create_review_once,
+    )
+
+    result = await payments_reliability_async.run_telegram_stars_reconciliation_async()
+
+    assert result["auto_recovery_counts"] == {"revalidation_failed": 1}
+    assert result["review_events_created"] == 1
+    assert review_payloads[0]["reason"] == "WOULD_RECOVER_EXACT_MATCH"
+
+
+@pytest.mark.asyncio
+async def test_telegram_stars_reconciliation_auto_blocks_credited_charge_conflict(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        payments_reliability_async,
+        "get_settings",
+        lambda: _settings(enabled=True, dry_run=False, auto_recovery_enabled=True),
+    )
+    monkeypatch.setattr(payments_reliability_async, "SessionLocal", _SessionLocal())
+    purchase = purchase_model(status="PRECHECKOUT_OK", stars_amount=29, invoice_payload="invoice-1")
+    purchase.created_at = datetime(2026, 7, 7, 11, 55, tzinfo=timezone.utc)
+    candidate_calls = 0
+    review_payloads: list[dict[str, object]] = []
+
+    class FakeStarsClient:
+        def __init__(self, *, bot_token: str) -> None:
+            assert bot_token == "bot-token-secret"
+
+        async def get_star_transactions(self, *, limit: int) -> TelegramStarTransactionsPage:
+            del limit
+            return TelegramStarTransactionsPage(transactions=[_transaction()])
+
+    async def _candidate_rows(*_args, **_kwargs):
+        nonlocal candidate_calls
+        candidate_calls += 1
+        if candidate_calls == 2:
+            purchase.status = "CREDITED"
+            purchase.telegram_payment_charge_id = "different-charge"
+        return [(purchase, 270)]
+
+    async def _apply_successful_payment(*_args, **_kwargs):
+        raise AssertionError("charge conflict must not auto-credit")
+
+    async def _create_review_once(
+        session: object,
+        *,
+        event_type: str,
+        payload: dict[str, object],
+        payload_key: str,
+        status: str,
+    ):
+        del session, event_type, payload_key, status
+        review_payloads.append(payload)
+        return object(), True
+
+    monkeypatch.setattr(payments_reliability_async, "TelegramStarsClient", FakeStarsClient)
+    monkeypatch.setattr(
+        payments_reliability_async.PurchasesRepo,
+        "list_stars_reconciliation_candidate_rows",
+        _candidate_rows,
+    )
+    monkeypatch.setattr(
+        payments_reliability_async.PurchaseService,
+        "apply_successful_payment",
+        _apply_successful_payment,
+    )
+    monkeypatch.setattr(
+        payments_reliability_async.OutboxEventsRepo,
+        "create_once_by_payload_key",
+        _create_review_once,
+    )
+
+    result = await payments_reliability_async.run_telegram_stars_reconciliation_async()
+
+    assert result["auto_recovery_counts"] == {"revalidation_failed": 1}
+    assert result["review_events_created"] == 1
+    assert review_payloads[0]["reason"] == "WOULD_RECOVER_EXACT_MATCH"
 
 
 @pytest.mark.asyncio
