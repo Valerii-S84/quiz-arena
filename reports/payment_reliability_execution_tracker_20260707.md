@@ -90,8 +90,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 
 | Phase | Goal | Status | Notes |
 |---|---|---:|---|
-| 0 | Baseline and safety tracker | AUDIT | Tracker created; targeted baseline checks passed. |
-| 1 | Read-only invariant checker and allowed_updates verification | TODO | No behavior changes; script and unit tests only. |
+| 0 | Baseline and safety tracker | DONE | Tracker created; targeted baseline checks passed; audit passed with notes. |
+| 1 | Read-only invariant checker and allowed_updates verification | AUDIT | Read-only script and unit tests added; no runtime behavior changes. |
 | 2 | Payment-specific observability and alerts | TODO | Structured logs, read-only scheduled alerts, docs. |
 | 3 | Telegram Stars client and reconciliation dry-run | TODO | Feature-flagged, dry-run, no auto-credit. |
 | 4 | Review records / persistent reconciliation findings | TODO | Migration only after safety/data audit or documented deferral. |
@@ -104,9 +104,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 
 | Patch | Phase | Target | Status | Commit | Tests/evidence | Auditor verdict | Lead response |
 |---|---:|---|---:|---|---|---|---|
-| P0 | 0 | Add execution tracker and baseline code map | AUDIT | Pending | `.venv/bin/python -m pytest --capture=no -q --ignore=tests/integration tests/api/test_telegram_webhook.py tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py tests/services/test_payments_reliability.py tests/workers/test_payments_reliability_async.py` -> `30 passed in 14.32s` | Pending | Pending |
-| P1A | 1 | Unit coverage for payment invariant checks and allowed_updates helper | TODO | Pending | Pending | Pending | Pending |
-| P1B | 1 | `scripts/payment_reliability_checks.py` read-only checker | TODO | Pending | Pending | Pending | Pending |
+| P0 | 0 | Add execution tracker and baseline code map | DONE | `217bdc9` | `.venv/bin/python -m pytest --capture=no -q --ignore=tests/integration tests/api/test_telegram_webhook.py tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py tests/services/test_payments_reliability.py tests/workers/test_payments_reliability_async.py` -> `30 passed in 14.32s` | `PASS_WITH_NOTES` | Accepted; tracker verdict/response recorded after audit. |
+| P1A | 1 | `scripts/payment_reliability_checks.py` read-only checker and unit coverage | AUDIT | Pending | `pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `6 passed`; `ruff check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `black --check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `isort --check-only scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `mypy tests/scripts/test_payment_reliability_checks.py` -> pass; CLI `--skip-db --webhook-info-json -` sample -> OK | Pending | Pending |
 | P2A | 2 | Structured payment logs without sensitive payloads | TODO | Pending | Pending | Pending | Pending |
 | P2B | 2 | Read-only invariant alerts in scheduled reliability path | TODO | Pending | Pending | Pending | Pending |
 | P2C | 2 | Production state and sandbox Stars runbook updates | TODO | Pending | Pending | Pending | Pending |
@@ -124,13 +123,30 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 
 - `git rev-parse HEAD` -> `7c0590a93c56849fae680b14508ec6531cc30f3f`.
 - `.agent/project` has no `[FILL_PER_PROJECT]` placeholders.
+- Code Map Agent `Ohm` independently confirmed the plan code map is current for local HEAD and
+  noted that paid premium products include Week, Month, Season, and Year, so implementation must
+  avoid hardcoding only Week/Month.
 - Targeted baseline:
   - Command: `.venv/bin/python -m pytest --capture=no -q --ignore=tests/integration tests/api/test_telegram_webhook.py tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py tests/services/test_payments_reliability.py tests/workers/test_payments_reliability_async.py`
   - Result: `30 passed in 14.32s`.
 
 ## Audit log
 
-Pending first commit.
+### P0 - `217bdc9` - `docs(payments): add reliability execution tracker`
+
+Auditor verdict: `PASS_WITH_NOTES`
+
+Auditor notes:
+
+- No blocking issues.
+- Commit is docs-only and adds only this execution tracker.
+- No production code, migrations, deploy config, `.env*`, secrets, Telegram runtime behavior,
+  or payment/idempotency logic were changed.
+- Test evidence is recorded as lead-provided; auditor did not rerun tests.
+- Tracker verdict/lead response were pending during the audit and should be updated after audit
+  closure.
+
+Lead response: Accepted; tracker verdict and lead response updated after audit closure.
 
 ## Open owner decisions
 
