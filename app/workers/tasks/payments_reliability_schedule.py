@@ -32,6 +32,11 @@ def configure_payments_reliability_schedule(celery_app) -> None:
                 "schedule": 900.0,
                 "options": {"queue": "q_normal"},
             },
+            "telegram-stars-reconciliation-every-5-minutes": {
+                "task": "app.workers.tasks.payments_reliability.run_telegram_stars_reconciliation",
+                "schedule": 300.0,
+                "options": {"queue": "q_normal"},
+            },
             "payments-reconciliation-daily-0330-berlin": {
                 "task": "app.workers.tasks.payments_reliability.run_payments_reconciliation",
                 "schedule": crontab(hour=3, minute=30),

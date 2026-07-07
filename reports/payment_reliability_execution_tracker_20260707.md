@@ -93,7 +93,7 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | 0 | Baseline and safety tracker | DONE | Tracker created; targeted baseline checks passed; audit passed with notes. |
 | 1 | Read-only invariant checker and allowed_updates verification | DONE | Read-only script, allowed_updates helper, and runbook checks passed audit. |
 | 2 | Payment-specific observability and alerts | DONE | Successful-payment logs, invariant alerts, recovery logs, and docs passed audit. |
-| 3 | Telegram Stars client and reconciliation dry-run | AUDIT | Telegram Stars API wrapper passed after fix; dry-run classifier and safe flags ready for audit. |
+| 3 | Telegram Stars client and reconciliation dry-run | IN_PROGRESS | Telegram Stars client and dry-run classifier passed after fixes; disabled/dry-run task wiring under audit. |
 | 4 | Review records / persistent reconciliation findings | TODO | Migration only after safety/data audit or documented deferral. |
 | 5 | Exact-match auto-recovery behind feature flag | TODO | Disabled by default; strict exact-match criteria. |
 | 6 | Durable payment inbox / payment events | TODO | Only after prior phases are stable. |
@@ -114,8 +114,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P3A | 3 | Telegram Stars API wrapper with safe timeout/error handling | FAIL | `bfe751a` | `pytest --capture=no -q tests/services/test_telegram_stars.py` -> `6 passed`; `ruff check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `black --check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `isort --check-only app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `mypy app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; official Telegram Bot API checked for `getStarTransactions` parameters and `StarTransaction` fields | `FAIL` | Blocking issue: chained `httpx.HTTPError` could expose token-bearing URL in traceback; fixing in P3A-FIX. |
 | P3A-FIX | 3 | Sanitize Telegram Stars HTTP error traceback token exposure | DONE | `1e52b51` | `pytest --capture=no -q tests/services/test_telegram_stars.py` -> `7 passed`; `ruff check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `black --check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `isort --check-only app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `mypy app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; traceback-format test confirms token is absent from HTTP status failure traceback | `PASS_WITH_NOTES` | Fixed blocker from P3A; accepted. |
 | P3B | 3 | Dry-run reconciliation classifier and safe feature flags | FAIL | `ee3a268` | `pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `14 passed`; `ruff check app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass | `FAIL` | Blocking issue: exact dry-run match lacked purchase/transaction time-window validation; fixing in P3B-FIX. |
-| P3B-FIX | 3 | Add exact-match time-window validation to dry-run classifier | AUDIT | Pending | `pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `15 passed`; `ruff check app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass | Pending | Pending |
-| P3C | 3 | Disabled/dry-run Celery wiring | TODO | Pending | Pending | Pending | Pending |
+| P3B-FIX | 3 | Add exact-match time-window validation to dry-run classifier | DONE | `fef6760` | `pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `15 passed`; `ruff check app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass | `PASS_WITH_NOTES` | Fixed blocker from P3B; accepted. Later DB integration must preserve created/precheckout-time and configurable-window intent. |
+| P3C | 3 | Disabled/dry-run Celery wiring | AUDIT | Pending | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/workers/test_payments_reliability_task.py tests/workers/test_worker_schedule_units.py tests/workers/test_payments_reliability_async.py` -> `18 passed`; `ruff check app/workers/tasks/payments_reliability_async.py app/workers/tasks/payments_reliability.py app/workers/tasks/payments_reliability_schedule.py tests/workers/test_telegram_stars_reconciliation_task.py tests/workers/test_payments_reliability_task.py tests/workers/test_worker_schedule_units.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy ...` -> pass | Pending | Pending |
 | P4 | 4 | Persistent review records or documented migration deferral | TODO | Pending | Pending | Pending | Pending |
 | P5 | 5 | Exact-match auto-recovery behind safe flags | TODO | Pending | Pending | Pending | Pending |
 | P6 | 6 | Durable payment update inbox and replay path | TODO | Pending | Pending | Pending | Pending |
@@ -306,6 +306,23 @@ Blocking issue:
 Lead response: Fixed in P3B-FIX; candidates now carry `created_at`, exact matches require the
 transaction date to fall within a 30-minute purchase window, and same-user/same-amount candidates
 outside that window classify as ambiguous instead of recoverable.
+
+### P3B-FIX - `fef6760` - `fix(payments): require Stars reconciliation time window`
+
+Auditor verdict: `PASS_WITH_NOTES`
+
+Auditor notes:
+
+- No blocking issues.
+- Previous exact-match time-window failure is fixed.
+- Exact-match classification now requires `created_at <= transaction_date <= created_at + 30
+  minutes`.
+- Same-user/same-amount candidates outside the window classify as ambiguous.
+- Non-blocking note: the window is fixed at 30 minutes and uses `created_at` only; later DB
+  integration should preserve broader created/precheckout-time and configurable-window intent.
+
+Lead response: Accepted; later DB integration must preserve created/precheckout-time and
+configurable-window intent.
 
 ## Open owner decisions
 

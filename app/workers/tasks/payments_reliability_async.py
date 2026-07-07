@@ -5,6 +5,7 @@ from uuid import UUID
 
 import structlog
 
+from app.core.config import get_settings
 from app.db.repo.promo_repo import PromoRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.session import SessionLocal
@@ -25,6 +26,7 @@ logger = structlog.get_logger("app.workers.tasks.payments_reliability")
 __all__ = [
     "expire_stale_unpaid_invoices_async",
     "recover_paid_uncredited_async",
+    "run_telegram_stars_reconciliation_async",
     "run_payments_reconciliation_async",
     "run_refund_promo_rollback_async",
 ]
@@ -255,3 +257,28 @@ async def _send_payment_invariant_alerts(summary: dict[str, int]) -> None:
                 ],
             },
         )
+
+
+async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
+    settings = get_settings()
+    enabled = bool(getattr(settings, "telegram_stars_reconciliation_enabled", False))
+    dry_run = bool(getattr(settings, "telegram_stars_reconciliation_dry_run", True))
+    auto_recovery_enabled = bool(getattr(settings, "telegram_stars_auto_recovery_enabled", False))
+    if not enabled:
+        result: dict[str, object] = {
+            "status": "disabled",
+            "dry_run": dry_run,
+            "auto_recovery_enabled": auto_recovery_enabled,
+            "transactions_examined": 0,
+        }
+        logger.info("telegram_stars_reconciliation_skipped", **result)
+        return result
+
+    result = {
+        "status": "dry_run_not_started",
+        "dry_run": dry_run,
+        "auto_recovery_enabled": auto_recovery_enabled,
+        "transactions_examined": 0,
+    }
+    logger.info("telegram_stars_reconciliation_dry_run_pending", **result)
+    return result

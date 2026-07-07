@@ -85,3 +85,17 @@ def test_run_payments_reconciliation_task_wrapper(monkeypatch) -> None:
     result = payments_reliability.run_payments_reconciliation(stale_minutes=30)
     assert result["paid_purchases_count"] == 30
     assert result["status"] == "OK"
+
+
+def test_run_telegram_stars_reconciliation_task_wrapper(monkeypatch) -> None:
+    async def fake_async() -> dict[str, object]:
+        return {"status": "disabled", "transactions_examined": 0}
+
+    monkeypatch.setattr(
+        payments_reliability,
+        "run_telegram_stars_reconciliation_async",
+        fake_async,
+    )
+
+    result = payments_reliability.run_telegram_stars_reconciliation()
+    assert result == {"status": "disabled", "transactions_examined": 0}
