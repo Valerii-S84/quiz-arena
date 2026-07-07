@@ -97,8 +97,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | 4 | Review records / persistent reconciliation findings | DONE | Outbox-based OPEN review events and documented migration deferral passed audit; no new migration added. |
 | 5 | Exact-match auto-recovery behind feature flag | DONE | Exact-match auto-recovery and transaction revalidation fix passed audit; defaults remain disabled/dry-run. |
 | 6 | Durable payment inbox / payment events | DONE | Interim outbox evidence before ACK and documented inbox/payment_events migration deferral passed audit. |
-| 7 | Idempotent asset crediting and stronger DB constraints | IN_PROGRESS | Idempotent premium entitlement and purchase ledger re-entry passed audit; constraint preflight checks under audit with no migration. |
-| 8 | Production smoke and final hardening | TODO | Safe smoke/runbook, no deploy. |
+| 7 | Idempotent asset crediting and stronger DB constraints | BLOCKED | Idempotent crediting passed audit, but P7B constraint-preflight failed twice around `credited_at` / `REFUNDED` semantics. |
+| 8 | Production smoke and final hardening | BLOCKED | Not started because Phase 7 hit the two-fail stop condition. |
 
 ## Planned patch ledger
 
@@ -126,8 +126,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P7A | 7 | Idempotent premium entitlement and ledger credit re-entry | FAIL | `cd95bf4` | `pytest --capture=no -q tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_assets_flow_units.py tests/economy/test_purchase_credit_service.py tests/integration/test_purchase_premium_integration.py tests/integration/test_purchase_refund_integration.py` -> `21 passed`; `ruff check app/economy/purchases/service/entitlements.py app/economy/purchases/service/credit_assets.py tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_assets_flow_units.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/economy/purchases/service/entitlements.py app/economy/purchases/service/credit_assets.py tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_assets_flow_units.py` -> pass | `FAIL` | Blocking issue: existing purchase-ledger replay skipped duplicate ledger creation but still allowed energy/streak side effects before the guard; fixing in P7A-FIX. |
 | P7A-FIX | 7 | Skip asset side effects when purchase credit ledger already exists | DONE | `c835cff` | `pytest --capture=no -q tests/economy/test_purchase_credit_assets_flow_units.py tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_service.py tests/integration/test_purchase_premium_integration.py tests/integration/test_purchase_refund_integration.py` -> `21 passed`; `ruff check app/economy/purchases/service/credit_assets.py tests/economy/test_purchase_credit_assets_flow_units.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/economy/purchases/service/credit_assets.py tests/economy/test_purchase_credit_assets_flow_units.py` -> pass | `PASS_WITH_NOTES` | Fixed prior P7A blocker; DB uniqueness/constraint hardening remains deferred to P7B. |
 | P7B | 7 | Add read-only constraint preflight and defer unsafe migrations | FAIL | `be16109` | `pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `7 passed`; `ruff check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `black --check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `isort --check-only scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `mypy tests/scripts/test_payment_reliability_checks.py` -> pass; `rg -n "payments_constraint_duplicate_premium_source_purchase|payments_constraint_duplicate_purchase_credit_ledger|payments_constraint_paid_purchase_missing_charge_id|payments_constraint_paid_purchase_missing_paid_at|DB constraint hardening rule|read-only migration preflight" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> required entries present | `FAIL` | Blocking issue: missing `credited_at` constraint preflight; fixing in P7B-FIX. |
-| P7B-FIX | 7 | Add credited_at constraint preflight coverage | AUDIT | Pending | `pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `7 passed`; `ruff check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `black --check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `isort --check-only scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `mypy tests/scripts/test_payment_reliability_checks.py` -> pass; `rg -n "payments_constraint_duplicate_premium_source_purchase|payments_constraint_duplicate_purchase_credit_ledger|payments_constraint_paid_purchase_missing_charge_id|payments_constraint_paid_purchase_missing_paid_at|payments_constraint_credited_purchase_missing_credited_at|DB constraint hardening rule|read-only migration preflight" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> required entries present | Pending | Pending |
-| P8 | 8 | Payment smoke and final reliability runbook | TODO | Pending | Pending | Pending | Pending |
+| P7B-FIX | 7 | Add credited_at constraint preflight coverage | FAIL | `f6b5db0` | `pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `7 passed`; `ruff check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `black --check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `isort --check-only scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `mypy tests/scripts/test_payment_reliability_checks.py` -> pass; `rg -n "payments_constraint_duplicate_premium_source_purchase|payments_constraint_duplicate_purchase_credit_ledger|payments_constraint_paid_purchase_missing_charge_id|payments_constraint_paid_purchase_missing_paid_at|payments_constraint_credited_purchase_missing_credited_at|DB constraint hardening rule|read-only migration preflight" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> required entries present | `FAIL` | Blocked by stop condition: `credited_at` preflight is too broad for allowed `PAID_UNCREDITED` refund path; owner decision needed before more P7B changes. |
+| P8 | 8 | Payment smoke and final reliability runbook | BLOCKED | Pending | Not run | Pending | Blocked behind Phase 7 stop condition. |
 
 ## Baseline checks
 
@@ -537,6 +537,20 @@ Blocking issue:
 Lead response: Fixed in P7B-FIX by adding `payments_constraint_credited_purchase_missing_credited_at`
 to the read-only checker, docs, and unit coverage.
 
+### P7B-FIX - `f6b5db0` - `fix(payments): cover credited-at constraint preflight`
+
+Auditor verdict: `FAIL`
+
+Blocking issue:
+
+- The new `credited_at` preflight is too broad for current refund behavior. It flags every
+  `REFUNDED` purchase with `credited_at IS NULL`, but refunds from `PAID_UNCREDITED` remain allowed
+  and that path sets `REFUNDED` / `refunded_at` without setting `credited_at`.
+
+Lead response: Blocked by the two-fail stop condition for the P7B constraint-preflight area. Owner
+decision needed: either keep the `PAID_UNCREDITED` refund exception and narrow the preflight/future
+constraint accordingly, or remove/change that refund path with matching tests before continuing.
+
 ## Open owner decisions
 
 - Whether to commit `PAID_UNCREDITED` before crediting in normal successful-payment flow.
@@ -545,3 +559,5 @@ to the read-only checker, docs, and unit coverage.
 - Manual compensation model and refund policy after compensation.
 - Auto-recovery enablement soak gate duration.
 - Telegram Stars API implementation choice if aiogram lacks typed support.
+- Whether `REFUNDED` purchases that were refunded from `PAID_UNCREDITED` may legitimately have
+  `credited_at IS NULL`, and how future strict status constraints should model that exception.
