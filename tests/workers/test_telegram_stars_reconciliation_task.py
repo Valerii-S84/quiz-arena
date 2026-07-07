@@ -32,6 +32,9 @@ class _SessionLocal:
     def __call__(self) -> _SessionContext:
         return _SessionContext(self.session)
 
+    def begin(self) -> _SessionContext:
+        return _SessionContext(self.session)
+
 
 def _settings(*, enabled: bool, dry_run: bool = True) -> SimpleNamespace:
     return SimpleNamespace(
@@ -106,6 +109,7 @@ async def test_telegram_stars_reconciliation_dry_run_classifies_transactions(
     monkeypatch.setattr(payments_reliability_async, "get_settings", lambda: _settings(enabled=True))
     monkeypatch.setattr(payments_reliability_async, "SessionLocal", _SessionLocal())
     logged: list[dict[str, object]] = []
+    review_payloads: list[dict[str, object]] = []
     monkeypatch.setattr(
         payments_reliability_async.logger,
         "info",
@@ -159,6 +163,27 @@ async def test_telegram_stars_reconciliation_dry_run_classifies_transactions(
         _candidate_rows,
     )
 
+    async def _create_review_once(
+        session: object,
+        *,
+        event_type: str,
+        payload: dict[str, object],
+        payload_key: str,
+        status: str,
+    ):
+        del session
+        assert event_type == "payments_telegram_stars_reconciliation_review"
+        assert payload_key == "review_key"
+        assert status == "OPEN"
+        review_payloads.append(payload)
+        return object(), True
+
+    monkeypatch.setattr(
+        payments_reliability_async.OutboxEventsRepo,
+        "create_once_by_payload_key",
+        _create_review_once,
+    )
+
     result = await payments_reliability_async.run_telegram_stars_reconciliation_async()
 
     assert result["status"] == "dry_run_completed"
@@ -171,11 +196,79 @@ async def test_telegram_stars_reconciliation_dry_run_classifies_transactions(
     }
     assert result["high_severity_findings"] == 2
     assert result["medium_severity_findings"] == 0
+    assert result["review_findings"] == 2
+    assert result["review_events_created"] == 2
+    assert result["review_events_existing"] == 0
+
+    assert [payload["reason"] for payload in review_payloads] == [
+        "WOULD_RECOVER_EXACT_MATCH",
+        "NO_DB_PURCHASE",
+    ]
+    serialized_reviews = repr(review_payloads)
+    assert "bot-token-secret" not in serialized_reviews
+    assert "invoice-1" not in serialized_reviews
+    assert "charge-1" not in serialized_reviews
+    assert all(payload["raw_payload_stored"] is False for payload in review_payloads)
 
     serialized_logs = repr(logged)
     assert "bot-token-secret" not in serialized_logs
     assert "invoice-1" not in serialized_logs
     assert "charge-1" not in serialized_logs
+
+
+@pytest.mark.asyncio
+async def test_telegram_stars_reconciliation_deduplicates_open_review_events(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(payments_reliability_async, "get_settings", lambda: _settings(enabled=True))
+    monkeypatch.setattr(payments_reliability_async, "SessionLocal", _SessionLocal())
+    seen_review_keys: set[str] = set()
+
+    class FakeStarsClient:
+        def __init__(self, *, bot_token: str) -> None:
+            assert bot_token == "bot-token-secret"
+
+        async def get_star_transactions(self, *, limit: int) -> TelegramStarTransactionsPage:
+            del limit
+            return TelegramStarTransactionsPage(transactions=[_transaction()])
+
+    async def _no_candidate_rows(*_args, **_kwargs):
+        return []
+
+    async def _create_review_once(
+        session: object,
+        *,
+        event_type: str,
+        payload: dict[str, object],
+        payload_key: str,
+        status: str,
+    ):
+        del session, event_type, payload_key, status
+        review_key = str(payload["review_key"])
+        if review_key in seen_review_keys:
+            return object(), False
+        seen_review_keys.add(review_key)
+        return object(), True
+
+    monkeypatch.setattr(payments_reliability_async, "TelegramStarsClient", FakeStarsClient)
+    monkeypatch.setattr(
+        payments_reliability_async.PurchasesRepo,
+        "list_stars_reconciliation_candidate_rows",
+        _no_candidate_rows,
+    )
+    monkeypatch.setattr(
+        payments_reliability_async.OutboxEventsRepo,
+        "create_once_by_payload_key",
+        _create_review_once,
+    )
+
+    first = await payments_reliability_async.run_telegram_stars_reconciliation_async()
+    second = await payments_reliability_async.run_telegram_stars_reconciliation_async()
+
+    assert first["review_events_created"] == 1
+    assert first["review_events_existing"] == 0
+    assert second["review_events_created"] == 0
+    assert second["review_events_existing"] == 1
 
 
 @pytest.mark.asyncio

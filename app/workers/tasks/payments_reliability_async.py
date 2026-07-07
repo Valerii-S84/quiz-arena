@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -7,6 +8,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.db.repo.outbox_events_repo import OutboxEventsRepo
 from app.db.repo.promo_repo import PromoRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.session import SessionLocal
@@ -34,6 +36,8 @@ from app.workers.tasks.payments_reliability_reconciliation import (
 )
 
 logger = structlog.get_logger("app.workers.tasks.payments_reliability")
+PAYMENT_STARS_RECONCILIATION_REVIEW_EVENT = "payments_telegram_stars_reconciliation_review"
+_REVIEWABLE_SEVERITIES = frozenset({"HIGH", "MEDIUM"})
 
 __all__ = [
     "expire_stale_unpaid_invoices_async",
@@ -331,6 +335,8 @@ async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
         dry_run=dry_run,
         auto_recovery_enabled=auto_recovery_enabled,
     )
+    review_summary = await _persist_telegram_stars_review_findings(decisions)
+    result.update(review_summary)
     logger.info("telegram_stars_reconciliation_finished", **result)
     return result
 
@@ -387,3 +393,56 @@ def _build_telegram_stars_dry_run_result(
         "high_severity_findings": severity_counts.get("HIGH", 0),
         "medium_severity_findings": severity_counts.get("MEDIUM", 0),
     }
+
+
+async def _persist_telegram_stars_review_findings(
+    decisions: list[ReconciliationDecision],
+) -> dict[str, int]:
+    review_decisions = [
+        decision for decision in decisions if decision.severity in _REVIEWABLE_SEVERITIES
+    ]
+    if not review_decisions:
+        return {"review_findings": 0, "review_events_created": 0, "review_events_existing": 0}
+
+    created = 0
+    existing = 0
+    async with SessionLocal.begin() as session:
+        for decision in review_decisions:
+            _, was_created = await OutboxEventsRepo.create_once_by_payload_key(
+                session,
+                event_type=PAYMENT_STARS_RECONCILIATION_REVIEW_EVENT,
+                payload=_telegram_stars_review_payload(decision),
+                payload_key="review_key",
+                status="OPEN",
+            )
+            if was_created:
+                created += 1
+            else:
+                existing += 1
+
+    return {
+        "review_findings": len(review_decisions),
+        "review_events_created": created,
+        "review_events_existing": existing,
+    }
+
+
+def _telegram_stars_review_payload(decision: ReconciliationDecision) -> dict[str, object]:
+    candidate_purchase_ids = [str(purchase_id) for purchase_id in decision.candidate_purchase_ids]
+    return {
+        "schema_version": 1,
+        "source": "telegram_stars_reconciliation",
+        "reason": decision.classification,
+        "severity": decision.severity,
+        "review_key": _stable_payment_review_hash(
+            f"{decision.transaction_id}:{decision.classification}"
+        ),
+        "transaction_id_hash": _stable_payment_review_hash(decision.transaction_id),
+        "candidate_purchase_ids": candidate_purchase_ids,
+        "candidate_purchase_count": len(candidate_purchase_ids),
+        "raw_payload_stored": False,
+    }
+
+
+def _stable_payment_review_hash(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()

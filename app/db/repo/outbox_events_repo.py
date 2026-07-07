@@ -27,6 +27,59 @@ class OutboxEventsRepo:
         return event
 
     @staticmethod
+    async def get_open_by_payload_key(
+        session: AsyncSession,
+        *,
+        event_type: str,
+        payload_key: str,
+        payload_value: str,
+        status: str = "OPEN",
+    ) -> OutboxEvent | None:
+        stmt = (
+            select(OutboxEvent)
+            .where(
+                OutboxEvent.event_type == event_type,
+                OutboxEvent.status == status,
+                OutboxEvent.payload[payload_key].astext == payload_value,
+            )
+            .order_by(OutboxEvent.created_at.desc(), OutboxEvent.id.desc())
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def create_once_by_payload_key(
+        session: AsyncSession,
+        *,
+        event_type: str,
+        payload: dict[str, object],
+        payload_key: str,
+        status: str = "OPEN",
+    ) -> tuple[OutboxEvent, bool]:
+        payload_value = payload.get(payload_key)
+        if not isinstance(payload_value, str) or not payload_value:
+            raise ValueError("payload key value must be a non-empty string")
+
+        existing = await OutboxEventsRepo.get_open_by_payload_key(
+            session,
+            event_type=event_type,
+            payload_key=payload_key,
+            payload_value=payload_value,
+            status=status,
+        )
+        if existing is not None:
+            return existing, False
+
+        event = await OutboxEventsRepo.create(
+            session,
+            event_type=event_type,
+            payload=payload,
+            status=status,
+        )
+        return event, True
+
+    @staticmethod
     async def list_events_since(
         session: AsyncSession,
         *,

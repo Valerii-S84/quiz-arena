@@ -93,8 +93,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | 0 | Baseline and safety tracker | DONE | Tracker created; targeted baseline checks passed; audit passed with notes. |
 | 1 | Read-only invariant checker and allowed_updates verification | DONE | Read-only script, allowed_updates helper, and runbook checks passed audit. |
 | 2 | Payment-specific observability and alerts | DONE | Successful-payment logs, invariant alerts, recovery logs, and docs passed audit. |
-| 3 | Telegram Stars client and reconciliation dry-run | IN_PROGRESS | Telegram Stars client, dry-run classifier, task wiring, and read-only dry-run runner are under audit. |
-| 4 | Review records / persistent reconciliation findings | TODO | Migration only after safety/data audit or documented deferral. |
+| 3 | Telegram Stars client and reconciliation dry-run | DONE | Telegram Stars client, conservative dry-run classifier, disabled task wiring, and read-only dry-run runner passed audit. |
+| 4 | Review records / persistent reconciliation findings | IN_PROGRESS | Outbox-based OPEN review events under audit; dedicated review-table migration deferred pending approval/data audit. |
 | 5 | Exact-match auto-recovery behind feature flag | TODO | Disabled by default; strict exact-match criteria. |
 | 6 | Durable payment inbox / payment events | TODO | Only after prior phases are stable. |
 | 7 | Idempotent asset crediting and stronger DB constraints | TODO | Constraints only after data audit. |
@@ -116,8 +116,9 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P3B | 3 | Dry-run reconciliation classifier and safe feature flags | FAIL | `ee3a268` | `pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `14 passed`; `ruff check app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass | `FAIL` | Blocking issue: exact dry-run match lacked purchase/transaction time-window validation; fixing in P3B-FIX. |
 | P3B-FIX | 3 | Add exact-match time-window validation to dry-run classifier | DONE | `fef6760` | `pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `15 passed`; `ruff check app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass | `PASS_WITH_NOTES` | Fixed blocker from P3B; accepted. Later DB integration must preserve created/precheckout-time and configurable-window intent. |
 | P3C | 3 | Disabled/dry-run Celery wiring | DONE | `b1e15f3` | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/workers/test_payments_reliability_task.py tests/workers/test_worker_schedule_units.py tests/workers/test_payments_reliability_async.py` -> `18 passed`; `ruff check app/workers/tasks/payments_reliability_async.py app/workers/tasks/payments_reliability.py app/workers/tasks/payments_reliability_schedule.py tests/workers/test_telegram_stars_reconciliation_task.py tests/workers/test_payments_reliability_task.py tests/workers/test_worker_schedule_units.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy ...` -> pass | `PASS_WITH_NOTES` | Accepted; wiring-only task is safe, and real dry-run comparison remains tracked as P3D. |
-| P3D | 3 | Dry-run Stars reconciliation runner without mutations | AUDIT | Pending | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `19 passed`; `pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py` -> `13 passed`; `ruff check app/db/repo/purchases_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/purchases_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | Pending | Pending |
-| P4 | 4 | Persistent review records or documented migration deferral | TODO | Pending | Pending | Pending | Pending |
+| P3D | 3 | Dry-run Stars reconciliation runner without mutations | DONE | `56fa4fb` | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `19 passed`; `pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py` -> `13 passed`; `ruff check app/db/repo/purchases_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/purchases_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | `PASS_WITH_NOTES` | Accepted; persistent checkpoints/review records and dry-run alerts remain tracked for Phase 4. |
+| P4A | 4 | Persist Stars dry-run review findings through existing outbox | AUDIT | Pending | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py` -> `13 passed`; `pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py` -> `13 passed`; `ruff check app/db/repo/outbox_events_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/outbox_events_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | Pending | Pending |
+| P4B | 4 | Document review outbox workflow and migration deferral limits | TODO | Pending | Pending | Pending | Pending |
 | P5 | 5 | Exact-match auto-recovery behind safe flags | TODO | Pending | Pending | Pending | Pending |
 | P6 | 6 | Durable payment update inbox and replay path | TODO | Pending | Pending | Pending | Pending |
 | P7A | 7 | Idempotent premium entitlement and ledger credit re-entry | TODO | Pending | Pending | Pending | Pending |
@@ -343,6 +344,29 @@ Auditor notes:
   checkpointing, alerts, or review-record flow.
 
 Lead response: Accepted; real dry-run comparison is tracked as P3D before Phase 4.
+
+### P3D - `56fa4fb` - `feat(payments): run Stars reconciliation dry run`
+
+Auditor verdict: `PASS_WITH_NOTES`
+
+Auditor notes:
+
+- No blocking issues.
+- Patch respects P3D scope: Telegram `getStarTransactions` is only reached when reconciliation is
+  enabled and dry-run is true.
+- Disabled and non-dry-run paths return before client construction.
+- Candidate lookup is SELECT-only and bounded by charge id, invoice payload, or Telegram user/time
+  window.
+- The dry-run path classifies with the conservative classifier and logs/returns aggregate
+  classification and severity counts only.
+- No purchases, entitlements, ledger rows, review records, config, migrations, or auto-credit path
+  are mutated.
+- Logs do not include bot token, raw transaction payload, raw invoice payload, or raw charge id.
+- Non-blocking note: persistent checkpoints/review records and dry-run alerts remain future plan
+  work.
+
+Lead response: Accepted; Phase 4 will address persistent findings/review records or documented
+migration deferral.
 
 ## Open owner decisions
 
