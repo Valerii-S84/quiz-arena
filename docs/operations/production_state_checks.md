@@ -54,7 +54,38 @@ Expected:
 - `pre_checkout_query` is present so Telegram can deliver payment approval requests.
 - `callback_query` stays present so existing bot callbacks keep working.
 
-## 3) Queue and worker pressure
+## 3) Payment reliability invariants
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/payment_reliability_checks.py \
+  --webhook-info-json /tmp/telegram_webhook_info.json
+```
+
+Expected:
+- `payments_precheckout_stuck_detected` is `OK`.
+- `payments_paid_uncredited_stuck_detected` is `OK`.
+- `payments_credited_premium_missing_entitlement` is `OK`.
+- `payments_credited_stars_missing_purchase_credit` is `OK`.
+- `payments_duplicate_telegram_payment_charge_id` is `OK`.
+- `payments_duplicate_active_premium_entitlements` is `OK`.
+- `payments_open_manual_review_records` is `OK` or `SKIPPED` if the review table has not been added yet.
+
+Payment invariant alerts are emitted by:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env exec -T worker \
+  celery -A app.workers.celery_app inspect registered | grep run_payment_invariant_alerts
+```
+
+Expected:
+- `app.workers.tasks.payments_reliability.run_payment_invariant_alerts` is registered.
+- Alert events route through configured ops channels:
+  - `payments_precheckout_stuck_detected`
+  - `payments_paid_uncredited_stuck_detected`
+  - `payments_credit_invariant_failed`
+  - `payments_webhook_allowed_updates_missing`
+
+## 4) Queue and worker pressure
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env exec -T redis redis-cli LLEN q_high
@@ -69,20 +100,21 @@ Expected:
 - no long-running stuck tasks in `active`,
 - `reserved` remains small.
 
-## 4) Error scan (last 30 minutes)
+## 5) Error scan (last 30 minutes)
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env logs --since 30m api | \
   grep -Ei "\\[(ERROR|CRITICAL)/|traceback|exception" || true
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env logs --since 30m worker | \
-  grep -Ei "\\[(ERROR|CRITICAL)/|traceback|exception|telegram_update_failed_final|telegram_update_non_retryable_error" || true
+  grep -Ei "\\[(ERROR|CRITICAL)/|traceback|exception|telegram_update_failed_final|telegram_update_non_retryable_error|payment_recovery_failed" || true
 ```
 
 Expected:
 - no fresh critical errors,
 - no burst of `telegram_update_failed_final`.
+- no unresolved `payment_recovery_failed` burst.
 
-## 5) Database lock sanity
+## 6) Database lock sanity
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env exec -T postgres \
@@ -96,7 +128,7 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env exec -
 Expected:
 - empty set, or only very short-lived entries.
 
-## 6) Quick usage counters
+## 7) Quick usage counters
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env exec -T postgres \
@@ -112,12 +144,14 @@ Expected:
 - query returns quickly,
 - values are plausible and not dropping unexpectedly.
 
-## 7) Escalation triggers
+## 8) Escalation triggers
 
 Escalate immediately if any of the following is true:
 - health endpoint not `ok`,
 - webhook `pending_update_count` grows for more than 10 minutes,
 - queue lengths grow continuously with no drain,
 - repeated `telegram_update_failed_final`,
+- any payment reliability invariant check reports `FAIL`,
+- `payment_recovery_failed` repeats for the same purchase,
 - long `idle in transaction` sessions,
 - container restart count increases unexpectedly.

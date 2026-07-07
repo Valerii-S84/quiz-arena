@@ -185,6 +185,10 @@ These events are sent through `send_ops_alert(...)` and routed by `app/services/
 - `promo_campaign_auto_paused`
 - `payments_recovery_review_required`
 - `payments_reconciliation_diff_detected`
+- `payments_precheckout_stuck_detected`
+- `payments_paid_uncredited_stuck_detected`
+- `payments_credit_invariant_failed`
+- `payments_webhook_allowed_updates_missing`
 - `offers_conversion_drop_detected`
 - `offers_spam_anomaly_detected`
 - `referral_fraud_spike_detected`

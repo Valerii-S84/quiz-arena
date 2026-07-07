@@ -113,6 +113,20 @@ Expected:
 - latest `purchases.status='CREDITED'`,
 - `discount_stars_amount > 0`.
 
+### 3.2 Payment reliability checks
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/payment_reliability_checks.py \
+  --webhook-info-json /tmp/telegram_webhook_info.json
+```
+
+Expected:
+- `payments_precheckout_stuck_detected` is `OK`,
+- `payments_paid_uncredited_stuck_detected` is `OK`,
+- `payments_credited_premium_missing_entitlement` is `OK`,
+- `payments_credited_stars_missing_purchase_credit` is `OK`,
+- `payments_webhook_allowed_updates_missing` is `OK`.
+
 ## 4) Scenario B: referral reward callback replay
 
 1. Ensure a referrer has claimable reward state.
