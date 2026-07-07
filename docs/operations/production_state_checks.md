@@ -68,7 +68,17 @@ Expected:
 - `payments_credited_stars_missing_purchase_credit` is `OK`.
 - `payments_duplicate_telegram_payment_charge_id` is `OK`.
 - `payments_duplicate_active_premium_entitlements` is `OK`.
+- `payments_constraint_duplicate_premium_source_purchase` is `OK`.
+- `payments_constraint_duplicate_purchase_credit_ledger` is `OK`.
+- `payments_constraint_paid_purchase_missing_charge_id` is `OK`.
+- `payments_constraint_paid_purchase_missing_paid_at` is `OK`.
 - `payments_open_manual_review_records` is `OK` or `SKIPPED` if the review table has not been added yet.
+
+DB constraint hardening rule:
+- do not add strict Alembic constraints during an incident or without owner approval;
+- run this read-only checker first and require every `payments_constraint_*` preflight to be `OK`;
+- only then consider a backward-compatible migration for unique premium entitlement per source
+  purchase, unique purchase credit ledger per purchase, or stricter paid-status invariants.
 
 Telegram Stars reconciliation review findings currently persist through `outbox_events`
 while the dedicated review table migration is deferred:

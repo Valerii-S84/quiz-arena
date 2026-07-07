@@ -97,7 +97,7 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | 4 | Review records / persistent reconciliation findings | DONE | Outbox-based OPEN review events and documented migration deferral passed audit; no new migration added. |
 | 5 | Exact-match auto-recovery behind feature flag | DONE | Exact-match auto-recovery and transaction revalidation fix passed audit; defaults remain disabled/dry-run. |
 | 6 | Durable payment inbox / payment events | DONE | Interim outbox evidence before ACK and documented inbox/payment_events migration deferral passed audit. |
-| 7 | Idempotent asset crediting and stronger DB constraints | IN_PROGRESS | Idempotent premium entitlement and purchase ledger re-entry under audit; constraints deferred pending data audit/approval. |
+| 7 | Idempotent asset crediting and stronger DB constraints | IN_PROGRESS | Idempotent premium entitlement and purchase ledger re-entry passed audit; constraint preflight checks under audit with no migration. |
 | 8 | Production smoke and final hardening | TODO | Safe smoke/runbook, no deploy. |
 
 ## Planned patch ledger
@@ -124,8 +124,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P6A | 6 | Store payment webhook update evidence before ACK through outbox | DONE | `3d78480` | `pytest --capture=no -q tests/api/test_telegram_webhook.py tests/workers/test_telegram_updates_task.py tests/workers/test_telegram_updates_processing_units.py tests/workers/test_telegram_updates_reliability_units.py` -> `28 passed`; `pytest --capture=no -q tests/api/test_telegram_webhook.py` -> `10 passed`; `ruff check app/api/routes/telegram_webhook.py tests/api/test_telegram_webhook.py` -> pass; `black --check app/api/routes/telegram_webhook.py tests/api/test_telegram_webhook.py` -> pass; `isort --check-only app/api/routes/telegram_webhook.py tests/api/test_telegram_webhook.py` -> pass; `mypy app/api/routes/telegram_webhook.py tests/api/test_telegram_webhook.py` -> pass | `PASS_WITH_NOTES` | Accepted; outbox evidence is interim, with best-effort dedupe and no dedicated inbox unique constraint. |
 | P6B | 6 | Document payment update outbox evidence and inbox migration deferral | DONE | `0bb4160` | `rg -n "telegram_payment_update_received|payment_update_kind|payment_update_key|telegram_update_inbox|payment_events|raw_update|webhook secrets|PENDING" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md docs/analytics/events_catalog.md` -> required entries present; `rg -n "bot[0-9]+:|TELEGRAM_BOT_TOKEN=.*[0-9A-Za-z_-]{20}|secret-token|bot-token-secret" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md docs/analytics/events_catalog.md` -> no matches | `PASS_WITH_NOTES` | Accepted; dedicated inbox/payment_events migration and DB unique constraint remain deferred pending approval/data audit. |
 | P7A | 7 | Idempotent premium entitlement and ledger credit re-entry | FAIL | `cd95bf4` | `pytest --capture=no -q tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_assets_flow_units.py tests/economy/test_purchase_credit_service.py tests/integration/test_purchase_premium_integration.py tests/integration/test_purchase_refund_integration.py` -> `21 passed`; `ruff check app/economy/purchases/service/entitlements.py app/economy/purchases/service/credit_assets.py tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_assets_flow_units.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/economy/purchases/service/entitlements.py app/economy/purchases/service/credit_assets.py tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_assets_flow_units.py` -> pass | `FAIL` | Blocking issue: existing purchase-ledger replay skipped duplicate ledger creation but still allowed energy/streak side effects before the guard; fixing in P7A-FIX. |
-| P7A-FIX | 7 | Skip asset side effects when purchase credit ledger already exists | AUDIT | Pending | `pytest --capture=no -q tests/economy/test_purchase_credit_assets_flow_units.py tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_service.py tests/integration/test_purchase_premium_integration.py tests/integration/test_purchase_refund_integration.py` -> `21 passed`; `ruff check app/economy/purchases/service/credit_assets.py tests/economy/test_purchase_credit_assets_flow_units.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/economy/purchases/service/credit_assets.py tests/economy/test_purchase_credit_assets_flow_units.py` -> pass | Pending | Pending |
-| P7B | 7 | Data-audited DB constraints if approved | TODO | Pending | Pending | Pending | Pending |
+| P7A-FIX | 7 | Skip asset side effects when purchase credit ledger already exists | DONE | `c835cff` | `pytest --capture=no -q tests/economy/test_purchase_credit_assets_flow_units.py tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_service.py tests/integration/test_purchase_premium_integration.py tests/integration/test_purchase_refund_integration.py` -> `21 passed`; `ruff check app/economy/purchases/service/credit_assets.py tests/economy/test_purchase_credit_assets_flow_units.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/economy/purchases/service/credit_assets.py tests/economy/test_purchase_credit_assets_flow_units.py` -> pass | `PASS_WITH_NOTES` | Fixed prior P7A blocker; DB uniqueness/constraint hardening remains deferred to P7B. |
+| P7B | 7 | Add read-only constraint preflight and defer unsafe migrations | AUDIT | Pending | `pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `7 passed`; `ruff check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `black --check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `isort --check-only scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `mypy tests/scripts/test_payment_reliability_checks.py` -> pass; `rg -n "payments_constraint_duplicate_premium_source_purchase|payments_constraint_duplicate_purchase_credit_ledger|payments_constraint_paid_purchase_missing_charge_id|payments_constraint_paid_purchase_missing_paid_at|DB constraint hardening rule|read-only migration preflight" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> required entries present | Pending | Pending |
 | P8 | 8 | Payment smoke and final reliability runbook | TODO | Pending | Pending | Pending | Pending |
 
 ## Baseline checks
@@ -503,6 +503,24 @@ Blocking issue:
 Lead response: Fixed in P7A-FIX by checking the existing purchase credit ledger before any asset,
 promo, or entitlement side effect and by adding a regression test that fails if energy, streak, promo,
 or ledger creation runs on existing-ledger replay.
+
+### P7A-FIX - `c835cff` - `fix(payments): guard purchase ledger replay side effects`
+
+Auditor verdict: `PASS_WITH_NOTES`
+
+Auditor notes:
+
+- No blocking issues.
+- Prior P7A blocker is fixed: existing `PURCHASE_CREDIT` is checked before entitlement, paid energy,
+  streak, promo, or duplicate ledger side effects.
+- Regression test now uses paid energy, streak saver, and promo state, and fails if those side effects
+  run on existing-ledger replay.
+- Scope is limited to P7A-FIX files; no migrations, config, deploy, `.env*`, or Telegram Stars API
+  behavior changed.
+- Non-blocking note: DB uniqueness/constraint hardening remains deferred to P7B as planned.
+
+Lead response: Accepted; P7B will address constraints only through read-only audit/approval-safe
+documentation or explicit deferral, not unsafe migration changes.
 
 ## Open owner decisions
 

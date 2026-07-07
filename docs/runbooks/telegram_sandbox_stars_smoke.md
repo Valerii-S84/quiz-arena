@@ -125,7 +125,15 @@ Expected:
 - `payments_paid_uncredited_stuck_detected` is `OK`,
 - `payments_credited_premium_missing_entitlement` is `OK`,
 - `payments_credited_stars_missing_purchase_credit` is `OK`,
+- `payments_constraint_duplicate_premium_source_purchase` is `OK`,
+- `payments_constraint_duplicate_purchase_credit_ledger` is `OK`,
+- `payments_constraint_paid_purchase_missing_charge_id` is `OK`,
+- `payments_constraint_paid_purchase_missing_paid_at` is `OK`,
 - `payments_webhook_allowed_updates_missing` is `OK`.
+
+These `payments_constraint_*` rows are read-only migration preflight checks. They do not create or
+enforce constraints; production constraints require a separate approved migration after clean data
+audit.
 
 Check that the Stars reconciliation dry-run did not leave open review findings:
 

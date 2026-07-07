@@ -206,6 +206,83 @@ def _duplicate_active_premium_check() -> InvariantCheck:
     )
 
 
+def _duplicate_premium_source_purchase_check() -> InvariantCheck:
+    return InvariantCheck(
+        name="payments_constraint_duplicate_premium_source_purchase",
+        severity="HIGH",
+        sql="""
+            SELECT COALESCE(SUM(duplicate_count - 1), 0)
+            FROM (
+              SELECT count(*) AS duplicate_count
+              FROM entitlements
+              WHERE entitlement_type = 'PREMIUM'
+                AND source_purchase_id IS NOT NULL
+              GROUP BY source_purchase_id
+              HAVING count(*) > 1
+            ) duplicates
+        """,
+        params={},
+        description=(
+            "Constraint preflight: duplicate premium entitlements exist for a source purchase."
+        ),
+    )
+
+
+def _duplicate_purchase_credit_ledger_check() -> InvariantCheck:
+    return InvariantCheck(
+        name="payments_constraint_duplicate_purchase_credit_ledger",
+        severity="HIGH",
+        sql="""
+            SELECT COALESCE(SUM(duplicate_count - 1), 0)
+            FROM (
+              SELECT count(*) AS duplicate_count
+              FROM ledger_entries
+              WHERE purchase_id IS NOT NULL
+                AND entry_type = 'PURCHASE_CREDIT'
+                AND direction = 'CREDIT'
+              GROUP BY purchase_id
+              HAVING count(*) > 1
+            ) duplicates
+        """,
+        params={},
+        description=(
+            "Constraint preflight: duplicate PURCHASE_CREDIT ledger rows exist for a purchase."
+        ),
+    )
+
+
+def _paid_purchase_missing_charge_id_check() -> InvariantCheck:
+    return InvariantCheck(
+        name="payments_constraint_paid_purchase_missing_charge_id",
+        severity="HIGH",
+        sql="""
+            SELECT count(*)
+            FROM purchases
+            WHERE stars_amount > 0
+              AND status IN ('PAID_UNCREDITED', 'CREDITED', 'REFUNDED')
+              AND telegram_payment_charge_id IS NULL
+        """,
+        params={},
+        description="Constraint preflight: paid Stars purchase is missing Telegram charge id.",
+    )
+
+
+def _paid_purchase_missing_paid_at_check() -> InvariantCheck:
+    return InvariantCheck(
+        name="payments_constraint_paid_purchase_missing_paid_at",
+        severity="HIGH",
+        sql="""
+            SELECT count(*)
+            FROM purchases
+            WHERE stars_amount > 0
+              AND status IN ('PAID_UNCREDITED', 'CREDITED', 'REFUNDED')
+              AND paid_at IS NULL
+        """,
+        params={},
+        description="Constraint preflight: paid Stars purchase is missing paid_at timestamp.",
+    )
+
+
 def build_invariant_checks(now_utc: datetime) -> list[InvariantCheck]:
     precheckout_cutoff = now_utc - timedelta(minutes=3)
     paid_uncredited_cutoff = now_utc - timedelta(seconds=60)
@@ -216,6 +293,10 @@ def build_invariant_checks(now_utc: datetime) -> list[InvariantCheck]:
         _credited_stars_missing_purchase_credit_check(),
         _duplicate_charge_id_check(),
         _duplicate_active_premium_check(),
+        _duplicate_premium_source_purchase_check(),
+        _duplicate_purchase_credit_ledger_check(),
+        _paid_purchase_missing_charge_id_check(),
+        _paid_purchase_missing_paid_at_check(),
     ]
 
 

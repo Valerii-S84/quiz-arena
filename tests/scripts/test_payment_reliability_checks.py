@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 
 from scripts.payment_reliability_checks import (
+    build_invariant_checks,
     evaluate_allowed_updates,
     extract_allowed_updates,
     read_only_sql_texts,
@@ -59,6 +61,19 @@ def test_read_only_sql_texts_do_not_contain_mutating_statements() -> None:
     assert read_only_sql_texts()
     for sql in read_only_sql_texts():
         assert forbidden.search(sql) is None
+
+
+def test_constraint_preflight_checks_are_included() -> None:
+    names = {
+        check.name for check in build_invariant_checks(datetime(2026, 1, 1, tzinfo=timezone.utc))
+    }
+
+    assert {
+        "payments_constraint_duplicate_premium_source_purchase",
+        "payments_constraint_duplicate_purchase_credit_ledger",
+        "payments_constraint_paid_purchase_missing_charge_id",
+        "payments_constraint_paid_purchase_missing_paid_at",
+    }.issubset(names)
 
 
 def test_text_renderer_uses_counts_without_raw_payloads() -> None:
