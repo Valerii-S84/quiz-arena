@@ -92,7 +92,7 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 |---|---|---:|---|
 | 0 | Baseline and safety tracker | DONE | Tracker created; targeted baseline checks passed; audit passed with notes. |
 | 1 | Read-only invariant checker and allowed_updates verification | DONE | Read-only script, allowed_updates helper, and runbook checks passed audit. |
-| 2 | Payment-specific observability and alerts | AUDIT | Successful-payment logs passed audit; read-only invariant alerts added; recovery logs/docs still pending. |
+| 2 | Payment-specific observability and alerts | AUDIT | Successful-payment logs and read-only invariant alerts passed audit; recovery logs ready for audit; docs still pending. |
 | 3 | Telegram Stars client and reconciliation dry-run | TODO | Feature-flagged, dry-run, no auto-credit. |
 | 4 | Review records / persistent reconciliation findings | TODO | Migration only after safety/data audit or documented deferral. |
 | 5 | Exact-match auto-recovery behind feature flag | TODO | Disabled by default; strict exact-match criteria. |
@@ -108,8 +108,9 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P1A | 1 | `scripts/payment_reliability_checks.py` read-only checker and unit coverage | DONE | `e76b1cc` | `pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `6 passed`; `ruff check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `black --check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `isort --check-only scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `mypy tests/scripts/test_payment_reliability_checks.py` -> pass; CLI `--skip-db --webhook-info-json -` sample -> OK | `PASS_WITH_NOTES` | Accepted; later reconciliation/payment-event checks remain planned for future phases. |
 | P1B | 1 | Add allowed_updates verification commands to payment runbooks | DONE | `ca0fc52` | `rg -n "allowed_updates|payment_reliability_checks|message|callback_query|pre_checkout_query" docs/runbooks/telegram_sandbox_stars_smoke.md docs/operations/production_state_checks.md` -> required entries present; `scripts/payment_reliability_checks.py --help` -> documents offline `--webhook-info-json` and `--skip-db` usage | `PASS_WITH_NOTES` | Accepted; docs-only patch did not change runtime behavior. |
 | P2A | 2 | Structured successful-payment logs without sensitive payloads | DONE | `6b1705b` | `pytest --capture=no -q tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py` -> `17 passed`; `ruff check app/bot/handlers/payments.py app/economy/purchases/service/credit.py tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py` -> pass; `black --check app/bot/handlers/payments.py app/economy/purchases/service/credit.py tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py` -> pass; `isort --check-only app/bot/handlers/payments.py app/economy/purchases/service/credit.py tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py` -> pass; `mypy app/bot/handlers/payments.py app/economy/purchases/service/credit.py tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py` -> pass | `PASS_WITH_NOTES` | Accepted; `update_id` remains deferred to durable inbox/payment-event phases. |
-| P2B | 2 | Read-only invariant alerts in scheduled reliability path | AUDIT | Pending | `pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py tests/workers/test_worker_schedule_units.py tests/services/test_alerts.py` -> `22 passed`; `ruff check app/db/repo/purchases_repo.py app/services/alerts_config.py app/workers/tasks/payments_reliability_async.py app/workers/tasks/payments_reliability.py app/workers/tasks/payments_reliability_schedule.py tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py tests/workers/test_worker_schedule_units.py tests/services/test_alerts.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy ...` -> pass | Pending | Pending |
-| P2C | 2 | Production state and sandbox Stars runbook updates | TODO | Pending | Pending | Pending | Pending |
+| P2B | 2 | Read-only invariant alerts in scheduled reliability path | DONE | `a82484d` | `pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py tests/workers/test_worker_schedule_units.py tests/services/test_alerts.py` -> `22 passed`; `ruff check app/db/repo/purchases_repo.py app/services/alerts_config.py app/workers/tasks/payments_reliability_async.py app/workers/tasks/payments_reliability.py app/workers/tasks/payments_reliability_schedule.py tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py tests/workers/test_worker_schedule_units.py tests/services/test_alerts.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy ...` -> pass | `PASS_WITH_NOTES` | Accepted; repeated Slack/generic alerts while counts remain nonzero are a known non-blocking ops noise risk. |
+| P2C | 2 | Structured stale payment recovery logs | AUDIT | Pending | `pytest --capture=no -q tests/workers/test_payments_reliability_async_credit_batch.py` -> `3 passed`; `ruff check app/workers/tasks/payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py` -> pass; `black --check app/workers/tasks/payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py` -> pass; `isort --check-only app/workers/tasks/payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py` -> pass; `mypy app/workers/tasks/payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py` -> pass | Pending | Pending |
+| P2D | 2 | Production state and sandbox Stars runbook updates | TODO | Pending | Pending | Pending | Pending |
 | P3A | 3 | Telegram Stars API wrapper with safe timeout/error handling | TODO | Pending | Pending | Pending | Pending |
 | P3B | 3 | Dry-run reconciliation classifier and safe feature flags | TODO | Pending | Pending | Pending | Pending |
 | P3C | 3 | Disabled/dry-run Celery wiring | TODO | Pending | Pending | Pending | Pending |
@@ -202,6 +203,27 @@ Auditor notes:
   does not receive it yet; this remains deferred to durable inbox/payment-event phases.
 
 Lead response: Accepted; `update_id` remains tracked for later durable inbox/payment-event phases.
+
+### P2B - `a82484d` - `feat(payments): alert on stuck payment invariants`
+
+Auditor verdict: `PASS_WITH_NOTES`
+
+Auditor notes:
+
+- No blocking issues.
+- Patch matches Phase 2B scope: read-only invariant counts, scheduled alert task, alert routing,
+  focused tests, and tracker metadata.
+- Repo helpers are SELECT/count-only.
+- Task alerts only for nonzero counts and payloads contain counts only, not raw payment payloads
+  or secrets.
+- Alert severity/routing is critical `ops_l1`, aligned with high-severity payment invariant
+  intent.
+- Non-blocking noise note: PagerDuty has a stable dedup key in alert payload construction, but
+  Slack/generic targets can still receive repeated alerts each minute while an invariant remains
+  nonzero.
+
+Lead response: Accepted; repeated Slack/generic alerts while counts remain nonzero are tracked as
+a non-blocking ops noise risk.
 
 ## Open owner decisions
 

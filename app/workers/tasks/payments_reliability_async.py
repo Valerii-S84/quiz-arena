@@ -134,6 +134,11 @@ async def recover_paid_uncredited_async(
 ) -> dict[str, int]:
     now_utc = datetime.now(timezone.utc)
     stale_cutoff = now_utc - timedelta(minutes=stale_minutes)
+    logger.info(
+        "payment_recovery_started",
+        batch_size=batch_size,
+        stale_minutes=stale_minutes,
+    )
 
     async with SessionLocal.begin() as session:
         candidates = await PurchasesRepo.get_paid_uncredited_older_than(
@@ -155,12 +160,24 @@ async def recover_paid_uncredited_async(
     for purchase in candidates:
         try:
             outcome = await _recover_single_purchase(purchase.id, now_utc=now_utc)
-        except Exception:
+        except Exception as exc:
             summary["errors"] += 1
+            logger.warning(
+                "payment_recovery_failed",
+                purchase_id=str(purchase.id),
+                outcome="error",
+                error_type=type(exc).__name__,
+            )
             logger.exception("paid_uncredited_recovery_error", purchase_id=str(purchase.id))
             continue
 
         summary[outcome] = summary.get(outcome, 0) + 1
+        if outcome in {"review", "retryable_failure"}:
+            logger.warning(
+                "payment_recovery_failed",
+                purchase_id=str(purchase.id),
+                outcome=outcome,
+            )
 
     if summary["review"] > 0 or summary["errors"] > 0:
         payload: dict[str, object] = {key: value for key, value in summary.items()}
@@ -169,6 +186,7 @@ async def recover_paid_uncredited_async(
             payload=payload,
         )
 
+    logger.info("payment_recovery_finished", **summary)
     logger.info("paid_uncredited_recovery_finished", **summary)
     return summary
 
