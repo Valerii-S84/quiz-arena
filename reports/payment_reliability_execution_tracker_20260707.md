@@ -93,7 +93,7 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | 0 | Baseline and safety tracker | DONE | Tracker created; targeted baseline checks passed; audit passed with notes. |
 | 1 | Read-only invariant checker and allowed_updates verification | DONE | Read-only script, allowed_updates helper, and runbook checks passed audit. |
 | 2 | Payment-specific observability and alerts | DONE | Successful-payment logs, invariant alerts, recovery logs, and docs passed audit. |
-| 3 | Telegram Stars client and reconciliation dry-run | AUDIT | Telegram Stars API wrapper added; dry-run classifier/flags still pending. |
+| 3 | Telegram Stars client and reconciliation dry-run | AUDIT | Telegram Stars API wrapper passed after fix; dry-run classifier and safe flags ready for audit. |
 | 4 | Review records / persistent reconciliation findings | TODO | Migration only after safety/data audit or documented deferral. |
 | 5 | Exact-match auto-recovery behind feature flag | TODO | Disabled by default; strict exact-match criteria. |
 | 6 | Durable payment inbox / payment events | TODO | Only after prior phases are stable. |
@@ -112,8 +112,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P2C | 2 | Structured stale payment recovery logs | DONE | `69512ad` | `pytest --capture=no -q tests/workers/test_payments_reliability_async_credit_batch.py` -> `3 passed`; `ruff check app/workers/tasks/payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py` -> pass; `black --check app/workers/tasks/payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py` -> pass; `isort --check-only app/workers/tasks/payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py` -> pass; `mypy app/workers/tasks/payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py` -> pass | `PASS_WITH_NOTES` | Accepted; per-purchase warning logs may repeat while recovery remains unresolved. |
 | P2D | 2 | Production state, sandbox Stars, and alert catalog docs | DONE | `2b0d7a7` | `rg -n "payment_reliability_checks|payments_precheckout_stuck_detected|payments_paid_uncredited_stuck_detected|payments_credit_invariant_failed|payments_webhook_allowed_updates_missing|run_payment_invariant_alerts|payment_recovery_failed" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md docs/analytics/events_catalog.md` -> required entries present; `scripts/payment_reliability_checks.py --help` -> documents offline webhook JSON and skip-DB modes | `PASS_WITH_NOTES` | Accepted; event catalog payload/severity detail remains minimal but production checks cover severity/escalation. |
 | P3A | 3 | Telegram Stars API wrapper with safe timeout/error handling | FAIL | `bfe751a` | `pytest --capture=no -q tests/services/test_telegram_stars.py` -> `6 passed`; `ruff check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `black --check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `isort --check-only app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `mypy app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; official Telegram Bot API checked for `getStarTransactions` parameters and `StarTransaction` fields | `FAIL` | Blocking issue: chained `httpx.HTTPError` could expose token-bearing URL in traceback; fixing in P3A-FIX. |
-| P3A-FIX | 3 | Sanitize Telegram Stars HTTP error traceback token exposure | AUDIT | Pending | `pytest --capture=no -q tests/services/test_telegram_stars.py` -> `7 passed`; `ruff check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `black --check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `isort --check-only app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `mypy app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; traceback-format test confirms token is absent from HTTP status failure traceback | Pending | Pending |
-| P3B | 3 | Dry-run reconciliation classifier and safe feature flags | TODO | Pending | Pending | Pending | Pending |
+| P3A-FIX | 3 | Sanitize Telegram Stars HTTP error traceback token exposure | DONE | `1e52b51` | `pytest --capture=no -q tests/services/test_telegram_stars.py` -> `7 passed`; `ruff check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `black --check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `isort --check-only app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `mypy app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; traceback-format test confirms token is absent from HTTP status failure traceback | `PASS_WITH_NOTES` | Fixed blocker from P3A; accepted. |
+| P3B | 3 | Dry-run reconciliation classifier and safe feature flags | AUDIT | Pending | `pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `14 passed`; `ruff check app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass | Pending | Pending |
 | P3C | 3 | Disabled/dry-run Celery wiring | TODO | Pending | Pending | Pending | Pending |
 | P4 | 4 | Persistent review records or documented migration deferral | TODO | Pending | Pending | Pending | Pending |
 | P5 | 5 | Exact-match auto-recovery behind safe flags | TODO | Pending | Pending | Pending | Pending |
@@ -276,6 +276,22 @@ Blocking issue:
 
 Lead response: Fixed in P3A-FIX; HTTP status handling no longer calls `raise_for_status`, transport
 errors are raised `from None`, and traceback-level tests assert token absence.
+
+### P3A-FIX - `1e52b51` - `fix(payments): sanitize Telegram Stars client errors`
+
+Auditor verdict: `PASS_WITH_NOTES`
+
+Auditor notes:
+
+- No blocking issues.
+- Previous token-bearing traceback failure is fixed.
+- `response.raise_for_status()` is gone, `httpx.HTTPError` is re-raised `from None`, and HTTP
+  status failures use a sanitized local status check.
+- Traceback-format test covers the prior token-bearing URL risk.
+- No scheduler, reconciliation, DB writes, migrations, config/deploy changes, or auto-credit path
+  were added.
+
+Lead response: Accepted; P3A blocker closed.
 
 ## Open owner decisions
 

@@ -34,6 +34,18 @@ class MessagingSettingsMixin:
         default=False,
         alias="TELEGRAM_DEBUG_TRACE_ENABLED",
     )
+    telegram_stars_reconciliation_enabled: bool = Field(
+        default=False,
+        alias="TELEGRAM_STARS_RECONCILIATION_ENABLED",
+    )
+    telegram_stars_reconciliation_dry_run: bool = Field(
+        default=True,
+        alias="TELEGRAM_STARS_RECONCILIATION_DRY_RUN",
+    )
+    telegram_stars_auto_recovery_enabled: bool = Field(
+        default=False,
+        alias="TELEGRAM_STARS_AUTO_RECOVERY_ENABLED",
+    )
     promo_code_wait_ttl_seconds: int = Field(default=900, alias="PROMO_CODE_WAIT_TTL_SECONDS")
     friend_challenge_ttl_seconds: int = Field(default=86_400, alias="FRIEND_CHALLENGE_TTL_SECONDS")
     friend_challenge_last_chance_seconds: int = Field(
