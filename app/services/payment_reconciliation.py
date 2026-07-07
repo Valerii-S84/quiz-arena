@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from app.services.telegram_stars import TelegramStarTransaction
 
+EXACT_MATCH_WINDOW = timedelta(minutes=30)
 RECOVERABLE_RECONCILIATION_STATUSES = frozenset(
     {"PRECHECKOUT_OK", "INVOICE_SENT", "CREATED", "PAID_UNCREDITED"}
 )
@@ -25,6 +27,7 @@ class ReconciliationCandidate:
     telegram_user_id: int
     stars_amount: int
     status: str
+    created_at: datetime
     telegram_payment_charge_id: str | None = None
 
 
@@ -65,6 +68,8 @@ def classify_star_transaction_dry_run(
     if len(exact_candidates) > 1:
         return _decision(AMBIGUOUS_MATCH, "MEDIUM", transaction, candidates=exact_candidates)
 
+    if _has_same_user_amount_candidate(transaction, candidates):
+        return _decision(AMBIGUOUS_MATCH, "MEDIUM", transaction, candidates=candidates)
     if _has_same_user_candidate(transaction, candidates):
         return _decision(AMOUNT_MISMATCH, "HIGH", transaction, candidates=candidates)
     return _decision(USER_MISMATCH, "HIGH", transaction, candidates=candidates)
@@ -96,6 +101,29 @@ def _is_exact_recoverable_match(
         and candidate.stars_amount == transaction.amount
         and candidate.status in RECOVERABLE_RECONCILIATION_STATUSES
         and candidate.telegram_payment_charge_id in (None, transaction.transaction_id)
+        and _is_within_match_window(transaction, candidate)
+    )
+
+
+def _is_within_match_window(
+    transaction: TelegramStarTransaction,
+    candidate: ReconciliationCandidate,
+) -> bool:
+    return (
+        candidate.created_at
+        <= transaction.transaction_date
+        <= (candidate.created_at + EXACT_MATCH_WINDOW)
+    )
+
+
+def _has_same_user_amount_candidate(
+    transaction: TelegramStarTransaction,
+    candidates: list[ReconciliationCandidate],
+) -> bool:
+    return any(
+        candidate.telegram_user_id == transaction.source_user_id
+        and candidate.stars_amount == transaction.amount
+        for candidate in candidates
     )
 
 

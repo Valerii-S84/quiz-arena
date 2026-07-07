@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from app.services.payment_reconciliation import (
@@ -46,6 +46,7 @@ def _candidate(
     amount: int = 29,
     status: str = "PRECHECKOUT_OK",
     charge_id: str | None = None,
+    created_at: datetime | None = None,
 ) -> ReconciliationCandidate:
     return ReconciliationCandidate(
         purchase_id=uuid4(),
@@ -53,6 +54,7 @@ def _candidate(
         telegram_user_id=telegram_user_id,
         stars_amount=amount,
         status=status,
+        created_at=created_at or datetime(2026, 7, 6, 23, 45, tzinfo=timezone.utc),
         telegram_payment_charge_id=charge_id,
     )
 
@@ -111,6 +113,20 @@ def test_two_exact_candidates_are_ambiguous() -> None:
     assert decision.classification == AMBIGUOUS_MATCH
     assert decision.severity == "MEDIUM"
     assert len(decision.candidate_purchase_ids) == 2
+
+
+def test_same_user_amount_outside_time_window_is_ambiguous() -> None:
+    old_candidate = _candidate(
+        created_at=datetime(2026, 7, 7, tzinfo=timezone.utc) - timedelta(hours=2)
+    )
+
+    decision = classify_star_transaction_dry_run(
+        transaction=_transaction(),
+        candidates=[old_candidate],
+    )
+
+    assert decision.classification == AMBIGUOUS_MATCH
+    assert decision.auto_recovery_allowed is False
 
 
 def test_no_db_purchase_is_high_severity() -> None:

@@ -113,7 +113,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P2D | 2 | Production state, sandbox Stars, and alert catalog docs | DONE | `2b0d7a7` | `rg -n "payment_reliability_checks|payments_precheckout_stuck_detected|payments_paid_uncredited_stuck_detected|payments_credit_invariant_failed|payments_webhook_allowed_updates_missing|run_payment_invariant_alerts|payment_recovery_failed" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md docs/analytics/events_catalog.md` -> required entries present; `scripts/payment_reliability_checks.py --help` -> documents offline webhook JSON and skip-DB modes | `PASS_WITH_NOTES` | Accepted; event catalog payload/severity detail remains minimal but production checks cover severity/escalation. |
 | P3A | 3 | Telegram Stars API wrapper with safe timeout/error handling | FAIL | `bfe751a` | `pytest --capture=no -q tests/services/test_telegram_stars.py` -> `6 passed`; `ruff check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `black --check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `isort --check-only app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `mypy app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; official Telegram Bot API checked for `getStarTransactions` parameters and `StarTransaction` fields | `FAIL` | Blocking issue: chained `httpx.HTTPError` could expose token-bearing URL in traceback; fixing in P3A-FIX. |
 | P3A-FIX | 3 | Sanitize Telegram Stars HTTP error traceback token exposure | DONE | `1e52b51` | `pytest --capture=no -q tests/services/test_telegram_stars.py` -> `7 passed`; `ruff check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `black --check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `isort --check-only app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `mypy app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; traceback-format test confirms token is absent from HTTP status failure traceback | `PASS_WITH_NOTES` | Fixed blocker from P3A; accepted. |
-| P3B | 3 | Dry-run reconciliation classifier and safe feature flags | AUDIT | Pending | `pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `14 passed`; `ruff check app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass | Pending | Pending |
+| P3B | 3 | Dry-run reconciliation classifier and safe feature flags | FAIL | `ee3a268` | `pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `14 passed`; `ruff check app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass | `FAIL` | Blocking issue: exact dry-run match lacked purchase/transaction time-window validation; fixing in P3B-FIX. |
+| P3B-FIX | 3 | Add exact-match time-window validation to dry-run classifier | AUDIT | Pending | `pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `15 passed`; `ruff check app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass | Pending | Pending |
 | P3C | 3 | Disabled/dry-run Celery wiring | TODO | Pending | Pending | Pending | Pending |
 | P4 | 4 | Persistent review records or documented migration deferral | TODO | Pending | Pending | Pending | Pending |
 | P5 | 5 | Exact-match auto-recovery behind safe flags | TODO | Pending | Pending | Pending | Pending |
@@ -292,6 +293,19 @@ Auditor notes:
   were added.
 
 Lead response: Accepted; P3A blocker closed.
+
+### P3B - `ee3a268` - `feat(payments): add Stars reconciliation dry-run classifier`
+
+Auditor verdict: `FAIL`
+
+Blocking issue:
+
+- `WOULD_RECOVER_EXACT_MATCH` could be emitted without purchase-time/window validation. The plan
+  requires charge/user/amount/time/status matching before safe recovery classification.
+
+Lead response: Fixed in P3B-FIX; candidates now carry `created_at`, exact matches require the
+transaction date to fall within a 30-minute purchase window, and same-user/same-amount candidates
+outside that window classify as ambiguous instead of recoverable.
 
 ## Open owner decisions
 
