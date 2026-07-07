@@ -94,7 +94,7 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | 1 | Read-only invariant checker and allowed_updates verification | DONE | Read-only script, allowed_updates helper, and runbook checks passed audit. |
 | 2 | Payment-specific observability and alerts | DONE | Successful-payment logs, invariant alerts, recovery logs, and docs passed audit. |
 | 3 | Telegram Stars client and reconciliation dry-run | DONE | Telegram Stars client, conservative dry-run classifier, disabled task wiring, and read-only dry-run runner passed audit. |
-| 4 | Review records / persistent reconciliation findings | IN_PROGRESS | Outbox-based OPEN review events under audit; dedicated review-table migration deferred pending approval/data audit. |
+| 4 | Review records / persistent reconciliation findings | IN_PROGRESS | Outbox-based OPEN review events passed audit; review workflow docs under audit. |
 | 5 | Exact-match auto-recovery behind feature flag | TODO | Disabled by default; strict exact-match criteria. |
 | 6 | Durable payment inbox / payment events | TODO | Only after prior phases are stable. |
 | 7 | Idempotent asset crediting and stronger DB constraints | TODO | Constraints only after data audit. |
@@ -117,8 +117,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P3B-FIX | 3 | Add exact-match time-window validation to dry-run classifier | DONE | `fef6760` | `pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `15 passed`; `ruff check app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/services/payment_reconciliation.py app/services/telegram_stars.py app/core/config_messaging.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> pass | `PASS_WITH_NOTES` | Fixed blocker from P3B; accepted. Later DB integration must preserve created/precheckout-time and configurable-window intent. |
 | P3C | 3 | Disabled/dry-run Celery wiring | DONE | `b1e15f3` | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/workers/test_payments_reliability_task.py tests/workers/test_worker_schedule_units.py tests/workers/test_payments_reliability_async.py` -> `18 passed`; `ruff check app/workers/tasks/payments_reliability_async.py app/workers/tasks/payments_reliability.py app/workers/tasks/payments_reliability_schedule.py tests/workers/test_telegram_stars_reconciliation_task.py tests/workers/test_payments_reliability_task.py tests/workers/test_worker_schedule_units.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy ...` -> pass | `PASS_WITH_NOTES` | Accepted; wiring-only task is safe, and real dry-run comparison remains tracked as P3D. |
 | P3D | 3 | Dry-run Stars reconciliation runner without mutations | DONE | `56fa4fb` | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `19 passed`; `pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py` -> `13 passed`; `ruff check app/db/repo/purchases_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/purchases_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | `PASS_WITH_NOTES` | Accepted; persistent checkpoints/review records and dry-run alerts remain tracked for Phase 4. |
-| P4A | 4 | Persist Stars dry-run review findings through existing outbox | AUDIT | Pending | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py` -> `13 passed`; `pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py` -> `13 passed`; `ruff check app/db/repo/outbox_events_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/outbox_events_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | Pending | Pending |
-| P4B | 4 | Document review outbox workflow and migration deferral limits | TODO | Pending | Pending | Pending | Pending |
+| P4A | 4 | Persist Stars dry-run review findings through existing outbox | DONE | `e34bf1e` | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py` -> `13 passed`; `pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py` -> `13 passed`; `ruff check app/db/repo/outbox_events_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/outbox_events_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | `PASS_WITH_NOTES` | Accepted; best-effort outbox dedupe is not race-proof without a future unique constraint/review table. |
+| P4B | 4 | Document review outbox workflow and migration deferral limits | AUDIT | Pending | `rg -n "payments_telegram_stars_reconciliation_review|review_key|transaction_id_hash|raw_payload_stored|candidate_purchase_ids|dedupe|deduplication|OPEN" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md docs/analytics/events_catalog.md` -> required entries present; `rg -n "bot[0-9]+:|TELEGRAM_BOT_TOKEN=.*[0-9A-Za-z_-]{20}|secret-token|bot-token-secret|charge-1|invoice-1" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md docs/analytics/events_catalog.md` -> no matches | Pending | Pending |
 | P5 | 5 | Exact-match auto-recovery behind safe flags | TODO | Pending | Pending | Pending | Pending |
 | P6 | 6 | Durable payment update inbox and replay path | TODO | Pending | Pending | Pending | Pending |
 | P7A | 7 | Idempotent premium entitlement and ledger credit re-entry | TODO | Pending | Pending | Pending | Pending |
@@ -367,6 +367,25 @@ Auditor notes:
 
 Lead response: Accepted; Phase 4 will address persistent findings/review records or documented
 migration deferral.
+
+### P4A - `e34bf1e` - `feat(payments): persist Stars reconciliation reviews`
+
+Auditor verdict: `PASS_WITH_NOTES`
+
+Auditor notes:
+
+- No blocking issues.
+- Patch writes only `OPEN` review events to existing `outbox_events`.
+- It does not add migrations or mutate purchases, entitlements, ledger rows, recovery status,
+  crediting state, config, or feature flags.
+- Persisted payload is minimized: reason, severity, hashed `review_key`, hashed transaction id,
+  candidate purchase ids/count, and `raw_payload_stored=False`.
+- No bot token, raw Telegram payload, raw invoice payload, or raw charge id is stored.
+- Deduplication is stable by hashed `review_key` and `OPEN` status.
+- Non-blocking note: dedupe is best-effort check-then-insert without a DB unique constraint, so it
+  is not race-proof. A dedicated review table/constraint remains the stronger future path.
+
+Lead response: Accepted; P4B will document the outbox workflow and migration-deferral limits.
 
 ## Open owner decisions
 

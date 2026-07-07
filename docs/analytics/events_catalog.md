@@ -174,9 +174,16 @@ and covered by repo/integration tests for the duel funnel aggregation path.
 | `telegram_update_failed_final` | telegram update max-retries reached | `SENT` | `app/workers/tasks/telegram_updates_observability.py` |
 | `referral_reward_milestone_available` | `app/workers/tasks/referrals.py` | `SENT` or `FAILED` | internal referrals events feed (`/internal/referrals/events`) |
 | `referral_reward_granted` | `app/workers/tasks/referrals.py` | `SENT` or `FAILED` | internal referrals events feed (`/internal/referrals/events`) |
+| `payments_telegram_stars_reconciliation_review` | `app/workers/tasks/payments_reliability_async.py` | `OPEN` | payment manual review / production state checks |
 
 Notes:
 - `outbox_events` is also subject to retention cleanup (`app/workers/tasks/retention_cleanup.py`).
+- `payments_telegram_stars_reconciliation_review` is the migration-deferred review mechanism for
+  Stars reconciliation findings. Payload stores `reason`, `severity`, hashed `review_key`, hashed
+  `transaction_id_hash`, `candidate_purchase_ids`, `candidate_purchase_count`, and
+  `raw_payload_stored=false`. It must not contain bot tokens, raw Telegram payloads, raw invoice
+  payloads, or raw charge ids. Deduplication is best-effort until a dedicated review table or
+  unique constraint is approved.
 
 ## 4) Ops Alert Event Catalog (External Channels)
 

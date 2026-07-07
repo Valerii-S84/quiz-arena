@@ -70,6 +70,32 @@ Expected:
 - `payments_duplicate_active_premium_entitlements` is `OK`.
 - `payments_open_manual_review_records` is `OK` or `SKIPPED` if the review table has not been added yet.
 
+Telegram Stars reconciliation review findings currently persist through `outbox_events`
+while the dedicated review table migration is deferred:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env exec -T postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c \
+"SELECT id, created_at, payload->>'reason' AS reason, payload->>'severity' AS severity, \
+        payload->>'transaction_id_hash' AS transaction_id_hash, \
+        payload->'candidate_purchase_ids' AS candidate_purchase_ids \
+ FROM outbox_events \
+ WHERE event_type='payments_telegram_stars_reconciliation_review' AND status='OPEN' \
+ ORDER BY created_at DESC, id DESC \
+ LIMIT 50;"
+```
+
+Expected:
+- no `OPEN` rows after a healthy dry-run reconciliation,
+- any `OPEN` row is a manual review item before compensation or recovery,
+- payload stores hashed transaction identifiers and candidate purchase ids only; it must not
+  contain a bot token, raw Telegram payload, raw invoice payload, or raw charge id.
+
+Current limitation:
+- outbox review dedupe is best-effort by hashed `review_key` and `OPEN` status;
+- it is not protected by a DB-level unique constraint until a dedicated review table/migration is
+  approved after a data audit.
+
 Payment invariant alerts are emitted by:
 
 ```bash
@@ -152,6 +178,7 @@ Escalate immediately if any of the following is true:
 - queue lengths grow continuously with no drain,
 - repeated `telegram_update_failed_final`,
 - any payment reliability invariant check reports `FAIL`,
+- any `OPEN` `payments_telegram_stars_reconciliation_review` row exists,
 - `payment_recovery_failed` repeats for the same purchase,
 - long `idle in transaction` sessions,
 - container restart count increases unexpectedly.
