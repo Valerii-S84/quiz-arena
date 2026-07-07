@@ -194,8 +194,20 @@ async def test_credit_purchase_assets_keeps_already_applied_promo_usage_stable(
 async def test_credit_purchase_assets_skips_existing_purchase_ledger(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    purchase = purchase_model(stars_amount=5, status="PAID_UNCREDITED")
-    product = ProductSpec("ENERGY_10", "MICRO", "Energy", "Energy", 5, 0)
+    purchase = purchase_model(
+        stars_amount=5,
+        applied_promo_code_id=21,
+        status="PAID_UNCREDITED",
+    )
+    product = ProductSpec(
+        "ENERGY_10",
+        "MICRO",
+        "Energy",
+        "Energy",
+        5,
+        10,
+        grants_streak_saver=True,
+    )
     existing_ledger = object()
     events: list[str] = []
 
@@ -206,6 +218,15 @@ async def test_credit_purchase_assets_skips_existing_purchase_ledger(
     async def _fail_create(_session, *, entry: LedgerEntry):
         del entry
         pytest.fail("existing purchase credit ledger should not be duplicated")
+
+    async def _fail_credit_paid_energy(*_args, **_kwargs):
+        pytest.fail("existing purchase credit ledger should skip paid energy side effect")
+
+    async def _fail_add_streak_saver_token(*_args, **_kwargs):
+        pytest.fail("existing purchase credit ledger should skip streak saver side effect")
+
+    async def _fail_validate_reserved_discount(*_args, **_kwargs):
+        pytest.fail("existing purchase credit ledger should skip promo mutation")
 
     async def _fake_emit_purchase_event(
         _session, *, event_type: str, purchase, happened_at, extra_payload=None
@@ -220,6 +241,19 @@ async def test_credit_purchase_assets_skips_existing_purchase_ledger(
         _fake_get_purchase_credit_for_update,
     )
     monkeypatch.setattr(purchase_credit_assets.LedgerRepo, "create", _fail_create)
+    monkeypatch.setattr(
+        purchase_credit_assets.EnergyService, "credit_paid_energy", _fail_credit_paid_energy
+    )
+    monkeypatch.setattr(
+        purchase_credit_assets.StreakRepo,
+        "add_streak_saver_token",
+        _fail_add_streak_saver_token,
+    )
+    monkeypatch.setattr(
+        purchase_credit_assets,
+        "_validate_reserved_discount_for_purchase",
+        _fail_validate_reserved_discount,
+    )
     monkeypatch.setattr(purchase_credit_assets, "_emit_purchase_event", _fake_emit_purchase_event)
 
     await purchase_credit_assets.credit_purchase_assets(

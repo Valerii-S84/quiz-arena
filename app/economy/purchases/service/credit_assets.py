@@ -37,6 +37,23 @@ async def credit_purchase_assets(
     product: ProductSpec,
     now_utc: datetime,
 ) -> None:
+    existing_purchase_credit = None
+    if purchase.stars_amount > 0:
+        existing_purchase_credit = await LedgerRepo.get_purchase_credit_for_update(
+            session,
+            purchase_id=purchase.id,
+        )
+        if existing_purchase_credit is not None:
+            purchase.status = "CREDITED"
+            purchase.credited_at = now_utc
+            await _emit_purchase_event(
+                session,
+                event_type="purchase_credited",
+                purchase=purchase,
+                happened_at=now_utc,
+            )
+            return
+
     if product.product_type == "PREMIUM":
         await _apply_premium_entitlement(
             session,
@@ -73,30 +90,25 @@ async def credit_purchase_assets(
             promo_code.updated_at = now_utc
 
     if purchase.stars_amount > 0:
-        existing_purchase_credit = await LedgerRepo.get_purchase_credit_for_update(
+        await LedgerRepo.create(
             session,
-            purchase_id=purchase.id,
+            entry=LedgerEntry(
+                user_id=user_id,
+                purchase_id=purchase.id,
+                entry_type="PURCHASE_CREDIT",
+                asset="PURCHASE",
+                direction="CREDIT",
+                amount=purchase.stars_amount,
+                balance_after=None,
+                source="PURCHASE",
+                idempotency_key=f"credit:purchase:{purchase.id}",
+                metadata_={
+                    "product_code": product.product_code,
+                    "asset_breakdown": build_asset_breakdown(product),
+                },
+                created_at=now_utc,
+            ),
         )
-        if existing_purchase_credit is None:
-            await LedgerRepo.create(
-                session,
-                entry=LedgerEntry(
-                    user_id=user_id,
-                    purchase_id=purchase.id,
-                    entry_type="PURCHASE_CREDIT",
-                    asset="PURCHASE",
-                    direction="CREDIT",
-                    amount=purchase.stars_amount,
-                    balance_after=None,
-                    source="PURCHASE",
-                    idempotency_key=f"credit:purchase:{purchase.id}",
-                    metadata_={
-                        "product_code": product.product_code,
-                        "asset_breakdown": build_asset_breakdown(product),
-                    },
-                    created_at=now_utc,
-                ),
-            )
 
     purchase.status = "CREDITED"
     purchase.credited_at = now_utc
