@@ -58,7 +58,7 @@ class EntitlementsRepo:
         if cached is not None:
             return cached
 
-        stmt = select(Entitlement.scope).where(
+        stmt = select(Entitlement.id, Entitlement.scope).where(
             and_(
                 Entitlement.user_id == user_id,
                 Entitlement.entitlement_type == "PREMIUM",
@@ -68,9 +68,10 @@ class EntitlementsRepo:
             )
         )
         result = await session.execute(stmt)
-        scope = result.scalar_one_or_none()
+        row = result.one_or_none()
+        scope = None if row is None else row[1]
         status = _PremiumStatus(
-            active=scope is not None,
+            active=row is not None,
             scope=scope,
         )
         store_cached_premium_status(user_id, now_utc, status)

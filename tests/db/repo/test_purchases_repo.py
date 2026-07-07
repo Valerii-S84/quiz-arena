@@ -139,6 +139,7 @@ async def test_purchase_count_and_metric_queries_apply_paid_filters() -> None:
         == 1
     )
     assert "purchases.product_code = 'PREMIUM_30'" in compile_statement(product_session.statement)
+    assert "purchases.stars_amount > 0" in compile_statement(product_session.statement)
 
     credited_session = RecordingSession(_ScalarResult(5))
     assert (

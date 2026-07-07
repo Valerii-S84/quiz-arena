@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 from typing import cast
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.core import global_best_streak_cache
 
@@ -115,3 +117,78 @@ async def test_maybe_update_global_best_streak_only_raises_cached_value(monkeypa
     await global_best_streak_cache.maybe_update_global_best_streak(25)
     assert fake.values[global_best_streak_cache.GLOBAL_BEST_STREAK_CACHE_KEY] == "25"
     assert fake.expiries[global_best_streak_cache.GLOBAL_BEST_STREAK_CACHE_KEY] == 45
+
+
+@pytest.mark.asyncio
+async def test_maybe_update_global_best_streak_caches_redis_winner(monkeypatch) -> None:
+    fake = _FakeRedis()
+    fake.values[global_best_streak_cache.GLOBAL_BEST_STREAK_CACHE_KEY] = "30"
+
+    async def _fake_client(settings):
+        del settings
+        return fake
+
+    monkeypatch.setattr(global_best_streak_cache, "get_settings", _settings)
+    monkeypatch.setattr(global_best_streak_cache, "_get_redis_client", _fake_client)
+
+    await global_best_streak_cache.maybe_update_global_best_streak(25)
+
+    assert fake.values[global_best_streak_cache.GLOBAL_BEST_STREAK_CACHE_KEY] == "30"
+    assert global_best_streak_cache._get_local_best_streak() == 30
+
+
+@pytest.mark.asyncio
+async def test_schedule_global_best_streak_update_waits_for_commit(monkeypatch) -> None:
+    calls: list[int] = []
+
+    async def _fake_update(best_streak: int) -> None:
+        calls.append(best_streak)
+
+    monkeypatch.setattr(
+        global_best_streak_cache,
+        "maybe_update_global_best_streak",
+        _fake_update,
+    )
+    sync_session = Session()
+    sync_session.begin()
+    session = SimpleNamespace(sync_session=sync_session)
+
+    global_best_streak_cache.schedule_global_best_streak_update_after_commit(
+        cast(AsyncSession, session),
+        18,
+    )
+    global_best_streak_cache.schedule_global_best_streak_update_after_commit(
+        cast(AsyncSession, session),
+        21,
+    )
+
+    assert calls == []
+    sync_session.commit()
+    await asyncio.sleep(0)
+    assert calls == [21]
+
+
+@pytest.mark.asyncio
+async def test_schedule_global_best_streak_update_drops_rollback(monkeypatch) -> None:
+    calls: list[int] = []
+
+    async def _fake_update(best_streak: int) -> None:
+        calls.append(best_streak)
+
+    monkeypatch.setattr(
+        global_best_streak_cache,
+        "maybe_update_global_best_streak",
+        _fake_update,
+    )
+    sync_session = Session()
+    sync_session.begin()
+    session = SimpleNamespace(sync_session=sync_session)
+
+    global_best_streak_cache.schedule_global_best_streak_update_after_commit(
+        cast(AsyncSession, session),
+        18,
+    )
+
+    sync_session.rollback()
+    await asyncio.sleep(0)
+    assert calls == []

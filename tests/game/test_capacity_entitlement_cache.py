@@ -8,15 +8,24 @@ import pytest
 from app.db.repo.entitlements_repo import EntitlementsRepo, entitlement_request_cache
 from tests.db.repo._helpers import RecordingSession, compile_statement
 from tests.type_helpers import AsyncSessionStub
-from tests.type_helpers import ScalarResult as _ScalarResult
 
 UTC = timezone.utc
+
+
+class _PremiumStatusResult:
+    def __init__(self, row: tuple[int, str | None] | None) -> None:
+        self._row = row
+
+    def one_or_none(self) -> tuple[int, str | None] | None:
+        return self._row
 
 
 @pytest.mark.asyncio
 async def test_entitlement_cache_is_scoped_by_user_and_keeps_missing_user_denied() -> None:
     now_utc = datetime(2026, 6, 18, 12, 0, tzinfo=UTC)
-    session = RecordingSession(_ScalarResult("premium_week"), _ScalarResult(None))
+    session = RecordingSession(
+        _PremiumStatusResult((10, "premium_week")), _PremiumStatusResult(None)
+    )
 
     with entitlement_request_cache():
         assert await EntitlementsRepo.has_active_premium(session, 7, now_utc) is True
@@ -35,7 +44,9 @@ async def test_entitlement_cache_is_scoped_by_user_and_keeps_missing_user_denied
 @pytest.mark.asyncio
 async def test_entitlement_cache_does_not_reuse_missing_status_across_flows() -> None:
     now_utc = datetime(2026, 6, 18, 12, 0, tzinfo=UTC)
-    session = RecordingSession(_ScalarResult(None), _ScalarResult("premium_month"))
+    session = RecordingSession(
+        _PremiumStatusResult(None), _PremiumStatusResult((10, "premium_month"))
+    )
 
     with entitlement_request_cache():
         assert await EntitlementsRepo.has_active_premium(session, 7, now_utc) is False
@@ -78,4 +89,4 @@ class _FailThenScopeSession(AsyncSessionStub):
         self.execute_calls += 1
         if self.execute_calls == 1:
             raise RuntimeError("transient entitlement lookup failure")
-        return _ScalarResult("premium_day")
+        return _PremiumStatusResult((10, "premium_day"))

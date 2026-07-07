@@ -5,12 +5,14 @@ from collections.abc import Awaitable
 from time import monotonic
 
 import redis.asyncio as redis
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
 from app.db.repo.users_repo import UsersRepo
 
 GLOBAL_BEST_STREAK_CACHE_KEY = "quiz_arena:global_best_streak"
+_PENDING_GLOBAL_BEST_STREAK_KEY = "quiz_arena_pending_global_best_streak"
 
 _redis_client: redis.Redis | None = None
 _redis_client_loop_id: int | None = None
@@ -133,12 +135,11 @@ async def maybe_update_global_best_streak(best_streak: int) -> None:
 
     settings = get_settings()
     ttl_seconds = _ttl_seconds(settings)
-    local_best = _get_local_best_streak()
-    if local_best is None or candidate > local_best:
-        _set_local_best_streak(candidate, ttl_seconds=ttl_seconds)
-
     client = await _get_redis_client(settings)
     if client is None:
+        local_best = _get_local_best_streak()
+        if local_best is None or candidate > local_best:
+            _set_local_best_streak(candidate, ttl_seconds=ttl_seconds)
         return
 
     script = """
@@ -159,9 +160,46 @@ return current
             str(ttl_seconds),
         )
         if isinstance(eval_result, Awaitable):
-            await eval_result
+            eval_result = await eval_result
     except Exception:
         return
+
+    current_best = _parse_cached_best(eval_result)
+    if current_best is None:
+        return
+    local_best = _get_local_best_streak()
+    if local_best is None or current_best > local_best:
+        _set_local_best_streak(current_best, ttl_seconds=ttl_seconds)
+
+
+def schedule_global_best_streak_update_after_commit(
+    session: AsyncSession,
+    best_streak: int,
+) -> None:
+    candidate = max(0, int(best_streak))
+    if candidate <= 0:
+        return
+
+    loop = asyncio.get_running_loop()
+    sync_session = session.sync_session
+    pending = sync_session.info.get(_PENDING_GLOBAL_BEST_STREAK_KEY)
+    if pending is None:
+        sync_session.info[_PENDING_GLOBAL_BEST_STREAK_KEY] = candidate
+
+        def _after_commit(committed_session) -> None:
+            pending_best = committed_session.info.pop(_PENDING_GLOBAL_BEST_STREAK_KEY, None)
+            if pending_best is None:
+                return
+            loop.create_task(maybe_update_global_best_streak(int(pending_best)))
+
+        def _after_rollback(rolled_back_session) -> None:
+            rolled_back_session.info.pop(_PENDING_GLOBAL_BEST_STREAK_KEY, None)
+
+        event.listen(sync_session, "after_commit", _after_commit, once=True)
+        event.listen(sync_session, "after_rollback", _after_rollback, once=True)
+        return
+
+    sync_session.info[_PENDING_GLOBAL_BEST_STREAK_KEY] = max(int(pending), candidate)
 
 
 async def clear_global_best_streak_cache() -> None:
