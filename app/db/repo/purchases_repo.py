@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import cast
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.entitlements import Entitlement
 from app.db.models.ledger_entries import LedgerEntry
 from app.db.models.purchases import Purchase
+from app.db.models.users import User
 
 from .purchases_repo_metrics import (
     count_paid_purchases,
@@ -236,6 +238,39 @@ class PurchasesRepo:
         )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def list_stars_reconciliation_candidate_rows(
+        session: AsyncSession,
+        *,
+        transaction_id: str,
+        invoice_payload: str | None,
+        telegram_user_id: int | None,
+        transaction_date: datetime,
+        match_window: timedelta,
+        limit: int = 20,
+    ) -> list[tuple[Purchase, int]]:
+        match_conditions = [Purchase.telegram_payment_charge_id == transaction_id]
+        if invoice_payload:
+            match_conditions.append(Purchase.invoice_payload == invoice_payload)
+        if telegram_user_id is not None:
+            match_conditions.append(
+                and_(
+                    User.telegram_user_id == telegram_user_id,
+                    Purchase.created_at >= transaction_date - match_window,
+                    Purchase.created_at <= transaction_date,
+                )
+            )
+
+        stmt = (
+            select(Purchase, User.telegram_user_id)
+            .join(User, User.id == Purchase.user_id)
+            .where(Purchase.stars_amount > 0, or_(*match_conditions))
+            .order_by(Purchase.created_at.desc())
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        return [(cast(Purchase, row[0]), int(row[1])) for row in result.all()]
 
     @staticmethod
     async def expire_stale_unpaid_invoices(

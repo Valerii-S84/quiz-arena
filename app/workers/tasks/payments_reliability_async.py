@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.db.repo.promo_repo import PromoRepo
@@ -17,6 +18,17 @@ from app.economy.purchases.errors import (
 from app.economy.purchases.recovery import MAX_CREDIT_RECOVERY_ATTEMPTS, increment_recovery_failures
 from app.economy.purchases.service import PurchaseService
 from app.services.alerts import send_ops_alert
+from app.services.payment_reconciliation import (
+    EXACT_MATCH_WINDOW,
+    ReconciliationCandidate,
+    ReconciliationDecision,
+    classify_star_transaction_dry_run,
+)
+from app.services.telegram_stars import (
+    TelegramStarsClient,
+    TelegramStarsClientError,
+    TelegramStarTransaction,
+)
 from app.workers.tasks.payments_reliability_reconciliation import (
     run_payments_reconciliation_async as run_payments_reconciliation_async,
 )
@@ -274,11 +286,104 @@ async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
         logger.info("telegram_stars_reconciliation_skipped", **result)
         return result
 
-    result = {
-        "status": "dry_run_not_started",
+    if not dry_run:
+        result = {
+            "status": "dry_run_required",
+            "dry_run": dry_run,
+            "auto_recovery_enabled": auto_recovery_enabled,
+            "transactions_examined": 0,
+        }
+        logger.warning("telegram_stars_reconciliation_dry_run_required", **result)
+        return result
+
+    logger.info(
+        "telegram_stars_reconciliation_started",
+        dry_run=dry_run,
+        auto_recovery_enabled=auto_recovery_enabled,
+    )
+    try:
+        client = TelegramStarsClient(bot_token=settings.telegram_bot_token)
+        page = await client.get_star_transactions(limit=100)
+    except TelegramStarsClientError as exc:
+        result = {
+            "status": "telegram_error",
+            "dry_run": dry_run,
+            "auto_recovery_enabled": auto_recovery_enabled,
+            "transactions_examined": 0,
+            "error_type": exc.error_type or type(exc).__name__,
+        }
+        logger.warning("telegram_stars_reconciliation_failed", **result)
+        return result
+
+    decisions: list[ReconciliationDecision] = []
+    async with SessionLocal() as session:
+        for transaction in page.transactions:
+            candidates = await _load_star_reconciliation_candidates(session, transaction)
+            decisions.append(
+                classify_star_transaction_dry_run(
+                    transaction=transaction,
+                    candidates=candidates,
+                )
+            )
+
+    result = _build_telegram_stars_dry_run_result(
+        decisions=decisions,
+        dry_run=dry_run,
+        auto_recovery_enabled=auto_recovery_enabled,
+    )
+    logger.info("telegram_stars_reconciliation_finished", **result)
+    return result
+
+
+async def _load_star_reconciliation_candidates(
+    session: AsyncSession,
+    transaction: TelegramStarTransaction,
+) -> list[ReconciliationCandidate]:
+    if not transaction.is_incoming or transaction.transaction_type != "invoice_payment":
+        return []
+    rows = await PurchasesRepo.list_stars_reconciliation_candidate_rows(
+        session,
+        transaction_id=transaction.transaction_id,
+        invoice_payload=transaction.invoice_payload,
+        telegram_user_id=transaction.source_user_id,
+        transaction_date=transaction.transaction_date,
+        match_window=EXACT_MATCH_WINDOW,
+    )
+    return [
+        ReconciliationCandidate(
+            purchase_id=purchase.id,
+            user_id=purchase.user_id,
+            telegram_user_id=telegram_user_id,
+            stars_amount=purchase.stars_amount,
+            status=purchase.status,
+            created_at=purchase.created_at,
+            telegram_payment_charge_id=purchase.telegram_payment_charge_id,
+        )
+        for purchase, telegram_user_id in rows
+    ]
+
+
+def _build_telegram_stars_dry_run_result(
+    *,
+    decisions: list[ReconciliationDecision],
+    dry_run: bool,
+    auto_recovery_enabled: bool,
+) -> dict[str, object]:
+    classification_counts: dict[str, int] = {}
+    severity_counts: dict[str, int] = {}
+    for decision in decisions:
+        classification_counts[decision.classification] = (
+            classification_counts.get(decision.classification, 0) + 1
+        )
+        severity_counts[decision.severity] = severity_counts.get(decision.severity, 0) + 1
+
+    return {
+        "status": "dry_run_completed",
         "dry_run": dry_run,
         "auto_recovery_enabled": auto_recovery_enabled,
-        "transactions_examined": 0,
+        "transactions_examined": len(decisions),
+        "classification_counts": classification_counts,
+        "severity_counts": severity_counts,
+        "high_severity_findings": severity_counts.get("HIGH", 0),
+        "medium_severity_findings": severity_counts.get("MEDIUM", 0),
     }
-    logger.info("telegram_stars_reconciliation_dry_run_pending", **result)
-    return result
