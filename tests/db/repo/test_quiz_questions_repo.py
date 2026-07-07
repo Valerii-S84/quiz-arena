@@ -69,7 +69,26 @@ async def test_quiz_question_queries_filter_optional_pools_and_map_changes() -> 
 
     change_time = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
     changes_session = RecordingSession(
-        _RowsResult([("q1", "DAILY_CUP", "A1", "ACTIVE", True, change_time)])
+        _RowsResult(
+            [
+                (
+                    "q1",
+                    "DAILY_CUP",
+                    "A1",
+                    "bank.csv",
+                    "Grammatik",
+                    "Frage?",
+                    "Antwort",
+                    "Falsch",
+                    "Falsch",
+                    "Falsch",
+                    0,
+                    "ACTIVE",
+                    True,
+                    change_time,
+                )
+            ]
+        )
     )
     assert await QuizQuestionsRepo.list_question_pool_changes_since(
         changes_session,
@@ -79,6 +98,14 @@ async def test_quiz_question_queries_filter_optional_pools_and_map_changes() -> 
             question_id="q1",
             mode_code="DAILY_CUP",
             level="A1",
+            source_file="bank.csv",
+            category="Grammatik",
+            question_text="Frage?",
+            option_1="Antwort",
+            option_2="Falsch",
+            option_3="Falsch",
+            option_4="Falsch",
+            correct_option_id=0,
             status="ACTIVE",
             quick_mix_eligible=True,
             updated_at=change_time,
@@ -87,13 +114,19 @@ async def test_quiz_question_queries_filter_optional_pools_and_map_changes() -> 
 
 
 async def test_quiz_question_candidate_queries_return_metadata_and_quick_mix_semantics() -> None:
-    rows = [("q1", "A1", "bank.csv", "Grammatik")]
+    rows = [("q1", "A1", "bank.csv", "Grammatik", "Frage?", "A", "B", "C", "D", 1)]
     expected = [
         QuizQuestionPoolCandidate(
             question_id="q1",
             level="A1",
             source_file="bank.csv",
             category="Grammatik",
+            question_text="Frage?",
+            option_1="A",
+            option_2="B",
+            option_3="C",
+            option_4="D",
+            correct_option_id=1,
         )
     ]
 
@@ -109,8 +142,10 @@ async def test_quiz_question_candidate_queries_return_metadata_and_quick_mix_sem
     )
     mode_sql = compile_statement(mode_session.statement)
     assert "quiz_questions.mode_code = 'DAILY_CUP'" in mode_sql
+    assert "quiz_questions.status = 'ACTIVE'" in mode_sql
     assert "quiz_questions.source_file" in mode_sql
     assert "quiz_questions.category" in mode_sql
+    assert "quiz_questions.question_text" in mode_sql
 
     all_session = RecordingSession(_RowsResult(rows))
     assert (
@@ -123,5 +158,6 @@ async def test_quiz_question_candidate_queries_return_metadata_and_quick_mix_sem
         == expected
     )
     all_sql = compile_statement(all_session.statement)
+    assert "quiz_questions.status = 'ACTIVE'" in all_sql
     assert "quiz_questions.quick_mix_eligible IS true" in all_sql
     assert "quiz_questions.mode_code =" not in all_sql

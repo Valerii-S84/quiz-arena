@@ -236,7 +236,7 @@ async def test_redeem_promo_from_text_handles_premium_grant(monkeypatch) -> None
     await promo._redeem_promo_from_text(message)
 
     assert message.answers[0].text == TEXTS_DE["msg.promo.success.grant"]
-    assert "7 Tage Premium" in (message.answers[1].text or "")
+    assert "7 Tage Arena Pass" in (message.answers[1].text or "")
 
 
 @pytest.mark.asyncio

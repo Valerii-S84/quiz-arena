@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from uuid import UUID
 
+from app.game.arena_duels.analytics import ARENA_PAYWALL_CONTEXTS
 from app.game.duels.constants import DUEL_PAYWALL_CALLBACK_CONTEXT
 
 
@@ -42,6 +43,10 @@ def parse_buy_callback_data(callback_data: str) -> tuple[str, UUID | None, int |
     if len(parts) == 2:
         return parts[1], None, None
     if len(parts) == 3 and parts[2] == DUEL_PAYWALL_CALLBACK_CONTEXT:
+        return parts[1], None, None
+    if len(parts) == 4 and parts[2] == DUEL_PAYWALL_CALLBACK_CONTEXT:
+        if parts[3] not in ARENA_PAYWALL_CONTEXTS:
+            raise ValueError("invalid duel paywall context")
         return parts[1], None, None
     if len(parts) == 4 and parts[2] == "promo":
         return parts[1], UUID(parts[3]), None

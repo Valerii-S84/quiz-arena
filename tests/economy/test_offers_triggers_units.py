@@ -81,6 +81,80 @@ async def test_build_trigger_codes_returns_energy_and_purchase_triggers_for_non_
 
 
 @pytest.mark.asyncio
+async def test_build_trigger_codes_returns_duel_ticket_second_buy_for_non_premium(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now_utc = datetime(2026, 3, 13, 10, 0, tzinfo=UTC)
+    purchase_count_calls: list[tuple[str, datetime]] = []
+
+    async def _fake_get_energy_state(_session, _user_id):
+        return SimpleNamespace(free_energy=5, paid_energy=0)
+
+    async def _fake_get_streak_state(_session, _user_id):
+        return SimpleNamespace(
+            current_streak=0,
+            today_status="PLAYED",
+            last_activity_local_date=date(2026, 3, 13),
+        )
+
+    async def _fake_has_active_premium(_session, _user_id, _now_utc):
+        return False
+
+    async def _fake_count_paid_product_since(
+        _session,
+        *,
+        product_code: str,
+        since_utc: datetime,
+        **_kwargs,
+    ):
+        purchase_count_calls.append((product_code, since_utc))
+        if product_code == "FRIEND_CHALLENGE_5":
+            return 2
+        return 0
+
+    async def _false(*_args, **_kwargs):
+        return False
+
+    monkeypatch.setattr(offer_triggers.EnergyRepo, "get_by_user_id", _fake_get_energy_state)
+    monkeypatch.setattr(offer_triggers.StreakRepo, "get_by_user_id", _fake_get_streak_state)
+    monkeypatch.setattr(
+        offer_triggers.EntitlementsRepo,
+        "has_active_premium",
+        _fake_has_active_premium,
+    )
+    monkeypatch.setattr(
+        offer_triggers.PurchasesRepo,
+        "count_paid_product_since",
+        _fake_count_paid_product_since,
+    )
+    monkeypatch.setattr(
+        offer_triggers.EntitlementsRepo,
+        "has_recently_ended_premium_scope",
+        _false,
+    )
+    monkeypatch.setattr(
+        offer_triggers.EntitlementsRepo,
+        "has_active_premium_scope_ending_within",
+        _false,
+    )
+    monkeypatch.setattr(offer_triggers, "is_weekend_flash_window", lambda _local_now: False)
+    monkeypatch.setattr(offer_triggers, "berlin_now", lambda _now_utc: _now_utc)
+
+    result = await offer_triggers.build_trigger_codes(
+        _Session(),
+        user_id=5,
+        now_utc=now_utc,
+        trigger_event="ignored",
+    )
+
+    assert result == {offer_triggers.TRG_DUEL_TICKET_SECOND_BUY}
+    assert (
+        "FRIEND_CHALLENGE_5",
+        now_utc - offer_triggers.DUEL_TICKET_SECOND_BUY_WINDOW,
+    ) in purchase_count_calls
+
+
+@pytest.mark.asyncio
 async def test_build_trigger_codes_returns_streak_and_comeback_triggers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -7,6 +7,9 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message, PreCheckoutQuery
 
 from app.bot.handlers.payments_buy_flow import BuyHandlerServices, handle_buy_callback
+from app.bot.handlers.payments_duel_paywall import (
+    _duel_paywall_context_from_callback as _duel_paywall_context_from_callback,
+)
 from app.bot.handlers.payments_duel_paywall import _emit_duel_paywall_click
 from app.bot.handlers.payments_duel_paywall import (
     _is_duel_paywall_callback as _is_duel_paywall_callback,

@@ -6,10 +6,10 @@ PROMO_PRODUCT_LABELS = {
     "ENERGY_10": "+10 Energie",
     "STREAK_SAVER_20": "Serien-Schutz",
     "FRIEND_CHALLENGE_5": "Duell-Ticket",
-    "PREMIUM_WEEK": "Premium Woche",
-    "PREMIUM_MONTH": "Premium Monat",
-    "PREMIUM_SEASON": "Premium Saison",
-    "PREMIUM_YEAR": "Premium Jahr",
+    "PREMIUM_WEEK": "Arena Pass 7 Tage",
+    "PREMIUM_MONTH": "Arena Pass 30 Tage",
+    "PREMIUM_SEASON": "Arena Pass Saison",
+    "PREMIUM_YEAR": "Arena Pass Jahr",
 }
 
 

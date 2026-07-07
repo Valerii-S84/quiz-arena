@@ -7,6 +7,9 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.entitlements import Entitlement
+from app.db.repo.entitlements_cache import PremiumStatus as _PremiumStatus
+from app.db.repo.entitlements_cache import entitlement_request_cache  # noqa: F401
+from app.db.repo.entitlements_cache import get_cached_premium_status, store_cached_premium_status
 
 
 class EntitlementsRepo:
@@ -33,10 +36,8 @@ class EntitlementsRepo:
 
     @staticmethod
     async def has_active_premium(session: AsyncSession, user_id: int, now_utc: datetime) -> bool:
-        entitlement = await EntitlementsRepo._get_active_premium_entitlement(
-            session, user_id, now_utc
-        )
-        return entitlement is not None
+        status = await EntitlementsRepo._get_active_premium_status(session, user_id, now_utc)
+        return status.active
 
     @staticmethod
     async def get_active_premium_scope(
@@ -44,10 +45,37 @@ class EntitlementsRepo:
         user_id: int,
         now_utc: datetime,
     ) -> str | None:
-        entitlement = await EntitlementsRepo._get_active_premium_entitlement(
-            session, user_id, now_utc
+        status = await EntitlementsRepo._get_active_premium_status(session, user_id, now_utc)
+        return status.scope
+
+    @staticmethod
+    async def _get_active_premium_status(
+        session: AsyncSession,
+        user_id: int,
+        now_utc: datetime,
+    ) -> _PremiumStatus:
+        cached = get_cached_premium_status(user_id, now_utc)
+        if cached is not None:
+            return cached
+
+        stmt = select(Entitlement.id, Entitlement.scope).where(
+            and_(
+                Entitlement.user_id == user_id,
+                Entitlement.entitlement_type == "PREMIUM",
+                Entitlement.status == "ACTIVE",
+                Entitlement.starts_at <= now_utc,
+                or_(Entitlement.ends_at.is_(None), Entitlement.ends_at > now_utc),
+            )
         )
-        return entitlement.scope if entitlement is not None else None
+        result = await session.execute(stmt)
+        row = result.one_or_none()
+        scope = None if row is None else row[1]
+        status = _PremiumStatus(
+            active=row is not None,
+            scope=scope,
+        )
+        store_cached_premium_status(user_id, now_utc, status)
+        return status
 
     @staticmethod
     async def get_active_premium_for_update(

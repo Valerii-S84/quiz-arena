@@ -19,6 +19,7 @@ from app.bot.handlers.gameplay_flows.answer_delivery import (
 from app.bot.handlers.start_flow import _send_home_message
 from app.bot.keyboards.home import build_home_keyboard
 from app.bot.texts.de import TEXTS_DE
+from app.db.repo.entitlements_repo import entitlement_request_cache
 from app.game.sessions.errors import InvalidAnswerOptionError, SessionNotFoundError
 from app.game.sessions.types import AnswerSessionResult
 
@@ -38,44 +39,45 @@ async def handle_answer(
     if request is None:
         return
 
-    submitted = await _record_answer_and_prompts(callback, request=request, context=context)
-    if submitted is None:
-        return
+    with entitlement_request_cache():
+        submitted = await _record_answer_and_prompts(callback, request=request, context=context)
+        if submitted is None:
+            return
 
-    result = submitted.result
-    if result.source == "DAILY_CHALLENGE":
-        await answer_branches.continue_daily_answer(
+        result = submitted.result
+        if result.source == "DAILY_CHALLENGE":
+            await answer_branches.continue_daily_answer(
+                callback,
+                result=result,
+                request=request,
+                prompts=submitted.prompts,
+                context=context,
+            )
+            return
+
+        if result.mode_code is None or result.source is None:
+            await _send_home_message(request.message, text=TEXTS_DE["msg.game.stopped"])
+            await callback.answer()
+            return
+
+        await send_answer_feedback(request.message, result=result)
+
+        if result.source == "FRIEND_CHALLENGE":
+            await answer_branches.continue_friend_answer(
+                callback,
+                result=result,
+                request=request,
+                context=context,
+            )
+            return
+
+        await answer_branches.continue_regular_answer(
             callback,
             result=result,
             request=request,
             prompts=submitted.prompts,
             context=context,
         )
-        return
-
-    if result.mode_code is None or result.source is None:
-        await _send_home_message(request.message, text=TEXTS_DE["msg.game.stopped"])
-        await callback.answer()
-        return
-
-    await send_answer_feedback(request.message, result=result)
-
-    if result.source == "FRIEND_CHALLENGE":
-        await answer_branches.continue_friend_answer(
-            callback,
-            result=result,
-            request=request,
-            context=context,
-        )
-        return
-
-    await answer_branches.continue_regular_answer(
-        callback,
-        result=result,
-        request=request,
-        prompts=submitted.prompts,
-        context=context,
-    )
 
 
 async def _parse_answer_request(

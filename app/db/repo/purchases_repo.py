@@ -150,6 +150,7 @@ class PurchasesRepo:
             Purchase.product_code == product_code,
             Purchase.paid_at.is_not(None),
             Purchase.paid_at >= since_utc,
+            Purchase.stars_amount > 0,
         )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)

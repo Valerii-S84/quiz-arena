@@ -91,6 +91,7 @@ class AnswerSessionResult:
     correct_answer_text: str | None = None
     question_level: str | None = None
     next_preferred_level: str | None = None
+    next_preferred_mix_step: int | None = None
     friend_challenge: FriendChallengeSnapshot | None = None
     friend_challenge_answered_round: int | None = None
     friend_challenge_round_completed: bool = False

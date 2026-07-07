@@ -13,7 +13,11 @@ from app.game.questions.runtime_bank_fallback import (
 )
 from app.game.questions.runtime_bank_mode_picker import _list_active_records_by_id, _pick_from_mode
 from app.game.questions.runtime_bank_models import to_quiz_question
-from app.game.questions.runtime_bank_pool import _repo
+from app.game.questions.runtime_bank_pool import (
+    _get_question_by_id_cache,
+    _repo,
+    _store_question_by_id_cache,
+)
 from app.game.questions.types import QuizQuestion
 
 __all__ = [
@@ -56,9 +60,15 @@ async def get_question_by_id(
     question_id: str,
     local_date_berlin: date,
 ) -> QuizQuestion | None:
+    cached = _get_question_by_id_cache(question_id)
+    if cached is not None:
+        return cached
+
     selected = await _repo().get_by_id(session, question_id)
     if selected is not None and selected.status == "ACTIVE":
-        return to_quiz_question(selected)
+        question = to_quiz_question(selected)
+        _store_question_by_id_cache(question)
+        return question
     return fallback_get_question_by_id(
         mode_code,
         question_id=question_id,

@@ -3,6 +3,10 @@ from types import SimpleNamespace
 import pytest
 
 from app.bot.handlers.gameplay_flows import arena_duel_flow
+from app.bot.handlers.gameplay_flows.arena_duel_paywall import (
+    DuelPaywallContext,
+    resolve_duel_paywall_text,
+)
 from app.game.arena_duels.errors import ArenaDuelPaymentRequiredError
 from app.game.arena_duels.types import ArenaBaselineStartResult
 from app.game.sessions.errors import FriendChallengeAccessError
@@ -18,6 +22,15 @@ from .support import (
     require_text,
     start_result,
 )
+
+PAYWALL_CONTEXT_CASES: list[tuple[DuelPaywallContext, str]] = [
+    ("close_loss", "Willst du sofort eine Revanche?"),
+    ("revanche_limit", "Deine freie Revanche ist heute verbraucht."),
+    ("arena_limit", "Dein heutiges Arena-Duell-Limit ist erreicht."),
+    ("friend_create_limit", "Deine freien Freundesduelle sind heute verbraucht."),
+    ("friend_rematch_limit", "Deine freie Freundes-Revanche ist heute verbraucht."),
+    ("beaten_result", "Willst du deinen Platz zurückholen?"),
+]
 
 
 @pytest.mark.asyncio
@@ -72,10 +85,10 @@ async def test_arena_start_create_limit_hit_shows_duel_paywall_without_start() -
     )
 
     response = callback.message.answers[0]
-    assert "Dein heutiges Duell-Limit ist erreicht." in require_text(response.text)
+    assert "Dein heutiges Arena-Duell-Limit ist erreicht." in require_text(response.text)
     assert callback_data_list(response.kwargs["reply_markup"]) == [
-        "buy:FRIEND_CHALLENGE_5:duel",
-        "buy:PREMIUM_WEEK:duel",
+        "buy:FRIEND_CHALLENGE_5:duel:arena_limit",
+        "buy:PREMIUM_WEEK:duel:arena_limit",
         "arena:list",
     ]
 
@@ -132,6 +145,18 @@ async def test_arena_start_attempt_limit_hit_shows_duel_paywall_without_accept()
 
     response = callback.message.answers[0]
     callbacks = callback_data_list(response.kwargs["reply_markup"])
-    assert "Duell-Limit" in require_text(response.text)
-    assert callbacks == ["buy:FRIEND_CHALLENGE_5:duel", "buy:PREMIUM_WEEK:duel", "arena:list"]
+    assert "Arena-Duell-Limit" in require_text(response.text)
+    assert callbacks == [
+        "buy:FRIEND_CHALLENGE_5:duel:arena_limit",
+        "buy:PREMIUM_WEEK:duel:arena_limit",
+        "arena:list",
+    ]
     assert "buy:PREMIUM_3_DAYS" not in callbacks
+
+
+@pytest.mark.parametrize(("context", "expected_text"), PAYWALL_CONTEXT_CASES)
+def test_duel_paywall_text_contexts_are_specific(
+    context: DuelPaywallContext,
+    expected_text: str,
+) -> None:
+    assert expected_text in resolve_duel_paywall_text(context=context)

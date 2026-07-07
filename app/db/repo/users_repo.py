@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import date, datetime
+from datetime import datetime
 
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.daily_push_logs import DailyPushLog
-from app.db.models.daily_runs import DailyRun
 from app.db.models.streak_state import StreakState
-from app.db.models.tournament_participants import TournamentParticipant
 from app.db.models.users import User
+from app.db.repo.users_push_targets import (
+    list_daily_cup_push_targets as _list_daily_cup_push_targets,
+)
+from app.db.repo.users_push_targets import (
+    list_daily_cup_registered_reminder_targets as _list_daily_cup_registered_reminder_targets,
+)
+from app.db.repo.users_push_targets import list_daily_push_targets as _list_daily_push_targets
 
 
 class UsersRepo:
@@ -29,6 +33,15 @@ class UsersRepo:
         stmt = select(User).where(User.telegram_user_id == telegram_user_id)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_id_by_telegram_user_id(
+        session: AsyncSession, telegram_user_id: int
+    ) -> int | None:
+        stmt = select(User.id).where(User.telegram_user_id == telegram_user_id)
+        result = await session.execute(stmt)
+        user_id = result.scalar_one_or_none()
+        return None if user_id is None else int(user_id)
 
     @staticmethod
     async def get_by_referral_code(session: AsyncSession, referral_code: str) -> User | None:
@@ -81,136 +94,28 @@ class UsersRepo:
         return int(getattr(result, "rowcount", 0) or 0)
 
     @staticmethod
+    async def touch_last_seen_by_telegram_user_id(
+        session: AsyncSession,
+        telegram_user_id: int,
+        seen_at: datetime,
+    ) -> User | None:
+        stmt = (
+            update(User)
+            .where(User.telegram_user_id == telegram_user_id)
+            .values(last_seen_at=seen_at)
+            .returning(User)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_global_best_streak(session: AsyncSession) -> int:
         stmt = select(func.coalesce(func.max(StreakState.best_streak), 0))
         result = await session.execute(stmt)
         return int(result.scalar_one())
 
-    @staticmethod
-    async def list_daily_push_targets(
-        session: AsyncSession,
-        *,
-        berlin_date: date,
-        push_kind: str,
-        after_user_id: int | None,
-        limit: int,
-    ) -> list[tuple[int, int, int]]:
-        resolved_limit = max(1, min(1000, int(limit)))
-        completed_daily_exists = (
-            select(DailyRun.id)
-            .where(
-                DailyRun.user_id == User.id,
-                DailyRun.berlin_date == berlin_date,
-                DailyRun.status == "COMPLETED",
-            )
-            .exists()
-        )
-        push_logged_exists = (
-            select(DailyPushLog.user_id)
-            .where(
-                DailyPushLog.user_id == User.id,
-                DailyPushLog.berlin_date == berlin_date,
-                DailyPushLog.push_kind == push_kind,
-            )
-            .exists()
-        )
-        stmt = (
-            select(
-                User.id,
-                User.telegram_user_id,
-                func.coalesce(StreakState.current_streak, 0),
-            )
-            .outerjoin(StreakState, StreakState.user_id == User.id)
-            .where(User.status == "ACTIVE", ~completed_daily_exists, ~push_logged_exists)
-            .order_by(User.id.asc())
-            .limit(resolved_limit)
-        )
-        if after_user_id is not None:
-            stmt = stmt.where(User.id > after_user_id)
-
-        result = await session.execute(stmt)
-        rows: list[tuple[int, int, int]] = []
-        for user_id_raw, telegram_user_id_raw, streak_raw in result.all():
-            rows.append(
-                (
-                    int(user_id_raw),
-                    int(telegram_user_id_raw),
-                    int(streak_raw),
-                )
-            )
-        return rows
-
-    @staticmethod
-    async def list_daily_cup_push_targets(
-        session: AsyncSession,
-        *,
-        tournament_id,
-        active_since_utc: datetime,
-        after_user_id: int | None,
-        limit: int,
-    ) -> list[tuple[int, int]]:
-        resolved_limit = max(1, min(1000, int(limit)))
-        registered_exists = (
-            select(TournamentParticipant.user_id)
-            .where(
-                TournamentParticipant.tournament_id == tournament_id,
-                TournamentParticipant.user_id == User.id,
-            )
-            .exists()
-        )
-        stmt = (
-            select(User.id, User.telegram_user_id)
-            .where(
-                User.status == "ACTIVE",
-                User.last_seen_at.is_not(None),
-                User.last_seen_at >= active_since_utc,
-                ~registered_exists,
-            )
-            .order_by(User.id.asc())
-            .limit(resolved_limit)
-        )
-        if after_user_id is not None:
-            stmt = stmt.where(User.id > after_user_id)
-
-        result = await session.execute(stmt)
-        rows: list[tuple[int, int]] = []
-        for user_id_raw, telegram_user_id_raw in result.all():
-            rows.append((int(user_id_raw), int(telegram_user_id_raw)))
-        return rows
-
-    @staticmethod
-    async def list_daily_cup_registered_reminder_targets(
-        session: AsyncSession,
-        *,
-        tournament_id,
-        after_user_id: int | None,
-        limit: int,
-    ) -> list[tuple[int, int]]:
-        resolved_limit = max(1, min(1000, int(limit)))
-        stmt = (
-            select(User.id, User.telegram_user_id)
-            .join(
-                TournamentParticipant,
-                and_(
-                    TournamentParticipant.user_id == User.id,
-                    TournamentParticipant.tournament_id == tournament_id,
-                ),
-            )
-            .where(
-                User.status == "ACTIVE",
-                or_(
-                    User.last_seen_at.is_(None),
-                    User.last_seen_at <= TournamentParticipant.joined_at,
-                ),
-            )
-            .order_by(User.id.asc())
-            .limit(resolved_limit)
-        )
-        if after_user_id is not None:
-            stmt = stmt.where(User.id > after_user_id)
-
-        result = await session.execute(stmt)
-        rows: list[tuple[int, int]] = []
-        for user_id_raw, telegram_user_id_raw in result.all():
-            rows.append((int(user_id_raw), int(telegram_user_id_raw)))
-        return rows
+    list_daily_push_targets = staticmethod(_list_daily_push_targets)
+    list_daily_cup_push_targets = staticmethod(_list_daily_cup_push_targets)
+    list_daily_cup_registered_reminder_targets = staticmethod(
+        _list_daily_cup_registered_reminder_targets
+    )

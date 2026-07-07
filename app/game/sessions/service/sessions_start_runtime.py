@@ -30,6 +30,7 @@ async def _consume_start_energy_if_needed(
         user_id=user_id,
         idempotency_key=f"energy:{idempotency_key}",
         now_utc=now_utc,
+        ledger_idempotency_prechecked=True,
     )
     if not energy_result.allowed:
         raise EnergyInsufficientError

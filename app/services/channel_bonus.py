@@ -104,7 +104,11 @@ async def should_show_post_game_prompt(
         return False
     if await is_bonus_claimed(session, user_id=user_id):
         return False
-    completed_sessions = await QuizSessionsRepo.count_completed_for_user(session, user_id=user_id)
+    completed_sessions = await QuizSessionsRepo.count_completed_for_user(
+        session,
+        user_id=user_id,
+        cap=2,
+    )
     return completed_sessions == 1
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 
@@ -36,34 +36,45 @@ def _replay_result() -> AnswerSessionResult:
 
 
 @pytest.mark.asyncio
-async def test_submit_answer_reuses_existing_attempt_without_reapplying_daily_reward(
+async def test_submit_answer_replays_completed_regular_session_without_creating_second_attempt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    existing_attempt = SimpleNamespace(
-        session_id=UUID("123e4567-e89b-12d3-a456-426614174000"),
-        question_id="daily-q-7",
+    quiz_session = SimpleNamespace(
+        id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+        user_id=11,
+        source="MENU",
+        status="COMPLETED",
+        mode_code="QUICK_MIX_A1A2",
+        question_id="menu-q-1",
+    )
+    latest_attempt = SimpleNamespace(
+        session_id=quiz_session.id,
+        question_id="menu-q-1",
         is_correct=True,
     )
-    replay_session = SimpleNamespace(
-        id=existing_attempt.session_id,
-        source="DAILY_CHALLENGE",
-        mode_code="DAILY_CHALLENGE",
-        question_id="daily-q-7",
+    replay_result = AnswerSessionResult(
+        session_id=quiz_session.id,
+        question_id="menu-q-1",
+        is_correct=True,
+        current_streak=4,
+        best_streak=6,
+        idempotent_replay=True,
+        mode_code="QUICK_MIX_A1A2",
+        source="MENU",
     )
-    replay_result = _replay_result()
 
-    async def _unexpected_apply_daily_answer(*_args, **_kwargs):
-        pytest.fail("daily reward flow should not run for replayed submits")
+    async def _unexpected_create_attempt(*_args, **_kwargs):
+        pytest.fail("completed sessions must not create a second answer attempt")
 
-    monkeypatch.setattr(
-        sessions_submit.QuizAttemptsRepo,
-        "get_by_idempotency_key",
-        _async_return(existing_attempt),
-    )
     monkeypatch.setattr(
         sessions_submit.QuizSessionsRepo,
-        "get_by_id",
-        _async_return(replay_session),
+        "get_by_id_for_update",
+        _async_return(quiz_session),
+    )
+    monkeypatch.setattr(
+        sessions_submit.QuizAttemptsRepo,
+        "get_latest_for_session",
+        _async_return(latest_attempt),
     )
     monkeypatch.setattr(
         sessions_submit,
@@ -71,15 +82,15 @@ async def test_submit_answer_reuses_existing_attempt_without_reapplying_daily_re
         _async_return(replay_result),
     )
     monkeypatch.setattr(
-        sessions_submit,
-        "apply_daily_answer",
-        _unexpected_apply_daily_answer,
+        sessions_submit.QuizAttemptsRepo,
+        "create",
+        _unexpected_create_attempt,
     )
 
     result = await sessions_submit.submit_answer(
         _Session(),
         user_id=11,
-        session_id=uuid4(),
+        session_id=quiz_session.id,
         selected_option=1,
         idempotency_key="answer:duplicate",
         now_utc=NOW_UTC,

@@ -6,7 +6,6 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.ledger_repo import LedgerRepo
 from app.economy.energy.energy_consume_results import (
     build_consume_result,
@@ -16,7 +15,7 @@ from app.economy.energy.energy_consume_results import (
 from app.economy.energy.energy_daily_topup import apply_daily_topup_berlin
 from app.economy.energy.energy_models import (
     apply_snapshot_to_model,
-    get_or_create_state_for_update,
+    get_or_create_state_and_premium_status_for_update,
     snapshot_from_model,
 )
 from app.economy.energy.energy_regen import apply_regen_tick
@@ -41,10 +40,14 @@ async def consume_quiz(
     user_id: int,
     idempotency_key: str,
     now_utc: datetime,
+    ledger_idempotency_prechecked: bool = False,
 ) -> EnergyConsumeResult:
-    state = await get_or_create_state_for_update(session, user_id, now_utc)
-    existing_entry = await LedgerRepo.get_by_idempotency_key(session, idempotency_key)
-    premium_active = await EntitlementsRepo.has_active_premium(session, user_id, now_utc)
+    state, premium_active = await get_or_create_state_and_premium_status_for_update(
+        session, user_id, now_utc
+    )
+    existing_entry = None
+    if not ledger_idempotency_prechecked:
+        existing_entry = await LedgerRepo.get_by_idempotency_key(session, idempotency_key)
     snapshot = snapshot_from_model(state)
 
     if premium_active:

@@ -1,78 +1,22 @@
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.quiz_questions import QuizQuestion as QuizQuestionRecord
-from app.game.questions.runtime_bank_filters import (
-    filter_active_records,
-    pick_from_pool,
-    select_diverse_record,
-)
+from app.game.questions.runtime_bank_diverse_picker import _list_active_records_by_id  # noqa: F401
+from app.game.questions.runtime_bank_diverse_picker import _pick_diverse_from_pool, _pick_from_pool
 from app.game.questions.runtime_bank_models import to_quiz_question
-from app.game.questions.runtime_bank_pool import _get_pool_ids, _repo, clear_question_pool_cache
+from app.game.questions.runtime_bank_pool import (
+    _get_pool_candidates,
+    _get_pool_ids,
+    _get_pool_question,
+    _get_question_by_id_cache,
+    _repo,
+    _store_question_by_id_cache,
+    clear_question_pool_cache,
+)
 from app.game.questions.types import QuizQuestion
-
-
-def _pick_from_pool(
-    candidate_ids: Sequence[str],
-    *,
-    exclude_question_ids: Sequence[str],
-    selection_seed: str,
-) -> str | None:
-    return pick_from_pool(
-        candidate_ids,
-        exclude_question_ids=exclude_question_ids,
-        selection_seed=selection_seed,
-    )
-
-
-async def _list_active_records_by_id(
-    session: AsyncSession,
-    question_ids: Sequence[str],
-) -> list[QuizQuestionRecord]:
-    unique_ids = tuple(dict.fromkeys(question_ids))
-    if not unique_ids:
-        return []
-
-    records = await _repo().list_by_ids(session, question_ids=unique_ids)
-    return filter_active_records(records, ids=unique_ids)
-
-
-async def _pick_diverse_from_pool(
-    session: AsyncSession,
-    candidate_ids: Sequence[str],
-    *,
-    exclude_question_ids: Sequence[str],
-    previous_question_ids: Sequence[str],
-    selection_seed: str,
-) -> str | None:
-    if not candidate_ids or not previous_question_ids:
-        return None
-
-    excluded = set(exclude_question_ids)
-    eligible_ids = [question_id for question_id in candidate_ids if question_id not in excluded]
-    fallback_to_duplicate = False
-    if not eligible_ids:
-        eligible_ids = list(candidate_ids)
-        fallback_to_duplicate = True
-
-    candidate_records = await _list_active_records_by_id(session, eligible_ids)
-    if not candidate_records:
-        return None
-
-    previous_records = await _list_active_records_by_id(session, previous_question_ids)
-    selected = select_diverse_record(
-        candidate_records=candidate_records,
-        previous_records=previous_records,
-        selection_seed=selection_seed,
-    )
-    if selected is None:
-        return None
-    if not fallback_to_duplicate and selected.question_id in excluded:
-        return None
-    return selected.question_id
 
 
 async def _pick_question_id_from_pool(
@@ -83,14 +27,27 @@ async def _pick_question_id_from_pool(
     selection_seed: str,
     preferred_levels: tuple[str, ...] | None,
 ) -> str | None:
-    candidate_ids = await _get_pool_ids(
+    if not recent_question_ids:
+        candidate_ids = await _get_pool_ids(
+            session,
+            mode_code=mode_code,
+            preferred_levels=preferred_levels,
+        )
+        return _pick_from_pool(
+            candidate_ids,
+            exclude_question_ids=(),
+            selection_seed=selection_seed,
+        )
+
+    candidate_pool = await _get_pool_candidates(
         session,
         mode_code=mode_code,
         preferred_levels=preferred_levels,
     )
+    candidate_ids = tuple(candidate.question_id for candidate in candidate_pool)
     selected_id = await _pick_diverse_from_pool(
         session,
-        candidate_ids,
+        candidate_pool,
         exclude_question_ids=recent_question_ids,
         previous_question_ids=recent_question_ids,
         selection_seed=selection_seed,
@@ -127,7 +84,7 @@ async def _select_candidate_id_once(
     selection_seed: str,
     preferred_level: str | None,
     allowed_levels: Sequence[str] | None,
-) -> str | None:
+) -> tuple[str | None, tuple[str, ...] | None]:
     allowed_levels_normalized = _allowed_levels_tuple(allowed_levels)
     preferred_levels = (
         (preferred_level,) if preferred_level is not None else allowed_levels_normalized
@@ -139,6 +96,7 @@ async def _select_candidate_id_once(
         selection_seed=selection_seed,
         preferred_levels=preferred_levels,
     )
+    selected_preferred_levels = preferred_levels
     if (
         selected_id is None
         and preferred_levels is not None
@@ -151,7 +109,8 @@ async def _select_candidate_id_once(
             selection_seed=selection_seed,
             preferred_levels=allowed_levels_normalized,
         )
-    return selected_id
+        selected_preferred_levels = allowed_levels_normalized
+    return selected_id, selected_preferred_levels
 
 
 async def _pick_from_mode(
@@ -163,7 +122,7 @@ async def _pick_from_mode(
     preferred_level: str | None,
     allowed_levels: Sequence[str] | None = None,
 ) -> QuizQuestion | None:
-    selected_id = await _select_candidate_id_once(
+    selected_id, selected_preferred_levels = await _select_candidate_id_once(
         session,
         mode_code=mode_code,
         recent_question_ids=recent_question_ids,
@@ -174,11 +133,25 @@ async def _pick_from_mode(
     if selected_id is None:
         return None
 
+    cached = _get_question_by_id_cache(selected_id)
+    if cached is not None:
+        return cached
+
+    pool_question = await _get_pool_question(
+        session,
+        mode_code=mode_code,
+        preferred_levels=selected_preferred_levels,
+        question_id=selected_id,
+    )
+    if pool_question is not None:
+        _store_question_by_id_cache(pool_question)
+        return pool_question
+
     repo = _repo()
     selected = await repo.get_by_id(session, selected_id)
     if selected is None:
         clear_question_pool_cache()
-        retry_selected_id = await _select_candidate_id_once(
+        retry_selected_id, _ = await _select_candidate_id_once(
             session,
             mode_code=mode_code,
             recent_question_ids=recent_question_ids,
@@ -191,4 +164,6 @@ async def _pick_from_mode(
         selected = await repo.get_by_id(session, retry_selected_id)
         if selected is None:
             return None
-    return to_quiz_question(selected)
+    question = to_quiz_question(selected)
+    _store_question_by_id_cache(question)
+    return question

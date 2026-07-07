@@ -45,12 +45,14 @@ class EnergyService:
         user_id: int,
         idempotency_key: str,
         now_utc: datetime,
+        ledger_idempotency_prechecked: bool = False,
     ) -> EnergyConsumeResult:
         return await consume_quiz(
             session,
             user_id=user_id,
             idempotency_key=idempotency_key,
             now_utc=now_utc,
+            ledger_idempotency_prechecked=ledger_idempotency_prechecked,
         )
 
     @staticmethod

@@ -170,16 +170,31 @@ async def test_handle_buy_emits_duel_click_event_for_duel_context(monkeypatch) -
     async def fake_mark_invoice_sent(*args, **kwargs):
         return None
 
-    async def fake_duel_click(session, *, user_id, product_code, happened_at):
-        duel_clicks.append({"user_id": user_id, "product_code": product_code})
+    async def fake_duel_click(session, *, user_id, product_code, happened_at, paywall_context):
+        duel_clicks.append(
+            {
+                "user_id": user_id,
+                "product_code": product_code,
+                "paywall_context": paywall_context,
+            }
+        )
 
     monkeypatch.setattr(payments.UserOnboardingService, "ensure_home_snapshot", fake_home_snapshot)
     monkeypatch.setattr(payments.PurchaseService, "init_purchase", fake_init_purchase)
     monkeypatch.setattr(payments.PurchaseService, "mark_invoice_sent", fake_mark_invoice_sent)
     monkeypatch.setattr(payments, "_emit_duel_paywall_click", fake_duel_click)
 
-    callback = DummyCallback(data="buy:PREMIUM_WEEK:duel", from_user=SimpleNamespace(id=5))
+    callback = DummyCallback(
+        data="buy:PREMIUM_WEEK:duel:close_loss",
+        from_user=SimpleNamespace(id=5),
+    )
     await payments.handle_buy(callback)
 
-    assert duel_clicks == [{"user_id": 5, "product_code": "PREMIUM_WEEK"}]
+    assert duel_clicks == [
+        {
+            "user_id": 5,
+            "product_code": "PREMIUM_WEEK",
+            "paywall_context": "close_loss",
+        }
+    ]
     assert callback.bot.sent_invoices[0]["payload"] == "inv-duel-premium-1"

@@ -11,10 +11,12 @@ from app.db.repo.streak_repo import StreakRepo
 from app.economy.energy.constants import FREE_ENERGY_START
 from app.economy.offers.constants import (
     COMEBACK_WINDOW_DAYS,
+    DUEL_TICKET_SECOND_BUY_WINDOW,
     ENERGY10_SECOND_BUY_WINDOW,
     MONTH_EXPIRING_WINDOW,
     STARTER_EXPIRED_WINDOW,
     TRG_COMEBACK_3D,
+    TRG_DUEL_TICKET_SECOND_BUY,
     TRG_ENERGY10_SECOND_BUY,
     TRG_ENERGY_LOW,
     TRG_ENERGY_ZERO,
@@ -60,6 +62,46 @@ async def build_trigger_codes(
     if not premium_active and 1 <= total_energy <= 3:
         trigger_codes.add(TRG_ENERGY_LOW)
 
+    await _add_purchase_triggers(
+        session,
+        trigger_codes=trigger_codes,
+        user_id=user_id,
+        now_utc=now_utc,
+        premium_active=premium_active,
+    )
+    _add_streak_triggers(
+        trigger_codes=trigger_codes,
+        current_streak=current_streak,
+        today_status=today_status,
+        berlin_hour=berlin_now_dt.hour,
+    )
+    _add_comeback_trigger(
+        trigger_codes=trigger_codes,
+        berlin_today=berlin_today,
+        last_activity_local_date=last_activity_local_date,
+    )
+    await _add_premium_lifecycle_triggers(
+        session,
+        trigger_codes=trigger_codes,
+        user_id=user_id,
+        now_utc=now_utc,
+        premium_active=premium_active,
+    )
+
+    if is_weekend_flash_window(berlin_now_dt):
+        trigger_codes.add(TRG_WEEKEND_FLASH)
+
+    return trigger_codes
+
+
+async def _add_purchase_triggers(
+    session: AsyncSession,
+    *,
+    trigger_codes: set[str],
+    user_id: int,
+    now_utc: datetime,
+    premium_active: bool,
+) -> None:
     energy10_count = await PurchasesRepo.count_paid_product_since(
         session,
         user_id=user_id,
@@ -69,17 +111,50 @@ async def build_trigger_codes(
     if not premium_active and energy10_count >= 2:
         trigger_codes.add(TRG_ENERGY10_SECOND_BUY)
 
+    duel_ticket_count = await PurchasesRepo.count_paid_product_since(
+        session,
+        user_id=user_id,
+        product_code="FRIEND_CHALLENGE_5",
+        since_utc=now_utc - DUEL_TICKET_SECOND_BUY_WINDOW,
+    )
+    if not premium_active and duel_ticket_count >= 2:
+        trigger_codes.add(TRG_DUEL_TICKET_SECOND_BUY)
+
+
+def _add_streak_triggers(
+    *,
+    trigger_codes: set[str],
+    current_streak: int,
+    today_status: str,
+    berlin_hour: int,
+) -> None:
     if current_streak > 7:
         trigger_codes.add(TRG_STREAK_GT7)
-    if current_streak > 14 and berlin_now_dt.hour >= 22 and today_status == "NO_ACTIVITY":
+    if current_streak > 14 and berlin_hour >= 22 and today_status == "NO_ACTIVITY":
         trigger_codes.add(TRG_STREAK_RISK_22)
     if current_streak >= 30:
         trigger_codes.add(TRG_STREAK_MILESTONE_30)
 
+
+def _add_comeback_trigger(
+    *,
+    trigger_codes: set[str],
+    berlin_today: date,
+    last_activity_local_date: date | None,
+) -> None:
     if last_activity_local_date is not None:
         if (berlin_today - last_activity_local_date).days >= COMEBACK_WINDOW_DAYS:
             trigger_codes.add(TRG_COMEBACK_3D)
 
+
+async def _add_premium_lifecycle_triggers(
+    session: AsyncSession,
+    *,
+    trigger_codes: set[str],
+    user_id: int,
+    now_utc: datetime,
+    premium_active: bool,
+) -> None:
     starter_expired_recently = await EntitlementsRepo.has_recently_ended_premium_scope(
         session,
         user_id=user_id,
@@ -99,8 +174,3 @@ async def build_trigger_codes(
     )
     if month_expiring:
         trigger_codes.add(TRG_MONTH_EXPIRING)
-
-    if is_weekend_flash_window(berlin_now_dt):
-        trigger_codes.add(TRG_WEEKEND_FLASH)
-
-    return trigger_codes

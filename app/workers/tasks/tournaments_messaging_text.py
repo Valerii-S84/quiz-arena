@@ -125,7 +125,7 @@ def build_completed_text(
         "📊 Endtabelle",
         *standings_lines,
         "",
-        "📤 Nutze 'Ergebnis teilen' fuer deinen Share-Link.",
+        "📤 Nutze 'Ergebnis teilen' für deinen Share-Link.",
     ]
     return "\n".join(lines)
 

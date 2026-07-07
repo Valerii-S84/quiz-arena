@@ -4,12 +4,20 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from app.db.models.entitlements import Entitlement
-from app.db.repo.entitlements_repo import EntitlementsRepo
+from app.db.repo.entitlements_repo import EntitlementsRepo, entitlement_request_cache
 from tests.db.repo._helpers import RecordingSession, compile_statement
 from tests.type_helpers import ScalarResult as _ScalarResult
 from tests.type_helpers import ScalarsResult as _ScalarsResult
 
 UTC = timezone.utc
+
+
+class _PremiumStatusResult:
+    def __init__(self, row: tuple[int, str | None] | None) -> None:
+        self._row = row
+
+    def one_or_none(self) -> tuple[int, str | None] | None:
+        return self._row
 
 
 def _entitlement(**overrides: object) -> Entitlement:
@@ -36,19 +44,19 @@ async def test_active_premium_queries_return_bool_scope_and_lock() -> None:
     now_utc = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
     entitlement = _entitlement()
 
-    active_session = RecordingSession(_ScalarResult(entitlement))
+    active_session = RecordingSession(_PremiumStatusResult((entitlement.id, entitlement.scope)))
     assert await EntitlementsRepo.has_active_premium(active_session, 7, now_utc) is True
     active_sql = compile_statement(active_session.statement)
     assert "entitlements.user_id = 7" in active_sql
     assert "entitlements.entitlement_type = 'PREMIUM'" in active_sql
     assert "entitlements.status = 'ACTIVE'" in active_sql
 
-    scope_session = RecordingSession(_ScalarResult(entitlement))
+    scope_session = RecordingSession(_PremiumStatusResult((entitlement.id, entitlement.scope)))
     assert (
         await EntitlementsRepo.get_active_premium_scope(scope_session, 7, now_utc) == "daily_arena"
     )
 
-    missing_session = RecordingSession(_ScalarResult(None))
+    missing_session = RecordingSession(_PremiumStatusResult(None))
     assert await EntitlementsRepo.get_active_premium_scope(missing_session, 7, now_utc) is None
 
     lock_session = RecordingSession(_ScalarResult(entitlement))
@@ -57,6 +65,41 @@ async def test_active_premium_queries_return_bool_scope_and_lock() -> None:
         is entitlement
     )
     assert "FOR UPDATE" in compile_statement(lock_session.statement)
+
+
+async def test_entitlement_request_cache_reuses_premium_status_for_same_flow() -> None:
+    now_utc = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
+    entitlement = _entitlement(scope="arena_plus")
+    session = RecordingSession(_PremiumStatusResult((entitlement.id, entitlement.scope)))
+
+    with entitlement_request_cache():
+        assert await EntitlementsRepo.has_active_premium(session, 7, now_utc) is True
+        assert await EntitlementsRepo.get_active_premium_scope(session, 7, now_utc) == "arena_plus"
+
+    assert len(session.statements) == 1
+
+
+async def test_active_premium_status_preserves_null_scope_rows() -> None:
+    now_utc = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
+    entitlement = _entitlement(scope=None)
+    session = RecordingSession(_PremiumStatusResult((entitlement.id, entitlement.scope)))
+
+    with entitlement_request_cache():
+        assert await EntitlementsRepo.has_active_premium(session, 7, now_utc) is True
+        assert await EntitlementsRepo.get_active_premium_scope(session, 7, now_utc) is None
+
+    assert len(session.statements) == 1
+
+
+async def test_entitlement_request_cache_reuses_missing_status_for_same_flow() -> None:
+    now_utc = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)
+    session = RecordingSession(_PremiumStatusResult(None))
+
+    with entitlement_request_cache():
+        assert await EntitlementsRepo.has_active_premium(session, 7, now_utc) is False
+        assert await EntitlementsRepo.get_active_premium_scope(session, 7, now_utc) is None
+
+    assert len(session.statements) == 1
 
 
 async def test_premium_window_queries_and_purchase_revoke_paths() -> None:

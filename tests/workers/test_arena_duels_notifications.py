@@ -14,6 +14,11 @@ from app.game.arena_duels.constants import (
 )
 from app.game.arena_duels.types import ArenaBeatenNotification
 from app.workers.tasks import arena_duels
+from app.workers.tasks.arena_duels_notification_content import (
+    build_arena_beaten_notification_keyboard,
+    build_notification_text,
+    classify_beaten_notification_action_mode,
+)
 from tests.type_helpers import AsyncBeginContext
 
 NOW_UTC = datetime(2026, 5, 1, 12, 0, tzinfo=UTC)
@@ -49,19 +54,34 @@ class _FlakyBot:
         self.sent_messages.append(kwargs)
 
 
-def _notification() -> ArenaBeatenNotification:
+def _notification(
+    *,
+    previous_score: int = 6,
+    previous_time_ms: int = 48_000,
+    new_score: int = 7,
+    new_time_ms: int = 52_000,
+) -> ArenaBeatenNotification:
     return ArenaBeatenNotification(
         arena_duel_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
         previous_best_attempt_id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
         previous_best_user_id=11,
-        previous_best_score=6,
-        previous_best_time_ms=48_000,
+        previous_best_score=previous_score,
+        previous_best_time_ms=previous_time_ms,
         new_best_attempt_id=UUID("cccccccc-cccc-cccc-cccc-cccccccccccc"),
         new_best_user_id=22,
-        new_best_score=7,
-        new_best_time_ms=52_000,
+        new_best_score=new_score,
+        new_best_time_ms=new_time_ms,
         notification_type=ARENA_BEATEN_NOTIFICATION_TYPE,
     )
+
+
+def _callbacks(reply_markup: InlineKeyboardMarkup) -> list[str]:
+    return [
+        button.callback_data
+        for row in reply_markup.inline_keyboard
+        for button in row
+        if button.callback_data is not None
+    ]
 
 
 def test_send_arena_beaten_notification_records_key_after_successful_send(
@@ -125,22 +145,83 @@ def test_send_arena_beaten_notification_records_key_after_successful_send(
     assert payload["new_best_attempt_id"] == str(_notification().new_best_attempt_id)
     assert payload["notification_type"] == ARENA_BEATEN_NOTIFICATION_TYPE
     assert bot.sent_messages[0]["chat_id"] == 110_000_011
-    assert "@anna hat dein Ergebnis übertroffen" in str(bot.sent_messages[0]["text"])
+    assert "@anna hat dich überholt" in str(bot.sent_messages[0]["text"])
+    assert "+1 Antwort Unterschied." in str(bot.sent_messages[0]["text"])
+    assert "Hol dir deinen Platz zurück?" in str(bot.sent_messages[0]["text"])
     assert "Du:\n6/7 · 00:48" in str(bot.sent_messages[0]["text"])
     assert "@anna:\n7/7 · 00:52" in str(bot.sent_messages[0]["text"])
     keyboard = cast(InlineKeyboardMarkup, bot.sent_messages[0]["reply_markup"])
-    callbacks = [
-        button.callback_data
-        for row in keyboard.inline_keyboard
-        for button in row
-        if button.callback_data is not None
-    ]
-    assert callbacks == [
+    assert _callbacks(keyboard) == [
         "arena:revanche:cccccccc-cccc-cccc-cccc-cccccccccccc",
-        "buy:FRIEND_CHALLENGE_5:duel",
-        "buy:PREMIUM_WEEK:duel",
+        "buy:FRIEND_CHALLENGE_5:duel:beaten_result",
+        "buy:PREMIUM_WEEK:duel:beaten_result",
         "arena:list",
     ]
+
+
+def test_beaten_notification_same_score_time_loss_uses_premium_revanche_moment() -> None:
+    notification = _notification(
+        previous_score=6,
+        previous_time_ms=48_000,
+        new_score=6,
+        new_time_ms=41_000,
+    )
+
+    text = build_notification_text(notification=notification, challenger_label="@anna")
+    keyboard = build_arena_beaten_notification_keyboard(
+        source_attempt_id=str(notification.new_best_attempt_id),
+        action_mode=classify_beaten_notification_action_mode(notification),
+    )
+
+    assert "nur wegen der Zeit" in text
+    assert "7 Sekunden schneller." in text
+    assert "Revanche?" in text
+    assert _callbacks(keyboard) == [
+        "arena:revanche:cccccccc-cccc-cccc-cccc-cccccccccccc",
+        "buy:FRIEND_CHALLENGE_5:duel:beaten_result",
+        "buy:PREMIUM_WEEK:duel:beaten_result",
+        "arena:list",
+    ]
+
+
+def test_beaten_notification_large_score_gap_hides_monetization_rows() -> None:
+    notification = _notification(
+        previous_score=4,
+        previous_time_ms=48_000,
+        new_score=6,
+        new_time_ms=52_000,
+    )
+
+    text = build_notification_text(notification=notification, challenger_label="@anna")
+    keyboard = build_arena_beaten_notification_keyboard(
+        source_attempt_id=str(notification.new_best_attempt_id),
+        action_mode=classify_beaten_notification_action_mode(notification),
+    )
+
+    assert "2 richtige Antworten Unterschied." in text
+    assert "Starte eine Revanche" in text
+    assert _callbacks(keyboard) == [
+        "arena:revanche:cccccccc-cccc-cccc-cccc-cccccccccccc",
+        "arena:list",
+    ]
+
+
+def test_beaten_notification_weak_result_only_links_back_to_arena() -> None:
+    notification = _notification(
+        previous_score=2,
+        previous_time_ms=48_000,
+        new_score=7,
+        new_time_ms=52_000,
+    )
+
+    text = build_notification_text(notification=notification, challenger_label="@anna")
+    keyboard = build_arena_beaten_notification_keyboard(
+        source_attempt_id=str(notification.new_best_attempt_id),
+        action_mode=classify_beaten_notification_action_mode(notification),
+    )
+
+    assert "Wähle ein neues Duell in der Arena." in text
+    assert _callbacks(keyboard) == ["arena:list"]
 
 
 def test_send_arena_beaten_notification_skips_existing_sent_event(monkeypatch) -> None:

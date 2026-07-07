@@ -13,7 +13,7 @@ import {
 
 function promoTypeLabel(value) {
   if (value === "PERCENT_DISCOUNT") return "Prozent-Rabatt";
-  if (value === "PREMIUM_GRANT") return "Premium-Tage";
+  if (value === "PREMIUM_GRANT") return "Arena-Pass-Tage";
   return String(value || "-");
 }
 
@@ -28,15 +28,15 @@ function promoStatusLabel(value) {
 function promoScopeLabel(value) {
   if (value === "ANY") return "Alle Produkte";
   if (value === "MICRO_ANY") return "Mikro-Pakete";
-  if (value === "PREMIUM_ANY") return "Premium-Plaene";
+  if (value === "PREMIUM_ANY") return "Arena Pass Pläne";
   if (value === "ENERGY_10") return "+10 Energie";
   if (value === "STREAK_SAVER_20") return "Serien-Schutz";
   if (value === "FRIEND_CHALLENGE_5") return "Duell-Ticket";
-  if (value === "PREMIUM_3_DAYS") return "Premium 3 Tage";
-  if (value === "PREMIUM_WEEK") return "Premium Woche";
-  if (value === "PREMIUM_MONTH") return "Premium Monat";
-  if (value === "PREMIUM_SEASON") return "Premium Saison";
-  if (value === "PREMIUM_YEAR") return "Premium Jahr";
+  if (value === "PREMIUM_3_DAYS") return "Arena Pass 3 Tage";
+  if (value === "PREMIUM_WEEK") return "Arena Pass 7 Tage";
+  if (value === "PREMIUM_MONTH") return "Arena Pass 30 Tage";
+  if (value === "PREMIUM_SEASON") return "Arena Pass Saison";
+  if (value === "PREMIUM_YEAR") return "Arena Pass Jahr";
   return String(value || "-");
 }
 
@@ -113,7 +113,7 @@ export function initPromoPage() {
 
   async function updateCampaignStatus(row, desired) {
     const reason =
-      window.prompt(`Grund fuer Wechsel zu ${promoStatusLabel(desired)}? (optional)`, "") || "";
+      window.prompt(`Grund für Wechsel zu ${promoStatusLabel(desired)}? (optional)`, "") || "";
     try {
       await api(`/internal/promo/campaigns/${row.id}/status`, {
         method: "POST",
