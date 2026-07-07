@@ -175,6 +175,7 @@ and covered by repo/integration tests for the duel funnel aggregation path.
 | `referral_reward_milestone_available` | `app/workers/tasks/referrals.py` | `SENT` or `FAILED` | internal referrals events feed (`/internal/referrals/events`) |
 | `referral_reward_granted` | `app/workers/tasks/referrals.py` | `SENT` or `FAILED` | internal referrals events feed (`/internal/referrals/events`) |
 | `payments_telegram_stars_reconciliation_review` | `app/workers/tasks/payments_reliability_async.py` | `OPEN` | payment manual review / production state checks |
+| `telegram_payment_update_received` | `app/api/routes/telegram_webhook.py` | `PENDING` | payment evidence / manual replay until dedicated inbox exists |
 
 Notes:
 - `outbox_events` is also subject to retention cleanup (`app/workers/tasks/retention_cleanup.py`).
@@ -184,6 +185,11 @@ Notes:
   `raw_payload_stored=false`. It must not contain bot tokens, raw Telegram payloads, raw invoice
   payloads, or raw charge ids. Deduplication is best-effort until a dedicated review table or
   unique constraint is approved.
+- `telegram_payment_update_received` is the migration-deferred payment update evidence mechanism.
+  It stores `payment_update_kind`, `payment_update_key`, `update_id`, and DB-only `raw_update` for
+  `pre_checkout_query`, `message.successful_payment`, and `message.refunded_payment`. It must not
+  store request headers or webhook secrets. Deduplication is best-effort until a dedicated inbox
+  table or unique constraint is approved.
 
 ## 4) Ops Alert Event Catalog (External Channels)
 

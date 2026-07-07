@@ -146,6 +146,24 @@ Expected:
 - payload contains hashes and candidate purchase ids only, not a raw token, invoice payload, charge
   id, or Telegram transaction payload.
 
+Confirm payment webhook evidence was persisted before ACK:
+
+```bash
+docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c \
+"select id, created_at, status, payload->>'payment_update_kind' as payment_update_kind, \
+        payload->>'payment_update_key' as payment_update_key \
+ from outbox_events \
+ where event_type='telegram_payment_update_received' \
+ order by created_at desc, id desc \
+ limit 20;"
+```
+
+Expected:
+- the smoke payment has `pre_checkout_query` and `message.successful_payment` evidence rows,
+- rows are stored before the webhook returns `200`/enqueue succeeds,
+- payload contains the raw Telegram update in DB for manual replay, but not request headers or
+  webhook secrets.
+
 ## 4) Scenario B: referral reward callback replay
 
 1. Ensure a referrer has claimable reward state.

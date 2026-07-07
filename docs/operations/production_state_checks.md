@@ -96,6 +96,33 @@ Current limitation:
 - it is not protected by a DB-level unique constraint until a dedicated review table/migration is
   approved after a data audit.
 
+Payment-relevant webhook updates are durably captured before enqueue/ACK through interim
+`outbox_events` evidence while the dedicated `telegram_update_inbox` / `payment_events` migration
+is deferred:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env exec -T postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c \
+"SELECT id, created_at, status, payload->>'payment_update_kind' AS payment_update_kind, \
+        payload->>'payment_update_key' AS payment_update_key \
+ FROM outbox_events \
+ WHERE event_type='telegram_payment_update_received' \
+ ORDER BY created_at DESC, id DESC \
+ LIMIT 50;"
+```
+
+Expected:
+- recent payment smoke updates have an evidence row before normal worker processing,
+- `payment_update_kind` is one of `pre_checkout_query`, `message.successful_payment`, or
+  `message.refunded_payment`,
+- evidence payload stores the raw Telegram update in DB for replay/manual inspection, but must not
+  store request headers or webhook secrets.
+
+Current limitation:
+- evidence dedupe is best-effort by `payment_update_key` and `PENDING` status;
+- there is no DB-level unique constraint or dedicated replay/dead-letter state until an inbox
+  migration is approved.
+
 Payment invariant alerts are emitted by:
 
 ```bash
