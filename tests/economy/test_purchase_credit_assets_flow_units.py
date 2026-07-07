@@ -35,6 +35,10 @@ async def test_credit_purchase_assets_applies_energy_streak_promo_and_ledger(
         ledger_entries.append(entry)
         return entry
 
+    async def _fake_get_purchase_credit_for_update(_session, *, purchase_id):
+        assert purchase_id == purchase.id
+        return None
+
     async def _fake_emit_purchase_event(
         _session, *, event_type: str, purchase, happened_at, extra_payload=None
     ) -> None:
@@ -53,6 +57,11 @@ async def test_credit_purchase_assets_applies_energy_streak_promo_and_ledger(
         purchase_credit_assets,
         "_validate_reserved_discount_for_purchase",
         _fake_validate_reserved_discount,
+    )
+    monkeypatch.setattr(
+        purchase_credit_assets.LedgerRepo,
+        "get_purchase_credit_for_update",
+        _fake_get_purchase_credit_for_update,
     )
     monkeypatch.setattr(purchase_credit_assets.LedgerRepo, "create", _fake_create)
     monkeypatch.setattr(purchase_credit_assets, "_emit_purchase_event", _fake_emit_purchase_event)
@@ -178,4 +187,49 @@ async def test_credit_purchase_assets_keeps_already_applied_promo_usage_stable(
     assert redemption.applied_at is None
     assert code.used_total == 5
     assert purchase.status == "CREDITED"
+    assert events == ["purchase_credited"]
+
+
+@pytest.mark.asyncio
+async def test_credit_purchase_assets_skips_existing_purchase_ledger(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    purchase = purchase_model(stars_amount=5, status="PAID_UNCREDITED")
+    product = ProductSpec("ENERGY_10", "MICRO", "Energy", "Energy", 5, 0)
+    existing_ledger = object()
+    events: list[str] = []
+
+    async def _fake_get_purchase_credit_for_update(_session, *, purchase_id):
+        assert purchase_id == purchase.id
+        return existing_ledger
+
+    async def _fail_create(_session, *, entry: LedgerEntry):
+        del entry
+        pytest.fail("existing purchase credit ledger should not be duplicated")
+
+    async def _fake_emit_purchase_event(
+        _session, *, event_type: str, purchase, happened_at, extra_payload=None
+    ) -> None:
+        assert happened_at == NOW
+        assert extra_payload is None
+        events.append(event_type)
+
+    monkeypatch.setattr(
+        purchase_credit_assets.LedgerRepo,
+        "get_purchase_credit_for_update",
+        _fake_get_purchase_credit_for_update,
+    )
+    monkeypatch.setattr(purchase_credit_assets.LedgerRepo, "create", _fail_create)
+    monkeypatch.setattr(purchase_credit_assets, "_emit_purchase_event", _fake_emit_purchase_event)
+
+    await purchase_credit_assets.credit_purchase_assets(
+        SessionStub(),
+        user_id=7,
+        purchase=purchase,
+        product=product,
+        now_utc=NOW,
+    )
+
+    assert purchase.status == "CREDITED"
+    assert purchase.credited_at == NOW
     assert events == ["purchase_credited"]
