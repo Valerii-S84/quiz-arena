@@ -7,11 +7,14 @@ from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
+from app.db.repo.outbox_events_repo import OutboxEventsRepo
+from app.db.session import SessionLocal
 from app.services.telegram_updates import extract_update_id, is_valid_webhook_secret
 from app.workers.tasks.telegram_updates import process_telegram_update
 
 router = APIRouter(tags=["telegram"])
 logger = structlog.get_logger(__name__)
+PAYMENT_UPDATE_EVIDENCE_EVENT = "telegram_payment_update_received"
 
 
 def _is_celery_task(task_obj: object) -> bool:
@@ -55,6 +58,56 @@ async def _enqueue_update(
         return False
 
 
+def _payment_update_kind(update_payload: dict[str, object]) -> str | None:
+    if isinstance(update_payload.get("pre_checkout_query"), dict):
+        return "pre_checkout_query"
+
+    message = update_payload.get("message")
+    if not isinstance(message, dict):
+        return None
+    if isinstance(message.get("successful_payment"), dict):
+        return "message.successful_payment"
+    if isinstance(message.get("refunded_payment"), dict):
+        return "message.refunded_payment"
+    return None
+
+
+async def _store_payment_update_evidence(
+    *,
+    update_payload: dict[str, object],
+    update_id: int,
+) -> bool:
+    payment_update_kind = _payment_update_kind(update_payload)
+    if payment_update_kind is None:
+        return True
+
+    payload = {
+        "schema_version": 1,
+        "update_id": update_id,
+        "payment_update_kind": payment_update_kind,
+        "payment_update_key": f"{update_id}:{payment_update_kind}",
+        "raw_update": update_payload,
+    }
+    try:
+        async with SessionLocal.begin() as session:
+            await OutboxEventsRepo.create_once_by_payload_key(
+                session,
+                event_type=PAYMENT_UPDATE_EVIDENCE_EVENT,
+                payload=payload,
+                payload_key="payment_update_key",
+                status="PENDING",
+            )
+    except Exception as exc:
+        logger.warning(
+            "telegram_payment_update_evidence_store_failed",
+            update_id=update_id,
+            payment_update_kind=payment_update_kind,
+            error_type=type(exc).__name__,
+        )
+        return False
+    return True
+
+
 @router.post("/webhook/telegram")
 async def telegram_webhook(request: Request) -> JSONResponse:
     settings = get_settings()
@@ -84,6 +137,16 @@ async def telegram_webhook(request: Request) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={"status": "ignored"},
+        )
+
+    evidence_stored = await _store_payment_update_evidence(
+        update_payload=update_payload,
+        update_id=update_id,
+    )
+    if not evidence_stored:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "retry"},
         )
 
     enqueue_timeout_ms = max(

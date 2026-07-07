@@ -95,8 +95,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | 2 | Payment-specific observability and alerts | DONE | Successful-payment logs, invariant alerts, recovery logs, and docs passed audit. |
 | 3 | Telegram Stars client and reconciliation dry-run | DONE | Telegram Stars client, conservative dry-run classifier, disabled task wiring, and read-only dry-run runner passed audit. |
 | 4 | Review records / persistent reconciliation findings | DONE | Outbox-based OPEN review events and documented migration deferral passed audit; no new migration added. |
-| 5 | Exact-match auto-recovery behind feature flag | IN_PROGRESS | Initial auto-recovery patch failed audit; transaction revalidation fix under audit. |
-| 6 | Durable payment inbox / payment events | TODO | Only after prior phases are stable. |
+| 5 | Exact-match auto-recovery behind feature flag | DONE | Exact-match auto-recovery and transaction revalidation fix passed audit; defaults remain disabled/dry-run. |
+| 6 | Durable payment inbox / payment events | IN_PROGRESS | Existing-outbox payment update evidence under audit; dedicated inbox table migration deferred pending approval. |
 | 7 | Idempotent asset crediting and stronger DB constraints | TODO | Constraints only after data audit. |
 | 8 | Production smoke and final hardening | TODO | Safe smoke/runbook, no deploy. |
 
@@ -120,8 +120,9 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P4A | 4 | Persist Stars dry-run review findings through existing outbox | DONE | `e34bf1e` | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py` -> `13 passed`; `pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py` -> `13 passed`; `ruff check app/db/repo/outbox_events_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/outbox_events_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | `PASS_WITH_NOTES` | Accepted; best-effort outbox dedupe is not race-proof without a future unique constraint/review table. |
 | P4B | 4 | Document review outbox workflow and migration deferral limits | DONE | `5665a6e` | `rg -n "payments_telegram_stars_reconciliation_review|review_key|transaction_id_hash|raw_payload_stored|candidate_purchase_ids|dedupe|deduplication|OPEN" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md docs/analytics/events_catalog.md` -> required entries present; `rg -n "bot[0-9]+:|TELEGRAM_BOT_TOKEN=.*[0-9A-Za-z_-]{20}|secret-token|bot-token-secret|charge-1|invoice-1" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md docs/analytics/events_catalog.md` -> no matches | `PASS_WITH_NOTES` | Accepted; docs-only patch, no runtime/config/migration changes. |
 | P5 | 5 | Exact-match auto-recovery behind safe flags | FAIL | `010067f` | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py tests/economy/test_purchase_credit_service.py` -> `23 passed`; `pytest --capture=no -q tests/integration/test_purchase_premium_integration.py` -> `3 passed`; `ruff check app/db/repo/purchases_repo.py app/db/repo/entitlements_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/purchases_repo.py app/db/repo/entitlements_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | `FAIL` | Blocking issues: exactness was not revalidated inside the recovery transaction, and credited charge conflicts could be counted as success. Fixed in P5-FIX. |
-| P5-FIX | 5 | Revalidate exact-match auto-recovery under lock | AUDIT | Pending | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py tests/economy/test_purchase_credit_service.py` -> `25 passed`; `pytest --capture=no -q tests/integration/test_purchase_premium_integration.py` -> `3 passed`; `ruff check app/db/repo/purchases_repo.py app/db/repo/entitlements_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/purchases_repo.py app/db/repo/entitlements_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | Pending | Pending |
-| P6 | 6 | Durable payment update inbox and replay path | TODO | Pending | Pending | Pending | Pending |
+| P5-FIX | 5 | Revalidate exact-match auto-recovery under lock | DONE | `16768c7` | `pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py tests/services/test_payment_reconciliation.py tests/economy/test_purchase_credit_service.py` -> `25 passed`; `pytest --capture=no -q tests/integration/test_purchase_premium_integration.py` -> `3 passed`; `ruff check app/db/repo/purchases_repo.py app/db/repo/entitlements_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/db/repo/purchases_repo.py app/db/repo/entitlements_repo.py app/workers/tasks/payments_reliability_async.py tests/workers/test_telegram_stars_reconciliation_task.py` -> pass | `PASS_WITH_NOTES` | Accepted; revalidation failures preserve the original review reason, which is less precise but keeps manual review intact. |
+| P6A | 6 | Store payment webhook update evidence before ACK through outbox | AUDIT | Pending | `pytest --capture=no -q tests/api/test_telegram_webhook.py tests/workers/test_telegram_updates_task.py tests/workers/test_telegram_updates_processing_units.py tests/workers/test_telegram_updates_reliability_units.py` -> `28 passed`; `pytest --capture=no -q tests/api/test_telegram_webhook.py` -> `10 passed`; `ruff check app/api/routes/telegram_webhook.py tests/api/test_telegram_webhook.py` -> pass; `black --check app/api/routes/telegram_webhook.py tests/api/test_telegram_webhook.py` -> pass; `isort --check-only app/api/routes/telegram_webhook.py tests/api/test_telegram_webhook.py` -> pass; `mypy app/api/routes/telegram_webhook.py tests/api/test_telegram_webhook.py` -> pass | Pending | Pending |
+| P6B | 6 | Document payment update outbox evidence and inbox migration deferral | TODO | Pending | Pending | Pending | Pending |
 | P7A | 7 | Idempotent premium entitlement and ledger credit re-entry | TODO | Pending | Pending | Pending | Pending |
 | P7B | 7 | Data-audited DB constraints if approved | TODO | Pending | Pending | Pending | Pending |
 | P8 | 8 | Payment smoke and final reliability runbook | TODO | Pending | Pending | Pending | Pending |
@@ -422,6 +423,27 @@ Blocking issues:
 Lead response: Fixed in P5-FIX by re-querying candidate rows with `FOR UPDATE`, reclassifying
 under lock, and adding regression tests for changed locked candidate sets and credited charge
 conflicts.
+
+### P5-FIX - `16768c7` - `fix(payments): revalidate Stars auto recovery under lock`
+
+Auditor verdict: `PASS_WITH_NOTES`
+
+Auditor notes:
+
+- No blocking issues.
+- Previous blocker is fixed: auto-recovery re-loads candidate rows inside the recovery transaction
+  with `for_update=True`, reclassifies the locked set, and refuses recovery unless the locked
+  decision is exactly the same single `WOULD_RECOVER_EXACT_MATCH`.
+- Credited charge-conflict risk is blocked before crediting.
+- Auto-credit still only runs through `PurchaseService.apply_successful_payment` after open-review,
+  status, invoice, charge, ledger, and entitlement checks.
+- Defaults remain safe: reconciliation disabled, dry-run true, and auto-recovery disabled.
+- No migrations, deploy/config files, or secrets changed.
+- Non-blocking note: revalidation failures persist the original review decision rather than the
+  locked reclassification details, so the review reason can be less precise for changed candidate
+  sets.
+
+Lead response: Accepted; manual review remains intact for revalidation failures.
 
 ## Open owner decisions
 
