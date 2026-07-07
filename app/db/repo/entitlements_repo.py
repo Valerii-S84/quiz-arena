@@ -97,6 +97,24 @@ class EntitlementsRepo:
         return entitlement
 
     @staticmethod
+    async def get_by_source_purchase_id_for_update(
+        session: AsyncSession,
+        *,
+        purchase_id: UUID,
+        entitlement_type: str,
+    ) -> Entitlement | None:
+        stmt = (
+            select(Entitlement)
+            .where(
+                Entitlement.source_purchase_id == purchase_id,
+                Entitlement.entitlement_type == entitlement_type,
+            )
+            .with_for_update()
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def has_recently_ended_premium_scope(
         session: AsyncSession,
         *,

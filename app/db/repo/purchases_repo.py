@@ -59,6 +59,19 @@ class PurchasesRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_by_telegram_payment_charge_id_for_update(
+        session: AsyncSession,
+        telegram_payment_charge_id: str,
+    ) -> Purchase | None:
+        stmt = (
+            select(Purchase)
+            .where(Purchase.telegram_payment_charge_id == telegram_payment_charge_id)
+            .with_for_update()
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def get_active_invoice_for_user_product(
         session: AsyncSession,
         *,

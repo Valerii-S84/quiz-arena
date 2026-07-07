@@ -8,10 +8,13 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.db.repo.entitlements_repo import EntitlementsRepo
+from app.db.repo.ledger_repo import LedgerRepo
 from app.db.repo.outbox_events_repo import OutboxEventsRepo
 from app.db.repo.promo_repo import PromoRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.session import SessionLocal
+from app.economy.purchases.catalog import get_product
 from app.economy.purchases.errors import (
     ProductNotFoundError,
     PurchaseNotFoundError,
@@ -21,7 +24,9 @@ from app.economy.purchases.recovery import MAX_CREDIT_RECOVERY_ATTEMPTS, increme
 from app.economy.purchases.service import PurchaseService
 from app.services.alerts import send_ops_alert
 from app.services.payment_reconciliation import (
+    ALREADY_CREDITED,
     EXACT_MATCH_WINDOW,
+    WOULD_RECOVER_EXACT_MATCH,
     ReconciliationCandidate,
     ReconciliationDecision,
     classify_star_transaction_dry_run,
@@ -37,7 +42,9 @@ from app.workers.tasks.payments_reliability_reconciliation import (
 
 logger = structlog.get_logger("app.workers.tasks.payments_reliability")
 PAYMENT_STARS_RECONCILIATION_REVIEW_EVENT = "payments_telegram_stars_reconciliation_review"
+PAYMENT_STARS_AUTO_RECOVERED_EVENT = "payments_telegram_star_auto_recovered"
 _REVIEWABLE_SEVERITIES = frozenset({"HIGH", "MEDIUM"})
+_AUTO_RECOVERY_SUCCESS_OUTCOMES = frozenset({"auto_recovered", "already_credited"})
 
 __all__ = [
     "expire_stale_unpaid_invoices_async",
@@ -290,14 +297,14 @@ async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
         logger.info("telegram_stars_reconciliation_skipped", **result)
         return result
 
-    if not dry_run:
+    if not dry_run and not auto_recovery_enabled:
         result = {
-            "status": "dry_run_required",
+            "status": "auto_recovery_disabled",
             "dry_run": dry_run,
             "auto_recovery_enabled": auto_recovery_enabled,
             "transactions_examined": 0,
         }
-        logger.warning("telegram_stars_reconciliation_dry_run_required", **result)
+        logger.warning("telegram_stars_reconciliation_auto_recovery_disabled", **result)
         return result
 
     logger.info(
@@ -320,22 +327,42 @@ async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
         return result
 
     decisions: list[ReconciliationDecision] = []
+    review_decisions: list[ReconciliationDecision] = []
+    auto_recovery_counts: dict[str, int] = {}
     async with SessionLocal() as session:
         for transaction in page.transactions:
             candidates = await _load_star_reconciliation_candidates(session, transaction)
-            decisions.append(
-                classify_star_transaction_dry_run(
-                    transaction=transaction,
-                    candidates=candidates,
-                )
+            decision = classify_star_transaction_dry_run(
+                transaction=transaction,
+                candidates=candidates,
             )
+            decisions.append(decision)
+            if dry_run:
+                if decision.severity in _REVIEWABLE_SEVERITIES:
+                    review_decisions.append(decision)
+                continue
 
-    result = _build_telegram_stars_dry_run_result(
+            outcome = await _auto_recover_star_transaction_if_exact(
+                transaction=transaction,
+                decision=decision,
+            )
+            auto_recovery_counts[outcome] = auto_recovery_counts.get(outcome, 0) + 1
+            if (
+                outcome not in _AUTO_RECOVERY_SUCCESS_OUTCOMES
+                and decision.severity in _REVIEWABLE_SEVERITIES
+            ):
+                review_decisions.append(decision)
+
+    result = _build_telegram_stars_reconciliation_result(
+        status="dry_run_completed" if dry_run else "auto_recovery_completed",
         decisions=decisions,
         dry_run=dry_run,
         auto_recovery_enabled=auto_recovery_enabled,
     )
-    review_summary = await _persist_telegram_stars_review_findings(decisions)
+    if auto_recovery_counts:
+        result["auto_recovery_counts"] = auto_recovery_counts
+        result["auto_recovered"] = auto_recovery_counts.get("auto_recovered", 0)
+    review_summary = await _persist_telegram_stars_review_findings(review_decisions)
     result.update(review_summary)
     logger.info("telegram_stars_reconciliation_finished", **result)
     return result
@@ -369,8 +396,9 @@ async def _load_star_reconciliation_candidates(
     ]
 
 
-def _build_telegram_stars_dry_run_result(
+def _build_telegram_stars_reconciliation_result(
     *,
+    status: str,
     decisions: list[ReconciliationDecision],
     dry_run: bool,
     auto_recovery_enabled: bool,
@@ -384,7 +412,7 @@ def _build_telegram_stars_dry_run_result(
         severity_counts[decision.severity] = severity_counts.get(decision.severity, 0) + 1
 
     return {
-        "status": "dry_run_completed",
+        "status": status,
         "dry_run": dry_run,
         "auto_recovery_enabled": auto_recovery_enabled,
         "transactions_examined": len(decisions),
@@ -392,6 +420,114 @@ def _build_telegram_stars_dry_run_result(
         "severity_counts": severity_counts,
         "high_severity_findings": severity_counts.get("HIGH", 0),
         "medium_severity_findings": severity_counts.get("MEDIUM", 0),
+    }
+
+
+async def _auto_recover_star_transaction_if_exact(
+    *,
+    transaction: TelegramStarTransaction,
+    decision: ReconciliationDecision,
+) -> str:
+    if decision.classification == ALREADY_CREDITED:
+        return "already_credited"
+    if (
+        decision.classification != WOULD_RECOVER_EXACT_MATCH
+        or len(decision.candidate_purchase_ids) != 1
+    ):
+        return "not_exact_match"
+    if transaction.invoice_payload is None:
+        return "missing_invoice_payload"
+
+    purchase_id = decision.candidate_purchase_ids[0]
+    transaction_id_hash = _stable_payment_review_hash(transaction.transaction_id)
+    async with SessionLocal.begin() as session:
+        open_review = await OutboxEventsRepo.get_open_by_payload_key(
+            session,
+            event_type=PAYMENT_STARS_RECONCILIATION_REVIEW_EVENT,
+            payload_key="transaction_id_hash",
+            payload_value=transaction_id_hash,
+            status="OPEN",
+        )
+        if open_review is not None:
+            return "open_review_blocked"
+
+        purchase = await PurchasesRepo.get_by_id_for_update(session, purchase_id)
+        if purchase is None:
+            return "purchase_missing"
+        if purchase.status == "CREDITED":
+            return "already_credited"
+        if purchase.status not in {"PRECHECKOUT_OK", "INVOICE_SENT", "CREATED", "PAID_UNCREDITED"}:
+            return "status_rejected"
+        if purchase.invoice_payload != transaction.invoice_payload:
+            return "invoice_payload_mismatch"
+        if purchase.telegram_payment_charge_id not in (None, transaction.transaction_id):
+            return "charge_conflict"
+
+        charge_purchase = await PurchasesRepo.get_by_telegram_payment_charge_id_for_update(
+            session,
+            transaction.transaction_id,
+        )
+        if charge_purchase is not None and charge_purchase.id != purchase.id:
+            return "charge_conflict"
+
+        ledger_entry = await LedgerRepo.get_purchase_credit_for_update(
+            session,
+            purchase_id=purchase.id,
+        )
+        if ledger_entry is not None:
+            return "ledger_conflict"
+
+        product = get_product(purchase.product_code)
+        if product is None:
+            return "product_missing"
+        if product.product_type == "PREMIUM":
+            entitlement = await EntitlementsRepo.get_by_source_purchase_id_for_update(
+                session,
+                purchase_id=purchase.id,
+                entitlement_type="PREMIUM",
+            )
+            if entitlement is not None:
+                return "entitlement_conflict"
+
+        await PurchaseService.apply_successful_payment(
+            session,
+            user_id=purchase.user_id,
+            invoice_payload=transaction.invoice_payload,
+            telegram_payment_charge_id=transaction.transaction_id,
+            raw_successful_payment=_successful_payment_payload_from_star_transaction(transaction),
+            now_utc=transaction.transaction_date,
+        )
+        await OutboxEventsRepo.create(
+            session,
+            event_type=PAYMENT_STARS_AUTO_RECOVERED_EVENT,
+            payload={
+                "schema_version": 1,
+                "source": "telegram_stars_reconciliation",
+                "purchase_id": str(purchase.id),
+                "transaction_id_hash": transaction_id_hash,
+                "classification": decision.classification,
+            },
+            status="SENT",
+        )
+        logger.info(
+            "telegram_stars_auto_recovery_finished",
+            purchase_id=str(purchase.id),
+            transaction_id_hash=transaction_id_hash,
+            product_code=purchase.product_code,
+        )
+        return "auto_recovered"
+
+
+def _successful_payment_payload_from_star_transaction(
+    transaction: TelegramStarTransaction,
+) -> dict[str, object]:
+    return {
+        "invoice_payload": transaction.invoice_payload,
+        "currency": "XTR",
+        "total_amount": transaction.amount,
+        "telegram_payment_charge_id": transaction.transaction_id,
+        "recovered_by": "telegram_stars_reconciliation",
+        "transaction_date": transaction.transaction_date.isoformat(),
     }
 
 
