@@ -33,8 +33,26 @@ curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"
 
 Expected:
 - `url=https://deutchquizarena.de/webhook/telegram`
+- `allowed_updates` contains at least `message`, `callback_query`, and `pre_checkout_query`
 - `pending_update_count=0` (or low and not growing)
 - if `last_error_message` exists, `last_error_date` must be older than current incident window/deploy
+
+Payment-specific allowed updates check:
+
+```bash
+curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo" \
+  > /tmp/telegram_webhook_info.json
+
+PYTHONPATH=. .venv/bin/python scripts/payment_reliability_checks.py \
+  --skip-db \
+  --webhook-info-json /tmp/telegram_webhook_info.json
+```
+
+Expected:
+- `payments_webhook_allowed_updates_missing` is `OK`.
+- `message` is present so Telegram can deliver `message.successful_payment`.
+- `pre_checkout_query` is present so Telegram can deliver payment approval requests.
+- `callback_query` stays present so existing bot callbacks keep working.
 
 ## 3) Queue and worker pressure
 

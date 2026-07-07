@@ -56,13 +56,21 @@ Use one generated code in Telegram scenario A.
 ```bash
 curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook" \
   -d "url=${PUBLIC_WEBHOOK_BASE}/webhook/telegram" \
-  -d "secret_token=${TELEGRAM_WEBHOOK_SECRET}"
+  -d "secret_token=${TELEGRAM_WEBHOOK_SECRET}" \
+  --data-urlencode 'allowed_updates=["message","callback_query","pre_checkout_query","my_chat_member"]'
 
-curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"
+curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo" \
+  > /tmp/telegram_webhook_info.json
+
+PYTHONPATH=. .venv/bin/python scripts/payment_reliability_checks.py \
+  --skip-db \
+  --webhook-info-json /tmp/telegram_webhook_info.json
 ```
 
 Expected:
 - webhook URL points to `${PUBLIC_WEBHOOK_BASE}/webhook/telegram`,
+- `payment_reliability_checks` reports `payments_webhook_allowed_updates_missing` as `OK`,
+- `allowed_updates` contains at least `message`, `callback_query`, and `pre_checkout_query`,
 - `pending_update_count` не росте; якщо є `last_error_message`, тоді `last_error_date` має бути до початку поточного smoke.
 
 ## 3) Scenario A: promo discount -> Stars purchase
