@@ -73,6 +73,7 @@ def test_constraint_preflight_checks_are_included() -> None:
         "payments_constraint_duplicate_purchase_credit_ledger",
         "payments_constraint_paid_purchase_missing_charge_id",
         "payments_constraint_paid_purchase_missing_paid_at",
+        "payments_constraint_credited_purchase_missing_credited_at",
     }.issubset(names)
 
 

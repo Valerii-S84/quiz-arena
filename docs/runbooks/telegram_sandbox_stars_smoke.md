@@ -129,6 +129,7 @@ Expected:
 - `payments_constraint_duplicate_purchase_credit_ledger` is `OK`,
 - `payments_constraint_paid_purchase_missing_charge_id` is `OK`,
 - `payments_constraint_paid_purchase_missing_paid_at` is `OK`,
+- `payments_constraint_credited_purchase_missing_credited_at` is `OK`,
 - `payments_webhook_allowed_updates_missing` is `OK`.
 
 These `payments_constraint_*` rows are read-only migration preflight checks. They do not create or

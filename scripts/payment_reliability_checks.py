@@ -283,6 +283,21 @@ def _paid_purchase_missing_paid_at_check() -> InvariantCheck:
     )
 
 
+def _credited_purchase_missing_credited_at_check() -> InvariantCheck:
+    return InvariantCheck(
+        name="payments_constraint_credited_purchase_missing_credited_at",
+        severity="HIGH",
+        sql="""
+            SELECT count(*)
+            FROM purchases
+            WHERE status IN ('CREDITED', 'REFUNDED')
+              AND credited_at IS NULL
+        """,
+        params={},
+        description="Constraint preflight: credited/refunded purchase is missing credited_at.",
+    )
+
+
 def build_invariant_checks(now_utc: datetime) -> list[InvariantCheck]:
     precheckout_cutoff = now_utc - timedelta(minutes=3)
     paid_uncredited_cutoff = now_utc - timedelta(seconds=60)
@@ -297,6 +312,7 @@ def build_invariant_checks(now_utc: datetime) -> list[InvariantCheck]:
         _duplicate_purchase_credit_ledger_check(),
         _paid_purchase_missing_charge_id_check(),
         _paid_purchase_missing_paid_at_check(),
+        _credited_purchase_missing_credited_at_check(),
     ]
 
 
