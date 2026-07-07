@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timezone
 
 import structlog
@@ -46,6 +47,10 @@ _extract_offer_impression_id_from_purchase_idempotency_key = (
 )
 _parse_buy_callback_data = parse_buy_callback_data
 _success_text_key = success_text_key
+
+
+def _invoice_payload_hash(invoice_payload: str) -> str:
+    return hashlib.sha256(invoice_payload.encode("utf-8")).hexdigest()[:16]
 
 
 @router.callback_query(F.data.startswith("buy:"))
@@ -95,6 +100,16 @@ async def handle_successful_payment(message: Message) -> None:
 
     payment = message.successful_payment
     now_utc = datetime.now(timezone.utc)
+    invoice_payload_hash = _invoice_payload_hash(payment.invoice_payload)
+
+    logger.info(
+        "payment_successful_update_received",
+        telegram_user_id=message.from_user.id,
+        telegram_payment_charge_id=payment.telegram_payment_charge_id,
+        invoice_payload_hash=invoice_payload_hash,
+        currency=getattr(payment, "currency", None),
+        total_amount=getattr(payment, "total_amount", None),
+    )
 
     try:
         credit_result = await apply_successful_payment(
@@ -106,7 +121,14 @@ async def handle_successful_payment(message: Message) -> None:
         PurchaseNotFoundError,
         ProductNotFoundError,
         PurchasePrecheckoutValidationError,
-    ):
+    ) as exc:
+        logger.warning(
+            "payment_credit_failed",
+            telegram_user_id=message.from_user.id,
+            telegram_payment_charge_id=payment.telegram_payment_charge_id,
+            invoice_payload_hash=invoice_payload_hash,
+            error_type=type(exc).__name__,
+        )
         await message.answer(
             TEXTS_DE["msg.purchase.error.failed"], reply_markup=build_home_keyboard()
         )

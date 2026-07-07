@@ -33,6 +33,8 @@ class _SuccessfulPayment:
     def __init__(self) -> None:
         self.invoice_payload = "inv-1"
         self.telegram_payment_charge_id = "charge-1"
+        self.currency = "XTR"
+        self.total_amount = 29
 
     def model_dump(self, exclude_none: bool = True) -> dict[str, object]:
         assert exclude_none is True
@@ -54,6 +56,18 @@ class _PaymentMessage(DummyMessage):
         super().__init__()
         self.from_user = from_user
         self.successful_payment = successful_payment
+
+
+class _Logger:
+    def __init__(self) -> None:
+        self.infos: list[tuple[str, dict[str, object]]] = []
+        self.warnings: list[tuple[str, dict[str, object]]] = []
+
+    def info(self, event: str, **payload: object) -> None:
+        self.infos.append((event, payload))
+
+    def warning(self, event: str, **payload: object) -> None:
+        self.warnings.append((event, payload))
 
 
 @pytest.mark.asyncio
@@ -218,6 +232,36 @@ async def test_handle_successful_payment_sends_success_text(monkeypatch) -> None
     await payments.handle_successful_payment(message)  # type: ignore[arg-type]
 
     assert message.answers[0].text == TEXTS_DE["msg.purchase.success.premium"]
+
+
+@pytest.mark.asyncio
+async def test_handle_successful_payment_logs_received_update_without_raw_payload(
+    monkeypatch,
+) -> None:
+    logger = _Logger()
+    monkeypatch.setattr(payments, "logger", logger)
+
+    async def _fake_apply_payment(*args, **kwargs):
+        return PurchaseCreditResult(
+            purchase_id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+            product_code="PREMIUM_WEEK",
+            status="CREDITED",
+            idempotent_replay=False,
+        )
+
+    monkeypatch.setattr(payments, "apply_successful_payment", _fake_apply_payment)
+
+    payment = _SuccessfulPayment()
+    payment.invoice_payload = "invoice-raw-value"
+    message = _PaymentMessage(from_user=SimpleNamespace(id=1), successful_payment=payment)
+
+    await payments.handle_successful_payment(message)  # type: ignore[arg-type]
+
+    assert logger.infos[0][0] == "payment_successful_update_received"
+    assert logger.infos[0][1]["invoice_payload_hash"] != payment.invoice_payload
+    assert "invoice_payload" not in logger.infos[0][1]
+    assert payment.invoice_payload not in str(logger.infos)
+    assert "token" not in str(logger.infos).lower()
 
 
 @pytest.mark.asyncio

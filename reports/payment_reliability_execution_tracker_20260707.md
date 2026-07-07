@@ -91,8 +91,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | Phase | Goal | Status | Notes |
 |---|---|---:|---|
 | 0 | Baseline and safety tracker | DONE | Tracker created; targeted baseline checks passed; audit passed with notes. |
-| 1 | Read-only invariant checker and allowed_updates verification | AUDIT | Read-only script and unit tests passed audit; allowed_updates docs patch ready for audit. |
-| 2 | Payment-specific observability and alerts | TODO | Structured logs, read-only scheduled alerts, docs. |
+| 1 | Read-only invariant checker and allowed_updates verification | DONE | Read-only script, allowed_updates helper, and runbook checks passed audit. |
+| 2 | Payment-specific observability and alerts | AUDIT | Successful-payment structured logs added; recovery logs/alerts still pending. |
 | 3 | Telegram Stars client and reconciliation dry-run | TODO | Feature-flagged, dry-run, no auto-credit. |
 | 4 | Review records / persistent reconciliation findings | TODO | Migration only after safety/data audit or documented deferral. |
 | 5 | Exact-match auto-recovery behind feature flag | TODO | Disabled by default; strict exact-match criteria. |
@@ -106,8 +106,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 |---|---:|---|---:|---|---|---|---|
 | P0 | 0 | Add execution tracker and baseline code map | DONE | `217bdc9` | `.venv/bin/python -m pytest --capture=no -q --ignore=tests/integration tests/api/test_telegram_webhook.py tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py tests/services/test_payments_reliability.py tests/workers/test_payments_reliability_async.py` -> `30 passed in 14.32s` | `PASS_WITH_NOTES` | Accepted; tracker verdict/response recorded after audit. |
 | P1A | 1 | `scripts/payment_reliability_checks.py` read-only checker and unit coverage | DONE | `e76b1cc` | `pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `6 passed`; `ruff check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `black --check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `isort --check-only scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `mypy tests/scripts/test_payment_reliability_checks.py` -> pass; CLI `--skip-db --webhook-info-json -` sample -> OK | `PASS_WITH_NOTES` | Accepted; later reconciliation/payment-event checks remain planned for future phases. |
-| P1B | 1 | Add allowed_updates verification commands to payment runbooks | AUDIT | Pending | `rg -n "allowed_updates|payment_reliability_checks|message|callback_query|pre_checkout_query" docs/runbooks/telegram_sandbox_stars_smoke.md docs/operations/production_state_checks.md` -> required entries present; `scripts/payment_reliability_checks.py --help` -> documents offline `--webhook-info-json` and `--skip-db` usage | Pending | Pending |
-| P2A | 2 | Structured payment logs without sensitive payloads | TODO | Pending | Pending | Pending | Pending |
+| P1B | 1 | Add allowed_updates verification commands to payment runbooks | DONE | `ca0fc52` | `rg -n "allowed_updates|payment_reliability_checks|message|callback_query|pre_checkout_query" docs/runbooks/telegram_sandbox_stars_smoke.md docs/operations/production_state_checks.md` -> required entries present; `scripts/payment_reliability_checks.py --help` -> documents offline `--webhook-info-json` and `--skip-db` usage | `PASS_WITH_NOTES` | Accepted; docs-only patch did not change runtime behavior. |
+| P2A | 2 | Structured successful-payment logs without sensitive payloads | AUDIT | Pending | `pytest --capture=no -q tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py` -> `17 passed`; `ruff check app/bot/handlers/payments.py app/economy/purchases/service/credit.py tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py` -> pass; `black --check app/bot/handlers/payments.py app/economy/purchases/service/credit.py tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py` -> pass; `isort --check-only app/bot/handlers/payments.py app/economy/purchases/service/credit.py tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py` -> pass; `mypy app/bot/handlers/payments.py app/economy/purchases/service/credit.py tests/bot/test_payments_handler_flow.py tests/economy/test_purchase_credit_service.py` -> pass | Pending | Pending |
 | P2B | 2 | Read-only invariant alerts in scheduled reliability path | TODO | Pending | Pending | Pending | Pending |
 | P2C | 2 | Production state and sandbox Stars runbook updates | TODO | Pending | Pending | Pending | Pending |
 | P3A | 3 | Telegram Stars API wrapper with safe timeout/error handling | TODO | Pending | Pending | Pending | Pending |
@@ -166,6 +166,23 @@ Auditor notes:
 
 Lead response: Accepted; future reconciliation/payment-event checks remain tracked for later
 phases.
+
+### P1B - `ca0fc52` - `docs(payments): require webhook payment updates checks`
+
+Auditor verdict: `PASS_WITH_NOTES`
+
+Auditor notes:
+
+- No blocking issues.
+- Patch is scoped to docs/tracker only.
+- Production checklist now requires `allowed_updates` to include `message`, `callback_query`,
+  and `pre_checkout_query`, and uses the offline helper with `--skip-db --webhook-info-json`.
+- Sandbox smoke binds webhook with payment-safe `allowed_updates` and verifies via
+  `payment_reliability_checks`.
+- Secret scan found env var placeholders and existing `.env` references only, no literal
+  token/secret values.
+
+Lead response: Accepted; docs-only patch did not change runtime behavior.
 
 ## Open owner decisions
 
