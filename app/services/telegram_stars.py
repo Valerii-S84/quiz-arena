@@ -96,15 +96,15 @@ class TelegramStarsClient:
             client = httpx.AsyncClient(timeout=self.timeout_seconds)
         try:
             response = await client.post(self._method_url(method_name), json=payload)
-            response.raise_for_status()
         except httpx.HTTPError as exc:
             raise TelegramStarsClientError(
                 "telegram_stars_request_failed",
                 error_type=type(exc).__name__,
-            ) from exc
+            ) from None
         finally:
             if close_client:
                 await client.aclose()
+        _raise_for_status_without_url(response)
         return _parse_api_response(response)
 
     def _method_url(self, method_name: str) -> str:
@@ -116,6 +116,15 @@ def _validate_pagination(*, offset: int, limit: int) -> None:
         raise ValueError("offset must be non-negative")
     if limit < 1 or limit > 100:
         raise ValueError("limit must be between 1 and 100")
+
+
+def _raise_for_status_without_url(response: httpx.Response) -> None:
+    status_code = getattr(response, "status_code", 200)
+    if status_code >= 400:
+        raise TelegramStarsClientError(
+            "telegram_stars_http_status_error",
+            error_type=f"HTTPStatus{status_code}",
+        )
 
 
 def _parse_api_response(response: httpx.Response) -> dict[str, object]:

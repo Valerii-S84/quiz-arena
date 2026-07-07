@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import traceback
 from datetime import timezone
 
 import httpx
@@ -13,24 +14,23 @@ from app.services.telegram_stars import (
 
 
 class _Response:
-    def __init__(self, payload: object) -> None:
+    def __init__(self, payload: object, *, status_code: int = 200) -> None:
         self._payload = payload
+        self.status_code = status_code
 
     def json(self) -> object:
         return self._payload
 
-    def raise_for_status(self) -> None:
-        return None
-
 
 class _Client:
-    def __init__(self, payload: object) -> None:
+    def __init__(self, payload: object, *, status_code: int = 200) -> None:
         self.payload = payload
+        self.status_code = status_code
         self.calls: list[dict[str, object]] = []
 
     async def post(self, url: str, json: dict[str, int]) -> _Response:
         self.calls.append({"url": url, "json": json})
-        return _Response(self.payload)
+        return _Response(self.payload, status_code=self.status_code)
 
 
 class _FailingClient:
@@ -115,6 +115,28 @@ async def test_get_star_transactions_sanitizes_transport_errors() -> None:
     assert str(exc_info.value) == "telegram_stars_request_failed"
     assert exc_info.value.error_type == "ConnectError"
     assert "token-secret" not in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_get_star_transactions_sanitizes_http_status_traceback() -> None:
+    client = TelegramStarsClient(
+        bot_token="token-secret",
+        http_client=_Client({"ok": False}, status_code=500),
+    )
+
+    with pytest.raises(TelegramStarsClientError) as exc_info:
+        await client.get_star_transactions()
+
+    formatted = "".join(
+        traceback.format_exception(
+            type(exc_info.value),
+            exc_info.value,
+            exc_info.value.__traceback__,
+        )
+    )
+    assert str(exc_info.value) == "telegram_stars_http_status_error"
+    assert exc_info.value.__cause__ is None
+    assert "token-secret" not in formatted
 
 
 @pytest.mark.asyncio

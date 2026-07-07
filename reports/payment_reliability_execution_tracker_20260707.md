@@ -111,7 +111,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P2B | 2 | Read-only invariant alerts in scheduled reliability path | DONE | `a82484d` | `pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py tests/workers/test_worker_schedule_units.py tests/services/test_alerts.py` -> `22 passed`; `ruff check app/db/repo/purchases_repo.py app/services/alerts_config.py app/workers/tasks/payments_reliability_async.py app/workers/tasks/payments_reliability.py app/workers/tasks/payments_reliability_schedule.py tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_task.py tests/workers/test_worker_schedule_units.py tests/services/test_alerts.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy ...` -> pass | `PASS_WITH_NOTES` | Accepted; repeated Slack/generic alerts while counts remain nonzero are a known non-blocking ops noise risk. |
 | P2C | 2 | Structured stale payment recovery logs | DONE | `69512ad` | `pytest --capture=no -q tests/workers/test_payments_reliability_async_credit_batch.py` -> `3 passed`; `ruff check app/workers/tasks/payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py` -> pass; `black --check app/workers/tasks/payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py` -> pass; `isort --check-only app/workers/tasks/payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py` -> pass; `mypy app/workers/tasks/payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py` -> pass | `PASS_WITH_NOTES` | Accepted; per-purchase warning logs may repeat while recovery remains unresolved. |
 | P2D | 2 | Production state, sandbox Stars, and alert catalog docs | DONE | `2b0d7a7` | `rg -n "payment_reliability_checks|payments_precheckout_stuck_detected|payments_paid_uncredited_stuck_detected|payments_credit_invariant_failed|payments_webhook_allowed_updates_missing|run_payment_invariant_alerts|payment_recovery_failed" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md docs/analytics/events_catalog.md` -> required entries present; `scripts/payment_reliability_checks.py --help` -> documents offline webhook JSON and skip-DB modes | `PASS_WITH_NOTES` | Accepted; event catalog payload/severity detail remains minimal but production checks cover severity/escalation. |
-| P3A | 3 | Telegram Stars API wrapper with safe timeout/error handling | AUDIT | Pending | `pytest --capture=no -q tests/services/test_telegram_stars.py` -> `6 passed`; `ruff check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `black --check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `isort --check-only app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `mypy app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; official Telegram Bot API checked for `getStarTransactions` parameters and `StarTransaction` fields | Pending | Pending |
+| P3A | 3 | Telegram Stars API wrapper with safe timeout/error handling | FAIL | `bfe751a` | `pytest --capture=no -q tests/services/test_telegram_stars.py` -> `6 passed`; `ruff check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `black --check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `isort --check-only app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `mypy app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; official Telegram Bot API checked for `getStarTransactions` parameters and `StarTransaction` fields | `FAIL` | Blocking issue: chained `httpx.HTTPError` could expose token-bearing URL in traceback; fixing in P3A-FIX. |
+| P3A-FIX | 3 | Sanitize Telegram Stars HTTP error traceback token exposure | AUDIT | Pending | `pytest --capture=no -q tests/services/test_telegram_stars.py` -> `7 passed`; `ruff check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `black --check app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `isort --check-only app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; `mypy app/services/telegram_stars.py tests/services/test_telegram_stars.py` -> pass; traceback-format test confirms token is absent from HTTP status failure traceback | Pending | Pending |
 | P3B | 3 | Dry-run reconciliation classifier and safe feature flags | TODO | Pending | Pending | Pending | Pending |
 | P3C | 3 | Disabled/dry-run Celery wiring | TODO | Pending | Pending | Pending | Pending |
 | P4 | 4 | Persistent review records or documented migration deferral | TODO | Pending | Pending | Pending | Pending |
@@ -261,6 +262,20 @@ Auditor notes:
 
 Lead response: Accepted; event catalog payload/severity detail remains minimal for now because
 production checks cover severity/escalation.
+
+### P3A - `bfe751a` - `feat(payments): add Telegram Stars client`
+
+Auditor verdict: `FAIL`
+
+Blocking issue:
+
+- The client built a Telegram request URL containing the bot token and re-raised
+  `TelegramStarsClientError` with chained `httpx.HTTPError`. For `response.raise_for_status()`,
+  the chained `HTTPStatusError` could include the full token-bearing request URL in traceback/log
+  rendering.
+
+Lead response: Fixed in P3A-FIX; HTTP status handling no longer calls `raise_for_status`, transport
+errors are raised `from None`, and traceback-level tests assert token absence.
 
 ## Open owner decisions
 
