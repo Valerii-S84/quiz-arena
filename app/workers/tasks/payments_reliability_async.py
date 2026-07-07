@@ -171,3 +171,69 @@ async def recover_paid_uncredited_async(
 
     logger.info("paid_uncredited_recovery_finished", **summary)
     return summary
+
+
+async def run_payment_invariant_alerts_async(
+    *,
+    precheckout_stale_minutes: int = 3,
+    paid_uncredited_stale_seconds: int = 60,
+) -> dict[str, int]:
+    now_utc = datetime.now(timezone.utc)
+    precheckout_cutoff = now_utc - timedelta(minutes=precheckout_stale_minutes)
+    paid_uncredited_cutoff = now_utc - timedelta(seconds=paid_uncredited_stale_seconds)
+
+    async with SessionLocal.begin() as session:
+        precheckout_stuck = await PurchasesRepo.count_precheckout_ok_older_than(
+            session,
+            older_than_utc=precheckout_cutoff,
+        )
+        paid_uncredited_stuck = await PurchasesRepo.count_paid_uncredited_older_than(
+            session,
+            older_than_utc=paid_uncredited_cutoff,
+        )
+        credited_premium_missing_entitlement = (
+            await PurchasesRepo.count_credited_premium_without_entitlement(session)
+        )
+        credited_stars_missing_purchase_credit = (
+            await PurchasesRepo.count_credited_stars_without_purchase_credit(session)
+        )
+
+    summary = {
+        "precheckout_stuck": precheckout_stuck,
+        "paid_uncredited_stuck": paid_uncredited_stuck,
+        "credited_premium_missing_entitlement": credited_premium_missing_entitlement,
+        "credited_stars_missing_purchase_credit": credited_stars_missing_purchase_credit,
+    }
+    await _send_payment_invariant_alerts(summary)
+    logger.info("payment_invariant_alerts_finished", **summary)
+    return summary
+
+
+async def _send_payment_invariant_alerts(summary: dict[str, int]) -> None:
+    if summary["precheckout_stuck"] > 0:
+        await send_ops_alert(
+            event="payments_precheckout_stuck_detected",
+            payload={"precheckout_stuck": summary["precheckout_stuck"]},
+        )
+    if summary["paid_uncredited_stuck"] > 0:
+        await send_ops_alert(
+            event="payments_paid_uncredited_stuck_detected",
+            payload={"paid_uncredited_stuck": summary["paid_uncredited_stuck"]},
+        )
+    credit_invariant_failures = (
+        summary["credited_premium_missing_entitlement"]
+        + summary["credited_stars_missing_purchase_credit"]
+    )
+    if credit_invariant_failures > 0:
+        await send_ops_alert(
+            event="payments_credit_invariant_failed",
+            payload={
+                "credit_invariant_failures": credit_invariant_failures,
+                "credited_premium_missing_entitlement": summary[
+                    "credited_premium_missing_entitlement"
+                ],
+                "credited_stars_missing_purchase_credit": summary[
+                    "credited_stars_missing_purchase_credit"
+                ],
+            },
+        )

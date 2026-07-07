@@ -6,6 +6,8 @@ from uuid import UUID
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models.entitlements import Entitlement
+from app.db.models.ledger_entries import LedgerEntry
 from app.db.models.purchases import Purchase
 
 from .purchases_repo_metrics import (
@@ -180,6 +182,57 @@ class PurchasesRepo:
             Purchase.status == "PAID_UNCREDITED",
             Purchase.paid_at.is_not(None),
             Purchase.paid_at <= older_than_utc,
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_precheckout_ok_older_than(
+        session: AsyncSession,
+        *,
+        older_than_utc: datetime,
+    ) -> int:
+        stmt = select(func.count(Purchase.id)).where(
+            Purchase.status == "PRECHECKOUT_OK",
+            Purchase.stars_amount > 0,
+            Purchase.created_at <= older_than_utc,
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_credited_premium_without_entitlement(session: AsyncSession) -> int:
+        entitlement_exists = (
+            select(Entitlement.id)
+            .where(
+                Entitlement.source_purchase_id == Purchase.id,
+                Entitlement.entitlement_type == "PREMIUM",
+            )
+            .exists()
+        )
+        stmt = select(func.count(Purchase.id)).where(
+            Purchase.status == "CREDITED",
+            Purchase.product_type == "PREMIUM",
+            ~entitlement_exists,
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_credited_stars_without_purchase_credit(session: AsyncSession) -> int:
+        ledger_exists = (
+            select(LedgerEntry.id)
+            .where(
+                LedgerEntry.purchase_id == Purchase.id,
+                LedgerEntry.entry_type == "PURCHASE_CREDIT",
+                LedgerEntry.direction == "CREDIT",
+            )
+            .exists()
+        )
+        stmt = select(func.count(Purchase.id)).where(
+            Purchase.status == "CREDITED",
+            Purchase.stars_amount > 0,
+            ~ledger_exists,
         )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)

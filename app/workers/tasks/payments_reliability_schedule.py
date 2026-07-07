@@ -12,6 +12,11 @@ def configure_payments_reliability_schedule(celery_app) -> None:
                 "schedule": 300.0,
                 "options": {"queue": "q_high"},
             },
+            "payment-invariant-alerts-every-minute": {
+                "task": "app.workers.tasks.payments_reliability.run_payment_invariant_alerts",
+                "schedule": 60.0,
+                "options": {"queue": "q_high"},
+            },
             "expire-stale-unpaid-invoices-every-5-minutes": {
                 "task": "app.workers.tasks.payments_reliability.expire_stale_unpaid_invoices",
                 "schedule": 300.0,
