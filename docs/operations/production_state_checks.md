@@ -54,6 +54,20 @@ Expected:
 - `pre_checkout_query` is present so Telegram can deliver payment approval requests.
 - `callback_query` stays present so existing bot callbacks keep working.
 
+Payment reliability flags must stay safe/off unless a separate owner-approved dry-run or
+auto-recovery window is active:
+
+```bash
+printf 'TELEGRAM_STARS_RECONCILIATION_ENABLED=%s\n' "${TELEGRAM_STARS_RECONCILIATION_ENABLED:-false}"
+printf 'TELEGRAM_STARS_RECONCILIATION_DRY_RUN=%s\n' "${TELEGRAM_STARS_RECONCILIATION_DRY_RUN:-true}"
+printf 'TELEGRAM_STARS_AUTO_RECOVERY_ENABLED=%s\n' "${TELEGRAM_STARS_AUTO_RECOVERY_ENABLED:-false}"
+```
+
+Expected default-safe values:
+- `TELEGRAM_STARS_RECONCILIATION_ENABLED=false`.
+- `TELEGRAM_STARS_RECONCILIATION_DRY_RUN=true`.
+- `TELEGRAM_STARS_AUTO_RECOVERY_ENABLED=false`.
+
 ## 3) Payment reliability invariants
 
 ```bash
@@ -73,13 +87,18 @@ Expected:
 - `payments_constraint_paid_purchase_missing_charge_id` is `OK`.
 - `payments_constraint_paid_purchase_missing_paid_at` is `OK`.
 - `payments_constraint_credited_purchase_missing_credited_at` is `OK`.
+- `payments_constraint_credited_purchase_missing_credited_at` is strict for `CREDITED` rows and
+  for `REFUNDED` rows with credit evidence. It intentionally allows `REFUNDED` rows with
+  `credited_at IS NULL` when the purchase was refunded from `PAID_UNCREDITED` before any product or
+  entitlement was granted.
 - `payments_open_manual_review_records` is `OK` or `SKIPPED` if the review table has not been added yet.
 
 DB constraint hardening rule:
 - do not add strict Alembic constraints during an incident or without owner approval;
 - run this read-only checker first and require every `payments_constraint_*` preflight to be `OK`;
 - only then consider a backward-compatible migration for unique premium entitlement per source
-  purchase, unique purchase credit ledger per purchase, or stricter paid-status invariants.
+  purchase, unique purchase credit ledger per purchase, or stricter paid-status invariants. Any
+  future `credited_at` constraint must preserve the uncredited refund exception.
 
 Telegram Stars reconciliation review findings currently persist through `outbox_events`
 while the dedicated review table migration is deferred:
@@ -133,6 +152,24 @@ Current limitation:
 - evidence dedupe is best-effort by `payment_update_key` and `PENDING` status;
 - there is no DB-level unique constraint or dedicated replay/dead-letter state until an inbox
   migration is approved.
+
+Auto-recovery success evidence, if an owner-approved non-dry-run window was active, is written as
+`payments_telegram_star_auto_recovered`:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env exec -T postgres \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c \
+"SELECT id, created_at, payload->>'purchase_id' AS purchase_id, \
+        payload->>'transaction_id_hash' AS transaction_id_hash, payload->>'classification' AS classification \
+ FROM outbox_events \
+ WHERE event_type='payments_telegram_star_auto_recovered' \
+ ORDER BY created_at DESC, id DESC \
+ LIMIT 50;"
+```
+
+Expected:
+- normally no recent rows while reconciliation is disabled or dry-run,
+- any row contains only `purchase_id`, a hashed transaction id, and classification metadata.
 
 Payment invariant alerts are emitted by:
 
@@ -218,5 +255,13 @@ Escalate immediately if any of the following is true:
 - any payment reliability invariant check reports `FAIL`,
 - any `OPEN` `payments_telegram_stars_reconciliation_review` row exists,
 - `payment_recovery_failed` repeats for the same purchase,
+- a non-dry-run reconciliation window is active without owner approval,
 - long `idle in transaction` sessions,
 - container restart count increases unexpectedly.
+
+Payment reliability rollback:
+- set `TELEGRAM_STARS_RECONCILIATION_ENABLED=false`,
+- keep `TELEGRAM_STARS_RECONCILIATION_DRY_RUN=true`,
+- set `TELEGRAM_STARS_AUTO_RECOVERY_ENABLED=false`,
+- restart only the approved app services for the target environment,
+- do not run schema rollback for this phase; no payment reliability migration is applied here.

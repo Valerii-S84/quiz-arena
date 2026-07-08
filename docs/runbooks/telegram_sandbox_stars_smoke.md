@@ -8,6 +8,9 @@ Covers:
 - promo discount redeem -> purchase -> pre-checkout -> successful credit,
 - referral reward callback duplicate replay safety.
 
+Do not run this runbook against production unless the production owner has approved a payment
+smoke window. The cleanup step mutates sandbox/staging promo data.
+
 ## Preconditions
 
 - Use sandbox/staging environment (not production campaign codes).
@@ -101,7 +104,8 @@ docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pa
  limit 1;"
 
 docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c \
-"select status, product_code, base_stars_amount, discount_stars_amount, stars_amount \
+"select id, status, product_code, base_stars_amount, discount_stars_amount, stars_amount, \
+        paid_at, credited_at \
  from purchases \
  where user_id = <user_id> \
  order by created_at desc \
@@ -111,7 +115,51 @@ docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pa
 Expected:
 - latest `promo_redemptions.status='APPLIED'`,
 - latest `purchases.status='CREDITED'`,
+- latest purchase has non-null `paid_at` and `credited_at`,
 - `discount_stars_amount > 0`.
+
+Check purchase credit ledger, premium entitlement, and the app-level premium lookup:
+
+```bash
+docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c \
+"select entry_type, direction, amount, metadata_->>'product_code' as product_code \
+ from ledger_entries \
+ where purchase_id = '<purchase_id>' and entry_type = 'PURCHASE_CREDIT' \
+ order by created_at desc;"
+
+docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c \
+"select entitlement_type, scope, status, starts_at, ends_at \
+ from entitlements \
+ where source_purchase_id = '<purchase_id>' and user_id = <user_id> \
+ order by created_at desc;"
+
+SMOKE_USER_ID=<user_id> PYTHONPATH=. .venv/bin/python - <<'PY'
+import asyncio
+import os
+from datetime import datetime, timezone
+
+from app.db.repo.entitlements_repo import EntitlementsRepo
+from app.db.session import SessionLocal
+
+
+async def main() -> None:
+    async with SessionLocal() as session:
+        active = await EntitlementsRepo.has_active_premium(
+            session,
+            int(os.environ["SMOKE_USER_ID"]),
+            datetime.now(timezone.utc),
+        )
+    print(f"active_premium={active}")
+
+
+asyncio.run(main())
+PY
+```
+
+Expected:
+- exactly one `PURCHASE_CREDIT` ledger row for the smoke purchase,
+- an `ACTIVE` `PREMIUM` entitlement exists for `source_purchase_id='<purchase_id>'`,
+- app-level lookup prints `active_premium=True`.
 
 ### 3.2 Payment reliability checks
 
@@ -134,7 +182,31 @@ Expected:
 
 These `payments_constraint_*` rows are read-only migration preflight checks. They do not create or
 enforce constraints; production constraints require a separate approved migration after clean data
-audit.
+audit. The `credited_at` preflight requires timestamps for `CREDITED` purchases and for `REFUNDED`
+purchases with credit evidence, but it intentionally allows a purchase refunded from
+`PAID_UNCREDITED` before crediting to keep `credited_at IS NULL`.
+
+Confirm reliability flags are still safe unless an explicit dry-run or auto-recovery window was
+approved:
+
+```bash
+printf 'TELEGRAM_STARS_RECONCILIATION_ENABLED=%s\n' "${TELEGRAM_STARS_RECONCILIATION_ENABLED:-false}"
+printf 'TELEGRAM_STARS_RECONCILIATION_DRY_RUN=%s\n' "${TELEGRAM_STARS_RECONCILIATION_DRY_RUN:-true}"
+printf 'TELEGRAM_STARS_AUTO_RECOVERY_ENABLED=%s\n' "${TELEGRAM_STARS_AUTO_RECOVERY_ENABLED:-false}"
+```
+
+Expected default-safe values:
+- `TELEGRAM_STARS_RECONCILIATION_ENABLED=false`,
+- `TELEGRAM_STARS_RECONCILIATION_DRY_RUN=true`,
+- `TELEGRAM_STARS_AUTO_RECOVERY_ENABLED=false`.
+
+Rollback for reconciliation issues:
+- set `TELEGRAM_STARS_RECONCILIATION_ENABLED=false`,
+- keep `TELEGRAM_STARS_RECONCILIATION_DRY_RUN=true`,
+- set `TELEGRAM_STARS_AUTO_RECOVERY_ENABLED=false`,
+- restart only the approved app services for the target environment,
+- no schema rollback is required for this runbook phase because no payment reliability migration is
+  applied here.
 
 Check that the Stars reconciliation dry-run did not leave open review findings:
 

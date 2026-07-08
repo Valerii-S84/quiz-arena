@@ -2,7 +2,8 @@
 
 Date: 2026-07-07
 Working branch: `feature/arena-monetization-pr`
-Plan: `reports/payment_reliability_plan_20260707.md`
+Plan: `reports/payment_reliability_plan_20260707.md` (inspected local planning artifact; left
+untracked because it predates the executed patches and its current-state sections are stale)
 Production incident SHA: `1fb8a09`
 Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 
@@ -97,8 +98,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | 4 | Review records / persistent reconciliation findings | DONE | Outbox-based OPEN review events and documented migration deferral passed audit; no new migration added. |
 | 5 | Exact-match auto-recovery behind feature flag | DONE | Exact-match auto-recovery and transaction revalidation fix passed audit; defaults remain disabled/dry-run. |
 | 6 | Durable payment inbox / payment events | DONE | Interim outbox evidence before ACK and documented inbox/payment_events migration deferral passed audit. |
-| 7 | Idempotent asset crediting and stronger DB constraints | BLOCKED | Idempotent crediting passed audit, but P7B constraint-preflight failed twice around `credited_at` / `REFUNDED` semantics. |
-| 8 | Production smoke and final hardening | BLOCKED | Not started because Phase 7 hit the two-fail stop condition. |
+| 7 | Idempotent asset crediting and stronger DB constraints | DONE | P7A idempotent crediting passed audit; P7B `credited_at` preflight was narrowed for legitimate uncredited refunds and passed audit with notes. |
+| 8 | Production smoke and final hardening | DONE | Runbooks now require app-level premium lookup proof, safe/off flag confirmation, auto-recovery evidence review, and rollback steps; no production action taken. |
 
 ## Planned patch ledger
 
@@ -127,7 +128,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P7A-FIX | 7 | Skip asset side effects when purchase credit ledger already exists | DONE | `c835cff` | `pytest --capture=no -q tests/economy/test_purchase_credit_assets_flow_units.py tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_service.py tests/integration/test_purchase_premium_integration.py tests/integration/test_purchase_refund_integration.py` -> `21 passed`; `ruff check app/economy/purchases/service/credit_assets.py tests/economy/test_purchase_credit_assets_flow_units.py` -> pass; `black --check ...` -> pass; `isort --check-only ...` -> pass; `mypy app/economy/purchases/service/credit_assets.py tests/economy/test_purchase_credit_assets_flow_units.py` -> pass | `PASS_WITH_NOTES` | Fixed prior P7A blocker; DB uniqueness/constraint hardening remains deferred to P7B. |
 | P7B | 7 | Add read-only constraint preflight and defer unsafe migrations | FAIL | `be16109` | `pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `7 passed`; `ruff check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `black --check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `isort --check-only scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `mypy tests/scripts/test_payment_reliability_checks.py` -> pass; `rg -n "payments_constraint_duplicate_premium_source_purchase|payments_constraint_duplicate_purchase_credit_ledger|payments_constraint_paid_purchase_missing_charge_id|payments_constraint_paid_purchase_missing_paid_at|DB constraint hardening rule|read-only migration preflight" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> required entries present | `FAIL` | Blocking issue: missing `credited_at` constraint preflight; fixing in P7B-FIX. |
 | P7B-FIX | 7 | Add credited_at constraint preflight coverage | FAIL | `f6b5db0` | `pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `7 passed`; `ruff check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `black --check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `isort --check-only scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `mypy tests/scripts/test_payment_reliability_checks.py` -> pass; `rg -n "payments_constraint_duplicate_premium_source_purchase|payments_constraint_duplicate_purchase_credit_ledger|payments_constraint_paid_purchase_missing_charge_id|payments_constraint_paid_purchase_missing_paid_at|payments_constraint_credited_purchase_missing_credited_at|DB constraint hardening rule|read-only migration preflight" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> required entries present | `FAIL` | Blocked by stop condition: `credited_at` preflight is too broad for allowed `PAID_UNCREDITED` refund path; owner decision needed before more P7B changes. |
-| P8 | 8 | Payment smoke and final reliability runbook | BLOCKED | Pending | Not run | Pending | Blocked behind Phase 7 stop condition. |
+| P7B-FIX2 | 7 | Narrow credited_at preflight for legitimate uncredited refunds | DONE | `1f0ca1d` | `.venv/bin/python -m pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `11 passed in 1.90s`; `.venv/bin/python -m pytest --capture=no -q tests/economy/test_purchase_refund_state_units.py` -> `3 passed in 31.17s`; `.venv/bin/python -m pytest --capture=no -q tests/economy/test_purchase_credit_assets_flow_units.py tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_service.py tests/economy/test_purchase_refund_state_units.py tests/economy/test_purchase_refund_additional_units.py tests/economy/test_purchase_refund_errors_units.py tests/economy/test_purchase_refund_helpers_units.py` -> `31 passed in 20.62s`; `.venv/bin/python -m pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py tests/workers/test_telegram_stars_reconciliation_task.py tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py tests/workers/test_payments_reliability_task.py` -> `40 passed in 25.68s`; `.venv/bin/python -m pytest --capture=no -q tests/integration/test_purchase_premium_integration.py tests/integration/test_purchase_refund_integration.py tests/integration/test_payments_idempotency_purchase_flow_integration.py tests/integration/test_payments_idempotency_recovery_integration.py tests/integration/test_payments_idempotency_reconciliation_integration.py tests/integration/test_economy_invariants_b_refund_symmetry_integration.py` -> `15 passed in 42.25s`; `.venv/bin/ruff check app tests scripts` -> pass; `.venv/bin/black --check app tests scripts` -> `1341 files would be left unchanged`; `.venv/bin/isort --check-only app tests scripts` -> pass; `.venv/bin/mypy app tests` -> `Success: no issues found in 1326 source files` | `PASS_WITH_NOTES` | Accepted; uncredited `PAID_UNCREDITED -> REFUNDED` rows may keep `credited_at IS NULL`, while `CREDITED` and credited-refunded rows remain strict. |
+| P8 | 8 | Payment smoke and final reliability runbook | DONE | `ff0ad91` | `rg -n "active_premium=|EntitlementsRepo\\.has_active_premium|TELEGRAM_STARS_RECONCILIATION_ENABLED=false|TELEGRAM_STARS_RECONCILIATION_DRY_RUN=true|TELEGRAM_STARS_AUTO_RECOVERY_ENABLED=false|payments_telegram_star_auto_recovered|Payment reliability rollback|credited_at IS NULL|uncredited refund" docs/runbooks/telegram_sandbox_stars_smoke.md docs/operations/production_state_checks.md docs/analytics/events_catalog.md` -> required entries present; `rg -n "bot[0-9]+:|TELEGRAM_BOT_TOKEN=.*[0-9A-Za-z_-]{20}|secret-token|bot-token-secret|charge-1|invoice-1" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md docs/analytics/events_catalog.md` -> no matches; `git diff --check` -> pass; `git diff --name-only -- alembic deploy .github docker-compose.prod.yml '.env*'` -> no output | `PASS_WITH_NOTES` | Runbooks/docs match current implementation and safe flag defaults; no deploy, production DB write, migration, protected path, `.env*`, or secret change. |
 
 ## Baseline checks
 
@@ -551,6 +553,56 @@ Lead response: Blocked by the two-fail stop condition for the P7B constraint-pre
 decision needed: either keep the `PAID_UNCREDITED` refund exception and narrow the preflight/future
 constraint accordingly, or remove/change that refund path with matching tests before continuing.
 
+Owner decision: `credited_at` means the user was actually credited / entitlement was actually
+granted. Therefore a `PAID_UNCREDITED -> REFUNDED` purchase that was never credited may
+legitimately have `credited_at IS NULL`; do not fake-fill `credited_at` and do not erase
+`credited_at` after a credited purchase is later refunded.
+
+### P7B-FIX2 - `1f0ca1d` - `fix(payments): narrow credited-at preflight`
+
+Auditor verdict: `PASS_WITH_NOTES`
+
+Auditor notes:
+
+- No blocking issues.
+- The preflight now allows `REFUNDED` with `credited_at IS NULL` only when there is no credit
+  evidence.
+- `CREDITED` rows missing `credited_at` are still flagged.
+- `REFUNDED` rows with `PURCHASE_CREDIT` ledger evidence or premium entitlement evidence and
+  missing `credited_at` are flagged.
+- Refund code preserves the original `credited_at` by not clearing it when moving a purchase to
+  `REFUNDED`; focused test coverage asserts that guarantee.
+- No migrations, deploy config, protected paths, `.env*`, secrets, production deploy, or
+  production DB writes were introduced.
+- Safe defaults remain unchanged:
+  `TELEGRAM_STARS_RECONCILIATION_ENABLED=false`,
+  `TELEGRAM_STARS_RECONCILIATION_DRY_RUN=true`,
+  `TELEGRAM_STARS_AUTO_RECOVERY_ENABLED=false`.
+- Non-blocking note: tracker update was pending during the read-only audit and is recorded here
+  after audit closure.
+
+Lead response: Accepted; Phase 7 is unblocked and Phase 8 may proceed.
+
+### P8 - `ff0ad91` - `docs(payments): finalize reliability runbooks`
+
+Auditor verdict: `PASS_WITH_NOTES`
+
+Auditor notes:
+
+- No blocking issues.
+- Phase 8 docs/tracker changes are scoped to final runbook hardening and evidence recording.
+- Sandbox smoke runbook now requires purchase `paid_at` / `credited_at`, purchase credit ledger,
+  premium entitlement, and app-level `EntitlementsRepo.has_active_premium(...)` proof.
+- Production state checks document safe flag confirmation, auto-recovery success evidence checks,
+  escalation when non-dry-run reconciliation is active without approval, and rollback steps.
+- Events catalog now documents the existing `payments_telegram_star_auto_recovered` outbox event.
+- No tracked diff under `alembic`, `deploy`, `.github`, `docker-compose.prod.yml`, `.env*`, or
+  secret/key paths.
+- Non-blocking note: this was a local read-only audit; production host history was not queried.
+
+Lead response: Accepted; Phase 8 is complete. The payment reliability plan is PR-ready after
+commit, push, and PR creation.
+
 ## Open owner decisions
 
 - Whether to commit `PAID_UNCREDITED` before crediting in normal successful-payment flow.
@@ -559,5 +611,3 @@ constraint accordingly, or remove/change that refund path with matching tests be
 - Manual compensation model and refund policy after compensation.
 - Auto-recovery enablement soak gate duration.
 - Telegram Stars API implementation choice if aiogram lacks typed support.
-- Whether `REFUNDED` purchases that were refunded from `PAID_UNCREDITED` may legitimately have
-  `credited_at IS NULL`, and how future strict status constraints should model that exception.
