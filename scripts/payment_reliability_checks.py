@@ -289,12 +289,35 @@ def _credited_purchase_missing_credited_at_check() -> InvariantCheck:
         severity="HIGH",
         sql="""
             SELECT count(*)
-            FROM purchases
-            WHERE status IN ('CREDITED', 'REFUNDED')
-              AND credited_at IS NULL
+            FROM purchases p
+            WHERE p.credited_at IS NULL
+              AND (
+                p.status = 'CREDITED'
+                OR (
+                  p.status = 'REFUNDED'
+                  AND (
+                    EXISTS (
+                      SELECT 1
+                      FROM ledger_entries l
+                      WHERE l.purchase_id = p.id
+                        AND l.entry_type = 'PURCHASE_CREDIT'
+                        AND l.direction = 'CREDIT'
+                    )
+                    OR EXISTS (
+                      SELECT 1
+                      FROM entitlements e
+                      WHERE e.source_purchase_id = p.id
+                        AND e.entitlement_type = 'PREMIUM'
+                    )
+                  )
+                )
+              )
         """,
         params={},
-        description="Constraint preflight: credited/refunded purchase is missing credited_at.",
+        description=(
+            "Constraint preflight: credited purchase is missing credited_at; uncredited refunded "
+            "purchases are excluded."
+        ),
     )
 
 

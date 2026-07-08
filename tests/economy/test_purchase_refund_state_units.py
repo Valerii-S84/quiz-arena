@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
 import pytest
@@ -48,6 +48,8 @@ async def test_refund_purchase_reuses_existing_refund_entry_without_duplicate_de
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     purchase = refund_purchase_state(status="CREDITED")
+    credited_at = NOW - timedelta(minutes=10)
+    purchase.credited_at = credited_at
     existing_refund_entry = object()
     revoked: list[dict[str, object]] = []
 
@@ -102,6 +104,7 @@ async def test_refund_purchase_reuses_existing_refund_entry_without_duplicate_de
 
     assert result.idempotent_replay is True
     assert purchase.status == "REFUNDED"
+    assert purchase.credited_at == credited_at
     assert revoked == [{"purchase_id": purchase.id, "now_utc": NOW}]
 
 

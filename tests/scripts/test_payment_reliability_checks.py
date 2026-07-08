@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 from datetime import datetime, timezone
 
 from scripts.payment_reliability_checks import (
@@ -10,6 +11,66 @@ from scripts.payment_reliability_checks import (
     read_only_sql_texts,
     render_text,
 )
+
+
+def _check_sql(name: str) -> str:
+    checks = build_invariant_checks(datetime(2026, 1, 1, tzinfo=timezone.utc))
+    for check in checks:
+        if check.name == name:
+            return check.sql
+    raise AssertionError(f"Missing check: {name}")
+
+
+def _credited_at_preflight_count(
+    *,
+    status: str,
+    credited_at: str | None,
+    has_purchase_credit: bool = False,
+    has_premium_entitlement: bool = False,
+) -> int:
+    with sqlite3.connect(":memory:") as connection:
+        connection.executescript(
+            """
+            CREATE TABLE purchases (
+                id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                credited_at TEXT
+            );
+            CREATE TABLE ledger_entries (
+                purchase_id TEXT,
+                entry_type TEXT NOT NULL,
+                direction TEXT NOT NULL
+            );
+            CREATE TABLE entitlements (
+                source_purchase_id TEXT,
+                entitlement_type TEXT NOT NULL
+            );
+            """
+        )
+        connection.execute(
+            "INSERT INTO purchases (id, status, credited_at) VALUES (?, ?, ?)",
+            ("purchase-1", status, credited_at),
+        )
+        if has_purchase_credit:
+            connection.execute(
+                """
+                INSERT INTO ledger_entries (purchase_id, entry_type, direction)
+                VALUES (?, 'PURCHASE_CREDIT', 'CREDIT')
+                """,
+                ("purchase-1",),
+            )
+        if has_premium_entitlement:
+            connection.execute(
+                """
+                INSERT INTO entitlements (source_purchase_id, entitlement_type)
+                VALUES (?, 'PREMIUM')
+                """,
+                ("purchase-1",),
+            )
+        result = connection.execute(
+            _check_sql("payments_constraint_credited_purchase_missing_credited_at")
+        )
+        return int(result.fetchone()[0])
 
 
 def test_allowed_updates_missing_message_fails() -> None:
@@ -75,6 +136,38 @@ def test_constraint_preflight_checks_are_included() -> None:
         "payments_constraint_paid_purchase_missing_paid_at",
         "payments_constraint_credited_purchase_missing_credited_at",
     }.issubset(names)
+
+
+def test_credited_at_preflight_allows_uncredited_refunded_purchase() -> None:
+    count = _credited_at_preflight_count(status="REFUNDED", credited_at=None)
+
+    assert count == 0
+
+
+def test_credited_at_preflight_flags_credited_purchase_missing_credited_at() -> None:
+    count = _credited_at_preflight_count(status="CREDITED", credited_at=None)
+
+    assert count == 1
+
+
+def test_credited_at_preflight_flags_refunded_credit_missing_credited_at() -> None:
+    count = _credited_at_preflight_count(
+        status="REFUNDED",
+        credited_at=None,
+        has_purchase_credit=True,
+    )
+
+    assert count == 1
+
+
+def test_credited_at_preflight_allows_refunded_credit_with_credited_at() -> None:
+    count = _credited_at_preflight_count(
+        status="REFUNDED",
+        credited_at="2026-01-01T00:00:00+00:00",
+        has_premium_entitlement=True,
+    )
+
+    assert count == 0
 
 
 def test_text_renderer_uses_counts_without_raw_payloads() -> None:
