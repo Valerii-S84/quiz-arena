@@ -288,18 +288,37 @@ def _paid_purchase_missing_paid_at_check() -> InvariantCheck:
         severity="HIGH",
         sql="""
             SELECT count(*)
-            FROM purchases
+            FROM purchases p
             WHERE stars_amount > 0
-              AND status IN (
+              AND p.status IN (
                 'PAID_UNCREDITED',
                 'FAILED_CREDIT_PENDING_REVIEW',
                 'CREDITED',
                 'REFUNDED'
               )
-              AND paid_at IS NULL
+              AND p.paid_at IS NULL
+              AND (
+                p.status != 'REFUNDED'
+                OR EXISTS (
+                  SELECT 1
+                  FROM ledger_entries l
+                  WHERE l.purchase_id = p.id
+                    AND l.entry_type = 'PURCHASE_CREDIT'
+                    AND l.direction = 'CREDIT'
+                )
+                OR EXISTS (
+                  SELECT 1
+                  FROM entitlements e
+                  WHERE e.source_purchase_id = p.id
+                    AND e.entitlement_type = 'PREMIUM'
+                )
+              )
         """,
         params={},
-        description="Constraint preflight: paid Stars purchase is missing paid_at timestamp.",
+        description=(
+            "Constraint preflight: paid Stars purchase is missing paid_at timestamp; "
+            "refund-only purchases without credit evidence are excluded."
+        ),
     )
 
 

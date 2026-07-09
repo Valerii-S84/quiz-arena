@@ -73,6 +73,57 @@ def _credited_at_preflight_count(
         return int(result.fetchone()[0])
 
 
+def _paid_at_preflight_count(
+    *,
+    status: str,
+    paid_at: str | None,
+    has_purchase_credit: bool = False,
+    has_premium_entitlement: bool = False,
+) -> int:
+    with sqlite3.connect(":memory:") as connection:
+        connection.executescript(
+            """
+            CREATE TABLE purchases (
+                id TEXT PRIMARY KEY,
+                stars_amount INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                paid_at TEXT
+            );
+            CREATE TABLE ledger_entries (
+                purchase_id TEXT,
+                entry_type TEXT NOT NULL,
+                direction TEXT NOT NULL
+            );
+            CREATE TABLE entitlements (
+                source_purchase_id TEXT,
+                entitlement_type TEXT NOT NULL
+            );
+            """
+        )
+        connection.execute(
+            "INSERT INTO purchases (id, stars_amount, status, paid_at) VALUES (?, ?, ?, ?)",
+            ("purchase-1", 5, status, paid_at),
+        )
+        if has_purchase_credit:
+            connection.execute(
+                """
+                INSERT INTO ledger_entries (purchase_id, entry_type, direction)
+                VALUES (?, 'PURCHASE_CREDIT', 'CREDIT')
+                """,
+                ("purchase-1",),
+            )
+        if has_premium_entitlement:
+            connection.execute(
+                """
+                INSERT INTO entitlements (source_purchase_id, entitlement_type)
+                VALUES (?, 'PREMIUM')
+                """,
+                ("purchase-1",),
+            )
+        result = connection.execute(_check_sql("payments_constraint_paid_purchase_missing_paid_at"))
+        return int(result.fetchone()[0])
+
+
 def test_allowed_updates_missing_message_fails() -> None:
     result = evaluate_allowed_updates(["callback_query", "pre_checkout_query"])
 
@@ -182,6 +233,28 @@ def test_paid_preflights_include_review_pending_paid_rows() -> None:
         "payments_constraint_paid_purchase_missing_paid_at",
     ):
         assert "FAILED_CREDIT_PENDING_REVIEW" in _check_sql(check_name)
+
+
+def test_paid_at_preflight_allows_refund_only_without_paid_at() -> None:
+    count = _paid_at_preflight_count(status="REFUNDED", paid_at=None)
+
+    assert count == 0
+
+
+def test_paid_at_preflight_flags_refunded_credit_without_paid_at() -> None:
+    count = _paid_at_preflight_count(
+        status="REFUNDED",
+        paid_at=None,
+        has_purchase_credit=True,
+    )
+
+    assert count == 1
+
+
+def test_paid_at_preflight_flags_paid_non_refunded_without_paid_at() -> None:
+    count = _paid_at_preflight_count(status="PAID_UNCREDITED", paid_at=None)
+
+    assert count == 1
 
 
 def test_credited_at_preflight_allows_uncredited_refunded_purchase() -> None:

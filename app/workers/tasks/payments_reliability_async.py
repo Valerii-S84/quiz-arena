@@ -639,11 +639,12 @@ async def _auto_recover_star_transaction_if_exact(
         if purchase.telegram_payment_charge_id not in (None, transaction.transaction_id):
             return "charge_conflict"
 
-        open_review = await OutboxEventsRepo.get_open_by_payload_key(
+        open_review = await OutboxEventsRepo.get_open_by_payload_key_excluding_reason(
             session,
             event_type=PAYMENT_STARS_RECONCILIATION_REVIEW_EVENT,
             payload_key="transaction_id_hash",
             payload_value=transaction_id_hash,
+            excluded_reason=WOULD_RECOVER_EXACT_MATCH,
             status="OPEN",
         )
         if open_review is not None:

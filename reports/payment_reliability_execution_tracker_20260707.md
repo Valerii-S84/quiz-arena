@@ -791,6 +791,64 @@ Lead verification notes:
 Lead response: Accepted for scoped commit and push. Keep PR #244 unmerged; no deploy or production
 data writes.
 
+### P8-CODEX-EMERGENCY-STABILIZATION - state-machine gate for final PR #244 pass
+
+Agent A state-machine note:
+
+- `CREATED`: no `paid_at`, no `credited_at`, provider-confirmed refund-only evidence may move it
+  toward `REFUNDED`, not counted in paid reconciliation totals, exact auto-recovery may recover it
+  only after transaction revalidation.
+- `INVOICE_SENT`: no `paid_at`, no `credited_at`, provider-confirmed refund-only evidence is valid,
+  not counted in paid reconciliation totals, exact auto-recovery may recover it after revalidation.
+- `PRECHECKOUT_OK`: no `paid_at` until successful payment or exact recovery, no `credited_at`,
+  provider-confirmed refund-only evidence is valid, not counted in paid reconciliation totals,
+  exact auto-recovery may recover it after revalidation.
+- `PAID_UNCREDITED`: requires `paid_at`, has no `credited_at`, refund is valid without asset debit,
+  counts in paid reconciliation totals until it becomes a never-credited `REFUNDED` row, and
+  auto-recovery may credit it only on an exact conflict-free match.
+- `CREDITED`: requires real `paid_at` and real `credited_at`; refund must preserve credit evidence
+  and use the debit/revoke path; it remains counted in paid reconciliation totals; auto-recovery must
+  not credit it again because `PURCHASE_CREDIT` is the terminal marker.
+- `FAILED_CREDIT_PENDING_REVIEW`: requires `paid_at`; `credited_at` is present only if credit
+  actually happened; generic refunds are rejected without provider evidence; provider-confirmed
+  refund may move it to `REFUNDED` without debit when there is no credit evidence.
+- `REFUNDED`: may have `paid_at IS NULL` only for legitimate refund-only rows; may have
+  `credited_at IS NULL` only when no assets/entitlement were credited; counted in paid
+  reconciliation totals only when real credit evidence remains; auto-recovery must not credit it.
+
+Agent B gate: `PASS` for the state-machine map and the three scoped fixes: exact match before
+fuzzy limit, refund-only `paid_at` preflight exception, and non-blocking dry-run exact-match review
+evidence.
+
+Implementation evidence:
+
+- Exact-match candidate query: `app/db/repo/purchases_repo.py` now orders exact charge/payload
+  matches before fuzzy user/time-window rows before applying `LIMIT`; regression proves an older
+  exact purchase is still classified as `WOULD_RECOVER_EXACT_MATCH` when newer fuzzy rows exceed the
+  query limit.
+- Refund-only `paid_at` preflight: `scripts/payment_reliability_checks.py` excludes only
+  never-credited `REFUNDED` rows without `PURCHASE_CREDIT` or premium entitlement evidence;
+  non-refunded paid rows and credited/refunded rows with credit evidence remain strict.
+- Dry-run review blocking: auto-recovery now ignores only `OPEN` review rows whose reason is
+  `WOULD_RECOVER_EXACT_MATCH`; ambiguous/conflicting/refund/manual review reasons still block
+  recovery.
+- Agent B: `PASS`; Agent C: `PASS` for exact-match patch, `PASS` for paid-at preflight patch after
+  formatting, `PASS` for dry-run review blocker patch; Agent D: `DONE`.
+- Test evidence: `tests/scripts/test_payment_reliability_checks.py` -> `20 passed in 2.10s`;
+  `tests/db/repo/test_purchases_repo.py tests/db/repo/test_admin_outbox_repo.py` ->
+  `10 passed in 7.28s`; reconciliation/Telegram Stars/worker group -> `57 passed in 29.25s`;
+  purchase/refund unit group -> `35 passed in 25.26s`; integration payment/refund/reconciliation
+  group -> `23 passed in 49.86s`.
+- Required gates passed: `ruff check app tests scripts`, `black --check app tests scripts`,
+  `isort --check-only app tests scripts`, `mypy app tests`, and `git diff --check`.
+- Protected-path check was empty for migrations, deploy config, `.github`, `.env*`, and production
+  config paths.
+- No migrations, deploy config, protected paths, `.env*`, secrets, production deploy, production DB
+  writes, fake credit assets, synthetic `PURCHASE_CREDIT` rows, auto-recovery default changes, or PR
+  merge were introduced.
+
+Lead response: Accepted for one scoped stabilization commit and push. Keep PR #244 unmerged.
+
 ## Open owner decisions
 
 - Whether to commit `PAID_UNCREDITED` before crediting in normal successful-payment flow.

@@ -83,6 +83,30 @@ class OutboxEventsRepo:
         return result.scalar_one_or_none()
 
     @staticmethod
+    async def get_open_by_payload_key_excluding_reason(
+        session: AsyncSession,
+        *,
+        event_type: str,
+        payload_key: str,
+        payload_value: str,
+        excluded_reason: str,
+        status: str = "OPEN",
+    ) -> OutboxEvent | None:
+        stmt = (
+            select(OutboxEvent)
+            .where(
+                OutboxEvent.event_type == event_type,
+                OutboxEvent.status == status,
+                OutboxEvent.payload[payload_key].astext == payload_value,
+                OutboxEvent.payload["reason"].astext != excluded_reason,
+            )
+            .order_by(OutboxEvent.created_at.desc(), OutboxEvent.id.desc())
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def create_once_by_payload_key(
         session: AsyncSession,
         *,

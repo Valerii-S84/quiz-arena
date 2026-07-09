@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import String, and_
+from sqlalchemy import String, and_, case
 from sqlalchemy import cast as sa_cast
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -276,8 +276,10 @@ class PurchasesRepo:
         limit: int = 20,
         for_update: bool = False,
     ) -> list[tuple[Purchase, int]]:
-        match_conditions = [Purchase.telegram_payment_charge_id == transaction_id]
+        exact_match_conditions = [Purchase.telegram_payment_charge_id == transaction_id]
+        match_conditions = list(exact_match_conditions)
         if invoice_payload:
+            exact_match_conditions.append(Purchase.invoice_payload == invoice_payload)
             match_conditions.append(Purchase.invoice_payload == invoice_payload)
         if telegram_user_id is not None:
             match_conditions.append(
@@ -288,11 +290,12 @@ class PurchasesRepo:
                 )
             )
 
+        exact_match_rank = case((or_(*exact_match_conditions), 0), else_=1)
         stmt = (
             select(Purchase, User.telegram_user_id)
             .join(User, User.id == Purchase.user_id)
             .where(Purchase.stars_amount > 0, or_(*match_conditions))
-            .order_by(Purchase.created_at.desc())
+            .order_by(exact_match_rank, Purchase.created_at.desc())
             .limit(limit)
         )
         if for_update:

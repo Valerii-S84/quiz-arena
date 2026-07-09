@@ -137,6 +137,35 @@ async def test_outbox_repo_create_once_locks_and_reuses_duplicate_payload_key() 
     assert "review-1" in lookup_sql
 
 
+async def test_outbox_repo_can_exclude_non_blocking_review_reason() -> None:
+    existing = OutboxEvent(
+        event_type="payments_telegram_stars_reconciliation_review",
+        payload={
+            "transaction_id_hash": "tx-hash-1",
+            "reason": "AMBIGUOUS_MATCH",
+        },
+        status="OPEN",
+    )
+    lookup_session = RecordingSession(_ScalarResult(existing))
+
+    result = await OutboxEventsRepo.get_open_by_payload_key_excluding_reason(
+        lookup_session,
+        event_type="payments_telegram_stars_reconciliation_review",
+        payload_key="transaction_id_hash",
+        payload_value="tx-hash-1",
+        excluded_reason="WOULD_RECOVER_EXACT_MATCH",
+        status="OPEN",
+    )
+
+    assert result is existing
+    lookup_sql = compile_statement(lookup_session.statement)
+    assert "transaction_id_hash" in lookup_sql
+    assert "tx-hash-1" in lookup_sql
+    assert "reason" in lookup_sql
+    assert "WOULD_RECOVER_EXACT_MATCH" in lookup_sql
+    assert "!=" in lookup_sql
+
+
 async def test_outbox_repo_create_once_inserts_after_locked_empty_lookup() -> None:
     create_session = RecordingSession(object(), _ScalarResult(None))
 
