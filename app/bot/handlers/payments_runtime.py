@@ -104,14 +104,45 @@ async def refund_payment_update(
             refunded_payment.telegram_payment_charge_id,
         )
         if purchase is None:
+            purchase = await PurchaseService.get_by_invoice_payload_for_update(
+                session,
+                refunded_payment.invoice_payload,
+            )
+        if purchase is None:
             raise PurchaseNotFoundError
         if (
             purchase.user_id != snapshot.user_id
             or purchase.invoice_payload != refunded_payment.invoice_payload
         ):
             raise PurchaseRefundValidationError
+        existing_charge_id = getattr(purchase, "telegram_payment_charge_id", None)
+        if existing_charge_id not in (
+            None,
+            refunded_payment.telegram_payment_charge_id,
+        ):
+            raise PurchaseRefundValidationError
+        _mark_refunded_payment_evidence(
+            purchase=purchase,
+            telegram_payment_charge_id=refunded_payment.telegram_payment_charge_id,
+            now_utc=now_utc,
+        )
         return await PurchaseService.refund_purchase(
             session,
             purchase_id=purchase.id,
             now_utc=now_utc,
         )
+
+
+def _mark_refunded_payment_evidence(
+    *,
+    purchase,
+    telegram_payment_charge_id: str,
+    now_utc: datetime,
+) -> None:
+    purchase.telegram_payment_charge_id = telegram_payment_charge_id
+    status = getattr(purchase, "status", None)
+    if status in {"CREATED", "INVOICE_SENT", "PRECHECKOUT_OK"}:
+        purchase.status = "PAID_UNCREDITED"
+        status = "PAID_UNCREDITED"
+    if status == "PAID_UNCREDITED" and getattr(purchase, "paid_at", None) is None:
+        purchase.paid_at = now_utc

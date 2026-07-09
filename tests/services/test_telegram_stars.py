@@ -103,6 +103,8 @@ async def test_get_star_transactions_preserves_outgoing_refund_shape() -> None:
 
     assert page.transactions[0].is_incoming is False
     assert page.transactions[0].source_user_id is None
+    assert page.transactions[0].receiver_user_id == 270
+    assert page.transactions[0].partner_user_id == 270
 
 
 @pytest.mark.asyncio

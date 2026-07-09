@@ -14,6 +14,7 @@ RESOLVED_RECONCILIATION_STATUSES = frozenset({"CREDITED", "REFUNDED"})
 
 ALREADY_CREDITED = "ALREADY_CREDITED"
 WOULD_RECOVER_EXACT_MATCH = "WOULD_RECOVER_EXACT_MATCH"
+PROVIDER_REFUND_REQUIRES_REVIEW = "PROVIDER_REFUND_REQUIRES_REVIEW"
 AMBIGUOUS_MATCH = "AMBIGUOUS_MATCH"
 NO_DB_PURCHASE = "NO_DB_PURCHASE"
 AMOUNT_MISMATCH = "AMOUNT_MISMATCH"
@@ -38,6 +39,11 @@ class ReconciliationDecision:
     classification: str
     severity: str
     transaction_id: str
+    transaction_amount: int
+    transaction_date: datetime
+    transaction_user_id: int | None
+    transaction_type: str | None
+    transaction_is_incoming: bool
     candidate_purchase_ids: tuple[UUID, ...]
     auto_recovery_allowed: bool = False
 
@@ -49,6 +55,9 @@ def classify_star_transaction_dry_run(
 ) -> ReconciliationDecision:
     if _should_ignore_transaction(transaction):
         return _decision(IGNORED_OUTGOING_OR_REFUND, "LOW", transaction, candidates=[])
+
+    if _is_provider_refund_transaction(transaction):
+        return _classify_provider_refund_transaction(transaction, candidates)
 
     resolved_match = _resolved_charge_match(transaction, candidates)
     if resolved_match is not None:
@@ -78,7 +87,29 @@ def classify_star_transaction_dry_run(
 
 
 def _should_ignore_transaction(transaction: TelegramStarTransaction) -> bool:
-    return not transaction.is_incoming or transaction.transaction_type != "invoice_payment"
+    return transaction.transaction_type != "invoice_payment"
+
+
+def _is_provider_refund_transaction(transaction: TelegramStarTransaction) -> bool:
+    return not transaction.is_incoming and transaction.transaction_type == "invoice_payment"
+
+
+def _classify_provider_refund_transaction(
+    transaction: TelegramStarTransaction,
+    candidates: list[ReconciliationCandidate],
+) -> ReconciliationDecision:
+    refunded_match = _refunded_charge_match(transaction, candidates)
+    if refunded_match is not None:
+        return _decision(ALREADY_CREDITED, "LOW", transaction, candidates=[refunded_match])
+    if not candidates:
+        return _decision(NO_DB_PURCHASE, "HIGH", transaction, candidates=[])
+    charge_matches = _charge_matches(transaction, candidates)
+    return _decision(
+        PROVIDER_REFUND_REQUIRES_REVIEW,
+        "HIGH",
+        transaction,
+        candidates=charge_matches or candidates,
+    )
 
 
 def _resolved_charge_match(
@@ -92,6 +123,30 @@ def _resolved_charge_match(
         ):
             return candidate
     return None
+
+
+def _refunded_charge_match(
+    transaction: TelegramStarTransaction,
+    candidates: list[ReconciliationCandidate],
+) -> ReconciliationCandidate | None:
+    for candidate in candidates:
+        if (
+            candidate.telegram_payment_charge_id == transaction.transaction_id
+            and candidate.status == "REFUNDED"
+        ):
+            return candidate
+    return None
+
+
+def _charge_matches(
+    transaction: TelegramStarTransaction,
+    candidates: list[ReconciliationCandidate],
+) -> list[ReconciliationCandidate]:
+    return [
+        candidate
+        for candidate in candidates
+        if candidate.telegram_payment_charge_id == transaction.transaction_id
+    ]
 
 
 def _is_exact_recoverable_match(
@@ -149,5 +204,10 @@ def _decision(
         classification=classification,
         severity=severity,
         transaction_id=transaction.transaction_id,
+        transaction_amount=transaction.amount,
+        transaction_date=transaction.transaction_date,
+        transaction_user_id=transaction.partner_user_id,
+        transaction_type=transaction.transaction_type,
+        transaction_is_incoming=transaction.is_incoming,
         candidate_purchase_ids=tuple(candidate.purchase_id for candidate in candidates),
     )

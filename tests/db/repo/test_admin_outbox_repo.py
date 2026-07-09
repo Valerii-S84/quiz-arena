@@ -106,4 +106,5 @@ async def test_outbox_repo_lists_counts_and_deletes_by_scoped_filters() -> None:
     )
     delete_sql = compile_statement(delete_session.statement)
     assert "DELETE FROM outbox_events" in delete_sql
+    assert "outbox_events.status != 'OPEN'" in delete_sql
     assert "LIMIT 1" in delete_sql

@@ -9,6 +9,7 @@ from app.services.payment_reconciliation import (
     AMOUNT_MISMATCH,
     IGNORED_OUTGOING_OR_REFUND,
     NO_DB_PURCHASE,
+    PROVIDER_REFUND_REQUIRES_REVIEW,
     USER_MISMATCH,
     WOULD_RECOVER_EXACT_MATCH,
     ReconciliationCandidate,
@@ -164,9 +165,45 @@ def test_no_db_purchase_is_high_severity() -> None:
     assert decision.severity == "HIGH"
 
 
-def test_outgoing_or_refund_transaction_is_ignored() -> None:
+def test_provider_refund_for_credited_purchase_requires_review() -> None:
+    candidate = _candidate(status="CREDITED", charge_id="charge-1")
+
     decision = classify_star_transaction_dry_run(
         transaction=_transaction(incoming=False),
+        candidates=[candidate],
+    )
+
+    assert decision.classification == PROVIDER_REFUND_REQUIRES_REVIEW
+    assert decision.severity == "HIGH"
+    assert decision.candidate_purchase_ids == (candidate.purchase_id,)
+
+
+def test_provider_refund_for_refunded_purchase_is_resolved_low_severity() -> None:
+    candidate = _candidate(status="REFUNDED", charge_id="charge-1")
+
+    decision = classify_star_transaction_dry_run(
+        transaction=_transaction(incoming=False),
+        candidates=[candidate],
+    )
+
+    assert decision.classification == ALREADY_CREDITED
+    assert decision.severity == "LOW"
+    assert decision.candidate_purchase_ids == (candidate.purchase_id,)
+
+
+def test_non_invoice_transaction_is_ignored() -> None:
+    transaction = _transaction()
+    transaction = TelegramStarTransaction(
+        transaction_id=transaction.transaction_id,
+        amount=transaction.amount,
+        transaction_date=transaction.transaction_date,
+        source={"type": "user", "transaction_type": "gift", "user": {"id": 270}},
+        receiver=None,
+        raw_payload=transaction.raw_payload,
+    )
+
+    decision = classify_star_transaction_dry_run(
+        transaction=transaction,
         candidates=[_candidate()],
     )
 

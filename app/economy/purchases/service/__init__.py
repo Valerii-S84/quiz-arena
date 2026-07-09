@@ -40,6 +40,9 @@ class PurchaseService:
     )
     _apply_premium_entitlement = staticmethod(_apply_premium_entitlement)
     get_by_id = staticmethod(PurchasesRepo.get_by_id)
+    get_by_invoice_payload_for_update = staticmethod(
+        PurchasesRepo.get_by_invoice_payload_for_update
+    )
     get_by_telegram_payment_charge_id_for_update = staticmethod(
         PurchasesRepo.get_by_telegram_payment_charge_id_for_update
     )

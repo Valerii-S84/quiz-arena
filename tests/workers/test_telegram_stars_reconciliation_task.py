@@ -92,6 +92,10 @@ async def test_fetch_star_transactions_backlog_pages_until_short_page() -> None:
             limit: int,
         ) -> TelegramStarTransactionsPage:
             calls.append((offset, limit))
+            if limit == 1:
+                if offset == 100:
+                    return TelegramStarTransactionsPage(transactions=[second_page[0]])
+                return TelegramStarTransactionsPage(transactions=[])
             if offset == 0:
                 return TelegramStarTransactionsPage(transactions=first_page)
             if offset == 100:
@@ -104,7 +108,8 @@ async def test_fetch_star_transactions_backlog_pages_until_short_page() -> None:
         )
     )
 
-    assert calls == [(0, 100), (100, 100)]
+    assert calls[0] == (0, 100)
+    assert (100, 100) in calls
     assert transactions == [*first_page, *second_page]
     assert pages_fetched == 2
     assert backlog_truncated is False
@@ -113,12 +118,9 @@ async def test_fetch_star_transactions_backlog_pages_until_short_page() -> None:
 @pytest.mark.asyncio
 async def test_fetch_star_transactions_backlog_stops_at_page_cap(monkeypatch) -> None:
     calls: list[tuple[int, int]] = []
-    pages = [
-        [
-            _transaction(transaction_id=f"charge-page-{page_index}-{item_index}", incoming=False)
-            for item_index in range(100)
-        ]
-        for page_index in range(2)
+    all_transactions = [
+        _transaction(transaction_id=f"charge-{item_index}", incoming=False)
+        for item_index in range(300)
     ]
     monkeypatch.setattr(
         payments_reliability_async,
@@ -134,7 +136,9 @@ async def test_fetch_star_transactions_backlog_stops_at_page_cap(monkeypatch) ->
             limit: int,
         ) -> TelegramStarTransactionsPage:
             calls.append((offset, limit))
-            return TelegramStarTransactionsPage(transactions=pages[offset // 100])
+            return TelegramStarTransactionsPage(
+                transactions=all_transactions[offset : offset + limit]
+            )
 
     transactions, pages_fetched, backlog_truncated = (
         await payments_reliability_async._fetch_star_transactions_backlog(
@@ -142,9 +146,9 @@ async def test_fetch_star_transactions_backlog_stops_at_page_cap(monkeypatch) ->
         )
     )
 
-    assert calls == [(0, 100), (100, 100)]
-    assert transactions == [*pages[0], *pages[1]]
-    assert pages_fetched == 2
+    assert calls[0] == (0, 100)
+    assert transactions == all_transactions[100:300]
+    assert pages_fetched == 3
     assert backlog_truncated is True
 
 
@@ -281,18 +285,22 @@ async def test_telegram_stars_reconciliation_dry_run_classifies_transactions(
         "WOULD_RECOVER_EXACT_MATCH": 1,
         "ALREADY_CREDITED": 1,
         "NO_DB_PURCHASE": 1,
-        "IGNORED_OUTGOING_OR_REFUND": 1,
+        "PROVIDER_REFUND_REQUIRES_REVIEW": 1,
     }
-    assert result["high_severity_findings"] == 2
+    assert result["high_severity_findings"] == 3
     assert result["medium_severity_findings"] == 0
-    assert result["review_findings"] == 2
-    assert result["review_events_created"] == 2
+    assert result["review_findings"] == 3
+    assert result["review_events_created"] == 3
     assert result["review_events_existing"] == 0
 
     assert [payload["reason"] for payload in review_payloads] == [
         "WOULD_RECOVER_EXACT_MATCH",
         "NO_DB_PURCHASE",
+        "PROVIDER_REFUND_REQUIRES_REVIEW",
     ]
+    assert [payload["transaction_amount"] for payload in review_payloads] == [29, 99, 29]
+    assert all(isinstance(payload["transaction_date"], str) for payload in review_payloads)
+    assert all(payload["telegram_user_id"] == 270 for payload in review_payloads)
     serialized_reviews = repr(review_payloads)
     assert "bot-token-secret" not in serialized_reviews
     assert "invoice-1" not in serialized_reviews
@@ -600,6 +608,119 @@ async def test_telegram_stars_reconciliation_auto_mode_reviews_ambiguous_match(
     assert result["review_findings"] == 1
     assert result["review_events_created"] == 1
     assert review_payloads[0]["reason"] == "AMBIGUOUS_MATCH"
+
+
+@pytest.mark.asyncio
+async def test_telegram_stars_reconciliation_auto_recovery_error_isolated(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        payments_reliability_async,
+        "get_settings",
+        lambda: _settings(enabled=True, dry_run=False, auto_recovery_enabled=True),
+    )
+    monkeypatch.setattr(payments_reliability_async, "SessionLocal", _SessionLocal())
+    review_payloads: list[dict[str, object]] = []
+
+    class FakeStarsClient:
+        def __init__(self, *, bot_token: str) -> None:
+            assert bot_token == "bot-token-secret"
+
+        async def get_star_transactions(
+            self,
+            *,
+            offset: int,
+            limit: int,
+        ) -> TelegramStarTransactionsPage:
+            del offset, limit
+            return TelegramStarTransactionsPage(
+                transactions=[
+                    _transaction(transaction_id="charge-error"),
+                    _transaction(transaction_id="charge-review"),
+                ]
+            )
+
+    async def _candidate_rows(
+        session: object,
+        *,
+        transaction_id: str,
+        invoice_payload: str | None,
+        telegram_user_id: int | None,
+        transaction_date: datetime,
+        match_window: timedelta,
+        limit: int = 20,
+        for_update: bool = False,
+    ):
+        del (
+            session,
+            invoice_payload,
+            telegram_user_id,
+            match_window,
+            limit,
+            for_update,
+        )
+        if transaction_id == "charge-review":
+            return []
+        purchase = purchase_model(
+            status="PRECHECKOUT_OK",
+            stars_amount=29,
+            invoice_payload="invoice-1",
+        )
+        purchase.created_at = transaction_date - timedelta(minutes=5)
+        return [(purchase, 270)]
+
+    async def _auto_recover_star_transaction_if_exact(
+        *,
+        transaction: TelegramStarTransaction,
+        decision,
+        recovery_now_utc: datetime,
+    ) -> str:
+        del decision, recovery_now_utc
+        if transaction.transaction_id == "charge-error":
+            raise RuntimeError("boom")
+        return "not_exact_match"
+
+    async def _create_review_once(
+        session: object,
+        *,
+        event_type: str,
+        payload: dict[str, object],
+        payload_key: str,
+        status: str,
+    ):
+        del session, event_type, payload_key, status
+        review_payloads.append(payload)
+        return object(), True
+
+    monkeypatch.setattr(payments_reliability_async, "TelegramStarsClient", FakeStarsClient)
+    monkeypatch.setattr(
+        payments_reliability_async.PurchasesRepo,
+        "list_stars_reconciliation_candidate_rows",
+        _candidate_rows,
+    )
+    monkeypatch.setattr(
+        payments_reliability_async,
+        "_auto_recover_star_transaction_if_exact",
+        _auto_recover_star_transaction_if_exact,
+    )
+    monkeypatch.setattr(
+        payments_reliability_async.OutboxEventsRepo,
+        "create_once_by_payload_key",
+        _create_review_once,
+    )
+
+    result = await payments_reliability_async.run_telegram_stars_reconciliation_async()
+
+    assert result["transactions_examined"] == 2
+    assert result["auto_recovery_counts"] == {
+        "auto_recovery_error": 1,
+        "not_exact_match": 1,
+    }
+    assert result["review_events_created"] == 2
+    assert [payload["reason"] for payload in review_payloads] == [
+        "WOULD_RECOVER_EXACT_MATCH",
+        "NO_DB_PURCHASE",
+    ]
 
 
 @pytest.mark.asyncio

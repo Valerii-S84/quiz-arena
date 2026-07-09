@@ -214,6 +214,9 @@ Check that the Stars reconciliation dry-run did not leave open review findings:
 docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c \
 "select id, created_at, payload->>'reason' as reason, payload->>'severity' as severity, \
         payload->>'transaction_id_hash' as transaction_id_hash, \
+        payload->>'transaction_amount' as transaction_amount, \
+        payload->>'transaction_date' as transaction_date, \
+        payload->>'telegram_user_id' as telegram_user_id, \
         payload->'candidate_purchase_ids' as candidate_purchase_ids \
  from outbox_events \
  where event_type='payments_telegram_stars_reconciliation_review' and status='OPEN' \
@@ -224,8 +227,10 @@ docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pa
 Expected:
 - no open rows for a healthy sandbox smoke,
 - any open row is reviewed manually before compensation/recovery,
-- payload contains hashes and candidate purchase ids only, not a raw token, invoice payload, charge
-  id, or Telegram transaction payload.
+- payload contains hashes, amount/date/user clues, and candidate purchase ids only, not a raw token,
+  invoice payload, charge id, or Telegram transaction payload,
+- `OPEN` review rows are retained until manually resolved and are not removed by age-based
+  outbox retention cleanup.
 
 Confirm payment webhook evidence was persisted before ACK:
 

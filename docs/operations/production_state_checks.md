@@ -108,6 +108,9 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env exec -
   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c \
 "SELECT id, created_at, payload->>'reason' AS reason, payload->>'severity' AS severity, \
         payload->>'transaction_id_hash' AS transaction_id_hash, \
+        payload->>'transaction_amount' AS transaction_amount, \
+        payload->>'transaction_date' AS transaction_date, \
+        payload->>'telegram_user_id' AS telegram_user_id, \
         payload->'candidate_purchase_ids' AS candidate_purchase_ids \
  FROM outbox_events \
  WHERE event_type='payments_telegram_stars_reconciliation_review' AND status='OPEN' \
@@ -118,13 +121,16 @@ docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env exec -
 Expected:
 - no `OPEN` rows after a healthy dry-run reconciliation,
 - any `OPEN` row is a manual review item before compensation or recovery,
-- payload stores hashed transaction identifiers and candidate purchase ids only; it must not
-  contain a bot token, raw Telegram payload, raw invoice payload, or raw charge id.
+- payload stores hashed transaction identifiers, amount/date/user clues, and candidate purchase
+  ids only; it must not contain a bot token, raw Telegram payload, raw invoice payload, or raw
+  charge id.
 
 Current limitation:
 - outbox review dedupe is best-effort by hashed `review_key` and `OPEN` status;
 - it is not protected by a DB-level unique constraint until a dedicated review table/migration is
   approved after a data audit.
+- `OPEN` review rows are excluded from retention cleanup so unresolved payment discrepancies do
+  not age out silently while the dedicated review table is deferred.
 
 Payment-relevant webhook updates are durably captured before enqueue/ACK through interim
 `outbox_events` evidence while the dedicated `telegram_update_inbox` / `payment_events` migration

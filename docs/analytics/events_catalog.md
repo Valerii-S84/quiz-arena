@@ -179,13 +179,15 @@ and covered by repo/integration tests for the duel funnel aggregation path.
 | `telegram_payment_update_received` | `app/api/routes/telegram_webhook.py` | `PENDING` | payment evidence / manual replay until dedicated inbox exists |
 
 Notes:
-- `outbox_events` is also subject to retention cleanup (`app/workers/tasks/retention_cleanup.py`).
+- `outbox_events` is also subject to retention cleanup (`app/workers/tasks/retention_cleanup.py`);
+  `OPEN` rows are retained until operators close/resolve them.
 - `payments_telegram_stars_reconciliation_review` is the migration-deferred review mechanism for
   Stars reconciliation findings. Payload stores `reason`, `severity`, hashed `review_key`, hashed
-  `transaction_id_hash`, `candidate_purchase_ids`, `candidate_purchase_count`, and
-  `raw_payload_stored=false`. It must not contain bot tokens, raw Telegram payloads, raw invoice
-  payloads, or raw charge ids. Deduplication is best-effort until a dedicated review table or
-  unique constraint is approved.
+  `transaction_id_hash`, `transaction_amount`, `transaction_date`, `telegram_user_id`,
+  `transaction_type`, `transaction_direction`, `candidate_purchase_ids`,
+  `candidate_purchase_count`, and `raw_payload_stored=false`. It must not contain bot tokens,
+  raw Telegram payloads, raw invoice payloads, or raw charge ids. Deduplication is best-effort
+  until a dedicated review table or unique constraint is approved.
 - `payments_telegram_star_auto_recovered` is emitted only after owner-approved non-dry-run exact
   match recovery succeeds. Payload stores `source`, `purchase_id`, hashed `transaction_id_hash`,
   and `classification`; it must not contain a bot token, raw Telegram payload, raw invoice payload,

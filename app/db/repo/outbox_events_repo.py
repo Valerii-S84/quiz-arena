@@ -145,7 +145,10 @@ class OutboxEventsRepo:
         resolved_limit = max(1, int(limit))
         candidate_ids = (
             select(OutboxEvent.id)
-            .where(OutboxEvent.created_at < cutoff_utc)
+            .where(
+                OutboxEvent.created_at < cutoff_utc,
+                OutboxEvent.status != "OPEN",
+            )
             .order_by(OutboxEvent.created_at.asc(), OutboxEvent.id.asc())
             .limit(resolved_limit)
             .scalar_subquery()
