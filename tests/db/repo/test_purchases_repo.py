@@ -162,6 +162,20 @@ async def test_purchase_count_and_metric_queries_apply_paid_filters() -> None:
     )
     assert "purchases.status = 'PAID_UNCREDITED'" in compile_statement(uncredited_session.statement)
 
+    precheckout_session = RecordingSession(_ScalarResult(3))
+    assert (
+        await PurchasesRepo.count_precheckout_ok_older_than(
+            precheckout_session,
+            older_than_utc=since_utc,
+        )
+        == 3
+    )
+    precheckout_sql = compile_statement(precheckout_session.statement)
+    assert "purchases.status = 'PRECHECKOUT_OK'" in precheckout_sql
+    assert "analytics_events.event_type = 'purchase_precheckout_ok'" in precheckout_sql
+    assert "analytics_events.happened_at <= '2026-03-01 00:00:00+00:00'" in precheckout_sql
+    assert "purchases.created_at <=" not in precheckout_sql
+
     paid_count_session = RecordingSession(_ScalarResult(8))
     assert await PurchasesRepo.count_paid_purchases(paid_count_session) == 8
     assert "purchases.paid_at IS NOT NULL" in compile_statement(paid_count_session.statement)

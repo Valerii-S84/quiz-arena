@@ -46,6 +46,7 @@ PAYMENT_STARS_RECONCILIATION_REVIEW_EVENT = "payments_telegram_stars_reconciliat
 PAYMENT_STARS_AUTO_RECOVERED_EVENT = "payments_telegram_star_auto_recovered"
 _REVIEWABLE_SEVERITIES = frozenset({"HIGH", "MEDIUM"})
 _AUTO_RECOVERY_SUCCESS_OUTCOMES = frozenset({"auto_recovered", "already_credited"})
+_TELEGRAM_STARS_RECONCILIATION_PAGE_LIMIT = 100
 
 __all__ = [
     "expire_stale_unpaid_invoices_async",
@@ -315,7 +316,7 @@ async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
     )
     try:
         client = TelegramStarsClient(bot_token=settings.telegram_bot_token)
-        page = await client.get_star_transactions(limit=100)
+        transactions, pages_fetched = await _fetch_star_transactions_backlog(client)
     except TelegramStarsClientError as exc:
         result = {
             "status": "telegram_error",
@@ -330,8 +331,9 @@ async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
     decisions: list[ReconciliationDecision] = []
     review_decisions: list[ReconciliationDecision] = []
     auto_recovery_counts: dict[str, int] = {}
+    recovery_now_utc = _now_utc()
     async with SessionLocal() as session:
-        for transaction in page.transactions:
+        for transaction in transactions:
             candidates = await _load_star_reconciliation_candidates(session, transaction)
             decision = classify_star_transaction_dry_run(
                 transaction=transaction,
@@ -346,6 +348,7 @@ async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
             outcome = await _auto_recover_star_transaction_if_exact(
                 transaction=transaction,
                 decision=decision,
+                recovery_now_utc=recovery_now_utc,
             )
             auto_recovery_counts[outcome] = auto_recovery_counts.get(outcome, 0) + 1
             if (
@@ -360,6 +363,7 @@ async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
         dry_run=dry_run,
         auto_recovery_enabled=auto_recovery_enabled,
     )
+    result["transactions_pages_fetched"] = pages_fetched
     if auto_recovery_counts:
         result["auto_recovery_counts"] = auto_recovery_counts
         result["auto_recovered"] = auto_recovery_counts.get("auto_recovered", 0)
@@ -367,6 +371,29 @@ async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
     result.update(review_summary)
     logger.info("telegram_stars_reconciliation_finished", **result)
     return result
+
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+async def _fetch_star_transactions_backlog(
+    client: TelegramStarsClient,
+) -> tuple[list[TelegramStarTransaction], int]:
+    transactions: list[TelegramStarTransaction] = []
+    offset = 0
+    pages_fetched = 0
+    while True:
+        page = await client.get_star_transactions(
+            offset=offset,
+            limit=_TELEGRAM_STARS_RECONCILIATION_PAGE_LIMIT,
+        )
+        pages_fetched += 1
+        transactions.extend(page.transactions)
+        page_size = len(page.transactions)
+        if page_size < _TELEGRAM_STARS_RECONCILIATION_PAGE_LIMIT:
+            return transactions, pages_fetched
+        offset += page_size
 
 
 async def _load_star_reconciliation_candidates(
@@ -448,6 +475,7 @@ async def _auto_recover_star_transaction_if_exact(
     *,
     transaction: TelegramStarTransaction,
     decision: ReconciliationDecision,
+    recovery_now_utc: datetime,
 ) -> str:
     if decision.classification == ALREADY_CREDITED:
         return "already_credited"
@@ -533,7 +561,7 @@ async def _auto_recover_star_transaction_if_exact(
             invoice_payload=transaction.invoice_payload,
             telegram_payment_charge_id=transaction.transaction_id,
             raw_successful_payment=_successful_payment_payload_from_star_transaction(transaction),
-            now_utc=transaction.transaction_date,
+            now_utc=recovery_now_utc,
         )
         await OutboxEventsRepo.create(
             session,

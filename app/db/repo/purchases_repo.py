@@ -4,9 +4,12 @@ from datetime import datetime, timedelta
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import String, and_
+from sqlalchemy import cast as sa_cast
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models.analytics_events import AnalyticsEvent
 from app.db.models.entitlements import Entitlement
 from app.db.models.ledger_entries import LedgerEntry
 from app.db.models.purchases import Purchase
@@ -207,10 +210,19 @@ class PurchasesRepo:
         *,
         older_than_utc: datetime,
     ) -> int:
+        precheckout_event_exists = (
+            select(AnalyticsEvent.id)
+            .where(
+                AnalyticsEvent.event_type == "purchase_precheckout_ok",
+                AnalyticsEvent.payload["purchase_id"].astext == sa_cast(Purchase.id, String),
+                AnalyticsEvent.happened_at <= older_than_utc,
+            )
+            .exists()
+        )
         stmt = select(func.count(Purchase.id)).where(
             Purchase.status == "PRECHECKOUT_OK",
             Purchase.stars_amount > 0,
-            Purchase.created_at <= older_than_utc,
+            precheckout_event_exists,
         )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)

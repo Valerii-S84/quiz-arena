@@ -10,6 +10,7 @@ EXACT_MATCH_WINDOW = timedelta(minutes=30)
 RECOVERABLE_RECONCILIATION_STATUSES = frozenset(
     {"PRECHECKOUT_OK", "INVOICE_SENT", "CREATED", "PAID_UNCREDITED"}
 )
+RESOLVED_RECONCILIATION_STATUSES = frozenset({"CREDITED", "REFUNDED"})
 
 ALREADY_CREDITED = "ALREADY_CREDITED"
 WOULD_RECOVER_EXACT_MATCH = "WOULD_RECOVER_EXACT_MATCH"
@@ -48,9 +49,9 @@ def classify_star_transaction_dry_run(
     if _should_ignore_transaction(transaction):
         return _decision(IGNORED_OUTGOING_OR_REFUND, "LOW", transaction, candidates=[])
 
-    credited_match = _credited_charge_match(transaction, candidates)
-    if credited_match is not None:
-        return _decision(ALREADY_CREDITED, "LOW", transaction, candidates=[credited_match])
+    resolved_match = _resolved_charge_match(transaction, candidates)
+    if resolved_match is not None:
+        return _decision(ALREADY_CREDITED, "LOW", transaction, candidates=[resolved_match])
 
     if not candidates:
         return _decision(NO_DB_PURCHASE, "HIGH", transaction, candidates=[])
@@ -79,14 +80,14 @@ def _should_ignore_transaction(transaction: TelegramStarTransaction) -> bool:
     return not transaction.is_incoming or transaction.transaction_type != "invoice_payment"
 
 
-def _credited_charge_match(
+def _resolved_charge_match(
     transaction: TelegramStarTransaction,
     candidates: list[ReconciliationCandidate],
 ) -> ReconciliationCandidate | None:
     for candidate in candidates:
         if (
             candidate.telegram_payment_charge_id == transaction.transaction_id
-            and candidate.status == "CREDITED"
+            and candidate.status in RESOLVED_RECONCILIATION_STATUSES
         ):
             return candidate
     return None

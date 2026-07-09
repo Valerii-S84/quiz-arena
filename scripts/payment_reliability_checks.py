@@ -54,11 +54,13 @@ def classify_count_result(
 
 def evaluate_allowed_updates(allowed_updates: list[str] | None) -> CheckResult:
     configured_updates = set(allowed_updates or [])
-    missing_updates = [
-        update_type
-        for update_type in REQUIRED_ALLOWED_UPDATES
-        if update_type not in configured_updates
-    ]
+    missing_updates = []
+    if configured_updates:
+        missing_updates = [
+            update_type
+            for update_type in REQUIRED_ALLOWED_UPDATES
+            if update_type not in configured_updates
+        ]
     description = (
         "Telegram webhook allowed_updates must include message, callback_query, "
         "and pre_checkout_query for Stars payments and existing callbacks."
@@ -97,10 +99,16 @@ def _precheckout_stuck_check(precheckout_cutoff: datetime) -> InvariantCheck:
         severity="HIGH",
         sql="""
             SELECT count(*)
-            FROM purchases
-            WHERE status = 'PRECHECKOUT_OK'
-              AND stars_amount > 0
-              AND created_at <= :precheckout_cutoff
+            FROM purchases p
+            WHERE p.status = 'PRECHECKOUT_OK'
+              AND p.stars_amount > 0
+              AND EXISTS (
+                SELECT 1
+                FROM analytics_events e
+                WHERE e.event_type = 'purchase_precheckout_ok'
+                  AND e.payload ->> 'purchase_id' = p.id::text
+                  AND e.happened_at <= :precheckout_cutoff
+              )
         """,
         params={"precheckout_cutoff": precheckout_cutoff},
         description="Paid Stars purchase stuck in PRECHECKOUT_OK older than 3 minutes.",
@@ -186,7 +194,7 @@ def _duplicate_charge_id_check() -> InvariantCheck:
     )
 
 
-def _duplicate_active_premium_check() -> InvariantCheck:
+def _duplicate_active_premium_check(now_utc: datetime) -> InvariantCheck:
     return InvariantCheck(
         name="payments_duplicate_active_premium_entitlements",
         severity="HIGH",
@@ -197,11 +205,13 @@ def _duplicate_active_premium_check() -> InvariantCheck:
               FROM entitlements
               WHERE entitlement_type = 'PREMIUM'
                 AND status = 'ACTIVE'
+                AND starts_at <= :now_utc
+                AND (ends_at IS NULL OR ends_at > :now_utc)
               GROUP BY user_id
               HAVING count(*) > 1
             ) duplicates
         """,
-        params={},
+        params={"now_utc": now_utc},
         description="Duplicate active premium entitlements exist for a user.",
     )
 
@@ -330,7 +340,7 @@ def build_invariant_checks(now_utc: datetime) -> list[InvariantCheck]:
         _credited_premium_missing_entitlement_check(),
         _credited_stars_missing_purchase_credit_check(),
         _duplicate_charge_id_check(),
-        _duplicate_active_premium_check(),
+        _duplicate_active_premium_check(now_utc),
         _duplicate_premium_source_purchase_check(),
         _duplicate_purchase_credit_ledger_check(),
         _paid_purchase_missing_charge_id_check(),
@@ -342,8 +352,12 @@ def build_invariant_checks(now_utc: datetime) -> list[InvariantCheck]:
 def read_only_sql_texts() -> list[str]:
     checks = build_invariant_checks(datetime(2026, 1, 1, tzinfo=timezone.utc))
     return [check.sql for check in checks] + [
-        "SELECT to_regclass('public.payment_reconciliation_reviews') IS NOT NULL",
-        "SELECT count(*) FROM payment_reconciliation_reviews WHERE status = 'OPEN'",
+        """
+        SELECT count(*)
+        FROM outbox_events
+        WHERE event_type = 'payments_telegram_stars_reconciliation_review'
+          AND status = 'OPEN'
+        """,
     ]
 
 
@@ -359,21 +373,16 @@ async def _run_count_check(session: AsyncSession, check: InvariantCheck) -> Chec
 
 
 async def _run_open_review_check(session: AsyncSession) -> CheckResult:
-    table_exists_result = await session.execute(
-        text("SELECT to_regclass('public.payment_reconciliation_reviews') IS NOT NULL")
-    )
-    table_exists = bool(table_exists_result.scalar_one())
     description = "Open payment reconciliation reviews exist."
-    if not table_exists:
-        return CheckResult(
-            name="payments_open_manual_review_records",
-            status="SKIPPED",
-            severity="MEDIUM",
-            count=None,
-            description="payment_reconciliation_reviews table is not present yet.",
-        )
     count_result = await session.execute(
-        text("SELECT count(*) FROM payment_reconciliation_reviews WHERE status = 'OPEN'")
+        text(
+            """
+            SELECT count(*)
+            FROM outbox_events
+            WHERE event_type = 'payments_telegram_stars_reconciliation_review'
+              AND status = 'OPEN'
+            """
+        )
     )
     count = int(count_result.scalar_one() or 0)
     return classify_count_result(

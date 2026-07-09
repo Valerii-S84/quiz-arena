@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
 from app.services.telegram_stars import (
+    TelegramStarsClient,
     TelegramStarsClientError,
     TelegramStarTransaction,
     TelegramStarTransactionsPage,
@@ -74,6 +76,38 @@ def _transaction(
 
 
 @pytest.mark.asyncio
+async def test_fetch_star_transactions_backlog_pages_until_short_page() -> None:
+    calls: list[tuple[int, int]] = []
+    first_page = [
+        _transaction(transaction_id=f"charge-page-1-{index}", incoming=False)
+        for index in range(100)
+    ]
+    second_page = [_transaction(transaction_id="charge-page-2", incoming=False)]
+
+    class FakeStarsClient:
+        async def get_star_transactions(
+            self,
+            *,
+            offset: int,
+            limit: int,
+        ) -> TelegramStarTransactionsPage:
+            calls.append((offset, limit))
+            if offset == 0:
+                return TelegramStarTransactionsPage(transactions=first_page)
+            if offset == 100:
+                return TelegramStarTransactionsPage(transactions=second_page)
+            return TelegramStarTransactionsPage(transactions=[])
+
+    transactions, pages_fetched = await payments_reliability_async._fetch_star_transactions_backlog(
+        cast(TelegramStarsClient, FakeStarsClient())
+    )
+
+    assert calls == [(0, 100), (100, 100)]
+    assert transactions == [*first_page, *second_page]
+    assert pages_fetched == 2
+
+
+@pytest.mark.asyncio
 async def test_telegram_stars_reconciliation_disabled_by_default(monkeypatch) -> None:
     monkeypatch.setattr(
         payments_reliability_async, "get_settings", lambda: _settings(enabled=False)
@@ -125,7 +159,13 @@ async def test_telegram_stars_reconciliation_dry_run_classifies_transactions(
         def __init__(self, *, bot_token: str) -> None:
             assert bot_token == "bot-token-secret"
 
-        async def get_star_transactions(self, *, limit: int) -> TelegramStarTransactionsPage:
+        async def get_star_transactions(
+            self,
+            *,
+            offset: int,
+            limit: int,
+        ) -> TelegramStarTransactionsPage:
+            assert offset == 0
             assert limit == 100
             return TelegramStarTransactionsPage(
                 transactions=[
@@ -234,8 +274,13 @@ async def test_telegram_stars_reconciliation_deduplicates_open_review_events(
         def __init__(self, *, bot_token: str) -> None:
             assert bot_token == "bot-token-secret"
 
-        async def get_star_transactions(self, *, limit: int) -> TelegramStarTransactionsPage:
-            del limit
+        async def get_star_transactions(
+            self,
+            *,
+            offset: int,
+            limit: int,
+        ) -> TelegramStarTransactionsPage:
+            del offset, limit
             return TelegramStarTransactionsPage(transactions=[_transaction()])
 
     async def _no_candidate_rows(*_args, **_kwargs):
@@ -295,6 +340,7 @@ async def test_telegram_stars_reconciliation_auto_recovers_exact_match_once(
         product_type="PREMIUM",
     )
     purchase.created_at = datetime(2026, 7, 7, 11, 55, tzinfo=timezone.utc)
+    recovery_now_utc = datetime(2026, 7, 9, 9, 15, tzinfo=timezone.utc)
     apply_calls: list[dict[str, object]] = []
     outbox_events: list[dict[str, object]] = []
 
@@ -302,8 +348,13 @@ async def test_telegram_stars_reconciliation_auto_recovers_exact_match_once(
         def __init__(self, *, bot_token: str) -> None:
             assert bot_token == "bot-token-secret"
 
-        async def get_star_transactions(self, *, limit: int) -> TelegramStarTransactionsPage:
-            del limit
+        async def get_star_transactions(
+            self,
+            *,
+            offset: int,
+            limit: int,
+        ) -> TelegramStarTransactionsPage:
+            del offset, limit
             return TelegramStarTransactionsPage(transactions=[_transaction()])
 
     async def _candidate_rows(*_args, **_kwargs):
@@ -401,6 +452,7 @@ async def test_telegram_stars_reconciliation_auto_recovers_exact_match_once(
         "apply_successful_payment",
         _apply_successful_payment,
     )
+    monkeypatch.setattr(payments_reliability_async, "_now_utc", lambda: recovery_now_utc)
 
     first = await payments_reliability_async.run_telegram_stars_reconciliation_async()
     second = await payments_reliability_async.run_telegram_stars_reconciliation_async()
@@ -413,11 +465,12 @@ async def test_telegram_stars_reconciliation_auto_recovers_exact_match_once(
     assert len(apply_calls) == 1
     assert apply_calls[0]["invoice_payload"] == "invoice-1"
     assert apply_calls[0]["telegram_payment_charge_id"] == "charge-1"
-    assert apply_calls[0]["now_utc"] == datetime(2026, 7, 7, 12, 0, tzinfo=timezone.utc)
+    assert apply_calls[0]["now_utc"] == recovery_now_utc
     raw_successful_payment = apply_calls[0]["raw_successful_payment"]
     assert isinstance(raw_successful_payment, dict)
     assert raw_successful_payment["currency"] == "XTR"
     assert raw_successful_payment["total_amount"] == 29
+    assert raw_successful_payment["transaction_date"] == "2026-07-07T12:00:00+00:00"
     assert len(outbox_events) == 1
     assert outbox_events[0]["event_type"] == "payments_telegram_star_auto_recovered"
     assert outbox_events[0]["status"] == "SENT"
@@ -450,8 +503,13 @@ async def test_telegram_stars_reconciliation_auto_mode_reviews_ambiguous_match(
         def __init__(self, *, bot_token: str) -> None:
             assert bot_token == "bot-token-secret"
 
-        async def get_star_transactions(self, *, limit: int) -> TelegramStarTransactionsPage:
-            del limit
+        async def get_star_transactions(
+            self,
+            *,
+            offset: int,
+            limit: int,
+        ) -> TelegramStarTransactionsPage:
+            del offset, limit
             return TelegramStarTransactionsPage(transactions=[_transaction()])
 
     async def _candidate_rows(*_args, **_kwargs):
@@ -522,8 +580,13 @@ async def test_telegram_stars_reconciliation_auto_revalidates_locked_candidates(
         def __init__(self, *, bot_token: str) -> None:
             assert bot_token == "bot-token-secret"
 
-        async def get_star_transactions(self, *, limit: int) -> TelegramStarTransactionsPage:
-            del limit
+        async def get_star_transactions(
+            self,
+            *,
+            offset: int,
+            limit: int,
+        ) -> TelegramStarTransactionsPage:
+            del offset, limit
             return TelegramStarTransactionsPage(transactions=[_transaction()])
 
     async def _candidate_rows(*_args, **_kwargs):
@@ -589,8 +652,13 @@ async def test_telegram_stars_reconciliation_auto_blocks_credited_charge_conflic
         def __init__(self, *, bot_token: str) -> None:
             assert bot_token == "bot-token-secret"
 
-        async def get_star_transactions(self, *, limit: int) -> TelegramStarTransactionsPage:
-            del limit
+        async def get_star_transactions(
+            self,
+            *,
+            offset: int,
+            limit: int,
+        ) -> TelegramStarTransactionsPage:
+            del offset, limit
             return TelegramStarTransactionsPage(transactions=[_transaction()])
 
     async def _candidate_rows(*_args, **_kwargs):
@@ -650,8 +718,13 @@ async def test_telegram_stars_reconciliation_reports_sanitized_client_error(
         def __init__(self, *, bot_token: str) -> None:
             assert bot_token == "bot-token-secret"
 
-        async def get_star_transactions(self, *, limit: int) -> TelegramStarTransactionsPage:
-            del limit
+        async def get_star_transactions(
+            self,
+            *,
+            offset: int,
+            limit: int,
+        ) -> TelegramStarTransactionsPage:
+            del offset, limit
             raise TelegramStarsClientError(
                 "telegram_stars_request_failed",
                 error_type="TimeoutError",

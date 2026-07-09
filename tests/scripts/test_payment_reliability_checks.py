@@ -88,6 +88,20 @@ def test_allowed_updates_missing_precheckout_fails() -> None:
     assert result.count == 1
 
 
+def test_allowed_updates_none_uses_telegram_default_set() -> None:
+    result = evaluate_allowed_updates(None)
+
+    assert result.status == "OK"
+    assert result.count == 0
+
+
+def test_allowed_updates_empty_list_uses_telegram_default_set() -> None:
+    result = evaluate_allowed_updates([])
+
+    assert result.status == "OK"
+    assert result.count == 0
+
+
 def test_allowed_updates_ok_when_payment_and_callbacks_are_present() -> None:
     result = evaluate_allowed_updates(
         ["message", "callback_query", "pre_checkout_query", "my_chat_member"]
@@ -136,6 +150,30 @@ def test_constraint_preflight_checks_are_included() -> None:
         "payments_constraint_paid_purchase_missing_paid_at",
         "payments_constraint_credited_purchase_missing_credited_at",
     }.issubset(names)
+
+
+def test_precheckout_stuck_check_ages_from_precheckout_event() -> None:
+    sql = _check_sql("payments_precheckout_stuck_detected")
+
+    assert "analytics_events" in sql
+    assert "purchase_precheckout_ok" in sql
+    assert "e.happened_at <= :precheckout_cutoff" in sql
+    assert "created_at <= :precheckout_cutoff" not in sql
+
+
+def test_duplicate_active_premium_check_uses_current_entitlement_window() -> None:
+    sql = _check_sql("payments_duplicate_active_premium_entitlements")
+
+    assert "starts_at <= :now_utc" in sql
+    assert "(ends_at IS NULL OR ends_at > :now_utc)" in sql
+
+
+def test_open_review_check_reads_current_outbox_mechanism() -> None:
+    sql_text = "\n".join(read_only_sql_texts())
+
+    assert "outbox_events" in sql_text
+    assert "payments_telegram_stars_reconciliation_review" in sql_text
+    assert "payment_reconciliation_reviews" not in sql_text
 
 
 def test_credited_at_preflight_allows_uncredited_refunded_purchase() -> None:

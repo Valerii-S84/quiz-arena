@@ -84,6 +84,19 @@ def test_already_credited_is_noop_classification() -> None:
     assert decision.severity == "LOW"
 
 
+def test_refunded_charge_match_is_resolved_low_severity() -> None:
+    candidate = _candidate(status="REFUNDED", charge_id="charge-1")
+
+    decision = classify_star_transaction_dry_run(
+        transaction=_transaction(),
+        candidates=[candidate],
+    )
+
+    assert decision.classification == ALREADY_CREDITED
+    assert decision.severity == "LOW"
+    assert decision.candidate_purchase_ids == (candidate.purchase_id,)
+
+
 def test_amount_mismatch_is_review_classification() -> None:
     decision = classify_star_transaction_dry_run(
         transaction=_transaction(amount=99),
