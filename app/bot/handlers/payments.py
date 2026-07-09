@@ -24,6 +24,7 @@ from app.bot.handlers.payments_helpers import (
 from app.bot.handlers.payments_runtime import (
     apply_successful_payment,
     apply_zero_cost_purchase,
+    refund_payment_update,
     validate_precheckout,
 )
 from app.bot.keyboards.home import build_home_keyboard
@@ -35,6 +36,8 @@ from app.economy.purchases.errors import (
     ProductNotFoundError,
     PurchaseNotFoundError,
     PurchasePrecheckoutValidationError,
+    PurchaseRefundInvariantError,
+    PurchaseRefundValidationError,
 )
 from app.economy.purchases.service import PurchaseService
 from app.services.user_onboarding import UserOnboardingService
@@ -138,3 +141,43 @@ async def handle_successful_payment(message: Message) -> None:
         TEXTS_DE[success_text_key(credit_result.product_code)],
         reply_markup=build_home_keyboard(),
     )
+
+
+@router.message(F.refunded_payment)
+async def handle_refunded_payment(message: Message) -> None:
+    if message.from_user is None or message.refunded_payment is None:
+        await message.answer(TEXTS_DE["msg.system.error"])
+        return
+
+    refunded_payment = message.refunded_payment
+    now_utc = datetime.now(timezone.utc)
+    invoice_payload_hash = _invoice_payload_hash(refunded_payment.invoice_payload)
+
+    logger.info(
+        "payment_refunded_update_received",
+        telegram_user_id=message.from_user.id,
+        telegram_payment_charge_id=refunded_payment.telegram_payment_charge_id,
+        invoice_payload_hash=invoice_payload_hash,
+        currency=getattr(refunded_payment, "currency", None),
+        total_amount=getattr(refunded_payment, "total_amount", None),
+    )
+
+    try:
+        await refund_payment_update(
+            telegram_user=message.from_user,
+            refunded_payment=refunded_payment,
+            now_utc=now_utc,
+        )
+    except (
+        PurchaseNotFoundError,
+        PurchaseRefundValidationError,
+        PurchaseRefundInvariantError,
+    ) as exc:
+        logger.warning(
+            "payment_refund_update_failed",
+            telegram_user_id=message.from_user.id,
+            telegram_payment_charge_id=refunded_payment.telegram_payment_charge_id,
+            invoice_payload_hash=invoice_payload_hash,
+            error_type=type(exc).__name__,
+        )
+        raise

@@ -47,6 +47,7 @@ def _candidate(
     status: str = "PRECHECKOUT_OK",
     charge_id: str | None = None,
     created_at: datetime | None = None,
+    invoice_payload: str | None = "invoice-1",
 ) -> ReconciliationCandidate:
     return ReconciliationCandidate(
         purchase_id=uuid4(),
@@ -56,6 +57,7 @@ def _candidate(
         status=status,
         created_at=created_at or datetime(2026, 7, 6, 23, 45, tzinfo=timezone.utc),
         telegram_payment_charge_id=charge_id,
+        invoice_payload=invoice_payload,
     )
 
 
@@ -126,6 +128,16 @@ def test_two_exact_candidates_are_ambiguous() -> None:
     assert decision.classification == AMBIGUOUS_MATCH
     assert decision.severity == "MEDIUM"
     assert len(decision.candidate_purchase_ids) == 2
+
+
+def test_invoice_payload_mismatch_is_ambiguous_not_exact() -> None:
+    decision = classify_star_transaction_dry_run(
+        transaction=_transaction(),
+        candidates=[_candidate(invoice_payload="other-invoice")],
+    )
+
+    assert decision.classification == AMBIGUOUS_MATCH
+    assert decision.severity == "MEDIUM"
 
 
 def test_same_user_amount_outside_time_window_is_ambiguous() -> None:

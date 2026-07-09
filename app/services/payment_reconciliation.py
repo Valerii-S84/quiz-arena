@@ -30,6 +30,7 @@ class ReconciliationCandidate:
     status: str
     created_at: datetime
     telegram_payment_charge_id: str | None = None
+    invoice_payload: str | None = None
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,8 @@ def _is_exact_recoverable_match(
         and candidate.stars_amount == transaction.amount
         and candidate.status in RECOVERABLE_RECONCILIATION_STATUSES
         and candidate.telegram_payment_charge_id in (None, transaction.transaction_id)
+        and transaction.invoice_payload is not None
+        and candidate.invoice_payload == transaction.invoice_payload
         and _is_within_match_window(transaction, candidate)
     )
 

@@ -98,13 +98,54 @@ async def test_fetch_star_transactions_backlog_pages_until_short_page() -> None:
                 return TelegramStarTransactionsPage(transactions=second_page)
             return TelegramStarTransactionsPage(transactions=[])
 
-    transactions, pages_fetched = await payments_reliability_async._fetch_star_transactions_backlog(
-        cast(TelegramStarsClient, FakeStarsClient())
+    transactions, pages_fetched, backlog_truncated = (
+        await payments_reliability_async._fetch_star_transactions_backlog(
+            cast(TelegramStarsClient, FakeStarsClient())
+        )
     )
 
     assert calls == [(0, 100), (100, 100)]
     assert transactions == [*first_page, *second_page]
     assert pages_fetched == 2
+    assert backlog_truncated is False
+
+
+@pytest.mark.asyncio
+async def test_fetch_star_transactions_backlog_stops_at_page_cap(monkeypatch) -> None:
+    calls: list[tuple[int, int]] = []
+    pages = [
+        [
+            _transaction(transaction_id=f"charge-page-{page_index}-{item_index}", incoming=False)
+            for item_index in range(100)
+        ]
+        for page_index in range(2)
+    ]
+    monkeypatch.setattr(
+        payments_reliability_async,
+        "_TELEGRAM_STARS_RECONCILIATION_MAX_PAGES",
+        2,
+    )
+
+    class FakeStarsClient:
+        async def get_star_transactions(
+            self,
+            *,
+            offset: int,
+            limit: int,
+        ) -> TelegramStarTransactionsPage:
+            calls.append((offset, limit))
+            return TelegramStarTransactionsPage(transactions=pages[offset // 100])
+
+    transactions, pages_fetched, backlog_truncated = (
+        await payments_reliability_async._fetch_star_transactions_backlog(
+            cast(TelegramStarsClient, FakeStarsClient())
+        )
+    )
+
+    assert calls == [(0, 100), (100, 100)]
+    assert transactions == [*pages[0], *pages[1]]
+    assert pages_fetched == 2
+    assert backlog_truncated is True
 
 
 @pytest.mark.asyncio
@@ -194,7 +235,9 @@ async def test_telegram_stars_reconciliation_dry_run_classifies_transactions(
         purchase = purchase_model(
             status="CREDITED" if transaction_id == "charge-credited" else "PRECHECKOUT_OK",
             stars_amount=29,
-            invoice_payload=f"invoice-{transaction_id}",
+            invoice_payload=(
+                "invoice-1" if transaction_id == "charge-1" else f"invoice-{transaction_id}"
+            ),
         )
         purchase.created_at = transaction_date - timedelta(minutes=5)
         purchase.telegram_payment_charge_id = (
@@ -570,7 +613,7 @@ async def test_telegram_stars_reconciliation_auto_revalidates_locked_candidates(
     )
     monkeypatch.setattr(payments_reliability_async, "SessionLocal", _SessionLocal())
     first = purchase_model(status="PRECHECKOUT_OK", stars_amount=29, invoice_payload="invoice-1")
-    second = purchase_model(status="PRECHECKOUT_OK", stars_amount=29, invoice_payload="invoice-2")
+    second = purchase_model(status="PRECHECKOUT_OK", stars_amount=29, invoice_payload="invoice-1")
     for purchase in (first, second):
         purchase.created_at = datetime(2026, 7, 7, 11, 55, tzinfo=timezone.utc)
     candidate_calls = 0

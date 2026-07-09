@@ -176,6 +176,14 @@ def test_open_review_check_reads_current_outbox_mechanism() -> None:
     assert "payment_reconciliation_reviews" not in sql_text
 
 
+def test_paid_preflights_include_review_pending_paid_rows() -> None:
+    for check_name in (
+        "payments_constraint_paid_purchase_missing_charge_id",
+        "payments_constraint_paid_purchase_missing_paid_at",
+    ):
+        assert "FAILED_CREDIT_PENDING_REVIEW" in _check_sql(check_name)
+
+
 def test_credited_at_preflight_allows_uncredited_refunded_purchase() -> None:
     count = _credited_at_preflight_count(status="REFUNDED", credited_at=None)
 

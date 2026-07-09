@@ -145,6 +145,8 @@ Expected:
 - recent payment smoke updates have an evidence row before normal worker processing,
 - `payment_update_kind` is one of `pre_checkout_query`, `message.successful_payment`, or
   `message.refunded_payment`,
+- `message.refunded_payment` updates are handled by the payments router through the idempotent
+  purchase refund path after enqueue,
 - evidence payload stores the raw Telegram update in DB for replay/manual inspection, but must not
   store request headers or webhook secrets.
 

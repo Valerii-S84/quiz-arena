@@ -269,7 +269,12 @@ def _paid_purchase_missing_charge_id_check() -> InvariantCheck:
             SELECT count(*)
             FROM purchases
             WHERE stars_amount > 0
-              AND status IN ('PAID_UNCREDITED', 'CREDITED', 'REFUNDED')
+              AND status IN (
+                'PAID_UNCREDITED',
+                'FAILED_CREDIT_PENDING_REVIEW',
+                'CREDITED',
+                'REFUNDED'
+              )
               AND telegram_payment_charge_id IS NULL
         """,
         params={},
@@ -285,7 +290,12 @@ def _paid_purchase_missing_paid_at_check() -> InvariantCheck:
             SELECT count(*)
             FROM purchases
             WHERE stars_amount > 0
-              AND status IN ('PAID_UNCREDITED', 'CREDITED', 'REFUNDED')
+              AND status IN (
+                'PAID_UNCREDITED',
+                'FAILED_CREDIT_PENDING_REVIEW',
+                'CREDITED',
+                'REFUNDED'
+              )
               AND paid_at IS NULL
         """,
         params={},

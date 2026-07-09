@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
+from aiogram.types import RefundedPayment
 
-from app.bot.handlers import payments
+from app.bot.handlers import payments, payments_runtime
 from app.bot.texts.de import TEXTS_DE
 from app.economy.purchases.errors import (
     PurchaseInitValidationError,
+    PurchaseNotFoundError,
     PurchasePrecheckoutValidationError,
 )
 from app.economy.purchases.types import PurchaseCreditResult, PurchaseInitResult
@@ -46,6 +49,14 @@ class _SuccessfulPayment:
         }
 
 
+def _refunded_payment(*, invoice_payload: str = "inv-1") -> RefundedPayment:
+    return RefundedPayment(
+        total_amount=29,
+        invoice_payload=invoice_payload,
+        telegram_payment_charge_id="charge-1",
+    )
+
+
 class _PaymentMessage(DummyMessage):
     def __init__(
         self,
@@ -56,6 +67,18 @@ class _PaymentMessage(DummyMessage):
         super().__init__()
         self.from_user = from_user
         self.successful_payment = successful_payment
+
+
+class _RefundedPaymentMessage(DummyMessage):
+    def __init__(
+        self,
+        *,
+        from_user: SimpleNamespace | None,
+        refunded_payment: RefundedPayment | None,
+    ) -> None:
+        super().__init__()
+        self.from_user = from_user
+        self.refunded_payment = refunded_payment
 
 
 class _Logger:
@@ -281,3 +304,120 @@ async def test_handle_successful_payment_sends_failure_text_for_validation_error
     await payments.handle_successful_payment(message)  # type: ignore[arg-type]
 
     assert message.answers[0].text == TEXTS_DE["msg.purchase.error.failed"]
+
+
+@pytest.mark.asyncio
+async def test_handle_refunded_payment_applies_refund_update(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    async def _fake_refund_payment_update(*, telegram_user, refunded_payment, now_utc):
+        calls.append(
+            {
+                "telegram_user_id": telegram_user.id,
+                "refunded_payment": refunded_payment,
+                "now_utc": now_utc,
+            }
+        )
+
+    monkeypatch.setattr(payments, "refund_payment_update", _fake_refund_payment_update)
+
+    refund = _refunded_payment()
+    message = _RefundedPaymentMessage(from_user=SimpleNamespace(id=1), refunded_payment=refund)
+    await payments.handle_refunded_payment(message)  # type: ignore[arg-type]
+
+    assert calls[0]["telegram_user_id"] == 1
+    assert calls[0]["refunded_payment"] is refund
+    assert message.answers == []
+
+
+@pytest.mark.asyncio
+async def test_handle_refunded_payment_logs_received_update_without_raw_payload(
+    monkeypatch,
+) -> None:
+    logger = _Logger()
+    monkeypatch.setattr(payments, "logger", logger)
+
+    async def _fake_refund_payment_update(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(payments, "refund_payment_update", _fake_refund_payment_update)
+
+    refund = _refunded_payment(invoice_payload="invoice-raw-value")
+    message = _RefundedPaymentMessage(from_user=SimpleNamespace(id=1), refunded_payment=refund)
+
+    await payments.handle_refunded_payment(message)  # type: ignore[arg-type]
+
+    assert logger.infos[0][0] == "payment_refunded_update_received"
+    assert logger.infos[0][1]["invoice_payload_hash"] != refund.invoice_payload
+    assert "invoice_payload" not in logger.infos[0][1]
+    assert refund.invoice_payload not in str(logger.infos)
+    assert "token" not in str(logger.infos).lower()
+
+
+@pytest.mark.asyncio
+async def test_handle_refunded_payment_reraises_missing_purchase_for_worker_retry(
+    monkeypatch,
+) -> None:
+    async def _fake_refund_payment_update(*args, **kwargs):
+        raise PurchaseNotFoundError()
+
+    monkeypatch.setattr(payments, "refund_payment_update", _fake_refund_payment_update)
+
+    message = _RefundedPaymentMessage(
+        from_user=SimpleNamespace(id=1), refunded_payment=_refunded_payment()
+    )
+
+    with pytest.raises(PurchaseNotFoundError):
+        await payments.handle_refunded_payment(message)  # type: ignore[arg-type]
+
+    assert message.answers == []
+
+
+@pytest.mark.asyncio
+async def test_refund_payment_update_uses_charge_lookup_and_refund_service(
+    monkeypatch,
+) -> None:
+    now_utc = datetime(2026, 7, 9, 12, 0, tzinfo=timezone.utc)
+    purchase_id = UUID("123e4567-e89b-12d3-a456-426614174000")
+    refund = _refunded_payment()
+    purchase = SimpleNamespace(id=purchase_id, user_id=77, invoice_payload=refund.invoice_payload)
+    calls: list[dict[str, object]] = []
+
+    async def _fake_home_snapshot(session, *, telegram_user):
+        del session
+        assert telegram_user.id == 270
+        return SimpleNamespace(user_id=77)
+
+    async def _fake_get_by_charge_id(_session, telegram_payment_charge_id: str):
+        assert telegram_payment_charge_id == refund.telegram_payment_charge_id
+        return purchase
+
+    async def _fake_refund_purchase(_session, *, purchase_id: UUID, now_utc: datetime):
+        calls.append({"purchase_id": purchase_id, "now_utc": now_utc})
+        return SimpleNamespace(status="REFUNDED")
+
+    monkeypatch.setattr(payments_runtime, "SessionLocal", DummySessionLocal())
+    monkeypatch.setattr(
+        payments_runtime.UserOnboardingService,
+        "ensure_home_snapshot",
+        _fake_home_snapshot,
+    )
+    monkeypatch.setattr(
+        payments_runtime.PurchaseService,
+        "get_by_telegram_payment_charge_id_for_update",
+        _fake_get_by_charge_id,
+    )
+    monkeypatch.setattr(
+        payments_runtime.PurchaseService,
+        "refund_purchase",
+        _fake_refund_purchase,
+    )
+
+    result = await payments_runtime.refund_payment_update(
+        telegram_user=SimpleNamespace(id=270),  # type: ignore[arg-type]
+        refunded_payment=refund,  # type: ignore[arg-type]
+        now_utc=now_utc,
+    )
+
+    assert result.status == "REFUNDED"
+    assert calls == [{"purchase_id": purchase_id, "now_utc": now_utc}]

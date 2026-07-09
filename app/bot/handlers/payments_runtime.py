@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from aiogram.types import SuccessfulPayment, User
+from aiogram.types import RefundedPayment, SuccessfulPayment, User
 
 from app.bot.handlers.payments_helpers import (
     extract_offer_impression_id_from_purchase_idempotency_key,
 )
 from app.db.session import SessionLocal
 from app.economy.offers.service import OfferService
+from app.economy.purchases.errors import PurchaseNotFoundError, PurchaseRefundValidationError
 from app.economy.purchases.service import PurchaseService
 from app.services.user_onboarding import UserOnboardingService
 
@@ -85,3 +86,32 @@ async def apply_successful_payment(
                     purchase_id=credit_result.purchase_id,
                 )
         return credit_result
+
+
+async def refund_payment_update(
+    *,
+    telegram_user: User,
+    refunded_payment: RefundedPayment,
+    now_utc: datetime,
+):
+    async with SessionLocal.begin() as session:
+        snapshot = await UserOnboardingService.ensure_home_snapshot(
+            session,
+            telegram_user=telegram_user,
+        )
+        purchase = await PurchaseService.get_by_telegram_payment_charge_id_for_update(
+            session,
+            refunded_payment.telegram_payment_charge_id,
+        )
+        if purchase is None:
+            raise PurchaseNotFoundError
+        if (
+            purchase.user_id != snapshot.user_id
+            or purchase.invoice_payload != refunded_payment.invoice_payload
+        ):
+            raise PurchaseRefundValidationError
+        return await PurchaseService.refund_purchase(
+            session,
+            purchase_id=purchase.id,
+            now_utc=now_utc,
+        )
