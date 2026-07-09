@@ -539,6 +539,95 @@ async def test_telegram_stars_reconciliation_auto_recovers_exact_match_once(
 
 
 @pytest.mark.asyncio
+async def test_telegram_stars_reconciliation_blocks_auto_recovery_for_batch_refund(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        payments_reliability_async,
+        "get_settings",
+        lambda: _settings(enabled=True, dry_run=False, auto_recovery_enabled=True),
+    )
+    monkeypatch.setattr(payments_reliability_async, "SessionLocal", _SessionLocal())
+    purchase = purchase_model(
+        status="PRECHECKOUT_OK",
+        stars_amount=29,
+        invoice_payload="invoice-1",
+        product_code="PREMIUM_WEEK",
+        product_type="PREMIUM",
+    )
+    purchase.created_at = datetime(2026, 7, 7, 11, 55, tzinfo=timezone.utc)
+    review_payloads: list[dict[str, object]] = []
+
+    class FakeStarsClient:
+        def __init__(self, *, bot_token: str) -> None:
+            assert bot_token == "bot-token-secret"
+
+        async def get_star_transactions(
+            self,
+            *,
+            offset: int,
+            limit: int,
+        ) -> TelegramStarTransactionsPage:
+            del offset, limit
+            return TelegramStarTransactionsPage(
+                transactions=[
+                    _transaction(transaction_id="charge-refunded"),
+                    _transaction(transaction_id="charge-refunded", incoming=False),
+                ]
+            )
+
+    async def _candidate_rows(*_args, **_kwargs):
+        return [(purchase, 270)]
+
+    async def _apply_successful_payment(*_args, **_kwargs):
+        raise AssertionError("same-batch refund evidence must block auto-credit")
+
+    async def _create_review_once(
+        session: object,
+        *,
+        event_type: str,
+        payload: dict[str, object],
+        payload_key: str,
+        status: str,
+    ):
+        del session, event_type, payload_key, status
+        review_payloads.append(payload)
+        return object(), True
+
+    monkeypatch.setattr(payments_reliability_async, "TelegramStarsClient", FakeStarsClient)
+    monkeypatch.setattr(
+        payments_reliability_async.PurchasesRepo,
+        "list_stars_reconciliation_candidate_rows",
+        _candidate_rows,
+    )
+    monkeypatch.setattr(
+        payments_reliability_async.PurchaseService,
+        "apply_successful_payment",
+        _apply_successful_payment,
+    )
+    monkeypatch.setattr(
+        payments_reliability_async.OutboxEventsRepo,
+        "create_once_by_payload_key",
+        _create_review_once,
+    )
+
+    result = await payments_reliability_async.run_telegram_stars_reconciliation_async()
+
+    assert result["transactions_examined"] == 2
+    assert result["auto_recovery_counts"] == {
+        "batch_refund_blocked": 1,
+        "not_exact_match": 1,
+    }
+    assert result["auto_recovered"] == 0
+    assert result["review_events_created"] == 2
+    assert [payload["reason"] for payload in review_payloads] == [
+        "BATCH_REFUND_CONFLICT_REQUIRES_REVIEW",
+        "PROVIDER_REFUND_REQUIRES_REVIEW",
+    ]
+    assert purchase.status == "PRECHECKOUT_OK"
+
+
+@pytest.mark.asyncio
 async def test_telegram_stars_reconciliation_auto_mode_reviews_ambiguous_match(
     monkeypatch,
 ) -> None:

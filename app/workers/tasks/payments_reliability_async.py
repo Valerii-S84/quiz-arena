@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -44,6 +45,7 @@ from app.workers.tasks.payments_reliability_reconciliation import (
 logger = structlog.get_logger("app.workers.tasks.payments_reliability")
 PAYMENT_STARS_RECONCILIATION_REVIEW_EVENT = "payments_telegram_stars_reconciliation_review"
 PAYMENT_STARS_AUTO_RECOVERED_EVENT = "payments_telegram_star_auto_recovered"
+BATCH_REFUND_CONFLICT_REQUIRES_REVIEW = "BATCH_REFUND_CONFLICT_REQUIRES_REVIEW"
 _REVIEWABLE_SEVERITIES = frozenset({"HIGH", "MEDIUM"})
 _AUTO_RECOVERY_SUCCESS_OUTCOMES = frozenset({"auto_recovered", "already_credited"})
 _TELEGRAM_STARS_RECONCILIATION_PAGE_LIMIT = 100
@@ -339,6 +341,7 @@ async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
     auto_recovery_counts: dict[str, int] = {}
     transaction_errors = 0
     recovery_now_utc = _now_utc()
+    batch_refund_transaction_ids = _batch_refund_transaction_ids(transactions)
     async with SessionLocal() as session:
         for transaction in transactions:
             try:
@@ -362,11 +365,19 @@ async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
                 continue
 
             try:
-                outcome = await _auto_recover_star_transaction_if_exact(
+                if _is_blocked_by_batch_refund(
                     transaction=transaction,
                     decision=decision,
-                    recovery_now_utc=recovery_now_utc,
-                )
+                    batch_refund_transaction_ids=batch_refund_transaction_ids,
+                ):
+                    outcome = "batch_refund_blocked"
+                    review_decisions.append(_batch_refund_conflict_decision(decision))
+                else:
+                    outcome = await _auto_recover_star_transaction_if_exact(
+                        transaction=transaction,
+                        decision=decision,
+                        recovery_now_utc=recovery_now_utc,
+                    )
             except Exception as exc:
                 outcome = "auto_recovery_error"
                 logger.exception(
@@ -376,7 +387,8 @@ async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
                 )
             auto_recovery_counts[outcome] = auto_recovery_counts.get(outcome, 0) + 1
             if (
-                outcome not in _AUTO_RECOVERY_SUCCESS_OUTCOMES
+                outcome != "batch_refund_blocked"
+                and outcome not in _AUTO_RECOVERY_SUCCESS_OUTCOMES
                 and decision.severity in _REVIEWABLE_SEVERITIES
             ):
                 review_decisions.append(decision)
@@ -398,6 +410,35 @@ async def run_telegram_stars_reconciliation_async() -> dict[str, object]:
     result.update(review_summary)
     logger.info("telegram_stars_reconciliation_finished", **result)
     return result
+
+
+def _batch_refund_transaction_ids(
+    transactions: list[TelegramStarTransaction],
+) -> set[str]:
+    return {
+        transaction.transaction_id
+        for transaction in transactions
+        if transaction.transaction_id and not transaction.is_incoming
+    }
+
+
+def _is_blocked_by_batch_refund(
+    *,
+    transaction: TelegramStarTransaction,
+    decision: ReconciliationDecision,
+    batch_refund_transaction_ids: set[str],
+) -> bool:
+    return (
+        transaction.is_incoming
+        and transaction.transaction_id in batch_refund_transaction_ids
+        and decision.classification == WOULD_RECOVER_EXACT_MATCH
+    )
+
+
+def _batch_refund_conflict_decision(
+    decision: ReconciliationDecision,
+) -> ReconciliationDecision:
+    return replace(decision, classification=BATCH_REFUND_CONFLICT_REQUIRES_REVIEW)
 
 
 def _now_utc() -> datetime:
