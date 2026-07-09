@@ -162,17 +162,40 @@ async def test_purchase_count_and_metric_queries_apply_paid_filters() -> None:
     )
     assert "purchases.status = 'PAID_UNCREDITED'" in compile_statement(uncredited_session.statement)
 
+    precheckout_session = RecordingSession(_ScalarResult(3))
+    assert (
+        await PurchasesRepo.count_precheckout_ok_older_than(
+            precheckout_session,
+            older_than_utc=since_utc,
+        )
+        == 3
+    )
+    precheckout_sql = compile_statement(precheckout_session.statement)
+    assert "purchases.status = 'PRECHECKOUT_OK'" in precheckout_sql
+    assert "analytics_events.event_type = 'purchase_precheckout_ok'" in precheckout_sql
+    assert "analytics_events.happened_at <= '2026-03-01 00:00:00+00:00'" in precheckout_sql
+    assert "purchases.created_at <=" not in precheckout_sql
+
     paid_count_session = RecordingSession(_ScalarResult(8))
     assert await PurchasesRepo.count_paid_purchases(paid_count_session) == 8
-    assert "purchases.paid_at IS NOT NULL" in compile_statement(paid_count_session.statement)
+    paid_count_sql = compile_statement(paid_count_session.statement)
+    assert "purchases.paid_at IS NOT NULL" in paid_count_sql
+    assert "purchases.status != 'REFUNDED'" in paid_count_sql
+    assert "purchases.credited_at IS NOT NULL" in paid_count_sql
 
     stars_session = RecordingSession(_ScalarResult(900))
     assert await PurchasesRepo.sum_paid_stars_amount(stars_session) == 900
+    stars_sql = compile_statement(stars_session.statement)
+    assert "purchases.status != 'REFUNDED'" in stars_sql
+    assert "purchases.credited_at IS NOT NULL" in stars_sql
 
     by_product_session = RecordingSession(_RowsResult([("PREMIUM_30", 300), ("ENERGY", None)]))
     totals = await PurchasesRepo.sum_paid_stars_amount_by_product(by_product_session)
     assert totals == {"PREMIUM_30": 300, "ENERGY": 0}
-    assert "GROUP BY purchases.product_code" in compile_statement(by_product_session.statement)
+    by_product_sql = compile_statement(by_product_session.statement)
+    assert "GROUP BY purchases.product_code" in by_product_sql
+    assert "purchases.status != 'REFUNDED'" in by_product_sql
+    assert "purchases.credited_at IS NOT NULL" in by_product_sql
 
 
 async def test_create_sets_created_at_and_flushes_purchase() -> None:

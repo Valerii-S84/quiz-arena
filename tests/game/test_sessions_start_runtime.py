@@ -12,7 +12,7 @@ NOW_UTC = datetime(2026, 5, 8, 12, 0, tzinfo=UTC)
 
 
 @pytest.mark.asyncio
-async def test_consume_start_energy_skips_redundant_ledger_lookup_after_session_precheck(
+async def test_consume_start_energy_keeps_post_lock_ledger_idempotency_check(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured: dict[str, object] = {}
@@ -37,4 +37,4 @@ async def test_consume_start_energy_skips_redundant_ledger_lookup_after_session_
 
     assert (free_energy, paid_energy, cost) == (4, 1, 1)
     assert captured["idempotency_key"] == "energy:menu:start"
-    assert captured["ledger_idempotency_prechecked"] is True
+    assert "ledger_idempotency_prechecked" not in captured

@@ -174,9 +174,29 @@ and covered by repo/integration tests for the duel funnel aggregation path.
 | `telegram_update_failed_final` | telegram update max-retries reached | `SENT` | `app/workers/tasks/telegram_updates_observability.py` |
 | `referral_reward_milestone_available` | `app/workers/tasks/referrals.py` | `SENT` or `FAILED` | internal referrals events feed (`/internal/referrals/events`) |
 | `referral_reward_granted` | `app/workers/tasks/referrals.py` | `SENT` or `FAILED` | internal referrals events feed (`/internal/referrals/events`) |
+| `payments_telegram_stars_reconciliation_review` | `app/workers/tasks/payments_reliability_async.py` | `OPEN` | payment manual review / production state checks |
+| `payments_telegram_star_auto_recovered` | `app/workers/tasks/payments_reliability_async.py` | `SENT` | payment reliability audit trail |
+| `telegram_payment_update_received` | `app/api/routes/telegram_webhook.py` | `PENDING` | payment evidence / manual replay until dedicated inbox exists |
 
 Notes:
-- `outbox_events` is also subject to retention cleanup (`app/workers/tasks/retention_cleanup.py`).
+- `outbox_events` is also subject to retention cleanup (`app/workers/tasks/retention_cleanup.py`);
+  `OPEN` rows are retained until operators close/resolve them.
+- `payments_telegram_stars_reconciliation_review` is the migration-deferred review mechanism for
+  Stars reconciliation findings. Payload stores `reason`, `severity`, hashed `review_key`, hashed
+  `transaction_id_hash`, `transaction_amount`, `transaction_date`, `telegram_user_id`,
+  `transaction_type`, `transaction_direction`, `candidate_purchase_ids`,
+  `candidate_purchase_count`, and `raw_payload_stored=false`. It must not contain bot tokens,
+  raw Telegram payloads, raw invoice payloads, or raw charge ids. Deduplication is best-effort
+  until a dedicated review table or unique constraint is approved.
+- `payments_telegram_star_auto_recovered` is emitted only after owner-approved non-dry-run exact
+  match recovery succeeds. Payload stores `source`, `purchase_id`, hashed `transaction_id_hash`,
+  and `classification`; it must not contain a bot token, raw Telegram payload, raw invoice payload,
+  or raw charge id.
+- `telegram_payment_update_received` is the migration-deferred payment update evidence mechanism.
+  It stores `payment_update_kind`, `payment_update_key`, `update_id`, and DB-only `raw_update` for
+  `pre_checkout_query`, `message.successful_payment`, and `message.refunded_payment`. It must not
+  store request headers or webhook secrets. Deduplication is best-effort until a dedicated inbox
+  table or unique constraint is approved.
 
 ## 4) Ops Alert Event Catalog (External Channels)
 
@@ -185,6 +205,10 @@ These events are sent through `send_ops_alert(...)` and routed by `app/services/
 - `promo_campaign_auto_paused`
 - `payments_recovery_review_required`
 - `payments_reconciliation_diff_detected`
+- `payments_precheckout_stuck_detected`
+- `payments_paid_uncredited_stuck_detected`
+- `payments_credit_invariant_failed`
+- `payments_webhook_allowed_updates_missing`
 - `offers_conversion_drop_detected`
 - `offers_spam_anomaly_detected`
 - `referral_fraud_spike_detected`

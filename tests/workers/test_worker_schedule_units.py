@@ -43,6 +43,16 @@ def test_payments_reliability_schedule_preserves_existing_entries() -> None:
     schedule = app.conf.beat_schedule
     assert schedule["existing"] == {"task": "keep"}
     assert schedule["recover-paid-uncredited-every-5-minutes"]["options"] == {"queue": "q_high"}
+    assert schedule["payment-invariant-alerts-every-minute"] == {
+        "task": "app.workers.tasks.payments_reliability.run_payment_invariant_alerts",
+        "schedule": 60.0,
+        "options": {"queue": "q_high"},
+    }
+    assert schedule["telegram-stars-reconciliation-every-5-minutes"] == {
+        "task": "app.workers.tasks.payments_reliability.run_telegram_stars_reconciliation",
+        "schedule": 300.0,
+        "options": {"queue": "q_normal"},
+    }
     assert schedule["payments-reconciliation-daily-0330-berlin"]["schedule"].hour == {3}
     assert schedule["payments-reconciliation-daily-0330-berlin"]["schedule"].minute == {30}
 

@@ -37,6 +37,23 @@ async def credit_purchase_assets(
     product: ProductSpec,
     now_utc: datetime,
 ) -> None:
+    existing_purchase_credit = None
+    if purchase.stars_amount > 0:
+        existing_purchase_credit = await LedgerRepo.get_purchase_credit_for_update(
+            session,
+            purchase_id=purchase.id,
+        )
+        if existing_purchase_credit is not None:
+            purchase.status = "CREDITED"
+            purchase.credited_at = now_utc
+            await _emit_purchase_event(
+                session,
+                event_type="purchase_credited",
+                purchase=purchase,
+                happened_at=now_utc,
+            )
+            return
+
     if product.product_type == "PREMIUM":
         await _apply_premium_entitlement(
             session,

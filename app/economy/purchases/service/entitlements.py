@@ -24,6 +24,14 @@ async def _apply_premium_entitlement(
     if product.premium_days <= 0:
         raise PurchasePrecheckoutValidationError
 
+    existing_entitlement = await EntitlementsRepo.get_by_source_purchase_id_for_update(
+        session,
+        purchase_id=purchase.id,
+        entitlement_type="PREMIUM",
+    )
+    if existing_entitlement is not None:
+        return
+
     active_entitlement = await EntitlementsRepo.get_active_premium_for_update(
         session, user_id, now_utc
     )

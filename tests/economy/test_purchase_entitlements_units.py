@@ -42,6 +42,15 @@ async def test_apply_premium_entitlement_creates_new_entitlement_without_active_
 ) -> None:
     created: list[Entitlement] = []
 
+    async def _fake_get_by_source_purchase_id_for_update(
+        _session,
+        *,
+        purchase_id,
+        entitlement_type: str,
+    ):
+        del purchase_id, entitlement_type
+        return None
+
     async def _fake_get_active_premium_for_update(_session, user_id: int, now_utc):
         assert user_id == 7
         assert now_utc == NOW
@@ -51,6 +60,11 @@ async def test_apply_premium_entitlement_creates_new_entitlement_without_active_
         created.append(entitlement)
         return entitlement
 
+    monkeypatch.setattr(
+        purchase_entitlements.EntitlementsRepo,
+        "get_by_source_purchase_id_for_update",
+        _fake_get_by_source_purchase_id_for_update,
+    )
     monkeypatch.setattr(
         purchase_entitlements.EntitlementsRepo,
         "get_active_premium_for_update",
@@ -80,9 +94,17 @@ async def test_apply_premium_entitlement_rejects_non_upgrade_active_plan(
 ) -> None:
     active_entitlement = SimpleNamespace(scope="PREMIUM_MONTH", ends_at=NOW + timedelta(days=5))
 
+    async def _fake_get_by_source_purchase_id_for_update(*_args, **_kwargs):
+        return None
+
     async def _fake_get_active_premium_for_update(_session, _user_id: int, _now_utc):
         return active_entitlement
 
+    monkeypatch.setattr(
+        purchase_entitlements.EntitlementsRepo,
+        "get_by_source_purchase_id_for_update",
+        _fake_get_by_source_purchase_id_for_update,
+    )
     monkeypatch.setattr(
         purchase_entitlements.EntitlementsRepo,
         "get_active_premium_for_update",
@@ -111,6 +133,9 @@ async def test_apply_premium_entitlement_revokes_active_plan_and_extends_upgrade
     )
     created: list[Entitlement] = []
 
+    async def _fake_get_by_source_purchase_id_for_update(*_args, **_kwargs):
+        return None
+
     async def _fake_get_active_premium_for_update(_session, _user_id: int, _now_utc):
         return active_entitlement
 
@@ -118,6 +143,11 @@ async def test_apply_premium_entitlement_revokes_active_plan_and_extends_upgrade
         created.append(entitlement)
         return entitlement
 
+    monkeypatch.setattr(
+        purchase_entitlements.EntitlementsRepo,
+        "get_by_source_purchase_id_for_update",
+        _fake_get_by_source_purchase_id_for_update,
+    )
     monkeypatch.setattr(
         purchase_entitlements.EntitlementsRepo,
         "get_active_premium_for_update",
@@ -137,3 +167,39 @@ async def test_apply_premium_entitlement_revokes_active_plan_and_extends_upgrade
     assert active_entitlement.status == "REVOKED"
     assert active_entitlement.updated_at == NOW
     assert created[0].ends_at == active_entitlement.ends_at + timedelta(days=30)
+
+
+@pytest.mark.asyncio
+async def test_apply_premium_entitlement_returns_existing_source_purchase(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing_entitlement = SimpleNamespace(source_purchase_id="purchase")
+
+    async def _fake_get_by_source_purchase_id_for_update(*_args, **_kwargs):
+        return existing_entitlement
+
+    async def _fail_get_active(*_args, **_kwargs):
+        raise AssertionError("existing source purchase entitlement should short-circuit")
+
+    async def _fail_create(*_args, **_kwargs):
+        raise AssertionError("existing source purchase entitlement should not create duplicate")
+
+    monkeypatch.setattr(
+        purchase_entitlements.EntitlementsRepo,
+        "get_by_source_purchase_id_for_update",
+        _fake_get_by_source_purchase_id_for_update,
+    )
+    monkeypatch.setattr(
+        purchase_entitlements.EntitlementsRepo,
+        "get_active_premium_for_update",
+        _fail_get_active,
+    )
+    monkeypatch.setattr(purchase_entitlements.EntitlementsRepo, "create", _fail_create)
+
+    await purchase_entitlements._apply_premium_entitlement(
+        SessionStub(),
+        user_id=7,
+        purchase=purchase_model(product_code="PREMIUM_MONTH", product_type="PREMIUM"),
+        product=_premium_product(),
+        now_utc=NOW,
+    )

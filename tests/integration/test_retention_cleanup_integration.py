@@ -23,6 +23,7 @@ async def test_retention_cleanup_deletes_only_records_older_than_policy_cutoffs(
     fresh_processed_update_id = 111_002
     old_outbox_event_id = 222_001
     fresh_outbox_event_id = 222_002
+    old_open_outbox_event_id = 222_003
     old_analytics_event_id = 333_001
     fresh_analytics_event_id = 333_002
 
@@ -54,6 +55,13 @@ async def test_retention_cleanup_deletes_only_records_older_than_policy_cutoffs(
                     payload={"scope": "integration"},
                     status="SENT",
                     created_at=now_utc - timedelta(days=3),
+                ),
+                OutboxEvent(
+                    id=old_open_outbox_event_id,
+                    event_type="payments_telegram_stars_reconciliation_review",
+                    payload={"scope": "integration", "review_key": "old-open"},
+                    status="OPEN",
+                    created_at=now_utc - timedelta(days=40),
                 ),
                 AnalyticsEvent(
                     id=old_analytics_event_id,
@@ -99,5 +107,6 @@ async def test_retention_cleanup_deletes_only_records_older_than_policy_cutoffs(
     assert fresh_processed_update_id in processed_rows
     assert old_outbox_event_id not in outbox_rows
     assert fresh_outbox_event_id in outbox_rows
+    assert old_open_outbox_event_id in outbox_rows
     assert old_analytics_event_id not in analytics_rows
     assert fresh_analytics_event_id in analytics_rows

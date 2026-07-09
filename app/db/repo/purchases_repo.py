@@ -1,12 +1,19 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import cast
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import String, and_, case
+from sqlalchemy import cast as sa_cast
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models.analytics_events import AnalyticsEvent
+from app.db.models.entitlements import Entitlement
+from app.db.models.ledger_entries import LedgerEntry
 from app.db.models.purchases import Purchase
+from app.db.models.users import User
 
 from .purchases_repo_metrics import (
     count_paid_purchases,
@@ -51,6 +58,19 @@ class PurchasesRepo:
         session: AsyncSession, invoice_payload: str
     ) -> Purchase | None:
         stmt = select(Purchase).where(Purchase.invoice_payload == invoice_payload).with_for_update()
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_by_telegram_payment_charge_id_for_update(
+        session: AsyncSession,
+        telegram_payment_charge_id: str,
+    ) -> Purchase | None:
+        stmt = (
+            select(Purchase)
+            .where(Purchase.telegram_payment_charge_id == telegram_payment_charge_id)
+            .with_for_update()
+        )
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -183,6 +203,105 @@ class PurchasesRepo:
         )
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_precheckout_ok_older_than(
+        session: AsyncSession,
+        *,
+        older_than_utc: datetime,
+    ) -> int:
+        precheckout_event_exists = (
+            select(AnalyticsEvent.id)
+            .where(
+                AnalyticsEvent.event_type == "purchase_precheckout_ok",
+                AnalyticsEvent.payload["purchase_id"].astext == sa_cast(Purchase.id, String),
+                AnalyticsEvent.happened_at <= older_than_utc,
+            )
+            .exists()
+        )
+        stmt = select(func.count(Purchase.id)).where(
+            Purchase.status == "PRECHECKOUT_OK",
+            Purchase.stars_amount > 0,
+            precheckout_event_exists,
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_credited_premium_without_entitlement(session: AsyncSession) -> int:
+        entitlement_exists = (
+            select(Entitlement.id)
+            .where(
+                Entitlement.source_purchase_id == Purchase.id,
+                Entitlement.entitlement_type == "PREMIUM",
+            )
+            .exists()
+        )
+        stmt = select(func.count(Purchase.id)).where(
+            Purchase.status == "CREDITED",
+            Purchase.product_type == "PREMIUM",
+            ~entitlement_exists,
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def count_credited_stars_without_purchase_credit(session: AsyncSession) -> int:
+        ledger_exists = (
+            select(LedgerEntry.id)
+            .where(
+                LedgerEntry.purchase_id == Purchase.id,
+                LedgerEntry.entry_type == "PURCHASE_CREDIT",
+                LedgerEntry.direction == "CREDIT",
+            )
+            .exists()
+        )
+        stmt = select(func.count(Purchase.id)).where(
+            Purchase.status == "CREDITED",
+            Purchase.stars_amount > 0,
+            ~ledger_exists,
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    @staticmethod
+    async def list_stars_reconciliation_candidate_rows(
+        session: AsyncSession,
+        *,
+        transaction_id: str,
+        invoice_payload: str | None,
+        telegram_user_id: int | None,
+        transaction_date: datetime,
+        match_window: timedelta,
+        limit: int = 20,
+        for_update: bool = False,
+    ) -> list[tuple[Purchase, int]]:
+        exact_match_conditions = [Purchase.telegram_payment_charge_id == transaction_id]
+        match_conditions = list(exact_match_conditions)
+        if invoice_payload:
+            exact_match_conditions.append(Purchase.invoice_payload == invoice_payload)
+            match_conditions.append(Purchase.invoice_payload == invoice_payload)
+        if telegram_user_id is not None:
+            match_conditions.append(
+                and_(
+                    User.telegram_user_id == telegram_user_id,
+                    Purchase.created_at >= transaction_date - match_window,
+                    Purchase.created_at <= transaction_date,
+                )
+            )
+
+        exact_match_rank = case((or_(*exact_match_conditions), 0), else_=1)
+        stmt = (
+            select(Purchase, User.telegram_user_id)
+            .join(User, User.id == Purchase.user_id)
+            .where(Purchase.stars_amount > 0, or_(*match_conditions))
+            .order_by(exact_match_rank, Purchase.created_at.desc())
+            .limit(limit)
+        )
+        if for_update:
+            stmt = stmt.with_for_update()
+        result = await session.execute(stmt)
+        return [(cast(Purchase, row[0]), int(row[1])) for row in result.all()]
 
     @staticmethod
     async def expire_stale_unpaid_invoices(
