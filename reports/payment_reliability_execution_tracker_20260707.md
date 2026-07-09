@@ -4,6 +4,8 @@ Date: 2026-07-07
 Working branch: `feature/arena-monetization-pr`
 Plan: `reports/payment_reliability_plan_20260707.md` (inspected local planning artifact; left
 untracked because it predates the executed patches and its current-state sections are stale)
+Completion-гілка: `feature/payment-reliability-completion`
+Completion-звіт: `reports/payment_reliability_completion_20260709.md`
 Production incident SHA: `1fb8a09`
 Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 
@@ -851,8 +853,12 @@ Lead response: Accepted for one scoped stabilization commit and push. Keep PR #2
 
 ## Open owner decisions
 
-- Whether to commit `PAID_UNCREDITED` before crediting in normal successful-payment flow.
-- Whether durable webhook storage should cover all updates or only payment-relevant updates.
+- Dedicated Stars reconciliation checkpoint table: більше не потрібна для цього completion PR.
+  `PAID_UNCREDITED` у `purchases` є durable credit checkpoint, а Telegram Stars reconciliation
+  лишається safe/off за замовчуванням і читає bounded recent window. Не описувати
+  `reconciliation_runs` як Stars cursor table.
+- Durable webhook storage покриває тільки payment-relevant updates. Зберігання non-payment updates
+  лишається поза scope цього payment reliability completion.
 - Payment audit retention period.
 - Manual compensation model and refund policy after compensation.
 - Auto-recovery enablement soak gate duration.

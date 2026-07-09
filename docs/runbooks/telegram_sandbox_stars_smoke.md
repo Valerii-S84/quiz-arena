@@ -178,6 +178,7 @@ Expected:
 - `payments_constraint_paid_purchase_missing_charge_id` is `OK`,
 - `payments_constraint_paid_purchase_missing_paid_at` is `OK`,
 - `payments_constraint_credited_purchase_missing_credited_at` is `OK`,
+- `payments_open_manual_review_records` is `OK`,
 - `payments_webhook_allowed_updates_missing` is `OK`.
 
 These `payments_constraint_*` rows are read-only migration preflight checks. They do not create or
@@ -205,8 +206,8 @@ Rollback for reconciliation issues:
 - keep `TELEGRAM_STARS_RECONCILIATION_DRY_RUN=true`,
 - set `TELEGRAM_STARS_AUTO_RECOVERY_ENABLED=false`,
 - restart only the approved app services for the target environment,
-- no schema rollback is required for this runbook phase because no payment reliability migration is
-  applied here.
+- schema rollback є окремим owner-approved release rollback рішенням; цей smoke rollback
+  використовує safe/off flags і не мутує production payment data.
 
 Check that the Stars reconciliation dry-run did not leave open review findings:
 
@@ -232,23 +233,48 @@ Expected:
 - `OPEN` review rows are retained until manually resolved and are not removed by age-based
   outbox retention cleanup.
 
-Confirm payment webhook evidence was persisted before ACK:
+Check dedicated payment validation reviews:
 
 ```bash
 docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c \
-"select id, created_at, status, payload->>'payment_update_kind' as payment_update_kind, \
-        payload->>'payment_update_key' as payment_update_key \
- from outbox_events \
- where event_type='telegram_payment_update_received' \
+"select id, created_at, review_type, severity, reason, purchase_id, transaction_id_hash, \
+        safe_payload->>'telegram_payment_charge_id_hash' as payment_charge_hash, status \
+ from payment_reconciliation_reviews \
+ where status='OPEN' \
  order by created_at desc, id desc \
  limit 20;"
 ```
 
 Expected:
-- the smoke payment has `pre_checkout_query` and `message.successful_payment` evidence rows,
-- rows are stored before the webhook returns `200`/enqueue succeeds,
-- payload contains the raw Telegram update in DB for manual replay, but not request headers or
-  webhook secrets.
+- немає open rows для здорового sandbox smoke,
+- будь-який open row блокує automatic credit/recovery до owner review,
+- rows містять тільки hashes і safe purchase/user references.
+
+Confirm payment webhook evidence persisted before ACK:
+
+```bash
+docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c \
+"select update_id, received_at, update_kind, status, \
+        sanitized_evidence->>'payment_update_kind' as payment_update_kind, payload_hash \
+ from telegram_update_inbox \
+ order by received_at desc, update_id desc \
+ limit 20;"
+```
+
+```bash
+docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c \
+"select id, provider, event_type, invoice_payload, provider_charge_id_hash, \
+        currency, total_amount, source_inbox_update_id \
+ from payment_events \
+ order by created_at desc, id desc \
+ limit 20;"
+```
+
+Expected:
+- smoke payment має `pre_checkout_query` і `message.successful_payment` inbox/event rows,
+- rows збережені до того, як webhook повертає `200` або enqueue succeeds,
+- evidence зберігає тільки sanitized fields і hashes; без raw order info, email, phone, shipping
+  details, raw charge ids, request headers або webhook secrets.
 
 ## 4) Scenario B: referral reward callback replay
 

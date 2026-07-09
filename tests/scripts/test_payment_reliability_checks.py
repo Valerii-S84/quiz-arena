@@ -219,12 +219,13 @@ def test_duplicate_active_premium_check_uses_current_entitlement_window() -> Non
     assert "(ends_at IS NULL OR ends_at > :now_utc)" in sql
 
 
-def test_open_review_check_reads_current_outbox_mechanism() -> None:
+def test_open_review_check_reads_legacy_and_dedicated_review_mechanisms() -> None:
     sql_text = "\n".join(read_only_sql_texts())
 
     assert "outbox_events" in sql_text
     assert "payments_telegram_stars_reconciliation_review" in sql_text
-    assert "payment_reconciliation_reviews" not in sql_text
+    assert "payment_reconciliation_reviews" in sql_text
+    assert "UNION ALL" in sql_text
 
 
 def test_paid_preflights_include_review_pending_paid_rows() -> None:
