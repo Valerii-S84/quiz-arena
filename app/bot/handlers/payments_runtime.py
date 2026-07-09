@@ -6,13 +6,15 @@ from datetime import datetime
 import structlog
 from aiogram.types import RefundedPayment, SuccessfulPayment, User
 
-from app.bot.handlers.payments_helpers import (
-    extract_offer_impression_id_from_purchase_idempotency_key,
-)
 from app.db.session import SessionLocal
-from app.economy.offers.service import OfferService
-from app.economy.purchases.errors import PurchaseNotFoundError, PurchaseRefundValidationError
+from app.economy.purchases.errors import (
+    PurchaseNotFoundError,
+    PurchasePrecheckoutValidationError,
+    PurchaseRefundValidationError,
+)
 from app.economy.purchases.service import PurchaseService
+from app.economy.purchases.service.payment_validation import sanitize_successful_payment_payload
+from app.services.payment_offer_conversion import mark_payment_offer_conversion
 from app.services.user_onboarding import UserOnboardingService
 
 logger = structlog.get_logger(__name__)
@@ -64,31 +66,40 @@ async def apply_successful_payment(
     payment: SuccessfulPayment,
     now_utc: datetime,
 ):
+    raw_successful_payment = sanitize_successful_payment_payload(
+        payment.model_dump(exclude_none=True)
+    )
     async with SessionLocal.begin() as session:
         snapshot = await UserOnboardingService.ensure_home_snapshot(
             session,
             telegram_user=telegram_user,
         )
-        credit_result = await PurchaseService.apply_successful_payment(
+        paid_result = await PurchaseService.mark_successful_payment_paid_uncredited(
             session,
             user_id=snapshot.user_id,
             invoice_payload=payment.invoice_payload,
             telegram_payment_charge_id=payment.telegram_payment_charge_id,
-            raw_successful_payment=payment.model_dump(exclude_none=True),
+            raw_successful_payment=raw_successful_payment,
             now_utc=now_utc,
         )
-        purchase = await PurchaseService.get_by_id(session, credit_result.purchase_id)
-        if purchase is not None:
-            offer_impression_id = extract_offer_impression_id_from_purchase_idempotency_key(
-                purchase.idempotency_key
-            )
-            if offer_impression_id is not None:
-                await OfferService.mark_offer_converted_purchase(
-                    session,
-                    user_id=snapshot.user_id,
-                    impression_id=offer_impression_id,
-                    purchase_id=credit_result.purchase_id,
-                )
+
+    if paid_result.status == "FAILED_CREDIT_PENDING_REVIEW":
+        raise PurchasePrecheckoutValidationError
+    if paid_result.status == "CREDITED":
+        return paid_result
+
+    async with SessionLocal.begin() as session:
+        credit_result = await PurchaseService.credit_paid_purchase(
+            session,
+            purchase_id=paid_result.purchase_id,
+            user_id=snapshot.user_id,
+            now_utc=now_utc,
+        )
+        await mark_payment_offer_conversion(
+            session,
+            user_id=snapshot.user_id,
+            purchase_id=credit_result.purchase_id,
+        )
         return credit_result
 
 

@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-import app.economy.purchases.service.credit as purchase_credit
+import app.economy.purchases.service.zero_cost as purchase_credit
 from app.economy.purchases.catalog import ProductSpec
 from app.economy.purchases.errors import ProductNotFoundError, PurchasePrecheckoutValidationError
 from tests.type_helpers import AsyncSessionStub

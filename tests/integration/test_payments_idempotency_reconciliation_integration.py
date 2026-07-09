@@ -196,6 +196,51 @@ async def test_reconciliation_ignores_refund_only_purchase_but_counts_refunded_c
 
 
 @pytest.mark.asyncio
+async def test_reconciliation_ignores_open_failed_credit_review_without_credit_evidence() -> None:
+    now_utc = datetime.now(UTC)
+    user_id = await _create_user("reconciliation-failed-review")
+    purchase_id = uuid4()
+
+    async with SessionLocal.begin() as session:
+        session.add(
+            Purchase(
+                id=purchase_id,
+                user_id=user_id,
+                product_code="ENERGY_10",
+                product_type="MICRO",
+                base_stars_amount=5,
+                discount_stars_amount=0,
+                stars_amount=5,
+                currency="XTR",
+                status="FAILED_CREDIT_PENDING_REVIEW",
+                idempotency_key="recon-failed-review-1",
+                invoice_payload="inv_recon_failed_review_1",
+                telegram_payment_charge_id="tg_charge_recon_failed_review_1",
+                raw_successful_payment={
+                    "invoice_payload": "inv_recon_failed_review_1",
+                    "currency": "XTR",
+                    "validation_error": "missing_total_amount",
+                    "raw_payload_stored": False,
+                },
+                created_at=now_utc - timedelta(minutes=50),
+                paid_at=now_utc - timedelta(minutes=45),
+                credited_at=None,
+            )
+        )
+        await session.flush()
+
+    result = await run_payments_reconciliation_async(stale_minutes=30)
+
+    assert result["paid_purchases_count"] == 0
+    assert result["credited_purchases_count"] == 0
+    assert result["paid_stars_total"] == 0
+    assert result["credited_stars_total"] == 0
+    assert result["product_stars_mismatch_count"] == 0
+    assert result["diff_count"] == 0
+    assert result["status"] == "OK"
+
+
+@pytest.mark.asyncio
 async def test_stars_candidate_query_keeps_older_exact_match_before_fuzzy_limit() -> None:
     now_utc = datetime.now(UTC)
     transaction_date = now_utc
