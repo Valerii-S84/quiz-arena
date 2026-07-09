@@ -99,7 +99,7 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | 5 | Exact-match auto-recovery behind feature flag | DONE | Exact-match auto-recovery and transaction revalidation fix passed audit; defaults remain disabled/dry-run. |
 | 6 | Durable payment inbox / payment events | DONE | Interim outbox evidence before ACK and documented inbox/payment_events migration deferral passed audit. |
 | 7 | Idempotent asset crediting and stronger DB constraints | DONE | P7A idempotent crediting passed audit; P7B `credited_at` preflight was narrowed for legitimate uncredited refunds and passed audit with notes. |
-| 8 | Production smoke and final hardening | DONE | Runbooks now require app-level premium lookup proof, safe/off flag confirmation, auto-recovery evidence review, and rollback steps; no production action taken. |
+| 8 | Production smoke and final hardening | DONE | Runbooks now require app-level premium lookup proof, safe/off flag confirmation, auto-recovery evidence review, and rollback steps; post-PR P2 reliability review findings fixed in follow-up; no production action taken. |
 
 ## Planned patch ledger
 
@@ -130,6 +130,7 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P7B-FIX | 7 | Add credited_at constraint preflight coverage | FAIL | `f6b5db0` | `pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `7 passed`; `ruff check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `black --check scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `isort --check-only scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> pass; `mypy tests/scripts/test_payment_reliability_checks.py` -> pass; `rg -n "payments_constraint_duplicate_premium_source_purchase|payments_constraint_duplicate_purchase_credit_ledger|payments_constraint_paid_purchase_missing_charge_id|payments_constraint_paid_purchase_missing_paid_at|payments_constraint_credited_purchase_missing_credited_at|DB constraint hardening rule|read-only migration preflight" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md scripts/payment_reliability_checks.py tests/scripts/test_payment_reliability_checks.py` -> required entries present | `FAIL` | Blocked by stop condition: `credited_at` preflight is too broad for allowed `PAID_UNCREDITED` refund path; owner decision needed before more P7B changes. |
 | P7B-FIX2 | 7 | Narrow credited_at preflight for legitimate uncredited refunds | DONE | `1f0ca1d` | `.venv/bin/python -m pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `11 passed in 1.90s`; `.venv/bin/python -m pytest --capture=no -q tests/economy/test_purchase_refund_state_units.py` -> `3 passed in 31.17s`; `.venv/bin/python -m pytest --capture=no -q tests/economy/test_purchase_credit_assets_flow_units.py tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_service.py tests/economy/test_purchase_refund_state_units.py tests/economy/test_purchase_refund_additional_units.py tests/economy/test_purchase_refund_errors_units.py tests/economy/test_purchase_refund_helpers_units.py` -> `31 passed in 20.62s`; `.venv/bin/python -m pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py tests/workers/test_telegram_stars_reconciliation_task.py tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py tests/workers/test_payments_reliability_task.py` -> `40 passed in 25.68s`; `.venv/bin/python -m pytest --capture=no -q tests/integration/test_purchase_premium_integration.py tests/integration/test_purchase_refund_integration.py tests/integration/test_payments_idempotency_purchase_flow_integration.py tests/integration/test_payments_idempotency_recovery_integration.py tests/integration/test_payments_idempotency_reconciliation_integration.py tests/integration/test_economy_invariants_b_refund_symmetry_integration.py` -> `15 passed in 42.25s`; `.venv/bin/ruff check app tests scripts` -> pass; `.venv/bin/black --check app tests scripts` -> `1341 files would be left unchanged`; `.venv/bin/isort --check-only app tests scripts` -> pass; `.venv/bin/mypy app tests` -> `Success: no issues found in 1326 source files` | `PASS_WITH_NOTES` | Accepted; uncredited `PAID_UNCREDITED -> REFUNDED` rows may keep `credited_at IS NULL`, while `CREDITED` and credited-refunded rows remain strict. |
 | P8 | 8 | Payment smoke and final reliability runbook | DONE | `7afc857` | `rg -n "active_premium=|EntitlementsRepo\\.has_active_premium|TELEGRAM_STARS_RECONCILIATION_ENABLED=false|TELEGRAM_STARS_RECONCILIATION_DRY_RUN=true|TELEGRAM_STARS_AUTO_RECOVERY_ENABLED=false|payments_telegram_star_auto_recovered|Payment reliability rollback|credited_at IS NULL|uncredited refund" docs/runbooks/telegram_sandbox_stars_smoke.md docs/operations/production_state_checks.md docs/analytics/events_catalog.md` -> required entries present; `rg -n "bot[0-9]+:|TELEGRAM_BOT_TOKEN=.*[0-9A-Za-z_-]{20}|secret-token|bot-token-secret|charge-1|invoice-1" docs/operations/production_state_checks.md docs/runbooks/telegram_sandbox_stars_smoke.md docs/analytics/events_catalog.md` -> no matches; `git diff --check` -> pass; `git diff --name-only -- alembic deploy .github docker-compose.prod.yml '.env*'` -> no output | `PASS_WITH_NOTES` | Runbooks/docs match current implementation and safe flag defaults; no deploy, production DB write, migration, protected path, `.env*`, or secret change. |
+| P8-PR-FIX | 8 | Address post-PR payment reliability P2 review findings | DONE | `6d72c8b` | `.venv/bin/python -m pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `16 passed in 1.77s`; `.venv/bin/python -m pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/game/test_sessions_start_runtime.py tests/db/repo/test_purchases_repo.py` -> `15 passed in 26.56s`; `.venv/bin/python -m pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py` -> `10 passed in 24.58s`; `.venv/bin/python -m pytest --capture=no -q tests/economy/test_purchase_credit_assets_flow_units.py tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_service.py tests/economy/test_purchase_refund_state_units.py tests/economy/test_purchase_refund_additional_units.py tests/economy/test_purchase_refund_errors_units.py tests/economy/test_purchase_refund_helpers_units.py tests/economy/test_purchase_refund_debit_units.py` -> `32 passed in 18.68s`; `.venv/bin/python -m pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py tests/workers/test_payments_reliability_async_credit_single.py tests/workers/test_payments_reliability_task.py tests/services/test_telegram_stars.py` -> `30 passed in 22.48s`; `.venv/bin/python -m pytest --capture=no -q tests/integration/test_purchase_premium_integration.py tests/integration/test_purchase_refund_integration.py tests/integration/test_payments_idempotency_purchase_flow_integration.py tests/integration/test_payments_idempotency_recovery_integration.py tests/integration/test_payments_idempotency_reconciliation_integration.py tests/integration/test_economy_invariants_b_refund_symmetry_integration.py` -> `15 passed in 40.41s`; `.venv/bin/ruff check app tests scripts` -> `All checks passed!`; `.venv/bin/black --check app tests scripts` -> `1341 files would be left unchanged`; `.venv/bin/isort --check-only app tests scripts` -> pass; `.venv/bin/mypy app tests` -> `Success: no issues found in 1326 source files`; `git diff --check` -> pass | `PASS_WITH_NOTES` | Local follow-up audit passed; external GitHub bot re-review/conversation resolution remains pending until after push. |
 
 ## Baseline checks
 
@@ -602,6 +603,40 @@ Auditor notes:
 
 Lead response: Accepted; Phase 8 is complete. The payment reliability plan is PR-ready after
 commit, push, and PR creation.
+
+### P8-PR-FIX - `6d72c8b` - `fix(payments): address reliability review findings`
+
+Auditor verdict: `PASS_WITH_NOTES`
+
+Auditor notes:
+
+- No blocking issues found in local follow-up verification after addressing the post-PR P2 review
+  comments.
+- `allowed_updates` checking now treats omitted/default empty Telegram webhook filters as valid and
+  still fails explicit non-empty filters missing required payment update types.
+- `PRECHECKOUT_OK` stale checks now age from the `purchase_precheckout_ok` transition event in both
+  the read-only checker and runtime invariant repo method.
+- Duplicate premium entitlement checking now excludes expired active-status rows outside the current
+  entitlement window.
+- Open manual review checking now reads the current
+  `payments_telegram_stars_reconciliation_review` outbox mechanism.
+- Stars reconciliation now treats same-charge `REFUNDED` candidates as resolved low severity,
+  pages through the Telegram Stars backlog by advancing `offset` until a short/empty page, and
+  records auto-recovery credits at recovery time while preserving the original Star transaction date
+  in `raw_successful_payment`.
+- Session start energy consumption no longer skips the post-lock ledger idempotency lookup, preserving
+  duplicate callback replay behavior after row-lock waits.
+- No migrations, deploy config, protected paths, `.env*`, secrets, production deploy, or production
+  DB writes were introduced.
+- Safe defaults remain unchanged:
+  `TELEGRAM_STARS_RECONCILIATION_ENABLED=false`,
+  `TELEGRAM_STARS_RECONCILIATION_DRY_RUN=true`,
+  `TELEGRAM_STARS_AUTO_RECOVERY_ENABLED=false`.
+- Non-blocking note: external GitHub bot re-review and conversation resolution remain pending until
+  the feature branch is pushed.
+
+Lead response: Accepted locally; push the branch for external re-review, keep the PR unmerged, and
+do not deploy or mutate production data.
 
 ## Open owner decisions
 
