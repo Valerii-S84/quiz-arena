@@ -134,6 +134,8 @@ Local baseline SHA: `7c0590a93c56849fae680b14508ec6531cc30f3f`
 | P8-PR-FIX2 | 8 | Address follow-up post-PR payment reliability P2 review findings | DONE | `60d689d` | `.venv/bin/python -m pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `17 passed in 1.34s`; `.venv/bin/python -m pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/workers/test_telegram_stars_reconciliation_task.py` -> `21 passed in 18.97s`; `.venv/bin/python -m pytest --capture=no -q tests/api/test_telegram_webhook.py tests/bot/test_payments_handler_flow.py tests/game/test_sessions_start_runtime.py` -> `24 passed in 14.28s`; `.venv/bin/python -m pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py tests/workers/test_telegram_stars_reconciliation_task.py tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py tests/workers/test_payments_reliability_async_credit_single.py tests/workers/test_payments_reliability_task.py` -> `51 passed in 28.78s`; `.venv/bin/python -m pytest --capture=no -q tests/economy/test_purchase_credit_assets_flow_units.py tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_credit_service.py tests/economy/test_purchase_refund_state_units.py tests/economy/test_purchase_refund_additional_units.py tests/economy/test_purchase_refund_errors_units.py tests/economy/test_purchase_refund_helpers_units.py tests/economy/test_purchase_refund_debit_units.py` -> `32 passed in 25.57s`; `.venv/bin/python -m pytest --capture=no -q tests/db/repo/test_purchases_repo.py tests/integration/test_purchase_premium_integration.py tests/integration/test_purchase_refund_integration.py` -> `9 passed in 22.84s`; `.venv/bin/python -m pytest --capture=no -q tests/integration/test_payments_idempotency_purchase_flow_integration.py tests/integration/test_payments_idempotency_recovery_integration.py tests/integration/test_payments_idempotency_reconciliation_integration.py tests/integration/test_economy_invariants_b_refund_symmetry_integration.py` -> `11 passed in 35.70s`; explicit test env `APP_ENV=test ... DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test .venv/bin/python scripts/payment_reliability_checks.py --json` -> all 12 checks `OK` with count `0`; `.venv/bin/ruff check app tests scripts` -> `All checks passed!`; `.venv/bin/black --check app tests scripts` -> `1341 files would be left unchanged`; `.venv/bin/isort --check-only app tests scripts` -> pass; `.venv/bin/mypy app tests` -> `Success: no issues found in 1326 source files`; `git diff --check` -> pass | `PASS_WITH_NOTES` | Local follow-up audit passed; external GitHub bot re-review/conversation resolution remains pending until after push. |
 | P8-PR-FIX3 | 8 | Address full-PR refund/reconciliation audit blockers | DONE | `cfd6366` | `.venv/bin/pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py` -> `19 passed in 17.37s`; `.venv/bin/pytest --capture=no -q tests/workers/test_telegram_stars_reconciliation_task.py` -> `12 passed in 22.89s`; `.venv/bin/pytest --capture=no -q tests/bot/test_payments_handler_flow.py tests/db/repo/test_admin_outbox_repo.py tests/integration/test_retention_cleanup_integration.py` -> `18 passed in 9.10s`; `.venv/bin/pytest --capture=no -q tests/scripts/test_payment_reliability_checks.py` -> `17 passed in 1.70s`; `.venv/bin/pytest --capture=no -q tests/economy/test_purchase_credit_service.py tests/economy/test_purchase_entitlements_units.py tests/economy/test_purchase_refund_state_units.py tests/economy/test_purchase_refund_errors_units.py tests/economy/test_purchase_credit_assets_flow_units.py tests/integration/test_economy_invariants_b_refund_symmetry_integration.py` -> `29 passed in 28.07s`; `.venv/bin/pytest --capture=no -q tests/game/test_sessions_start_runtime.py tests/game/test_capacity_energy_idempotency.py` -> `5 passed in 23.55s`; `.venv/bin/pytest --capture=no -q tests/workers/test_payments_reliability_async.py tests/workers/test_payments_reliability_async_credit_batch.py tests/workers/test_payments_reliability_task.py tests/workers/test_worker_schedule_units.py` -> `19 passed in 26.42s`; `.venv/bin/pytest --capture=no -q tests/api/test_telegram_webhook.py tests/api/test_internal_promo_refunds_unit.py tests/bot/test_payments_handler.py tests/bot/test_payments_handler_flow_offer.py tests/bot/test_payments_handler_flow.py` -> `45 passed in 17.00s`; `.venv/bin/pytest --capture=no -q tests/db/repo/test_purchases_repo.py tests/db/repo/test_entitlements_repo.py tests/economy/test_purchase_catalog.py tests/economy/test_purchase_precheckout_service_units.py tests/economy/test_purchase_precheckout_service_additional_units.py` -> `26 passed in 23.38s`; `.venv/bin/pytest --capture=no -q tests/services/test_payment_reconciliation.py tests/services/test_telegram_stars.py tests/services/test_alerts.py` -> `26 passed in 20.54s`; explicit test env `APP_ENV=test ... ADMIN_PASSWORD_PLAIN=dummy-admin-password DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test .venv/bin/python scripts/payment_reliability_checks.py --json` -> all 12 checks `OK` with count `0`; `printf '{"ok":true,"result":{"allowed_updates":[]}}' | .venv/bin/python scripts/payment_reliability_checks.py --skip-db --webhook-info-json - --json` -> `payments_webhook_allowed_updates_missing OK count=0`; `.venv/bin/ruff check app tests scripts` -> `All checks passed!`; `.venv/bin/black --check app tests scripts` -> `1341 files would be left unchanged`; `.venv/bin/isort --check-only app tests scripts` -> pass; `.venv/bin/mypy app tests` -> `Success: no issues found in 1326 source files`; `git diff --check HEAD~1..HEAD && git diff --check` -> pass; GitHub PR metadata via connector -> `mergeable=true`, `merged=false` | `PASS_WITH_NOTES` | Full read-only subagent re-audit found no blocking issues. Local fixes cover the full-PR audit blockers: provider refund Star transactions are reviewable/resolved, refund updates fall back by invoice payload with charge-conflict guard, Stars scan reads a bounded recent window instead of oldest-only, auto-recovery exceptions are isolated per transaction, `OPEN` review outbox rows are retention-protected, and review payloads include amount/date/user clues without raw token/invoice/charge payloads. Non-blocking notes: provider refund reconciliation remains manual-review-first, Stars count probes are not reflected in `pages_fetched`, review payload stores raw `telegram_user_id`, and review dedupe remains best-effort until a dedicated table/constraint is approved. No migrations, deploy config, `.env*`, secrets, production deploy, production DB writes, or auto-recovery default changes were introduced. |
 
+| P8-CODEX-REVIEW-BATCH | 8 | Resolve PR #244 Codex P1/P2 safety findings | DONE | `9a73048` + this tracker/evidence commit | Focused touched suite -> `49 passed`; Stars/payment worker suite -> `55 passed`; purchase/refund unit suite -> `34 passed`; webhook/handler/outbox/checker suite -> `63 passed`; targeted payment/refund/idempotency integration suite -> `15 passed`; `ruff check app tests scripts` -> pass; `black --check app tests scripts` -> pass; `isort --check-only app tests scripts` -> pass; `mypy app tests` -> pass; `git diff --check` -> pass; `bash scripts/local_ci.sh` -> failed in Architecture guards before unit/integration due PR-wide changed-file line limits | `N/A - lead verified` | Scope complete for listed Codex findings. Full local CI line-limit pass is deferred because passing it requires splitting existing oversized changed PR files, which violates the strict scope freeze. |
+
 ## Baseline checks
 
 - `git rev-parse HEAD` -> `7c0590a93c56849fae680b14508ec6531cc30f3f`.
@@ -463,7 +465,8 @@ Auditor notes:
   `message.successful_payment`, and `message.refunded_payment`.
 - Evidence is written before enqueue using `telegram_payment_update_received`, status `PENDING`,
   and `payment_update_key`.
-- Payload stores `raw_update` in DB but does not include request headers or webhook secret.
+- Original payload stored `raw_update` without request headers/webhook secret; this is superseded by
+  P8-CODEX-REVIEW-BATCH, which stores sanitized payment evidence only.
 - Evidence write failure returns `503 {"status":"retry"}` before enqueue, preserving Telegram retry
   behavior.
 - Generic non-payment updates bypass evidence storage and still enqueue normally.
@@ -486,8 +489,9 @@ Auditor notes:
   `.env*` changes.
 - Docs describe the interim outbox evidence path for `telegram_payment_update_received`.
 - Read-only inspection SQL is documented for evidence rows.
-- Payload contract covers `payment_update_kind`, `payment_update_key`, DB-only `raw_update`, and
-  supported payment update kinds.
+- Original payload contract covered `payment_update_kind`, `payment_update_key`, DB-only
+  `raw_update`, and supported payment update kinds; P8-CODEX-REVIEW-BATCH supersedes this with
+  sanitized payment evidence only.
 - Docs explicitly exclude request headers/webhook secrets.
 - Migration/dedupe limitations are explicit: best-effort dedupe, no DB unique constraint, and no
   dedicated replay/dead-letter state until future inbox migration approval.
@@ -719,6 +723,44 @@ Auditor notes:
 
 Lead response: Accepted locally; commit tracker update, push the branch for external re-review, keep
 the PR unmerged, and do not deploy or mutate production data.
+
+### P8-CODEX-REVIEW-BATCH - `9a73048` + this tracker/evidence commit - PR #244 Codex review safety pass
+
+Lead verification notes:
+
+- Codex P1 batch refund/auto-recovery finding: fixed by classifying the fetched Stars batch before
+  recovery and blocking exact incoming auto-recovery when the same transaction id has outgoing/refund
+  evidence in the batch. The blocked incoming transaction now produces explicit manual-review
+  evidence instead of granting assets.
+- Codex P2 refund amount/currency finding: fixed by validating `refunded_payment.currency` and
+  `refunded_payment.total_amount` against the stored purchase before mutating refund evidence or
+  calling `refund_purchase`. Mismatches raise validation and log sanitized rejection evidence without
+  revoking/debiting assets.
+- Codex P2 payment evidence finding: fixed by replacing durable `raw_update` storage for payment
+  webhooks with sanitized evidence only: update id, payment kind, invoice payload, currency, amount,
+  safe ids, charge hashes, `order_info_present`, and `raw_payload_stored=false`.
+- Codex P2 credit-pending-review refund finding: fixed by allowing
+  `FAILED_CREDIT_PENDING_REVIEW -> REFUNDED` when no purchase-credit evidence exists, without
+  debit/revoke side effects; if credit evidence exists, the credited refund reversal path is used.
+- Codex P2 outbox idempotency finding: fixed by taking a transaction-scoped PostgreSQL advisory lock
+  on the outbox dedupe key before lookup/create. This is a migration-free temporary safety mechanism;
+  a future unique constraint or dedicated review table can harden it further after approval.
+- Test evidence: focused touched suite `49 passed`, Stars/payment worker suite `55 passed`,
+  purchase/refund unit suite `34 passed`, webhook/handler/outbox/checker suite `63 passed`, targeted
+  payment/refund/idempotency integration suite `15 passed`.
+- Required gates passed: `ruff check app tests scripts`, `black --check app tests scripts`,
+  `isort --check-only app tests scripts`, `mypy app tests`, and `git diff --check`.
+- Deferred risk: `bash scripts/local_ci.sh` reached Architecture guards and failed before unit and
+  integration phases because the PR diff against `origin/main` contains oversized changed files
+  (`app/workers/tasks/payments_reliability_async.py`,
+  `tests/workers/test_telegram_stars_reconciliation_task.py`,
+  `tests/bot/test_payments_handler_flow.py`, and others). Passing that guard requires a broad file
+  split/refactor, so it is intentionally deferred under the strict scope freeze.
+- No migrations, deploy config, protected paths, `.env*`, secrets, production deploy, production DB
+  writes, auto-recovery default changes, or reconciliation default-safety changes were introduced.
+
+Lead response: Accepted for scoped commit and push. Keep PR #244 unmerged and route any new
+Codex-only P2 feedback through separate must-fix vs follow-up classification.
 
 ## Open owner decisions
 

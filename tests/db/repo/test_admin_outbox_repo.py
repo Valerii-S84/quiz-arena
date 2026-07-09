@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from app.db.models.admins import Admin
+from app.db.models.outbox_events import OutboxEvent
 from app.db.repo.admin_audit_repo import AdminAuditRepo
 from app.db.repo.admins_repo import AdminsRepo
 from app.db.repo.outbox_events_repo import OutboxEventsRepo
@@ -108,3 +109,48 @@ async def test_outbox_repo_lists_counts_and_deletes_by_scoped_filters() -> None:
     assert "DELETE FROM outbox_events" in delete_sql
     assert "outbox_events.status != 'OPEN'" in delete_sql
     assert "LIMIT 1" in delete_sql
+
+
+async def test_outbox_repo_create_once_locks_and_reuses_duplicate_payload_key() -> None:
+    existing = OutboxEvent(
+        event_type="payments_telegram_stars_reconciliation_review",
+        payload={"review_key": "review-1"},
+        status="OPEN",
+    )
+    reuse_session = RecordingSession(object(), _ScalarResult(existing))
+
+    reused, was_created = await OutboxEventsRepo.create_once_by_payload_key(
+        reuse_session,
+        event_type="payments_telegram_stars_reconciliation_review",
+        payload={"review_key": "review-1"},
+        payload_key="review_key",
+        status="OPEN",
+    )
+
+    assert reused is existing
+    assert was_created is False
+    assert reuse_session.added == []
+    assert "pg_advisory_xact_lock" in str(reuse_session.statements[0])
+    lookup_sql = compile_statement(reuse_session.statements[1])
+    assert "outbox_events" in lookup_sql
+    assert "review_key" in lookup_sql
+    assert "review-1" in lookup_sql
+
+
+async def test_outbox_repo_create_once_inserts_after_locked_empty_lookup() -> None:
+    create_session = RecordingSession(object(), _ScalarResult(None))
+
+    event, was_created = await OutboxEventsRepo.create_once_by_payload_key(
+        create_session,
+        event_type="telegram_payment_update_received",
+        payload={"payment_update_key": "777:message.successful_payment"},
+        payload_key="payment_update_key",
+        status="PENDING",
+    )
+
+    assert was_created is True
+    assert event.event_type == "telegram_payment_update_received"
+    assert event.status == "PENDING"
+    assert create_session.added == [event]
+    assert create_session.flushed is True
+    assert "pg_advisory_xact_lock" in str(create_session.statements[0])

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 
 import structlog
 from fastapi import APIRouter, Request, status
@@ -81,13 +82,11 @@ async def _store_payment_update_evidence(
     if payment_update_kind is None:
         return True
 
-    payload = {
-        "schema_version": 1,
-        "update_id": update_id,
-        "payment_update_kind": payment_update_kind,
-        "payment_update_key": f"{update_id}:{payment_update_kind}",
-        "raw_update": update_payload,
-    }
+    payload = _sanitized_payment_update_evidence(
+        update_payload=update_payload,
+        update_id=update_id,
+        payment_update_kind=payment_update_kind,
+    )
     try:
         async with SessionLocal.begin() as session:
             await OutboxEventsRepo.create_once_by_payload_key(
@@ -106,6 +105,94 @@ async def _store_payment_update_evidence(
         )
         return False
     return True
+
+
+def _sanitized_payment_update_evidence(
+    *,
+    update_payload: dict[str, object],
+    update_id: int,
+    payment_update_kind: str,
+) -> dict[str, object]:
+    payment_payload = _payment_payload_for_kind(update_payload, payment_update_kind)
+    evidence: dict[str, object | None] = {
+        "schema_version": 1,
+        "update_id": update_id,
+        "payment_update_kind": payment_update_kind,
+        "payment_update_key": f"{update_id}:{payment_update_kind}",
+        "invoice_payload": _safe_str(payment_payload.get("invoice_payload")),
+        "currency": _safe_str(payment_payload.get("currency")),
+        "total_amount": _safe_int(payment_payload.get("total_amount")),
+        "telegram_user_id": _payment_update_user_id(update_payload, payment_update_kind),
+        "message_id": _payment_update_message_id(update_payload, payment_update_kind),
+        "telegram_payment_charge_id_hash": _hash_payment_identifier(
+            payment_payload.get("telegram_payment_charge_id")
+        ),
+        "provider_payment_charge_id_hash": _hash_payment_identifier(
+            payment_payload.get("provider_payment_charge_id")
+        ),
+        "order_info_present": isinstance(payment_payload.get("order_info"), dict),
+        "raw_payload_stored": False,
+    }
+    return {key: value for key, value in evidence.items() if value is not None}
+
+
+def _payment_payload_for_kind(
+    update_payload: dict[str, object],
+    payment_update_kind: str,
+) -> dict[str, object]:
+    if payment_update_kind == "pre_checkout_query":
+        value = update_payload.get("pre_checkout_query")
+        return value if isinstance(value, dict) else {}
+
+    message = update_payload.get("message")
+    if not isinstance(message, dict):
+        return {}
+    field_name = payment_update_kind.removeprefix("message.")
+    value = message.get(field_name)
+    return value if isinstance(value, dict) else {}
+
+
+def _payment_update_user_id(
+    update_payload: dict[str, object],
+    payment_update_kind: str,
+) -> int | None:
+    container: object
+    if payment_update_kind == "pre_checkout_query":
+        container = update_payload.get("pre_checkout_query")
+    else:
+        container = update_payload.get("message")
+    if not isinstance(container, dict):
+        return None
+    from_user = container.get("from")
+    if not isinstance(from_user, dict):
+        return None
+    return _safe_int(from_user.get("id"))
+
+
+def _payment_update_message_id(
+    update_payload: dict[str, object],
+    payment_update_kind: str,
+) -> int | None:
+    if not payment_update_kind.startswith("message."):
+        return None
+    message = update_payload.get("message")
+    if not isinstance(message, dict):
+        return None
+    return _safe_int(message.get("message_id"))
+
+
+def _safe_str(value: object) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+def _safe_int(value: object) -> int | None:
+    return value if isinstance(value, int) else None
+
+
+def _hash_payment_identifier(value: object) -> str | None:
+    if not isinstance(value, str) or not value:
+        return None
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
 
 
 @router.post("/webhook/telegram")

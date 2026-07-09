@@ -1,11 +1,45 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.outbox_events import OutboxEvent
+
+
+async def _lock_payload_dedupe_key(
+    session: AsyncSession,
+    *,
+    event_type: str,
+    payload_key: str,
+    payload_value: str,
+    status: str,
+) -> None:
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(:lock_key)"),
+        {
+            "lock_key": _payload_dedupe_lock_key(
+                event_type=event_type,
+                payload_key=payload_key,
+                payload_value=payload_value,
+                status=status,
+            )
+        },
+    )
+
+
+def _payload_dedupe_lock_key(
+    *,
+    event_type: str,
+    payload_key: str,
+    payload_value: str,
+    status: str,
+) -> int:
+    lock_material = "\x1f".join((event_type, status, payload_key, payload_value))
+    digest = hashlib.sha256(lock_material.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], byteorder="big", signed=True)
 
 
 class OutboxEventsRepo:
@@ -61,6 +95,14 @@ class OutboxEventsRepo:
         if not isinstance(payload_value, str) or not payload_value:
             raise ValueError("payload key value must be a non-empty string")
 
+        # Temporary DB-backed serialization until a reviewed migration can add a true unique key.
+        await _lock_payload_dedupe_key(
+            session,
+            event_type=event_type,
+            payload_key=payload_key,
+            payload_value=payload_value,
+            status=status,
+        )
         existing = await OutboxEventsRepo.get_open_by_payload_key(
             session,
             event_type=event_type,

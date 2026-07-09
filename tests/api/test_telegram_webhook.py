@@ -189,6 +189,17 @@ def test_payment_update_evidence_is_stored_before_enqueue(monkeypatch) -> None:
                     "currency": "XTR",
                     "total_amount": 29,
                     "invoice_payload": "invoice-1",
+                    "telegram_payment_charge_id": "raw-telegram-charge",
+                    "provider_payment_charge_id": "raw-provider-charge",
+                    "order_info": {
+                        "email": "buyer@example.com",
+                        "phone_number": "+49123456789",
+                        "shipping_address": {
+                            "country_code": "DE",
+                            "city": "Berlin",
+                            "street_line1": "Private Strasse 1",
+                        },
+                    },
                 },
             },
         },
@@ -205,9 +216,23 @@ def test_payment_update_evidence_is_stored_before_enqueue(monkeypatch) -> None:
     assert isinstance(payload, dict)
     assert payload["payment_update_kind"] == "message.successful_payment"
     assert payload["payment_update_key"] == "777:message.successful_payment"
-    raw_update = payload["raw_update"]
-    assert isinstance(raw_update, dict)
-    assert raw_update["update_id"] == 777
+    assert payload["invoice_payload"] == "invoice-1"
+    assert payload["currency"] == "XTR"
+    assert payload["total_amount"] == 29
+    assert payload["order_info_present"] is True
+    assert payload["raw_payload_stored"] is False
+    assert "raw_update" not in payload
+    assert "successful_payment" not in payload
+    assert "telegram_payment_charge_id" not in payload
+    assert "provider_payment_charge_id" not in payload
+    assert payload["telegram_payment_charge_id_hash"] != "raw-telegram-charge"
+    assert payload["provider_payment_charge_id_hash"] != "raw-provider-charge"
+    serialized_payload = repr(payload)
+    assert "buyer@example.com" not in serialized_payload
+    assert "+49123456789" not in serialized_payload
+    assert "Private Strasse 1" not in serialized_payload
+    assert "raw-telegram-charge" not in serialized_payload
+    assert "raw-provider-charge" not in serialized_payload
 
 
 def test_payment_update_evidence_duplicate_still_enqueues_once(monkeypatch) -> None:
