@@ -15,6 +15,11 @@ from app.db.models.ledger_entries import LedgerEntry
 from app.db.models.mode_progress import ModeProgress
 from app.db.models.offers_impressions import OfferImpression
 from app.db.models.outbox_events import OutboxEvent
+from app.db.models.payment_inbox import (
+    PaymentEvent,
+    PaymentReconciliationReview,
+    TelegramUpdateInbox,
+)
 from app.db.models.processed_updates import ProcessedUpdate
 from app.db.models.promo_attempts import PromoAttempt
 from app.db.models.promo_audit_log import PromoAuditLog
@@ -55,6 +60,8 @@ __all__ = [
     "ModeProgress",
     "OfferImpression",
     "OutboxEvent",
+    "PaymentEvent",
+    "PaymentReconciliationReview",
     "ProcessedUpdate",
     "PromoAttempt",
     "PromoAuditLog",
@@ -68,6 +75,7 @@ __all__ = [
     "ReconciliationRun",
     "Referral",
     "StreakState",
+    "TelegramUpdateInbox",
     "Tournament",
     "TournamentMatch",
     "TournamentParticipant",
