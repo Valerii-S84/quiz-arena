@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime
 from uuid import UUID
 
@@ -24,6 +25,12 @@ RECOVERABLE_PAYMENT_STATUSES = frozenset(
 )
 
 
+def _payment_identifier_hash(value: str | None) -> str | None:
+    if not value:
+        return None
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
 def _payment_log_payload(
     *,
     purchase,
@@ -31,14 +38,14 @@ def _payment_log_payload(
     product_code: str | None = None,
     telegram_payment_charge_id: str | None = None,
 ) -> dict[str, object]:
+    charge_id = telegram_payment_charge_id or purchase.telegram_payment_charge_id
     return {
         "purchase_id": str(purchase.id),
         "user_id": user_id,
         "product_code": product_code or purchase.product_code,
         "status": purchase.status,
         "stars_amount": purchase.stars_amount,
-        "telegram_payment_charge_id": telegram_payment_charge_id
-        or purchase.telegram_payment_charge_id,
+        "telegram_payment_charge_id_hash": _payment_identifier_hash(charge_id),
     }
 
 

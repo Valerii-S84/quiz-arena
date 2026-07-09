@@ -24,7 +24,8 @@ from app.economy.purchases.errors import (
 )
 from app.economy.purchases.types import PurchaseRefundResult
 
-REFUNDABLE_PURCHASE_STATUSES = {"CREDITED", "PAID_UNCREDITED", "FAILED_CREDIT_PENDING_REVIEW"}
+PROVIDER_REFUND_EVIDENCE_REQUIRED_STATUS = "FAILED_CREDIT_PENDING_REVIEW"
+REFUNDABLE_PURCHASE_STATUSES = {"CREDITED", "PAID_UNCREDITED"}
 
 
 def _extract_asset_breakdown(metadata: dict[str, object]) -> dict[str, object]:
@@ -76,6 +77,7 @@ async def refund_purchase(
     *,
     purchase_id: UUID,
     now_utc: datetime,
+    provider_refund_confirmed: bool = False,
 ) -> PurchaseRefundResult:
     purchase = await PurchasesRepo.get_by_id_for_update(session, purchase_id)
     if purchase is None:
@@ -89,7 +91,9 @@ async def refund_purchase(
             idempotent_replay=True,
         )
 
-    if purchase.status not in REFUNDABLE_PURCHASE_STATUSES:
+    if purchase.status not in REFUNDABLE_PURCHASE_STATUSES and not (
+        provider_refund_confirmed and purchase.status == PROVIDER_REFUND_EVIDENCE_REQUIRED_STATUS
+    ):
         raise PurchaseRefundValidationError
 
     idempotent_replay = False

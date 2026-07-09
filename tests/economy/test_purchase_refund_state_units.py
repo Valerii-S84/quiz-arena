@@ -143,7 +143,7 @@ async def test_refund_purchase_marks_paid_uncredited_without_ledger_debit(
 
 
 @pytest.mark.asyncio
-async def test_refund_purchase_marks_credit_pending_review_without_ledger_debit(
+async def test_refund_purchase_marks_provider_confirmed_credit_pending_review_without_debit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     purchase = refund_purchase_state(status="FAILED_CREDIT_PENDING_REVIEW")
@@ -157,6 +157,12 @@ async def test_refund_purchase_marks_credit_pending_review_without_ledger_debit(
 
     async def _fail_create_refund_entry(_session, *, entry: LedgerEntry):
         pytest.fail("uncredited pending-review refund should not create a refund ledger entry")
+
+    async def _fail_debit_paid_energy_wallet(*_args, **_kwargs):
+        pytest.fail("uncredited pending-review refund should not debit paid energy")
+
+    async def _fail_remove_streak_saver_tokens(*_args, **_kwargs):
+        pytest.fail("uncredited pending-review refund should not debit streak tokens")
 
     async def _fail_revoke_entitlement(*_args, **_kwargs):
         pytest.fail("uncredited pending-review refund should not revoke entitlements")
@@ -173,6 +179,14 @@ async def test_refund_purchase_marks_credit_pending_review_without_ledger_debit(
     )
     monkeypatch.setattr(purchase_refund.LedgerRepo, "create", _fail_create_refund_entry)
     monkeypatch.setattr(
+        purchase_refund, "_debit_paid_energy_wallet", _fail_debit_paid_energy_wallet
+    )
+    monkeypatch.setattr(
+        purchase_refund.StreakRepo,
+        "remove_streak_saver_tokens",
+        _fail_remove_streak_saver_tokens,
+    )
+    monkeypatch.setattr(
         purchase_refund.EntitlementsRepo,
         "revoke_active_or_scheduled_by_purchase",
         _fail_revoke_entitlement,
@@ -182,6 +196,7 @@ async def test_refund_purchase_marks_credit_pending_review_without_ledger_debit(
         SessionStub(),
         purchase_id=purchase.id,
         now_utc=NOW,
+        provider_refund_confirmed=True,
     )
 
     assert result.idempotent_replay is False
@@ -254,6 +269,7 @@ async def test_refund_purchase_reverses_credit_pending_review_with_credit_eviden
         SessionStub(),
         purchase_id=purchase.id,
         now_utc=NOW,
+        provider_refund_confirmed=True,
     )
 
     assert result.status == "REFUNDED"

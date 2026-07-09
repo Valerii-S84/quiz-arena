@@ -215,7 +215,11 @@ async def test_apply_successful_payment_credits_legacy_premium_starter_as_premiu
         "payment_credit_started",
         "payment_credit_finished",
     ]
+    for _event, payload in logger.infos:
+        assert payload["telegram_payment_charge_id_hash"] != "charge-1"
+        assert "telegram_payment_charge_id" not in payload
     assert "inv-starter" not in str(logger.infos)
+    assert "charge-1" not in str(logger.infos)
 
 
 @pytest.mark.asyncio
@@ -258,9 +262,11 @@ async def test_apply_successful_payment_logs_credit_failure_without_raw_payload(
     assert event == "payment_credit_failed"
     assert payload["purchase_id"] == str(purchase.id)
     assert payload["status"] == "PAID_UNCREDITED"
-    assert payload["telegram_payment_charge_id"] == "charge-1"
+    assert payload["telegram_payment_charge_id_hash"] != "charge-1"
+    assert "telegram_payment_charge_id" not in payload
     assert payload["error_type"] == "RuntimeError"
     assert "inv-failure" not in str(logger.infos + logger.warnings)
+    assert "charge-1" not in str(logger.infos + logger.warnings)
     assert "token" not in str(logger.infos + logger.warnings).lower()
 
 

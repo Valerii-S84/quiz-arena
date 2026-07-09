@@ -56,6 +56,10 @@ def _invoice_payload_hash(invoice_payload: str) -> str:
     return hashlib.sha256(invoice_payload.encode("utf-8")).hexdigest()[:16]
 
 
+def _payment_identifier_hash(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
 @router.callback_query(F.data.startswith("buy:"))
 async def handle_buy(callback: CallbackQuery) -> None:
     await handle_buy_callback(
@@ -104,11 +108,12 @@ async def handle_successful_payment(message: Message) -> None:
     payment = message.successful_payment
     now_utc = datetime.now(timezone.utc)
     invoice_payload_hash = _invoice_payload_hash(payment.invoice_payload)
+    telegram_payment_charge_id_hash = _payment_identifier_hash(payment.telegram_payment_charge_id)
 
     logger.info(
         "payment_successful_update_received",
         telegram_user_id=message.from_user.id,
-        telegram_payment_charge_id=payment.telegram_payment_charge_id,
+        telegram_payment_charge_id_hash=telegram_payment_charge_id_hash,
         invoice_payload_hash=invoice_payload_hash,
         currency=getattr(payment, "currency", None),
         total_amount=getattr(payment, "total_amount", None),
@@ -128,7 +133,7 @@ async def handle_successful_payment(message: Message) -> None:
         logger.warning(
             "payment_credit_failed",
             telegram_user_id=message.from_user.id,
-            telegram_payment_charge_id=payment.telegram_payment_charge_id,
+            telegram_payment_charge_id_hash=telegram_payment_charge_id_hash,
             invoice_payload_hash=invoice_payload_hash,
             error_type=type(exc).__name__,
         )
@@ -152,11 +157,14 @@ async def handle_refunded_payment(message: Message) -> None:
     refunded_payment = message.refunded_payment
     now_utc = datetime.now(timezone.utc)
     invoice_payload_hash = _invoice_payload_hash(refunded_payment.invoice_payload)
+    telegram_payment_charge_id_hash = _payment_identifier_hash(
+        refunded_payment.telegram_payment_charge_id
+    )
 
     logger.info(
         "payment_refunded_update_received",
         telegram_user_id=message.from_user.id,
-        telegram_payment_charge_id=refunded_payment.telegram_payment_charge_id,
+        telegram_payment_charge_id_hash=telegram_payment_charge_id_hash,
         invoice_payload_hash=invoice_payload_hash,
         currency=getattr(refunded_payment, "currency", None),
         total_amount=getattr(refunded_payment, "total_amount", None),
@@ -176,7 +184,7 @@ async def handle_refunded_payment(message: Message) -> None:
         logger.warning(
             "payment_refund_update_failed",
             telegram_user_id=message.from_user.id,
-            telegram_payment_charge_id=refunded_payment.telegram_payment_charge_id,
+            telegram_payment_charge_id_hash=telegram_payment_charge_id_hash,
             invoice_payload_hash=invoice_payload_hash,
             error_type=type(exc).__name__,
         )

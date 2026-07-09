@@ -138,6 +138,7 @@ async def refund_payment_update(
             session,
             purchase_id=purchase.id,
             now_utc=now_utc,
+            provider_refund_confirmed=True,
         )
 
 

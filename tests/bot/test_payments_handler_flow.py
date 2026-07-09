@@ -289,8 +289,13 @@ async def test_handle_successful_payment_logs_received_update_without_raw_payloa
 
     assert logger.infos[0][0] == "payment_successful_update_received"
     assert logger.infos[0][1]["invoice_payload_hash"] != payment.invoice_payload
+    assert (
+        logger.infos[0][1]["telegram_payment_charge_id_hash"] != payment.telegram_payment_charge_id
+    )
     assert "invoice_payload" not in logger.infos[0][1]
+    assert "telegram_payment_charge_id" not in logger.infos[0][1]
     assert payment.invoice_payload not in str(logger.infos)
+    assert payment.telegram_payment_charge_id not in str(logger.infos)
     assert "token" not in str(logger.infos).lower()
 
 
@@ -303,14 +308,22 @@ async def test_handle_successful_payment_sends_failure_text_for_validation_error
     async def _fake_apply_payment(*args, **kwargs):
         raise PurchasePrecheckoutValidationError()
 
+    logger = _Logger()
+    monkeypatch.setattr(payments, "logger", logger)
     monkeypatch.setattr(payments, "apply_successful_payment", _fake_apply_payment)
 
-    message = _PaymentMessage(
-        from_user=SimpleNamespace(id=1), successful_payment=_SuccessfulPayment()
-    )
+    payment = _SuccessfulPayment()
+    message = _PaymentMessage(from_user=SimpleNamespace(id=1), successful_payment=payment)
     await payments.handle_successful_payment(message)  # type: ignore[arg-type]
 
     assert message.answers[0].text == TEXTS_DE["msg.purchase.error.failed"]
+    assert logger.warnings[0][0] == "payment_credit_failed"
+    assert (
+        logger.warnings[0][1]["telegram_payment_charge_id_hash"]
+        != payment.telegram_payment_charge_id
+    )
+    assert "telegram_payment_charge_id" not in logger.warnings[0][1]
+    assert payment.telegram_payment_charge_id not in str(logger.warnings)
 
 
 @pytest.mark.asyncio
@@ -356,8 +369,13 @@ async def test_handle_refunded_payment_logs_received_update_without_raw_payload(
 
     assert logger.infos[0][0] == "payment_refunded_update_received"
     assert logger.infos[0][1]["invoice_payload_hash"] != refund.invoice_payload
+    assert (
+        logger.infos[0][1]["telegram_payment_charge_id_hash"] != refund.telegram_payment_charge_id
+    )
     assert "invoice_payload" not in logger.infos[0][1]
+    assert "telegram_payment_charge_id" not in logger.infos[0][1]
     assert refund.invoice_payload not in str(logger.infos)
+    assert refund.telegram_payment_charge_id not in str(logger.infos)
     assert "token" not in str(logger.infos).lower()
 
 
@@ -368,16 +386,24 @@ async def test_handle_refunded_payment_reraises_missing_purchase_for_worker_retr
     async def _fake_refund_payment_update(*args, **kwargs):
         raise PurchaseNotFoundError()
 
+    logger = _Logger()
+    monkeypatch.setattr(payments, "logger", logger)
     monkeypatch.setattr(payments, "refund_payment_update", _fake_refund_payment_update)
 
-    message = _RefundedPaymentMessage(
-        from_user=SimpleNamespace(id=1), refunded_payment=_refunded_payment()
-    )
+    refund = _refunded_payment()
+    message = _RefundedPaymentMessage(from_user=SimpleNamespace(id=1), refunded_payment=refund)
 
     with pytest.raises(PurchaseNotFoundError):
         await payments.handle_refunded_payment(message)  # type: ignore[arg-type]
 
     assert message.answers == []
+    assert logger.warnings[0][0] == "payment_refund_update_failed"
+    assert (
+        logger.warnings[0][1]["telegram_payment_charge_id_hash"]
+        != refund.telegram_payment_charge_id
+    )
+    assert "telegram_payment_charge_id" not in logger.warnings[0][1]
+    assert refund.telegram_payment_charge_id not in str(logger.warnings)
 
 
 @pytest.mark.asyncio
@@ -408,8 +434,20 @@ async def test_refund_payment_update_uses_charge_lookup_and_refund_service(
         assert telegram_payment_charge_id == refund.telegram_payment_charge_id
         return purchase
 
-    async def _fake_refund_purchase(_session, *, purchase_id: UUID, now_utc: datetime):
-        calls.append({"purchase_id": purchase_id, "now_utc": now_utc})
+    async def _fake_refund_purchase(
+        _session,
+        *,
+        purchase_id: UUID,
+        now_utc: datetime,
+        provider_refund_confirmed: bool,
+    ):
+        calls.append(
+            {
+                "purchase_id": purchase_id,
+                "now_utc": now_utc,
+                "provider_refund_confirmed": provider_refund_confirmed,
+            }
+        )
         return SimpleNamespace(status="REFUNDED")
 
     monkeypatch.setattr(payments_runtime, "SessionLocal", DummySessionLocal())
@@ -436,7 +474,13 @@ async def test_refund_payment_update_uses_charge_lookup_and_refund_service(
     )
 
     assert result.status == "REFUNDED"
-    assert calls == [{"purchase_id": purchase_id, "now_utc": now_utc}]
+    assert calls == [
+        {
+            "purchase_id": purchase_id,
+            "now_utc": now_utc,
+            "provider_refund_confirmed": True,
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -471,11 +515,23 @@ async def test_refund_payment_update_falls_back_to_invoice_payload_before_refund
         assert invoice_payload == refund.invoice_payload
         return purchase
 
-    async def _fake_refund_purchase(_session, *, purchase_id: UUID, now_utc: datetime):
+    async def _fake_refund_purchase(
+        _session,
+        *,
+        purchase_id: UUID,
+        now_utc: datetime,
+        provider_refund_confirmed: bool,
+    ):
         assert purchase.status == "PAID_UNCREDITED"
         assert purchase.telegram_payment_charge_id == refund.telegram_payment_charge_id
         assert purchase.paid_at == now_utc
-        calls.append({"purchase_id": purchase_id, "now_utc": now_utc})
+        calls.append(
+            {
+                "purchase_id": purchase_id,
+                "now_utc": now_utc,
+                "provider_refund_confirmed": provider_refund_confirmed,
+            }
+        )
         return SimpleNamespace(status="REFUNDED")
 
     monkeypatch.setattr(payments_runtime, "SessionLocal", DummySessionLocal())
@@ -507,7 +563,13 @@ async def test_refund_payment_update_falls_back_to_invoice_payload_before_refund
     )
 
     assert result.status == "REFUNDED"
-    assert calls == [{"purchase_id": purchase_id, "now_utc": now_utc}]
+    assert calls == [
+        {
+            "purchase_id": purchase_id,
+            "now_utc": now_utc,
+            "provider_refund_confirmed": True,
+        }
+    ]
 
 
 @pytest.mark.asyncio
