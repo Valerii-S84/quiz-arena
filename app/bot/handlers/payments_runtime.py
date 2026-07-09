@@ -171,7 +171,7 @@ def _log_refund_validation_rejected(
 ) -> None:
     logger.warning(
         "payment_refund_update_validation_rejected",
-        purchase_id=str(purchase.id),
+        purchase_id_hash=_payment_identifier_hash(str(purchase.id)),
         reason=reason,
         expected_currency=purchase.currency,
         refunded_currency=refunded_payment.currency,
