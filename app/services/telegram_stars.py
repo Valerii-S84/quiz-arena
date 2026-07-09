@@ -43,10 +43,12 @@ class TelegramStarTransaction:
 
     @property
     def invoice_payload(self) -> str | None:
-        if self.source is None:
-            return None
-        payload = self.source.get("invoice_payload")
-        return payload if isinstance(payload, str) else None
+        payload = _partner_invoice_payload(self.source)
+        if payload is not None:
+            return payload
+        if self.source is None and self.transaction_type == "invoice_payment":
+            return _partner_invoice_payload(self.receiver)
+        return None
 
     @property
     def transaction_type(self) -> str | None:
@@ -55,6 +57,13 @@ class TelegramStarTransaction:
             return None
         value = partner.get("transaction_type")
         return value if isinstance(value, str) else None
+
+
+def _partner_invoice_payload(partner: dict[str, object] | None) -> str | None:
+    if partner is None:
+        return None
+    payload = partner.get("invoice_payload")
+    return payload if isinstance(payload, str) else None
 
 
 def _partner_user_id(partner: dict[str, object] | None) -> int | None:

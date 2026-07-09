@@ -197,6 +197,6 @@ def _mark_refunded_payment_evidence(
     status = getattr(purchase, "status", None)
     if status in {"CREATED", "INVOICE_SENT", "PRECHECKOUT_OK"}:
         purchase.status = "PAID_UNCREDITED"
-        status = "PAID_UNCREDITED"
+        return
     if status == "PAID_UNCREDITED" and getattr(purchase, "paid_at", None) is None:
         purchase.paid_at = now_utc

@@ -91,6 +91,7 @@ async def test_get_star_transactions_preserves_outgoing_refund_shape() -> None:
                             "type": "user",
                             "transaction_type": "invoice_payment",
                             "user": {"id": 270},
+                            "invoice_payload": "refund-invoice-1",
                         },
                     }
                 ]
@@ -105,6 +106,7 @@ async def test_get_star_transactions_preserves_outgoing_refund_shape() -> None:
     assert page.transactions[0].source_user_id is None
     assert page.transactions[0].receiver_user_id == 270
     assert page.transactions[0].partner_user_id == 270
+    assert page.transactions[0].invoice_payload == "refund-invoice-1"
 
 
 @pytest.mark.asyncio

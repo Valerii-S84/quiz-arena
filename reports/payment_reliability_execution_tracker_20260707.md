@@ -763,6 +763,34 @@ Lead verification notes:
 Lead response: Accepted for scoped commit and push. Keep PR #244 unmerged and route any new
 Codex-only P2 feedback through separate must-fix vs follow-up classification.
 
+### P8-CODEX-FINAL-P2-RECONCILIATION-REFUND - PR #244 final narrow safety pass
+
+Lead verification notes:
+
+- Codex P2 refund-only reconciliation finding: fixed by keeping early-state refunded-payment evidence
+  from setting `paid_at`, and by excluding never-credited `REFUNDED` rows from paid reconciliation
+  totals. Credited-then-refunded rows remain counted because they preserve `credited_at` and credit
+  ledger evidence.
+- Codex P2 Telegram Stars refund payload finding: fixed by reading `receiver.invoice_payload` for
+  outgoing invoice-payment refund transactions when `source` is absent, while preserving existing
+  source-first incoming behavior.
+- Regression coverage added for refund-only reconciliation: a never-credited refunded purchase with
+  `credited_at IS NULL` and no `PURCHASE_CREDIT` row no longer creates a permanent reconciliation
+  diff, while a credited-then-refunded purchase is still counted.
+- Unit coverage updated for outgoing refund transaction payload extraction from `receiver`.
+- Targeted test evidence: focused touched payment/reconciliation suite `43 passed in 12.27s`;
+  broader payment/refund worker suite `98 passed in 19.19s`; integration refund/reconciliation suite
+  `22 passed in 50.62s`.
+- Required gates passed: `ruff check app tests scripts`, `black --check app tests scripts`,
+  `isort --check-only app tests scripts`, `mypy app tests`, and `git diff --check`.
+- Protected-path check was empty for migrations, deploy config, `.github`, `.env*`, and production
+  config paths.
+- No migrations, deploy config, protected paths, `.env*`, secrets, production deploy, production DB
+  writes, fake credit assets, or synthetic `PURCHASE_CREDIT` ledger rows were introduced.
+
+Lead response: Accepted for scoped commit and push. Keep PR #244 unmerged; no deploy or production
+data writes.
+
 ## Open owner decisions
 
 - Whether to commit `PAID_UNCREDITED` before crediting in normal successful-payment flow.

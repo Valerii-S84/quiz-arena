@@ -524,7 +524,7 @@ async def test_refund_payment_update_falls_back_to_invoice_payload_before_refund
     ):
         assert purchase.status == "PAID_UNCREDITED"
         assert purchase.telegram_payment_charge_id == refund.telegram_payment_charge_id
-        assert purchase.paid_at == now_utc
+        assert purchase.paid_at is None
         calls.append(
             {
                 "purchase_id": purchase_id,

@@ -106,3 +106,82 @@ async def test_reconciliation_detects_diff_and_persists_run() -> None:
         assert latest_run.status == "DIFF"
         assert latest_run.diff_count == 4
         assert latest_run.finished_at is not None
+
+
+@pytest.mark.asyncio
+async def test_reconciliation_ignores_refund_only_purchase_but_counts_refunded_credit() -> None:
+    now_utc = datetime.now(UTC)
+    user_id = await _create_user("reconciliation-refund-only")
+    refunded_credit_id = uuid4()
+    refund_only_id = uuid4()
+
+    async with SessionLocal.begin() as session:
+        session.add(
+            Purchase(
+                id=refunded_credit_id,
+                user_id=user_id,
+                product_code="ENERGY_10",
+                product_type="MICRO",
+                base_stars_amount=5,
+                discount_stars_amount=0,
+                stars_amount=5,
+                currency="XTR",
+                status="REFUNDED",
+                idempotency_key="recon-refunded-credit-1",
+                invoice_payload="inv_recon_refunded_credit_1",
+                telegram_payment_charge_id="tg_charge_recon_refunded_credit_1",
+                raw_successful_payment={"invoice_payload": "inv_recon_refunded_credit_1"},
+                created_at=now_utc - timedelta(minutes=50),
+                paid_at=now_utc - timedelta(minutes=45),
+                credited_at=now_utc - timedelta(minutes=44),
+                refunded_at=now_utc - timedelta(minutes=40),
+            )
+        )
+        session.add(
+            Purchase(
+                id=refund_only_id,
+                user_id=user_id,
+                product_code="ENERGY_10",
+                product_type="MICRO",
+                base_stars_amount=5,
+                discount_stars_amount=0,
+                stars_amount=5,
+                currency="XTR",
+                status="REFUNDED",
+                idempotency_key="recon-refund-only-1",
+                invoice_payload="inv_recon_refund_only_1",
+                telegram_payment_charge_id="tg_charge_recon_refund_only_1",
+                raw_successful_payment=None,
+                created_at=now_utc - timedelta(minutes=50),
+                paid_at=now_utc - timedelta(minutes=45),
+                credited_at=None,
+                refunded_at=now_utc - timedelta(minutes=40),
+            )
+        )
+        await session.flush()
+        session.add(
+            LedgerEntry(
+                user_id=user_id,
+                purchase_id=refunded_credit_id,
+                entry_type="PURCHASE_CREDIT",
+                asset="PAID_ENERGY",
+                direction="CREDIT",
+                amount=10,
+                balance_after=10,
+                source="PURCHASE",
+                idempotency_key="ledger-recon-refunded-credit-1",
+                metadata_={},
+                created_at=now_utc - timedelta(minutes=44),
+            )
+        )
+        await session.flush()
+
+    result = await run_payments_reconciliation_async(stale_minutes=30)
+
+    assert result["paid_purchases_count"] == 1
+    assert result["credited_purchases_count"] == 1
+    assert result["paid_stars_total"] == 5
+    assert result["credited_stars_total"] == 5
+    assert result["product_stars_mismatch_count"] == 0
+    assert result["diff_count"] == 0
+    assert result["status"] == "OK"
