@@ -127,6 +127,7 @@ async def test_purchase_count_and_metric_queries_apply_paid_filters() -> None:
     paid_user_sql = compile_statement(paid_user_session.statement)
     assert "purchases.paid_at IS NOT NULL" in paid_user_sql
     assert "purchases.stars_amount > 0" in paid_user_sql
+    assert "purchases.status != 'FAILED_CREDIT_PENDING_REVIEW'" in paid_user_sql
 
     product_session = RecordingSession(_ScalarResult(1))
     assert (
@@ -140,6 +141,9 @@ async def test_purchase_count_and_metric_queries_apply_paid_filters() -> None:
     )
     assert "purchases.product_code = 'PREMIUM_30'" in compile_statement(product_session.statement)
     assert "purchases.stars_amount > 0" in compile_statement(product_session.statement)
+    assert "purchases.status != 'FAILED_CREDIT_PENDING_REVIEW'" in compile_statement(
+        product_session.statement
+    )
 
     credited_session = RecordingSession(_ScalarResult(5))
     assert (
@@ -180,13 +184,13 @@ async def test_purchase_count_and_metric_queries_apply_paid_filters() -> None:
     assert await PurchasesRepo.count_paid_purchases(paid_count_session) == 8
     paid_count_sql = compile_statement(paid_count_session.statement)
     assert "purchases.paid_at IS NOT NULL" in paid_count_sql
-    assert "purchases.status != 'REFUNDED'" in paid_count_sql
+    assert "purchases.status IN ('PAID_UNCREDITED', 'CREDITED')" in paid_count_sql
     assert "purchases.credited_at IS NOT NULL" in paid_count_sql
 
     stars_session = RecordingSession(_ScalarResult(900))
     assert await PurchasesRepo.sum_paid_stars_amount(stars_session) == 900
     stars_sql = compile_statement(stars_session.statement)
-    assert "purchases.status != 'REFUNDED'" in stars_sql
+    assert "purchases.status IN ('PAID_UNCREDITED', 'CREDITED')" in stars_sql
     assert "purchases.credited_at IS NOT NULL" in stars_sql
 
     by_product_session = RecordingSession(_RowsResult([("PREMIUM_30", 300), ("ENERGY", None)]))
@@ -194,7 +198,7 @@ async def test_purchase_count_and_metric_queries_apply_paid_filters() -> None:
     assert totals == {"PREMIUM_30": 300, "ENERGY": 0}
     by_product_sql = compile_statement(by_product_session.statement)
     assert "GROUP BY purchases.product_code" in by_product_sql
-    assert "purchases.status != 'REFUNDED'" in by_product_sql
+    assert "purchases.status IN ('PAID_UNCREDITED', 'CREDITED')" in by_product_sql
     assert "purchases.credited_at IS NOT NULL" in by_product_sql
 
 

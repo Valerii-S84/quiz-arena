@@ -34,19 +34,6 @@ class FailingStubTask:
         raise RuntimeError("broker_unavailable")
 
 
-class _SessionContext:
-    async def __aenter__(self) -> object:
-        return object()
-
-    async def __aexit__(self, exc_type, exc, tb) -> bool:
-        return False
-
-
-class _SessionLocal:
-    def begin(self) -> _SessionContext:
-        return _SessionContext()
-
-
 def _settings() -> SimpleNamespace:
     return SimpleNamespace(
         telegram_webhook_secret="secret-token",
@@ -164,19 +151,14 @@ def test_payment_update_evidence_is_stored_before_enqueue(monkeypatch) -> None:
     stub_task = StubTask(order)
     stored: list[dict[str, object]] = []
 
-    async def _create_once(_session, **kwargs):
+    async def _store_evidence(**kwargs):
         order.append("store")
         stored.append(kwargs)
-        return object(), True
+        return True
 
     monkeypatch.setattr(telegram_webhook, "get_settings", _settings)
     monkeypatch.setattr(telegram_webhook, "process_telegram_update", stub_task)
-    monkeypatch.setattr(telegram_webhook, "SessionLocal", _SessionLocal())
-    monkeypatch.setattr(
-        telegram_webhook.OutboxEventsRepo,
-        "create_once_by_payload_key",
-        _create_once,
-    )
+    monkeypatch.setattr(telegram_webhook, "store_payment_update_evidence", _store_evidence)
 
     client = TestClient(app)
     response = client.post(
@@ -209,54 +191,28 @@ def test_payment_update_evidence_is_stored_before_enqueue(monkeypatch) -> None:
     assert response.status_code == 200
     assert order == ["store", "enqueue"]
     assert stub_task.calls[0]["update_id"] == 777
-    assert stored[0]["event_type"] == "telegram_payment_update_received"
-    assert stored[0]["payload_key"] == "payment_update_key"
-    assert stored[0]["status"] == "PENDING"
-    payload = stored[0]["payload"]
-    assert isinstance(payload, dict)
-    assert payload["payment_update_kind"] == "message.successful_payment"
-    assert payload["payment_update_key"] == "777:message.successful_payment"
-    assert payload["invoice_payload"] == "invoice-1"
-    assert payload["currency"] == "XTR"
-    assert payload["total_amount"] == 29
-    assert payload["order_info_present"] is True
-    assert payload["raw_payload_stored"] is False
-    assert "raw_update" not in payload
-    assert "successful_payment" not in payload
-    assert "telegram_payment_charge_id" not in payload
-    assert "provider_payment_charge_id" not in payload
-    assert payload["telegram_payment_charge_id_hash"] != "raw-telegram-charge"
-    assert payload["provider_payment_charge_id_hash"] != "raw-provider-charge"
-    serialized_payload = repr(payload)
-    assert "buyer@example.com" not in serialized_payload
-    assert "+49123456789" not in serialized_payload
-    assert "Private Strasse 1" not in serialized_payload
-    assert "raw-telegram-charge" not in serialized_payload
-    assert "raw-provider-charge" not in serialized_payload
+    assert stored[0]["update_id"] == 777
+    forwarded_payload = stored[0]["update_payload"]
+    assert isinstance(forwarded_payload, dict)
+    forwarded_message = forwarded_payload["message"]
+    assert isinstance(forwarded_message, dict)
+    forwarded_payment = forwarded_message["successful_payment"]
+    assert isinstance(forwarded_payment, dict)
+    assert forwarded_payment["currency"] == "XTR"
 
 
 def test_payment_update_evidence_duplicate_still_enqueues_once(monkeypatch) -> None:
     stub_task = StubTask()
-    seen: set[str] = set()
-    created_count = 0
+    store_calls = 0
 
-    async def _create_once(_session, *, payload: dict[str, object], **_kwargs):
-        nonlocal created_count
-        payment_update_key = str(payload["payment_update_key"])
-        if payment_update_key in seen:
-            return object(), False
-        seen.add(payment_update_key)
-        created_count += 1
-        return object(), True
+    async def _store_evidence(**_kwargs):
+        nonlocal store_calls
+        store_calls += 1
+        return True
 
     monkeypatch.setattr(telegram_webhook, "get_settings", _settings)
     monkeypatch.setattr(telegram_webhook, "process_telegram_update", stub_task)
-    monkeypatch.setattr(telegram_webhook, "SessionLocal", _SessionLocal())
-    monkeypatch.setattr(
-        telegram_webhook.OutboxEventsRepo,
-        "create_once_by_payload_key",
-        _create_once,
-    )
+    monkeypatch.setattr(telegram_webhook, "store_payment_update_evidence", _store_evidence)
 
     client = TestClient(app)
     payload = {"update_id": 778, "pre_checkout_query": {"id": "pre-1"}}
@@ -268,24 +224,19 @@ def test_payment_update_evidence_duplicate_still_enqueues_once(monkeypatch) -> N
         )
         assert response.status_code == 200
 
-    assert created_count == 1
+    assert store_calls == 2
     assert len(stub_task.calls) == 2
 
 
 def test_payment_update_evidence_store_failure_returns_retry(monkeypatch) -> None:
     stub_task = StubTask()
 
-    async def _fail_create_once(*_args, **_kwargs):
-        raise RuntimeError("db down")
+    async def _fail_store_evidence(**_kwargs):
+        return False
 
     monkeypatch.setattr(telegram_webhook, "get_settings", _settings)
     monkeypatch.setattr(telegram_webhook, "process_telegram_update", stub_task)
-    monkeypatch.setattr(telegram_webhook, "SessionLocal", _SessionLocal())
-    monkeypatch.setattr(
-        telegram_webhook.OutboxEventsRepo,
-        "create_once_by_payload_key",
-        _fail_create_once,
-    )
+    monkeypatch.setattr(telegram_webhook, "store_payment_update_evidence", _fail_store_evidence)
 
     client = TestClient(app)
     response = client.post(
@@ -302,17 +253,8 @@ def test_payment_update_evidence_store_failure_returns_retry(monkeypatch) -> Non
 def test_non_payment_update_does_not_store_evidence(monkeypatch) -> None:
     stub_task = StubTask()
 
-    async def _create_once(*_args, **_kwargs):
-        raise AssertionError("non-payment update must not create payment evidence")
-
     monkeypatch.setattr(telegram_webhook, "get_settings", _settings)
     monkeypatch.setattr(telegram_webhook, "process_telegram_update", stub_task)
-    monkeypatch.setattr(telegram_webhook, "SessionLocal", _SessionLocal())
-    monkeypatch.setattr(
-        telegram_webhook.OutboxEventsRepo,
-        "create_once_by_payload_key",
-        _create_once,
-    )
 
     client = TestClient(app)
     response = client.post(

@@ -380,14 +380,7 @@ def build_invariant_checks(now_utc: datetime) -> list[InvariantCheck]:
 
 def read_only_sql_texts() -> list[str]:
     checks = build_invariant_checks(datetime(2026, 1, 1, tzinfo=timezone.utc))
-    return [check.sql for check in checks] + [
-        """
-        SELECT count(*)
-        FROM outbox_events
-        WHERE event_type = 'payments_telegram_stars_reconciliation_review'
-          AND status = 'OPEN'
-        """,
-    ]
+    return [check.sql for check in checks] + [_open_review_count_sql()]
 
 
 async def _run_count_check(session: AsyncSession, check: InvariantCheck) -> CheckResult:
@@ -401,18 +394,25 @@ async def _run_count_check(session: AsyncSession, check: InvariantCheck) -> Chec
     )
 
 
+def _open_review_count_sql() -> str:
+    return """
+        SELECT COALESCE(SUM(review_count), 0)
+        FROM (
+          SELECT count(*) AS review_count
+          FROM outbox_events
+          WHERE event_type = 'payments_telegram_stars_reconciliation_review'
+            AND status = 'OPEN'
+          UNION ALL
+          SELECT count(*) AS review_count
+          FROM payment_reconciliation_reviews
+          WHERE status = 'OPEN'
+        ) open_reviews
+    """
+
+
 async def _run_open_review_check(session: AsyncSession) -> CheckResult:
     description = "Open payment reconciliation reviews exist."
-    count_result = await session.execute(
-        text(
-            """
-            SELECT count(*)
-            FROM outbox_events
-            WHERE event_type = 'payments_telegram_stars_reconciliation_review'
-              AND status = 'OPEN'
-            """
-        )
-    )
+    count_result = await session.execute(text(_open_review_count_sql()))
     count = int(count_result.scalar_one() or 0)
     return classify_count_result(
         name="payments_open_manual_review_records",

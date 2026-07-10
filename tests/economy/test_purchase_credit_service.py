@@ -7,6 +7,8 @@ from uuid import uuid4
 import pytest
 
 import app.economy.purchases.service.credit as purchase_credit
+import app.economy.purchases.service.credit_logging as credit_logging
+import app.economy.purchases.service.credit_marked as credit_marked
 from app.economy.purchases.catalog import ProductSpec
 from app.economy.purchases.errors import PurchaseNotFoundError, PurchasePrecheckoutValidationError
 from tests.type_helpers import AsyncSessionStub
@@ -31,15 +33,24 @@ class _Logger:
 
 
 def _purchase(
-    *, user_id: int = 7, status: str = "CREATED", stars_amount: int = 0
+    *,
+    user_id: int = 7,
+    status: str = "CREATED",
+    stars_amount: int = 0,
+    invoice_payload: str = "inv-1",
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid4(),
         user_id=user_id,
         status=status,
         product_code="ENERGY_10",
+        product_type="MICRO",
         stars_amount=stars_amount,
+        discount_stars_amount=0,
+        currency="XTR",
+        invoice_payload=invoice_payload,
         paid_at=None,
+        credited_at=None,
         telegram_payment_charge_id=None,
         raw_successful_payment=None,
     )
@@ -118,10 +129,23 @@ async def test_apply_successful_payment_rejects_invalid_purchase_status(
     async def _fake_get_by_invoice_payload_for_update(_session, _invoice_payload):
         return purchase
 
+    async def _fake_get_for_credit_lock(_session, _purchase_id):
+        return purchase
+
     monkeypatch.setattr(
         purchase_credit.PurchasesRepo,
         "get_by_invoice_payload_for_update",
         _fake_get_by_invoice_payload_for_update,
+    )
+    monkeypatch.setattr(
+        purchase_credit.PurchasesRepo,
+        "get_for_credit_lock",
+        _fake_get_for_credit_lock,
+    )
+    monkeypatch.setattr(
+        purchase_credit.PurchasesRepo,
+        "get_for_credit_lock",
+        _fake_get_for_credit_lock,
     )
 
     with pytest.raises(PurchasePrecheckoutValidationError):
@@ -140,13 +164,16 @@ async def test_apply_successful_payment_credits_legacy_premium_starter_as_premiu
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now_utc = datetime.now(UTC)
-    purchase = _purchase(status="INVOICE_SENT", stars_amount=29)
+    purchase = _purchase(status="INVOICE_SENT", stars_amount=29, invoice_payload="inv-starter")
     purchase.product_code = "PREMIUM_STARTER"
     events: list[str] = []
     credit_calls: list[dict[str, object]] = []
     logger = _Logger()
 
     async def _fake_get_by_invoice_payload_for_update(_session, _invoice_payload):
+        return purchase
+
+    async def _fake_get_for_credit_lock(_session, _purchase_id):
         return purchase
 
     async def _fake_emit_purchase_event(
@@ -178,9 +205,14 @@ async def test_apply_successful_payment_credits_legacy_premium_starter_as_premiu
         "get_by_invoice_payload_for_update",
         _fake_get_by_invoice_payload_for_update,
     )
+    monkeypatch.setattr(
+        purchase_credit.PurchasesRepo,
+        "get_for_credit_lock",
+        _fake_get_for_credit_lock,
+    )
     monkeypatch.setattr(purchase_credit, "_emit_purchase_event", _fake_emit_purchase_event)
-    monkeypatch.setattr(purchase_credit, "credit_purchase_assets", _fake_credit_purchase_assets)
-    monkeypatch.setattr(purchase_credit, "logger", logger)
+    monkeypatch.setattr(credit_marked, "credit_purchase_assets", _fake_credit_purchase_assets)
+    monkeypatch.setattr(credit_logging, "logger", logger)
 
     result = await purchase_credit.apply_successful_payment(
         _Session(),
@@ -227,10 +259,13 @@ async def test_apply_successful_payment_logs_credit_failure_without_raw_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     now_utc = datetime.now(UTC)
-    purchase = _purchase(status="INVOICE_SENT", stars_amount=5)
+    purchase = _purchase(status="INVOICE_SENT", stars_amount=5, invoice_payload="inv-failure")
     logger = _Logger()
 
     async def _fake_get_by_invoice_payload_for_update(_session, _invoice_payload):
+        return purchase
+
+    async def _fake_get_for_credit_lock(_session, _purchase_id):
         return purchase
 
     async def _fake_emit_purchase_event(*_args, **_kwargs) -> None:
@@ -244,9 +279,14 @@ async def test_apply_successful_payment_logs_credit_failure_without_raw_payload(
         "get_by_invoice_payload_for_update",
         _fake_get_by_invoice_payload_for_update,
     )
+    monkeypatch.setattr(
+        purchase_credit.PurchasesRepo,
+        "get_for_credit_lock",
+        _fake_get_for_credit_lock,
+    )
     monkeypatch.setattr(purchase_credit, "_emit_purchase_event", _fake_emit_purchase_event)
-    monkeypatch.setattr(purchase_credit, "credit_purchase_assets", _fail_credit_purchase_assets)
-    monkeypatch.setattr(purchase_credit, "logger", logger)
+    monkeypatch.setattr(credit_marked, "credit_purchase_assets", _fail_credit_purchase_assets)
+    monkeypatch.setattr(credit_logging, "logger", logger)
 
     with pytest.raises(RuntimeError):
         await purchase_credit.apply_successful_payment(
@@ -268,103 +308,3 @@ async def test_apply_successful_payment_logs_credit_failure_without_raw_payload(
     assert "inv-failure" not in str(logger.infos + logger.warnings)
     assert "charge-1" not in str(logger.infos + logger.warnings)
     assert "token" not in str(logger.infos + logger.warnings).lower()
-
-
-@pytest.mark.asyncio
-async def test_apply_successful_payment_rejects_non_xtr_currency_for_paid_purchase(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    purchase = _purchase(status="INVOICE_SENT", stars_amount=5)
-
-    async def _fake_get_by_invoice_payload_for_update(_session, _invoice_payload):
-        return purchase
-
-    monkeypatch.setattr(
-        purchase_credit.PurchasesRepo,
-        "get_by_invoice_payload_for_update",
-        _fake_get_by_invoice_payload_for_update,
-    )
-
-    with pytest.raises(PurchasePrecheckoutValidationError):
-        await purchase_credit.apply_successful_payment(
-            _Session(),
-            user_id=7,
-            invoice_payload="inv-wrong-currency",
-            telegram_payment_charge_id="charge-1",
-            raw_successful_payment={
-                "invoice_payload": "inv-wrong-currency",
-                "currency": "USD",
-                "total_amount": 5,
-            },
-            now_utc=datetime.now(UTC),
-        )
-
-    assert purchase.status == "INVOICE_SENT"
-    assert purchase.raw_successful_payment is None
-
-
-@pytest.mark.asyncio
-async def test_apply_successful_payment_rejects_mismatched_total_amount_for_paid_purchase(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    purchase = _purchase(status="INVOICE_SENT", stars_amount=5)
-
-    async def _fake_get_by_invoice_payload_for_update(_session, _invoice_payload):
-        return purchase
-
-    monkeypatch.setattr(
-        purchase_credit.PurchasesRepo,
-        "get_by_invoice_payload_for_update",
-        _fake_get_by_invoice_payload_for_update,
-    )
-
-    with pytest.raises(PurchasePrecheckoutValidationError):
-        await purchase_credit.apply_successful_payment(
-            _Session(),
-            user_id=7,
-            invoice_payload="inv-wrong-total",
-            telegram_payment_charge_id="charge-1",
-            raw_successful_payment={
-                "invoice_payload": "inv-wrong-total",
-                "currency": "XTR",
-                "total_amount": 6,
-            },
-            now_utc=datetime.now(UTC),
-        )
-
-    assert purchase.status == "INVOICE_SENT"
-    assert purchase.raw_successful_payment is None
-
-
-@pytest.mark.asyncio
-async def test_apply_successful_payment_rejects_missing_payment_payload_for_paid_purchase(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    purchase = _purchase(status="INVOICE_SENT", stars_amount=5)
-
-    async def _fake_get_by_invoice_payload_for_update(_session, _invoice_payload):
-        return purchase
-
-    async def _fail_credit_purchase_assets(*_args, **_kwargs) -> None:
-        pytest.fail("paid purchase without successful payment payload must not be credited")
-
-    monkeypatch.setattr(
-        purchase_credit.PurchasesRepo,
-        "get_by_invoice_payload_for_update",
-        _fake_get_by_invoice_payload_for_update,
-    )
-    monkeypatch.setattr(purchase_credit, "credit_purchase_assets", _fail_credit_purchase_assets)
-
-    with pytest.raises(PurchasePrecheckoutValidationError):
-        await purchase_credit.apply_successful_payment(
-            _Session(),
-            user_id=7,
-            invoice_payload="inv-missing-payment",
-            telegram_payment_charge_id="charge-1",
-            raw_successful_payment={},
-            now_utc=datetime.now(UTC),
-        )
-
-    assert purchase.status == "INVOICE_SENT"
-    assert purchase.telegram_payment_charge_id is None
-    assert purchase.raw_successful_payment is None

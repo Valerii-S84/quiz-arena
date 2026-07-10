@@ -5,7 +5,7 @@ from uuid import UUID
 
 import pytest
 
-from app.bot.handlers import payments
+from app.bot.handlers import payments, payments_runtime
 from app.economy.purchases.types import PurchaseCreditResult, PurchaseInitResult
 from tests.bot.helpers import DummyCallback, DummyMessage, DummySessionLocal
 
@@ -77,13 +77,21 @@ async def test_handle_buy_with_offer_marks_click_without_conversion(monkeypatch)
 
 @pytest.mark.asyncio
 async def test_handle_successful_payment_marks_offer_conversion(monkeypatch) -> None:
-    monkeypatch.setattr(payments, "SessionLocal", DummySessionLocal())
+    monkeypatch.setattr(payments_runtime, "SessionLocal", DummySessionLocal())
     converted_calls: list[dict[str, object]] = []
 
     async def fake_home_snapshot(session, *, telegram_user):
         return SimpleNamespace(user_id=77)
 
-    async def fake_apply_payment(*args, **kwargs):
+    async def fake_mark_paid(*args, **kwargs):
+        return PurchaseCreditResult(
+            purchase_id=UUID("123e4567-e89b-12d3-a456-426614174099"),
+            product_code="ENERGY_10",
+            status="PAID_UNCREDITED",
+            idempotent_replay=False,
+        )
+
+    async def fake_credit_paid(*args, **kwargs):
         return PurchaseCreditResult(
             purchase_id=UUID("123e4567-e89b-12d3-a456-426614174099"),
             product_code="ENERGY_10",
@@ -91,19 +99,25 @@ async def test_handle_successful_payment_marks_offer_conversion(monkeypatch) -> 
             idempotent_replay=False,
         )
 
-    async def fake_get_by_id(*args, **kwargs):
-        return SimpleNamespace(idempotency_key="buy:abcd1234:offer:91:deadbeef10")
+    async def fake_mark_payment_offer_conversion(session, *, user_id: int, purchase_id: UUID):
+        converted_calls.append({"user_id": user_id, "purchase_id": purchase_id})
 
-    async def fake_mark_converted(session, *, user_id: int, impression_id: int, purchase_id: UUID):
-        converted_calls.append(
-            {"user_id": user_id, "impression_id": impression_id, "purchase_id": purchase_id}
-        )
-        return True
-
-    monkeypatch.setattr(payments.UserOnboardingService, "ensure_home_snapshot", fake_home_snapshot)
-    monkeypatch.setattr(payments.PurchaseService, "apply_successful_payment", fake_apply_payment)
-    monkeypatch.setattr(payments.PurchaseService, "get_by_id", fake_get_by_id)
-    monkeypatch.setattr(payments.OfferService, "mark_offer_converted_purchase", fake_mark_converted)
+    monkeypatch.setattr(
+        payments_runtime.UserOnboardingService,
+        "ensure_home_snapshot",
+        fake_home_snapshot,
+    )
+    monkeypatch.setattr(
+        payments_runtime.PurchaseService,
+        "mark_successful_payment_paid_uncredited",
+        fake_mark_paid,
+    )
+    monkeypatch.setattr(payments_runtime.PurchaseService, "credit_paid_purchase", fake_credit_paid)
+    monkeypatch.setattr(
+        payments_runtime,
+        "mark_payment_offer_conversion",
+        fake_mark_payment_offer_conversion,
+    )
 
     message = _PaymentMessage(from_user=SimpleNamespace(id=1))
     await payments.handle_successful_payment(message)  # type: ignore[arg-type]
@@ -111,7 +125,6 @@ async def test_handle_successful_payment_marks_offer_conversion(monkeypatch) -> 
     assert converted_calls == [
         {
             "user_id": 77,
-            "impression_id": 91,
             "purchase_id": UUID("123e4567-e89b-12d3-a456-426614174099"),
         }
     ]
