@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 from datetime import UTC, datetime
 from typing import cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.production_invariants import (
+    InvariantCheck,
     InvariantResult,
     build_invariant_checks,
     exit_code_for,
@@ -41,6 +43,7 @@ def test_production_invariant_checks_include_required_p1_surfaces() -> None:
         "paid_without_charge_id",
         "reconciliation_diff_nonzero",
         "daily_cup_expected_delivery_zero_outcomes",
+        "daily_cup_round_delivery_gap",
         "tournament_round_expected_delivery_zero_outcomes",
         "private_tournament_round_delivery_gap",
         "telegram_delivery_failure_rate",
@@ -77,6 +80,165 @@ def test_scheduled_offer_check_uses_delivery_attempt_expectation_only() -> None:
     assert "status = 'PENDING'" in check.sql
     assert "offers_impressions" not in check.sql
     assert "scheduled_offer_pending_cutoff" in check.params
+
+
+def test_daily_cup_delivery_gap_is_per_active_participant_and_not_canceled() -> None:
+    check = _check_by_name("daily_cup_round_delivery_gap")
+
+    assert "FROM tournament_participants p" in check.sql
+    assert "JOIN users u ON u.id = p.user_id" in check.sql
+    assert "u.status = 'ACTIVE'" in check.sql
+    assert "p.user_id::text || ':phase:'" in check.sql
+    assert "WHEN t.status = 'COMPLETED' THEN 'status:completed'" in check.sql
+    assert "'round:' || GREATEST(1, t.current_round)::text" in check.sql
+    assert "':status:' || lower(t.status)" in check.sql
+    assert "d.status IN ('SENT','FAILED','SKIPPED')" in check.sql
+    assert "'CANCELED'" not in check.sql
+
+
+def test_private_tournament_delivery_gap_is_current_phase_specific() -> None:
+    check = _check_by_name("private_tournament_round_delivery_gap")
+
+    assert "p.user_id::text || ':phase:'" in check.sql
+    assert "WHEN t.status = 'COMPLETED' THEN 'status:completed'" in check.sql
+    assert "'round:' || GREATEST(1, t.current_round)::text" in check.sql
+    assert "':status:' || lower(t.status)" in check.sql
+
+
+def test_daily_cup_zero_outcome_check_uses_active_eligible_users_only() -> None:
+    check = _check_by_name("daily_cup_expected_delivery_zero_outcomes")
+
+    assert "JOIN users u ON u.id = p.user_id" in check.sql
+    assert "u.status = 'ACTIVE'" in check.sql
+    assert "'CANCELED'" not in check.sql
+
+
+def test_streak_stale_check_correlates_activity_to_same_user() -> None:
+    check = _check_by_name("streak_update_stale")
+
+    assert "SELECT user_id, max(answered_at)" in check.sql
+    assert "GROUP BY user_id" in check.sql
+    assert "LEFT JOIN streak_state s ON s.user_id = a.user_id" in check.sql
+    assert "s.updated_at < a.latest_answered_at" in check.sql
+
+
+def test_daily_cup_gap_counts_missing_current_phase_participant() -> None:
+    check = _check_by_name("daily_cup_round_delivery_gap")
+    count = _run_invariant_sql(
+        check.sql,
+        check.params,
+        """
+        CREATE TABLE tournaments (
+            id TEXT, type TEXT, status TEXT, current_round INTEGER, created_at TEXT
+        );
+        CREATE TABLE tournament_participants (tournament_id TEXT, user_id INTEGER);
+        CREATE TABLE users (id INTEGER, status TEXT);
+        CREATE TABLE telegram_delivery_attempts (
+            flow TEXT, correlation_id TEXT, target_id TEXT, status TEXT
+        );
+        INSERT INTO tournaments VALUES ('cup-1', 'DAILY_ARENA', 'ROUND_2', 2, '2026-07-10 11:00:00+00:00');
+        INSERT INTO users VALUES (1, 'ACTIVE'), (2, 'ACTIVE');
+        INSERT INTO tournament_participants VALUES ('cup-1', 1), ('cup-1', 2);
+        INSERT INTO telegram_delivery_attempts VALUES (
+            'daily_cup_round_messaging', 'cup-1',
+            '1:phase:round:2:status:round_2:edit:101', 'SENT'
+        );
+        INSERT INTO telegram_delivery_attempts VALUES (
+            'daily_cup_round_messaging', 'cup-1',
+            '2:phase:round:1:status:round_1:edit:202', 'SENT'
+        );
+        """,
+    )
+
+    assert count == 1
+
+
+def test_daily_cup_gap_ignores_inactive_and_canceled_without_false_alert() -> None:
+    check = _check_by_name("daily_cup_round_delivery_gap")
+    count = _run_invariant_sql(
+        check.sql,
+        check.params,
+        """
+        CREATE TABLE tournaments (
+            id TEXT, type TEXT, status TEXT, current_round INTEGER, created_at TEXT
+        );
+        CREATE TABLE tournament_participants (tournament_id TEXT, user_id INTEGER);
+        CREATE TABLE users (id INTEGER, status TEXT);
+        CREATE TABLE telegram_delivery_attempts (
+            flow TEXT, correlation_id TEXT, target_id TEXT, status TEXT
+        );
+        INSERT INTO tournaments VALUES ('cup-1', 'DAILY_ARENA', 'ROUND_2', 2, '2026-07-10 11:00:00+00:00');
+        INSERT INTO tournaments VALUES ('cup-2', 'DAILY_ARENA', 'CANCELED', 0, '2026-07-10 11:00:00+00:00');
+        INSERT INTO users VALUES (1, 'BLOCKED'), (2, 'ACTIVE');
+        INSERT INTO tournament_participants VALUES ('cup-1', 1), ('cup-2', 2);
+        """,
+    )
+
+    assert count == 0
+
+
+def test_private_tournament_gap_counts_missing_current_phase_participant() -> None:
+    check = _check_by_name("private_tournament_round_delivery_gap")
+    count = _run_invariant_sql(
+        check.sql,
+        check.params,
+        """
+        CREATE TABLE tournaments (
+            id TEXT, type TEXT, status TEXT, current_round INTEGER, created_at TEXT
+        );
+        CREATE TABLE tournament_participants (tournament_id TEXT, user_id INTEGER);
+        CREATE TABLE telegram_delivery_attempts (
+            flow TEXT, correlation_id TEXT, target_id TEXT, status TEXT
+        );
+        INSERT INTO tournaments VALUES ('t-1', 'PRIVATE', 'ROUND_2', 2, '2026-07-10 11:00:00+00:00');
+        INSERT INTO tournament_participants VALUES ('t-1', 1), ('t-1', 2);
+        INSERT INTO telegram_delivery_attempts VALUES (
+            'private_tournament_round_messaging', 't-1',
+            '1:phase:round:2:status:round_2:edit:101', 'SENT'
+        );
+        INSERT INTO telegram_delivery_attempts VALUES (
+            'private_tournament_round_messaging', 't-1',
+            '2:phase:round:1:status:round_1:edit:202', 'SENT'
+        );
+        """,
+    )
+
+    assert count == 1
+
+
+def test_streak_stale_count_is_per_user_not_global() -> None:
+    check = _check_by_name("streak_update_stale")
+    count = _run_invariant_sql(
+        check.sql,
+        check.params,
+        """
+        CREATE TABLE quiz_attempts (user_id INTEGER, answered_at TEXT);
+        CREATE TABLE streak_state (user_id INTEGER, updated_at TEXT);
+        INSERT INTO quiz_attempts VALUES (1, '2026-07-10 11:00:00+00:00');
+        INSERT INTO quiz_attempts VALUES (2, '2026-07-10 11:30:00+00:00');
+        INSERT INTO streak_state VALUES (1, '2026-07-10 11:05:00+00:00');
+        INSERT INTO streak_state VALUES (2, '2026-07-10 11:00:00+00:00');
+        """,
+    )
+
+    assert count == 1
+
+
+def test_streak_stale_count_finds_missing_user_row() -> None:
+    check = _check_by_name("streak_update_stale")
+    count = _run_invariant_sql(
+        check.sql,
+        check.params,
+        """
+        CREATE TABLE quiz_attempts (user_id INTEGER, answered_at TEXT);
+        CREATE TABLE streak_state (user_id INTEGER, updated_at TEXT);
+        INSERT INTO quiz_attempts VALUES (1, '2026-07-10 11:00:00+00:00');
+        INSERT INTO quiz_attempts VALUES (2, '2026-07-10 11:30:00+00:00');
+        INSERT INTO streak_state VALUES (1, '2026-07-10 11:05:00+00:00');
+        """,
+    )
+
+    assert count == 1
 
 
 def test_production_invariant_exit_code_blocks_only_p0_p1_failures() -> None:
@@ -139,6 +301,26 @@ async def test_record_alerts_for_results_dedupes_and_resolves(monkeypatch) -> No
     assert calls[0][0] == "open"
     assert calls[0][1]["alert_type"] == "paid_without_entitlement"
     assert calls[1][0] == "resolved"
+
+
+def _check_by_name(name: str) -> InvariantCheck:
+    return next(check for check in build_invariant_checks(NOW_UTC) if check.name == name)
+
+
+def _run_invariant_sql(sql: str, params: dict[str, object], setup_sql: str) -> int:
+    translated_sql = sql.replace("::text", "").replace("GREATEST(", "max(")
+    translated_params = {
+        key: value.isoformat(sep=" ") if isinstance(value, datetime) else value
+        for key, value in params.items()
+    }
+    connection = sqlite3.connect(":memory:")
+    try:
+        connection.executescript(setup_sql)
+        row = connection.execute(translated_sql, translated_params).fetchone()
+    finally:
+        connection.close()
+    assert row is not None
+    return int(row[0] or 0)
 
 
 def _result(*, name: str, status: str, severity: str, count: int) -> InvariantResult:

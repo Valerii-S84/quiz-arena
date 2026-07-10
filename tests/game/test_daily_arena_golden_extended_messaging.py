@@ -98,6 +98,7 @@ async def test_daily_arena_messaging_round_pipeline_fetches_round_matches_for_ar
             "sent": 2,
             "edited": 0,
             "failed": 0,
+            "skipped": 0,
             "new_message_ids": {101: 1001},
             "replaced_message_ids": {},
         }
@@ -142,7 +143,14 @@ async def test_daily_arena_messaging_round_pipeline_fetches_round_matches_for_ar
         enqueue_completion_followups=True,
     )
 
-    assert result == {"processed": 1, "participants_total": 2, "sent": 2, "edited": 0, "failed": 0}
+    assert result == {
+        "processed": 1,
+        "participants_total": 2,
+        "sent": 2,
+        "edited": 0,
+        "failed": 0,
+        "skipped": 0,
+    }
     assert calls["round_no"] == 2
     assert calls["deliver"]["tournament"].type == TOURNAMENT_TYPE_DAILY_ARENA
     assert calls["persist"]["new_message_ids"] == {101: 1001}
@@ -206,8 +214,8 @@ def test_daily_arena_messaging_enqueue_paths_and_wrapper(monkeypatch: pytest.Mon
 
     monkeypatch.setattr(
         daily_cup_messaging,
-        "run_async_job",
-        lambda coroutine: {"wrapped": close_coroutine_with_name(coroutine)},
+        "run_tracked_async_job",
+        lambda **kwargs: {"wrapped": close_coroutine_with_name(kwargs["awaitable"])},
     )
     wrapped = daily_cup_messaging.run_daily_cup_round_messaging(tournament_id="arena-id-wrapper")
     assert wrapped == {"wrapped": "run_daily_cup_round_messaging_async_with_followups"}

@@ -149,7 +149,8 @@ def _daily_cup_cancel_delivery_target(
     correlation_id: str,
     chat_id: int,
 ) -> TelegramDeliveryTarget:
-    target_id = hash_chat_id(chat_id)
+    content_version = "status:canceled"
+    target_id = f"{hash_chat_id(chat_id)}:{content_version}"
     return TelegramDeliveryTarget(
         flow="daily_cup_cancel_message",
         task_name="daily_cup.close_registration_and_start",
@@ -164,7 +165,11 @@ def _daily_cup_cancel_delivery_target(
         ),
         telegram_user_id=chat_id,
         chat_id=chat_id,
-        safe_context={"tournament_id": correlation_id},
+        safe_context={
+            "tournament_id": correlation_id,
+            "content_version": content_version,
+            "pending_replay_safe": False,
+        },
     )
 
 

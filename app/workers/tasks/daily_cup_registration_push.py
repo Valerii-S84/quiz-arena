@@ -13,8 +13,6 @@ from app.db.session import SessionLocal
 from app.game.tournaments.constants import TOURNAMENT_STATUS_REGISTRATION
 from app.services.telegram_delivery import (
     SKIP_CODE_DUPLICATE,
-    TelegramDeliveryTarget,
-    build_delivery_idempotency_key,
     mark_telegram_delivery_failed,
     mark_telegram_delivery_sent,
     prepare_telegram_delivery,
@@ -26,6 +24,7 @@ from app.workers.tasks.daily_cup_config import (
 )
 from app.workers.tasks.daily_cup_core import ensure_daily_cup_registration_tournament
 from app.workers.tasks.daily_cup_push_events import list_already_pushed_user_ids
+from app.workers.tasks.daily_cup_registration_push_targets import daily_cup_delivery_target
 from app.workers.tasks.daily_cup_time import format_close_time_local
 
 
@@ -42,7 +41,7 @@ async def _send_daily_cup_registration_push_once(
     happened_at,
     sent_event_type: str,
 ) -> bool:
-    target = _daily_cup_delivery_target(
+    target = daily_cup_delivery_target(
         flow=flow,
         task_name=task_name,
         tournament_id_text=tournament_id_text,
@@ -157,7 +156,7 @@ async def send_daily_cup_registration_push_async(
                 last_user_id = user_id
                 if user_id in already_pushed_user_ids:
                     await record_telegram_delivery_skipped(
-                        target=_daily_cup_delivery_target(
+                        target=daily_cup_delivery_target(
                             flow=flow,
                             task_name=task_name,
                             tournament_id_text=tournament_id_text,
@@ -196,29 +195,3 @@ async def send_daily_cup_registration_push_async(
     }
     logger.info(log_event, **result)
     return result
-
-
-def _daily_cup_delivery_target(
-    *,
-    flow: str,
-    task_name: str,
-    tournament_id_text: str,
-    user_id: int,
-    telegram_user_id: int,
-) -> TelegramDeliveryTarget:
-    return TelegramDeliveryTarget(
-        flow=flow,
-        task_name=task_name,
-        correlation_id=tournament_id_text,
-        target_type="user",
-        target_id=str(user_id),
-        idempotency_key=build_delivery_idempotency_key(
-            flow=flow,
-            correlation_id=tournament_id_text,
-            target_type="user",
-            target_id=str(user_id),
-        ),
-        telegram_user_id=telegram_user_id,
-        chat_id=telegram_user_id,
-        safe_context={"tournament_id": tournament_id_text, "user_id": user_id},
-    )

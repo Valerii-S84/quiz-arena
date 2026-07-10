@@ -1,0 +1,86 @@
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta
+
+from app.services.production_invariant_checks.types import (
+    SEVERITY_P1,
+    SEVERITY_P2,
+    InvariantCheck,
+    build_check,
+)
+
+
+def build_freshness_checks(now_utc: datetime, local_today_berlin: date) -> list[InvariantCheck]:
+    return [
+        build_check(
+            name="queue_oldest_message_age_seconds",
+            severity=SEVERITY_P1,
+            sql="""
+                SELECT count(*)
+                FROM outbox_events
+                WHERE status IN ('NEW','PENDING','OPEN','RETRY')
+                  AND created_at <= :queue_old_cutoff
+            """,
+            params={"queue_old_cutoff": now_utc - timedelta(minutes=15)},
+            description="Outbox queue has messages older than 15 minutes.",
+        ),
+        build_check(
+            name="streak_update_stale",
+            severity=SEVERITY_P1,
+            sql="""
+                WITH recent_activity AS (
+                  SELECT user_id, max(answered_at) AS latest_answered_at
+                  FROM quiz_attempts
+                  WHERE answered_at >= :streak_activity_cutoff
+                  GROUP BY user_id
+                )
+                SELECT count(*)
+                FROM recent_activity a
+                LEFT JOIN streak_state s ON s.user_id = a.user_id
+                WHERE s.user_id IS NULL
+                   OR s.updated_at < a.latest_answered_at
+            """,
+            params={"streak_activity_cutoff": now_utc - timedelta(hours=6)},
+            description="Recent quiz activity exists but the same user's streak_state is stale.",
+        ),
+        build_check(
+            name="global_best_streak_source_inconsistent",
+            severity=SEVERITY_P1,
+            sql="""
+                SELECT count(*)
+                FROM streak_state
+                WHERE current_streak > best_streak
+            """,
+            description="Global best streak source has rows where current_streak exceeds best_streak.",
+        ),
+        build_check(
+            name="analytics_daily_stale",
+            severity=SEVERITY_P2,
+            sql="""
+                SELECT CASE WHEN EXISTS (
+                  SELECT 1
+                  FROM analytics_daily
+                  WHERE local_date_berlin >= :local_today_berlin
+                    AND calculated_at >= :analytics_fresh_cutoff
+                ) THEN 0 ELSE 1 END
+            """,
+            params={
+                "local_today_berlin": local_today_berlin,
+                "analytics_fresh_cutoff": now_utc - timedelta(hours=2),
+            },
+            description="Daily analytics aggregate is stale for the Berlin day.",
+        ),
+        build_check(
+            name="scheduled_offer_zero_delivery",
+            severity=SEVERITY_P2,
+            sql="""
+                SELECT count(*)
+                FROM telegram_delivery_attempts
+                WHERE flow = 'scheduled_offer_delivery'
+                  AND status = 'PENDING'
+                  AND created_at <= :scheduled_offer_pending_cutoff
+            """,
+            params={"scheduled_offer_pending_cutoff": now_utc - timedelta(minutes=30)},
+            description="Scheduled offer delivery attempt remains pending without a terminal outcome.",
+        ),
+    ]

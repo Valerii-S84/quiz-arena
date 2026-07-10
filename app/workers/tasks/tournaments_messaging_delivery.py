@@ -5,15 +5,21 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED
 from app.services.telegram_delivery import (
-    TelegramDeliveryTarget,
-    build_delivery_idempotency_key,
+    SKIP_CODE_EDIT_REPLACED_BY_SEND,
     mark_telegram_delivery_failed,
     mark_telegram_delivery_sent,
     prepare_telegram_delivery,
+    record_telegram_delivery_skipped,
 )
 from app.workers.tasks.tournaments_messaging_context import TournamentRoundMessagingContext
+from app.workers.tasks.tournaments_messaging_delivery_content import build_round_message_payload
+from app.workers.tasks.tournaments_messaging_delivery_targets import (
+    delivery_operation,
+    fallback_delivery_operation,
+    private_round_content_version,
+    private_round_delivery_target,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,70 +57,41 @@ async def deliver_round_messages(
     flow = "private_tournament_round_messaging"
     task_name = "tournaments_messaging.run_private_tournament_round_messaging"
     correlation_id = str(context.parsed_tournament_id)
+    content_version = private_round_content_version(tournament=context.tournament)
 
     bot = build_bot_fn()
     try:
         for user_id in context.standings_user_ids:
             chat_id = context.telegram_targets.get(user_id)
             existing_message_id = context.participant_rows[user_id].standings_message_id
-            target = _private_round_delivery_target(
+            target = private_round_delivery_target(
                 flow=flow,
                 task_name=task_name,
                 correlation_id=correlation_id,
                 user_id=user_id,
                 chat_id=chat_id,
-                delivery_operation=_delivery_operation(existing_message_id),
+                delivery_operation=delivery_operation(existing_message_id),
+                content_version=content_version,
+                tournament_status=str(context.tournament.status),
+                current_round=int(context.tournament.current_round),
+                pending_replay_safe=existing_message_id is not None,
             )
             delivery = await prepare_telegram_delivery(target=target, happened_at=happened_at)
             if not delivery.should_send:
                 skipped += 1
                 continue
 
-            play_challenge_id, opponent_user_id = resolve_match_context_fn(
-                round_matches=context.round_matches,
-                viewer_user_id=user_id,
-            )
-            standings_lines = build_standings_lines_fn(
-                standings_user_ids=context.standings_user_ids,
-                labels=context.labels,
-                points_by_user=context.points_by_user,
-                viewer_user_id=user_id,
-            )
-            if context.tournament.status == TOURNAMENT_STATUS_COMPLETED:
-                text = build_completed_text_fn(
-                    tournament_name=context.tournament.name,
-                    tournament_format=context.tournament.format,
-                    place=context.place_by_user[user_id],
-                    my_points=context.points_by_user.get(user_id, "0"),
-                    standings_lines=standings_lines,
-                )
-            else:
-                text = build_round_text_fn(
-                    tournament_name=context.tournament.name,
-                    tournament_format=context.tournament.format,
-                    round_no=max(1, int(context.tournament.current_round)),
-                    deadline_text=format_deadline_fn(context.tournament.round_deadline),
-                    opponent_label=(
-                        context.labels.get(opponent_user_id)
-                        if opponent_user_id is not None
-                        else None
-                    ),
-                    standings_lines=standings_lines,
-                )
-            keyboard = build_keyboard_fn(
-                invite_code=context.tournament.invite_code,
-                tournament_id=str(context.tournament.id),
-                can_join=False,
-                can_start=False,
-                play_challenge_id=play_challenge_id,
-                show_share_result=context.tournament.status == TOURNAMENT_STATUS_COMPLETED,
-            )
-            keyboard = add_share_button_fn(
-                keyboard=keyboard,
-                share_url=build_share_url_fn(
-                    invite_code=context.tournament.invite_code,
-                    tournament_name=context.tournament.name,
-                ),
+            text, keyboard = build_round_message_payload(
+                context=context,
+                user_id=user_id,
+                resolve_match_context_fn=resolve_match_context_fn,
+                build_standings_lines_fn=build_standings_lines_fn,
+                build_completed_text_fn=build_completed_text_fn,
+                build_round_text_fn=build_round_text_fn,
+                format_deadline_fn=format_deadline_fn,
+                build_keyboard_fn=build_keyboard_fn,
+                add_share_button_fn=add_share_button_fn,
+                build_share_url_fn=build_share_url_fn,
             )
             if existing_message_id is None:
                 try:
@@ -159,6 +136,32 @@ async def deliver_round_messages(
                     )
                     edited += 1
                     continue
+                fallback_target = private_round_delivery_target(
+                    flow=flow,
+                    task_name=task_name,
+                    correlation_id=correlation_id,
+                    user_id=user_id,
+                    chat_id=chat_id,
+                    delivery_operation=fallback_delivery_operation(existing_message_id),
+                    content_version=content_version,
+                    tournament_status=str(context.tournament.status),
+                    current_round=int(context.tournament.current_round),
+                    pending_replay_safe=False,
+                )
+                fallback_delivery = await prepare_telegram_delivery(
+                    target=fallback_target,
+                    happened_at=happened_at,
+                )
+                if not fallback_delivery.should_send:
+                    skipped += 1
+                    if fallback_delivery.status == "SENT":
+                        await record_telegram_delivery_skipped(
+                            target=target,
+                            happened_at=happened_at,
+                            failure_code=SKIP_CODE_EDIT_REPLACED_BY_SEND,
+                            failure_reason="edit delivery already replaced by fallback send",
+                        )
+                    continue
                 try:
                     message = await bot.send_message(
                         chat_id=chat_id,
@@ -168,14 +171,20 @@ async def deliver_round_messages(
                 except Exception as send_exc:
                     failed += 1
                     await mark_telegram_delivery_failed(
-                        idempotency_key=target.idempotency_key,
+                        idempotency_key=fallback_target.idempotency_key,
                         happened_at=happened_at,
                         exc=send_exc,
                     )
                     continue
                 await mark_telegram_delivery_sent(
-                    idempotency_key=target.idempotency_key,
+                    idempotency_key=fallback_target.idempotency_key,
                     happened_at=happened_at,
+                )
+                await record_telegram_delivery_skipped(
+                    target=target,
+                    happened_at=happened_at,
+                    failure_code=SKIP_CODE_EDIT_REPLACED_BY_SEND,
+                    failure_reason="edit delivery replaced by fallback send",
                 )
                 sent += 1
                 replaced_message_ids[user_id] = int(message.message_id)
@@ -197,40 +206,6 @@ async def deliver_round_messages(
         new_message_ids=new_message_ids,
         replaced_message_ids=replaced_message_ids,
     )
-
-
-def _private_round_delivery_target(
-    *,
-    flow: str,
-    task_name: str,
-    correlation_id: str,
-    user_id: int,
-    chat_id: int | None,
-    delivery_operation: str,
-) -> TelegramDeliveryTarget:
-    target_id = f"{user_id}:{delivery_operation}"
-    return TelegramDeliveryTarget(
-        flow=flow,
-        task_name=task_name,
-        correlation_id=correlation_id,
-        target_type="user",
-        target_id=target_id,
-        idempotency_key=build_delivery_idempotency_key(
-            flow=flow,
-            correlation_id=correlation_id,
-            target_type="user",
-            target_id=target_id,
-        ),
-        telegram_user_id=chat_id,
-        chat_id=chat_id,
-        safe_context={"tournament_id": correlation_id, "user_id": user_id},
-    )
-
-
-def _delivery_operation(existing_message_id: int | None) -> str:
-    if existing_message_id is None:
-        return "send"
-    return f"edit:{int(existing_message_id)}"
 
 
 __all__ = ["TournamentRoundDeliveryResult", "deliver_round_messages"]

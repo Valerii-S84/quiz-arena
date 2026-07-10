@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 from sqlalchemy.dialects import postgresql
 
@@ -108,6 +109,61 @@ async def test_delivery_attempt_terminal_updates_only_touch_pending_rows() -> No
     assert "telegram_delivery_attempts.status = %(status_1)s" in skipped_sql
 
 
+async def test_delivery_attempt_retry_claim_is_bounded_to_retryable_failures() -> None:
+    session = RecordingSession(SimpleNamespace(rowcount=1))
+
+    await TelegramDeliveryAttemptsRepo.claim_retryable_attempt(
+        session,
+        idempotency_key="delivery:retry",
+        claimed_at=NOW_UTC,
+        retryable_failure_codes=frozenset({"TELEGRAM_RETRY_AFTER"}),
+        stale_pending_before=NOW_UTC,
+        max_attempts=3,
+        allow_stale_pending_retry=False,
+    )
+
+    sql = compile_parameterized_statement(session.statement)
+    assert "UPDATE telegram_delivery_attempts" in sql
+    assert "telegram_delivery_attempts.attempt_count < %(attempt_count_1)s" in sql
+    assert "telegram_delivery_attempts.failure_code IN" in sql
+    assert "telegram_delivery_attempts.is_blocked_candidate IS false" in sql
+    assert "telegram_delivery_attempts.updated_at <= %(updated_at_1)s" not in sql
+
+
+async def test_delivery_attempt_retry_claim_can_include_safe_stale_pending() -> None:
+    session = RecordingSession(SimpleNamespace(rowcount=1))
+
+    await TelegramDeliveryAttemptsRepo.claim_retryable_attempt(
+        session,
+        idempotency_key="delivery:retry",
+        claimed_at=NOW_UTC,
+        retryable_failure_codes=frozenset({"TELEGRAM_RETRY_AFTER"}),
+        stale_pending_before=NOW_UTC,
+        max_attempts=3,
+        allow_stale_pending_retry=True,
+    )
+
+    sql = compile_parameterized_statement(session.statement)
+    assert "telegram_delivery_attempts.status = %(status_2)s" in sql
+    assert "telegram_delivery_attempts.updated_at <= %(updated_at_1)s" in sql
+
+
+async def test_blocked_candidate_ignores_rows_with_newer_user_activity() -> None:
+    session = RecordingSession(ScalarResult(None))
+
+    await TelegramDeliveryAttemptsRepo.has_blocked_candidate(
+        session,
+        telegram_user_id=101,
+        blocked_since=NOW_UTC,
+    )
+
+    sql = compile_parameterized_statement(session.statement)
+    assert "telegram_delivery_attempts.is_blocked_candidate IS true" in sql
+    assert "telegram_delivery_attempts.status = %(status_1)s" in sql
+    assert "users.telegram_user_id = %(telegram_user_id_2)s" in sql
+    assert "users.last_seen_at > coalesce(" in sql
+
+
 async def test_worker_heartbeat_started_uses_task_schedule_conflict_key() -> None:
     session = RecordingSession(ScalarResult(None))
 
@@ -182,6 +238,26 @@ async def test_invariant_alert_reopen_terminal_rows_reuses_type_key() -> None:
     assert "status=%(status)s" in sql
     assert "resolved_at=%(resolved_at)s" in sql
     assert "acked_at=%(acked_at)s" in sql
+    assert "count=(production_invariant_alerts.count + %(count_1)s)" in sql
+
+
+async def test_invariant_alert_record_open_returns_after_successful_reopen() -> None:
+    session = RecordingSession(ScalarResult(None), ScalarResult(42), SimpleNamespace(rowcount=1))
+
+    await ProductionInvariantAlertsRepo.record_open(
+        session,
+        severity="P1",
+        alert_type="worker_task_heartbeat_stale",
+        correlation_key="task:daily-cup-round-advance",
+        seen_at=NOW_UTC,
+        safe_context={"task_name": "task"},
+    )
+
+    assert len(session.statements) == 3
+    sql = compile_parameterized_statement(session.statements[2])
+    assert "UPDATE production_invariant_alerts" in sql
+    assert "count=(production_invariant_alerts.count + %(count_1)s)" in sql
+    assert "INSERT INTO production_invariant_alerts" not in sql
 
 
 def test_reliability_models_are_importable() -> None:

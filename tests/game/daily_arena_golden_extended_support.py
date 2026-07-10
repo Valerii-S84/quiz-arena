@@ -18,4 +18,11 @@ def arena_tournament(*, status: str, current_round: int = 0) -> SimpleNamespace:
 
 
 def empty_daily_cup_result() -> dict[str, int]:
-    return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
+    return {
+        "processed": 0,
+        "participants_total": 0,
+        "sent": 0,
+        "edited": 0,
+        "failed": 0,
+        "skipped": 0,
+    }

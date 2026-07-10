@@ -10,8 +10,28 @@ from app.workers.tasks.tournaments_messaging_context import TournamentRoundMessa
 from tests.game.tournaments_unit_support import NOW_UTC, match_row, participant_row, tournament_row
 
 
+def _patch_delivery_tracking(monkeypatch: pytest.MonkeyPatch, module) -> None:
+    async def _prepare(**kwargs):
+        target = kwargs["target"]
+        return SimpleNamespace(
+            should_send=target.chat_id is not None,
+            idempotency_key=target.idempotency_key,
+        )
+
+    async def _mark_terminal(**_kwargs) -> None:
+        return None
+
+    monkeypatch.setattr(module, "prepare_telegram_delivery", _prepare)
+    monkeypatch.setattr(module, "mark_telegram_delivery_sent", _mark_terminal)
+    monkeypatch.setattr(module, "mark_telegram_delivery_failed", _mark_terminal)
+    monkeypatch.setattr(module, "record_telegram_delivery_skipped", _mark_terminal)
+
+
 @pytest.mark.asyncio
-async def test_deliver_round_messages_sends_edits_replaces_and_counts_missing_chat() -> None:
+async def test_deliver_round_messages_sends_edits_replaces_and_counts_missing_chat(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_delivery_tracking(monkeypatch, tournaments_messaging_delivery)
     tournament = tournament_row(status="COMPLETED")
     context = TournamentRoundMessagingContext(
         parsed_tournament_id=tournament.id,
@@ -48,14 +68,18 @@ async def test_deliver_round_messages_sends_edits_replaces_and_counts_missing_ch
 
     assert result.sent == 2
     assert result.edited == 1
-    assert result.failed == 1
+    assert result.failed == 0
+    assert result.skipped == 1
     assert result.new_message_ids == {11: 901}
     assert result.replaced_message_ids == {33: 902}
     assert bot.closed
 
 
 @pytest.mark.asyncio
-async def test_deliver_round_messages_counts_not_modified_as_edited() -> None:
+async def test_deliver_round_messages_counts_not_modified_as_edited(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_delivery_tracking(monkeypatch, tournaments_messaging_delivery)
     tournament = tournament_row(status="ROUND_1", current_round=1, round_deadline=NOW_UTC)
     context = TournamentRoundMessagingContext(
         parsed_tournament_id=tournament.id,
@@ -115,6 +139,7 @@ async def test_deliver_daily_cup_messages_handles_send_edit_and_missing_chat(
     monkeypatch.setattr(
         daily_cup_messaging_delivery, "is_message_not_modified_error", lambda _exc: False
     )
+    _patch_delivery_tracking(monkeypatch, daily_cup_messaging_delivery)
 
     result = await daily_cup_messaging_delivery.deliver_daily_cup_messages(
         bot=bot,
@@ -132,7 +157,8 @@ async def test_deliver_daily_cup_messages_handles_send_edit_and_missing_chat(
 
     assert result["sent"] == 2
     assert result["edited"] == 0
-    assert result["failed"] == 1
+    assert result["failed"] == 0
+    assert result["skipped"] == 1
     assert result["new_message_ids"] == {11: 901}
     assert result["replaced_message_ids"] == {22: 902}
 
