@@ -14,6 +14,7 @@ from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES
 from app.game.tournaments.daily_cup_standings import calculate_daily_cup_standings
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
+from app.workers.task_heartbeat import run_tracked_async_job
 from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
 from app.workers.tasks.daily_cup_core import persist_daily_cup_standings_message_ids
 from app.workers.tasks.daily_cup_messaging_context import load_daily_cup_round_messaging_context
@@ -30,7 +31,14 @@ logger = structlog.get_logger("app.workers.tasks.daily_cup_messaging")
 
 
 def _empty_result() -> dict[str, int]:
-    return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
+    return {
+        "processed": 0,
+        "participants_total": 0,
+        "sent": 0,
+        "edited": 0,
+        "failed": 0,
+        "skipped": 0,
+    }
 
 
 async def run_daily_cup_round_messaging_async(*, tournament_id: str) -> dict[str, int]:
@@ -107,6 +115,7 @@ async def run_daily_cup_round_messaging_async_with_followups(
         "sent": int(delivery["sent"]),
         "edited": int(delivery["edited"]),
         "failed": int(delivery["failed"]),
+        "skipped": int(delivery.get("skipped", 0)),
     }
 
 
@@ -142,8 +151,12 @@ def run_daily_cup_round_messaging(
     tournament_id: str,
     enqueue_completion_followups: bool = False,
 ) -> dict[str, int]:
-    return run_async_job(
-        run_daily_cup_round_messaging_async_with_followups(
-            tournament_id=tournament_id, enqueue_completion_followups=enqueue_completion_followups
-        )
+    task_name = "app.workers.tasks.daily_cup.run_daily_cup_round_messaging"
+    return run_tracked_async_job(
+        task_name=task_name,
+        schedule_key="daily-cup-round-messaging-on-demand",
+        awaitable=run_daily_cup_round_messaging_async_with_followups(
+            tournament_id=tournament_id,
+            enqueue_completion_followups=enqueue_completion_followups,
+        ),
     )

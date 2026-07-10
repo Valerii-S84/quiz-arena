@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
-from aiogram.exceptions import TelegramForbiddenError
 from sqlalchemy import text
 
 from app.bot.application import build_bot
@@ -21,6 +20,14 @@ from app.game.tournaments.constants import (
     TOURNAMENT_TYPE_DAILY_ARENA,
 )
 from app.game.tournaments.internal import generate_invite_code
+from app.services.telegram_delivery import (
+    TelegramDeliveryTarget,
+    build_delivery_idempotency_key,
+    hash_chat_id,
+    mark_telegram_delivery_failed,
+    mark_telegram_delivery_sent,
+    prepare_telegram_delivery,
+)
 from app.workers.tasks.daily_cup_config import TOURNAMENT_MAX_PARTICIPANTS
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
 
@@ -102,22 +109,63 @@ async def emit_daily_cup_events(
 async def send_daily_cup_canceled_messages(
     *,
     telegram_targets: list[int],
+    tournament_id: str | None = None,
     bot_factory: Callable[[], Any] | None = None,
 ) -> None:
     if not telegram_targets:
         return
     resolved_bot_factory = bot_factory if bot_factory is not None else build_bot
     bot = resolved_bot_factory()
+    happened_at = now_utc()
+    correlation_id = tournament_id or "unknown"
     try:
         for chat_id in telegram_targets:
+            target = _daily_cup_cancel_delivery_target(
+                correlation_id=correlation_id,
+                chat_id=chat_id,
+            )
+            delivery = await prepare_telegram_delivery(target=target, happened_at=happened_at)
+            if not delivery.should_send:
+                continue
             try:
                 await bot.send_message(chat_id=chat_id, text=TEXTS_DE["msg.daily_cup.canceled"])
-            except TelegramForbiddenError:
+            except Exception as exc:
+                await mark_telegram_delivery_failed(
+                    idempotency_key=target.idempotency_key,
+                    happened_at=happened_at,
+                    exc=exc,
+                )
                 continue
-            except Exception:
-                continue
+            await mark_telegram_delivery_sent(
+                idempotency_key=target.idempotency_key,
+                happened_at=happened_at,
+            )
     finally:
         await bot.session.close()
+
+
+def _daily_cup_cancel_delivery_target(
+    *,
+    correlation_id: str,
+    chat_id: int,
+) -> TelegramDeliveryTarget:
+    target_id = hash_chat_id(chat_id)
+    return TelegramDeliveryTarget(
+        flow="daily_cup_cancel_message",
+        task_name="daily_cup.close_registration_and_start",
+        correlation_id=correlation_id,
+        target_type="chat_hash",
+        target_id=target_id,
+        idempotency_key=build_delivery_idempotency_key(
+            flow="daily_cup_cancel_message",
+            correlation_id=correlation_id,
+            target_type="chat_hash",
+            target_id=target_id,
+        ),
+        telegram_user_id=chat_id,
+        chat_id=chat_id,
+        safe_context={"tournament_id": correlation_id},
+    )
 
 
 async def persist_daily_cup_standings_message_ids(

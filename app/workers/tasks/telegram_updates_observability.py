@@ -9,8 +9,8 @@ from app.db.repo.outbox_events_repo import OutboxEventsRepo
 from app.db.repo.processed_updates_repo import ProcessedUpdatesRepo
 from app.db.session import SessionLocal
 from app.services.alerts import send_ops_alert
-from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
+from app.workers.task_heartbeat import run_tracked_async_job
 from app.workers.tasks.telegram_updates import (
     EVENT_TELEGRAM_UPDATE_FAILED_FINAL,
     EVENT_TELEGRAM_UPDATE_RECLAIMED,
@@ -131,7 +131,14 @@ async def run_telegram_updates_reliability_alerts_async() -> dict[str, object]:
     name="app.workers.tasks.telegram_updates_observability.run_telegram_updates_reliability_alerts"
 )
 def run_telegram_updates_reliability_alerts() -> dict[str, object]:
-    return run_async_job(run_telegram_updates_reliability_alerts_async())
+    task_name = (
+        "app.workers.tasks.telegram_updates_observability.run_telegram_updates_reliability_alerts"
+    )
+    return run_tracked_async_job(
+        task_name=task_name,
+        schedule_key="telegram-updates-reliability-alerts-every-5-minutes",
+        awaitable=run_telegram_updates_reliability_alerts_async(),
+    )
 
 
 celery_app.conf.beat_schedule = celery_app.conf.beat_schedule or {}

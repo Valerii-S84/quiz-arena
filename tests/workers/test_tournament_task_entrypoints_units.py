@@ -67,7 +67,7 @@ async def test_run_private_tournament_round_messaging_async_persists_sent_ids(
     monkeypatch.setattr(
         tournaments_messaging,
         "deliver_round_messages",
-        _async_return(TournamentRoundDeliveryResult(1, 2, 0, {11: 101}, {22: 202})),
+        _async_return(TournamentRoundDeliveryResult(1, 2, 0, 0, {11: 101}, {22: 202})),
     )
 
     async def _persist(**kwargs) -> None:
@@ -79,7 +79,14 @@ async def test_run_private_tournament_round_messaging_async_persists_sent_ids(
         tournament_id=str(tournament_id),
     )
 
-    assert result == {"processed": 1, "participants_total": 2, "sent": 1, "edited": 2, "failed": 0}
+    assert result == {
+        "processed": 1,
+        "participants_total": 2,
+        "sent": 1,
+        "edited": 2,
+        "failed": 0,
+        "skipped": 0,
+    }
     assert persisted[0]["new_message_ids"] == {11: 101}
 
 

@@ -14,6 +14,7 @@ from app.game.arena_duels.constants import (
 )
 from app.game.arena_duels.types import ArenaBeatenNotification
 from app.workers.tasks import arena_duels
+from app.workers.tasks import arena_duels_notification_delivery as delivery
 from app.workers.tasks.arena_duels_notification_content import (
     build_arena_beaten_notification_keyboard,
     build_notification_text,
@@ -89,6 +90,7 @@ def test_send_arena_beaten_notification_records_key_after_successful_send(
 ) -> None:
     recorded: list[dict[str, object]] = []
     bot = _DummyBot()
+    delivery_calls = _patch_delivery_tracking(monkeypatch)
 
     async def _fake_lock_key(session, **kwargs) -> None:
         del session, kwargs
@@ -138,6 +140,7 @@ def test_send_arena_beaten_notification_records_key_after_successful_send(
     )
 
     assert result == {"sent_total": 1, "failed_total": 0, "skipped_total": 0}
+    assert delivery_calls["sent"]
     payload = cast(dict[str, object], recorded[0]["payload"])
     assert recorded[0]["event_type"] == ARENA_BEATEN_NOTIFICATION_EVENT
     assert recorded[0]["user_id"] == 11
@@ -226,6 +229,7 @@ def test_beaten_notification_weak_result_only_links_back_to_arena() -> None:
 
 def test_send_arena_beaten_notification_skips_existing_sent_event(monkeypatch) -> None:
     bot = _DummyBot()
+    delivery_calls = _patch_delivery_tracking(monkeypatch)
 
     async def _fake_lock_key(session, **kwargs) -> None:
         del session, kwargs
@@ -268,6 +272,7 @@ def test_send_arena_beaten_notification_skips_existing_sent_event(monkeypatch) -
 
     assert result == {"sent_total": 0, "failed_total": 0, "skipped_total": 1}
     assert bot.sent_messages == []
+    assert delivery_calls["skipped"]
 
 
 def test_send_arena_beaten_notification_does_not_record_failed_send_and_retries(
@@ -275,6 +280,7 @@ def test_send_arena_beaten_notification_does_not_record_failed_send_and_retries(
 ) -> None:
     recorded: list[dict[str, object]] = []
     bot = _FlakyBot()
+    delivery_calls = _patch_delivery_tracking(monkeypatch)
 
     async def _fake_lock_key(session, **kwargs) -> None:
         del session, kwargs
@@ -343,3 +349,37 @@ def test_send_arena_beaten_notification_does_not_record_failed_send_and_retries(
     assert len(bot.attempted_messages) == 2
     assert len(bot.sent_messages) == 1
     assert len(recorded) == 1
+    assert len(delivery_calls["failed"]) == 1
+    assert len(delivery_calls["sent"]) == 1
+    assert len(delivery_calls["skipped"]) == 1
+
+
+def _patch_delivery_tracking(monkeypatch):
+    calls: dict[str, list[dict[str, object]]] = {
+        "prepare": [],
+        "sent": [],
+        "failed": [],
+        "skipped": [],
+    }
+
+    async def _prepare(**kwargs):
+        calls["prepare"].append(kwargs)
+        return SimpleNamespace(
+            should_send=True,
+            idempotency_key=kwargs["target"].idempotency_key,
+        )
+
+    async def _sent(**kwargs):
+        calls["sent"].append(kwargs)
+
+    async def _failed(**kwargs):
+        calls["failed"].append(kwargs)
+
+    async def _skipped(**kwargs):
+        calls["skipped"].append(kwargs)
+
+    monkeypatch.setattr(delivery, "prepare_telegram_delivery", _prepare)
+    monkeypatch.setattr(delivery, "mark_telegram_delivery_sent", _sent)
+    monkeypatch.setattr(delivery, "mark_telegram_delivery_failed", _failed)
+    monkeypatch.setattr(delivery, "record_telegram_delivery_skipped", _skipped)
+    return calls

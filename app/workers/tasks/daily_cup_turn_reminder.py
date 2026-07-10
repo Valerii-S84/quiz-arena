@@ -151,6 +151,7 @@ async def run_daily_cup_turn_reminders_async(
     )
     sent_total = delivery_result.sent_total
     failed_total = delivery_result.failed_total
+    skipped_total += delivery_result.skipped_total
     await store_reminder_events(
         sent_user_ids_by_tournament=delivery_result.sent_user_ids_by_tournament,
         event_type=_REMINDER_EVENT_TYPE,

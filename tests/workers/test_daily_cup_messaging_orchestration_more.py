@@ -76,7 +76,14 @@ def test_run_daily_cup_round_messaging_async_delivers_persists_and_follows_up(mo
         )
     )
 
-    assert result == {"processed": 1, "participants_total": 1, "sent": 2, "edited": 1, "failed": 0}
+    assert result == {
+        "processed": 1,
+        "participants_total": 1,
+        "sent": 2,
+        "edited": 1,
+        "failed": 0,
+        "skipped": 0,
+    }
     assert bot.closed is True
     assert calls == [
         ("session", "s1"),

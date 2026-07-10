@@ -9,6 +9,11 @@ from app.db.repo.ledger_repo import LedgerRepo
 from app.db.repo.mode_progress_repo import ModeProgressRepo
 from app.db.repo.offers_repo import OffersRepo
 from app.db.repo.processed_updates_repo import ProcessedUpdatesRepo
+from app.db.repo.production_reliability_repo import (
+    ProductionInvariantAlertsRepo,
+    TelegramDeliveryAttemptsRepo,
+    WorkerTaskHeartbeatsRepo,
+)
 from app.db.repo.promo_repo import PromoRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.quiz_attempts_repo import QuizAttemptsRepo
@@ -34,6 +39,7 @@ __all__ = [
     "ModeProgressRepo",
     "OffersRepo",
     "ProcessedUpdatesRepo",
+    "ProductionInvariantAlertsRepo",
     "PromoRepo",
     "PurchasesRepo",
     "QuizAttemptsRepo",
@@ -42,8 +48,10 @@ __all__ = [
     "ReconciliationRunsRepo",
     "ReferralsRepo",
     "StreakRepo",
+    "TelegramDeliveryAttemptsRepo",
     "TournamentMatchesRepo",
     "TournamentParticipantsRepo",
     "TournamentsRepo",
     "UsersRepo",
+    "WorkerTaskHeartbeatsRepo",
 ]

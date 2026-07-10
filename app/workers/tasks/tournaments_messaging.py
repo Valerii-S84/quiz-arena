@@ -15,6 +15,7 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
+from app.workers.task_heartbeat import run_tracked_async_job
 from app.workers.tasks.tournaments_messaging_context import load_round_messaging_context
 from app.workers.tasks.tournaments_messaging_delivery import deliver_round_messages
 from app.workers.tasks.tournaments_messaging_persistence import persist_standings_message_ids
@@ -62,7 +63,14 @@ async def run_private_tournament_round_messaging_async(*, tournament_id: str) ->
     try:
         parsed_tournament_id = UUID(tournament_id)
     except ValueError:
-        return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
+        return {
+            "processed": 0,
+            "participants_total": 0,
+            "sent": 0,
+            "edited": 0,
+            "failed": 0,
+            "skipped": 0,
+        }
 
     async with SessionLocal.begin() as session:
         context = await load_round_messaging_context(
@@ -77,7 +85,14 @@ async def run_private_tournament_round_messaging_async(*, tournament_id: str) ->
             format_user_label_fn=format_user_label,
         )
         if context is None:
-            return {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
+            return {
+                "processed": 0,
+                "participants_total": 0,
+                "sent": 0,
+                "edited": 0,
+                "failed": 0,
+                "skipped": 0,
+            }
     delivery_result = await deliver_round_messages(
         context=context,
         build_bot_fn=build_bot,
@@ -109,6 +124,7 @@ async def run_private_tournament_round_messaging_async(*, tournament_id: str) ->
         "sent": delivery_result.sent,
         "edited": delivery_result.edited,
         "failed": delivery_result.failed,
+        "skipped": delivery_result.skipped,
     }
 
 
@@ -130,4 +146,9 @@ def enqueue_private_tournament_round_messaging(*, tournament_id: str) -> None:
     name="app.workers.tasks.tournaments_messaging.run_private_tournament_round_messaging"
 )
 def run_private_tournament_round_messaging(*, tournament_id: str) -> dict[str, int]:
-    return run_async_job(run_private_tournament_round_messaging_async(tournament_id=tournament_id))
+    task_name = "app.workers.tasks.tournaments_messaging.run_private_tournament_round_messaging"
+    return run_tracked_async_job(
+        task_name=task_name,
+        schedule_key="private-tournament-round-messaging-on-demand",
+        awaitable=run_private_tournament_round_messaging_async(tournament_id=tournament_id),
+    )

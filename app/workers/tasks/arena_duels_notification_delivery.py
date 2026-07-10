@@ -8,6 +8,15 @@ from zoneinfo import ZoneInfo
 from app.core.analytics_events import BERLIN_TIMEZONE
 from app.game.arena_duels.constants import ARENA_BEATEN_NOTIFICATION_EVENT
 from app.game.arena_duels.types import ArenaBeatenNotification
+from app.services.telegram_delivery import (
+    SKIP_CODE_DUPLICATE,
+    TelegramDeliveryTarget,
+    build_delivery_idempotency_key,
+    mark_telegram_delivery_failed,
+    mark_telegram_delivery_sent,
+    prepare_telegram_delivery,
+    record_telegram_delivery_skipped,
+)
 from app.workers.tasks.arena_duels_notification_content import (
     build_arena_beaten_notification_keyboard,
     build_notification_text,
@@ -37,13 +46,58 @@ async def send_arena_beaten_notification_with_bot(
 
     async with deps.session_local.begin() as session:
         if await _notification_already_sent(session, notification, payload, deps):
+            await record_telegram_delivery_skipped(
+                target=_beaten_delivery_target(
+                    notification=notification,
+                    telegram_user_id=None,
+                ),
+                happened_at=happened_at,
+                failure_code=SKIP_CODE_DUPLICATE,
+                failure_reason="beaten notification analytics event already exists",
+                session_local=deps.session_local,
+            )
             return {"sent_total": 0, "failed_total": 0, "skipped_total": 1}
 
         previous_user, new_best_user = await _load_notification_users(session, notification, deps)
         if previous_user is None:
+            await record_telegram_delivery_skipped(
+                target=_beaten_delivery_target(
+                    notification=notification,
+                    telegram_user_id=None,
+                ),
+                happened_at=happened_at,
+                failure_code="MISSING_TARGET_USER",
+                failure_reason="target user missing",
+                session_local=deps.session_local,
+            )
+            return {"sent_total": 0, "failed_total": 0, "skipped_total": 1}
+
+        target = _beaten_delivery_target(
+            notification=notification,
+            telegram_user_id=int(previous_user.telegram_user_id),
+        )
+        delivery = await prepare_telegram_delivery(
+            target=target,
+            happened_at=happened_at,
+            session_local=deps.session_local,
+        )
+        if not delivery.should_send:
+            return {"sent_total": 0, "failed_total": 0, "skipped_total": 1}
+        try:
+            await _send_notification_message(bot, notification, previous_user, new_best_user)
+        except Exception as exc:
+            await mark_telegram_delivery_failed(
+                idempotency_key=target.idempotency_key,
+                happened_at=happened_at,
+                exc=exc,
+                session_local=deps.session_local,
+            )
             return {"sent_total": 0, "failed_total": 1, "skipped_total": 0}
-        if not await _send_notification_message(bot, notification, previous_user, new_best_user):
-            return {"sent_total": 0, "failed_total": 1, "skipped_total": 0}
+        await mark_telegram_delivery_sent(
+            idempotency_key=target.idempotency_key,
+            happened_at=happened_at,
+            session_local=deps.session_local,
+        )
 
         await deps.analytics_repo.create_arena_beaten_notification_event_once(
             session,
@@ -99,24 +153,55 @@ async def _send_notification_message(
     notification: ArenaBeatenNotification,
     previous_user,
     new_best_user,
-) -> bool:
+) -> None:
     challenger_label = format_user_label(
         username=getattr(new_best_user, "username", None),
         first_name=getattr(new_best_user, "first_name", None),
         fallback=f"Spieler #{notification.new_best_user_id}",
     )
-    try:
-        await bot.send_message(
-            chat_id=int(previous_user.telegram_user_id),
-            text=build_notification_text(
-                notification=notification,
-                challenger_label=challenger_label,
-            ),
-            reply_markup=build_arena_beaten_notification_keyboard(
-                source_attempt_id=str(notification.new_best_attempt_id),
-                action_mode=classify_beaten_notification_action_mode(notification),
-            ),
+    await bot.send_message(
+        chat_id=int(previous_user.telegram_user_id),
+        text=build_notification_text(
+            notification=notification,
+            challenger_label=challenger_label,
+        ),
+        reply_markup=build_arena_beaten_notification_keyboard(
+            source_attempt_id=str(notification.new_best_attempt_id),
+            action_mode=classify_beaten_notification_action_mode(notification),
+        ),
+    )
+
+
+def _beaten_delivery_target(
+    *,
+    notification: ArenaBeatenNotification,
+    telegram_user_id: int | None,
+) -> TelegramDeliveryTarget:
+    correlation_id = ":".join(
+        (
+            str(notification.arena_duel_id),
+            str(notification.previous_best_attempt_id),
+            str(notification.new_best_attempt_id),
         )
-    except Exception:
-        return False
-    return True
+    )
+    target_id = str(notification.previous_best_user_id)
+    return TelegramDeliveryTarget(
+        flow="arena_beaten_notification",
+        task_name="arena_duels.send_arena_beaten_notification_task",
+        correlation_id=correlation_id,
+        target_type="user",
+        target_id=target_id,
+        idempotency_key=build_delivery_idempotency_key(
+            flow="arena_beaten_notification",
+            correlation_id=correlation_id,
+            target_type="user",
+            target_id=target_id,
+        ),
+        telegram_user_id=telegram_user_id,
+        chat_id=telegram_user_id,
+        safe_context={
+            "arena_duel_id": str(notification.arena_duel_id),
+            "previous_best_user_id": notification.previous_best_user_id,
+            "new_best_user_id": notification.new_best_user_id,
+        },
+    )

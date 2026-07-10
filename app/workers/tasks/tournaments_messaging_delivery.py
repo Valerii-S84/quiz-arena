@@ -2,9 +2,17 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 from app.game.tournaments.constants import TOURNAMENT_STATUS_COMPLETED
+from app.services.telegram_delivery import (
+    TelegramDeliveryTarget,
+    build_delivery_idempotency_key,
+    mark_telegram_delivery_failed,
+    mark_telegram_delivery_sent,
+    prepare_telegram_delivery,
+)
 from app.workers.tasks.tournaments_messaging_context import TournamentRoundMessagingContext
 
 
@@ -13,6 +21,7 @@ class TournamentRoundDeliveryResult:
     sent: int
     edited: int
     failed: int
+    skipped: int
     new_message_ids: dict[int, int]
     replaced_message_ids: dict[int, int]
 
@@ -35,15 +44,30 @@ async def deliver_round_messages(
     sent = 0
     edited = 0
     failed = 0
+    skipped = 0
     new_message_ids: dict[int, int] = {}
     replaced_message_ids: dict[int, int] = {}
+    happened_at = datetime.now(timezone.utc)
+    flow = "private_tournament_round_messaging"
+    task_name = "tournaments_messaging.run_private_tournament_round_messaging"
+    correlation_id = str(context.parsed_tournament_id)
 
     bot = build_bot_fn()
     try:
         for user_id in context.standings_user_ids:
             chat_id = context.telegram_targets.get(user_id)
-            if chat_id is None:
-                failed += 1
+            existing_message_id = context.participant_rows[user_id].standings_message_id
+            target = _private_round_delivery_target(
+                flow=flow,
+                task_name=task_name,
+                correlation_id=correlation_id,
+                user_id=user_id,
+                chat_id=chat_id,
+                delivery_operation=_delivery_operation(existing_message_id),
+            )
+            delivery = await prepare_telegram_delivery(target=target, happened_at=happened_at)
+            if not delivery.should_send:
+                skipped += 1
                 continue
 
             play_challenge_id, opponent_user_id = resolve_match_context_fn(
@@ -92,9 +116,25 @@ async def deliver_round_messages(
                     tournament_name=context.tournament.name,
                 ),
             )
-            existing_message_id = context.participant_rows[user_id].standings_message_id
             if existing_message_id is None:
-                message = await bot.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
+                try:
+                    message = await bot.send_message(
+                        chat_id=chat_id,
+                        text=text,
+                        reply_markup=keyboard,
+                    )
+                except Exception as exc:
+                    failed += 1
+                    await mark_telegram_delivery_failed(
+                        idempotency_key=target.idempotency_key,
+                        happened_at=happened_at,
+                        exc=exc,
+                    )
+                    continue
+                await mark_telegram_delivery_sent(
+                    idempotency_key=target.idempotency_key,
+                    happened_at=happened_at,
+                )
                 sent += 1
                 new_message_ids[user_id] = int(message.message_id)
                 continue
@@ -106,12 +146,37 @@ async def deliver_round_messages(
                     text=text,
                     reply_markup=keyboard,
                 )
+                await mark_telegram_delivery_sent(
+                    idempotency_key=target.idempotency_key,
+                    happened_at=happened_at,
+                )
                 edited += 1
             except Exception as exc:
                 if is_message_not_modified_error_fn(exc):
+                    await mark_telegram_delivery_sent(
+                        idempotency_key=target.idempotency_key,
+                        happened_at=happened_at,
+                    )
                     edited += 1
                     continue
-                message = await bot.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
+                try:
+                    message = await bot.send_message(
+                        chat_id=chat_id,
+                        text=text,
+                        reply_markup=keyboard,
+                    )
+                except Exception as send_exc:
+                    failed += 1
+                    await mark_telegram_delivery_failed(
+                        idempotency_key=target.idempotency_key,
+                        happened_at=happened_at,
+                        exc=send_exc,
+                    )
+                    continue
+                await mark_telegram_delivery_sent(
+                    idempotency_key=target.idempotency_key,
+                    happened_at=happened_at,
+                )
                 sent += 1
                 replaced_message_ids[user_id] = int(message.message_id)
     except Exception as exc:
@@ -128,9 +193,44 @@ async def deliver_round_messages(
         sent=sent,
         edited=edited,
         failed=failed,
+        skipped=skipped,
         new_message_ids=new_message_ids,
         replaced_message_ids=replaced_message_ids,
     )
+
+
+def _private_round_delivery_target(
+    *,
+    flow: str,
+    task_name: str,
+    correlation_id: str,
+    user_id: int,
+    chat_id: int | None,
+    delivery_operation: str,
+) -> TelegramDeliveryTarget:
+    target_id = f"{user_id}:{delivery_operation}"
+    return TelegramDeliveryTarget(
+        flow=flow,
+        task_name=task_name,
+        correlation_id=correlation_id,
+        target_type="user",
+        target_id=target_id,
+        idempotency_key=build_delivery_idempotency_key(
+            flow=flow,
+            correlation_id=correlation_id,
+            target_type="user",
+            target_id=target_id,
+        ),
+        telegram_user_id=chat_id,
+        chat_id=chat_id,
+        safe_context={"tournament_id": correlation_id, "user_id": user_id},
+    )
+
+
+def _delivery_operation(existing_message_id: int | None) -> str:
+    if existing_message_id is None:
+        return "send"
+    return f"edit:{int(existing_message_id)}"
 
 
 __all__ = ["TournamentRoundDeliveryResult", "deliver_round_messages"]

@@ -7,6 +7,7 @@ from uuid import UUID
 import pytest
 
 from app.workers.tasks import daily_cup_turn_reminder
+from app.workers.tasks import daily_cup_turn_reminder_delivery as reminder_delivery
 from tests.workers.daily_cup_turn_reminder_test_support import (
     RecordingBot,
     reminder_candidate,
@@ -70,6 +71,7 @@ async def test_turn_reminders_mark_candidates_deduplicate_targets_and_store_even
     info_logs: list[dict[str, object]] = []
     store_calls: list[dict[str, object]] = []
     list_by_ids_calls: list[set[int]] = []
+    _patch_delivery_tracking(monkeypatch)
 
     challenge_primary = reminder_challenge(
         challenge_id=UUID("11111111-1111-1111-1111-111111111111"),
@@ -197,6 +199,7 @@ async def test_turn_reminders_count_send_failures_and_swallow_event_store_errors
     tournament_id = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
     bot = RecordingBot(forbidden_chat_id=10020, failing_chat_id=10030)
     warning_logs: list[dict[str, object]] = []
+    delivery_calls = _patch_delivery_tracking(monkeypatch)
 
     challenge = reminder_challenge(
         challenge_id=UUID("44444444-4444-4444-4444-444444444444"),
@@ -292,5 +295,29 @@ async def test_turn_reminders_count_send_failures_and_swallow_event_store_errors
     assert bot.session.closed is True
     assert [log["event"] for log in warning_logs] == [
         "daily_cup_turn_reminder_send_failed",
+        "daily_cup_turn_reminder_send_failed",
         "daily_cup_turn_reminder_event_store_failed",
     ]
+    assert len(delivery_calls["failed"]) == 2
+
+
+def _patch_delivery_tracking(monkeypatch: pytest.MonkeyPatch):
+    calls: dict[str, list[dict[str, object]]] = {"prepare": [], "sent": [], "failed": []}
+
+    async def _prepare(**kwargs):
+        calls["prepare"].append(kwargs)
+        return SimpleNamespace(
+            should_send=True,
+            idempotency_key=kwargs["target"].idempotency_key,
+        )
+
+    async def _sent(**kwargs):
+        calls["sent"].append(kwargs)
+
+    async def _failed(**kwargs):
+        calls["failed"].append(kwargs)
+
+    monkeypatch.setattr(reminder_delivery, "prepare_telegram_delivery", _prepare)
+    monkeypatch.setattr(reminder_delivery, "mark_telegram_delivery_sent", _sent)
+    monkeypatch.setattr(reminder_delivery, "mark_telegram_delivery_failed", _failed)
+    return calls

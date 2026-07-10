@@ -145,7 +145,9 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
 
     await emit_daily_cup_events(now_utc_value=now_utc_value, events=events)
     await send_daily_cup_canceled_messages(
-        telegram_targets=canceled_telegram_targets, bot_factory=build_bot
+        telegram_targets=canceled_telegram_targets,
+        tournament_id=str(tournament.id),
+        bot_factory=build_bot,
     )
     if started_tournament_id is not None and enqueue_legacy_round_messaging:
         enqueue_daily_cup_round_messaging(tournament_id=started_tournament_id)

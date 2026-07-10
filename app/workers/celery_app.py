@@ -11,6 +11,8 @@ celery_app = Celery(
     include=[
         "app.workers.tasks.telegram_updates",
         "app.workers.tasks.payments_reliability",
+        "app.workers.tasks.premium_expiry",
+        "app.workers.tasks.production_invariant_alerts",
         "app.workers.tasks.offers_observability",
         "app.workers.tasks.analytics_daily",
         "app.workers.tasks.admin_daily_metrics",

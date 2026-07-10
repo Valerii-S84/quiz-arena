@@ -49,16 +49,28 @@ async def test_daily_cup_core_emits_events_and_persists_message_ids(
 
 
 @pytest.mark.asyncio
-async def test_send_daily_cup_canceled_messages_ignores_send_errors() -> None:
+async def test_send_daily_cup_canceled_messages_ignores_send_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     bot = _Bot([RuntimeError("blocked"), None])
+    delivery_calls = _patch_cancel_delivery_tracking(monkeypatch)
 
     await daily_cup_core.send_daily_cup_canceled_messages(
-        telegram_targets=[101, 102],
+        telegram_targets=[101, 102, 103],
         bot_factory=lambda: bot,
     )
 
     assert bot.sent == [102]
     assert bot.closed
+    assert [call["target"].chat_id for call in delivery_calls["prepare"]] == [101, 102, 103]
+    assert len(delivery_calls["failed"]) == 1
+    assert delivery_calls["failed"][0]["idempotency_key"].endswith(
+        delivery_calls["prepare"][0]["target"].target_id
+    )
+    assert len(delivery_calls["sent"]) == 1
+    assert delivery_calls["sent"][0]["idempotency_key"].endswith(
+        delivery_calls["prepare"][1]["target"].target_id
+    )
 
 
 @pytest.mark.asyncio
@@ -141,6 +153,29 @@ class _Bot:
 
     async def _close(self) -> None:
         self.closed = True
+
+
+def _patch_cancel_delivery_tracking(monkeypatch: pytest.MonkeyPatch):
+    calls: dict[str, list[dict[str, object]]] = {"prepare": [], "sent": [], "failed": []}
+
+    async def _prepare(**kwargs):
+        calls["prepare"].append(kwargs)
+        target = kwargs["target"]
+        return SimpleNamespace(
+            should_send=target.chat_id != 103,
+            idempotency_key=target.idempotency_key,
+        )
+
+    async def _sent(**kwargs):
+        calls["sent"].append(kwargs)
+
+    async def _failed(**kwargs):
+        calls["failed"].append(kwargs)
+
+    monkeypatch.setattr(daily_cup_core, "prepare_telegram_delivery", _prepare)
+    monkeypatch.setattr(daily_cup_core, "mark_telegram_delivery_sent", _sent)
+    monkeypatch.setattr(daily_cup_core, "mark_telegram_delivery_failed", _failed)
+    return calls
 
 
 def _async_return(value: object):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import cast
 from uuid import uuid4
 
 import pytest
@@ -15,7 +16,11 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     bot = _Bot([])
+    delivery_calls: list[dict[str, object]] = []
     monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push, "prepare_telegram_delivery", _prepare_delivery(True))
+    monkeypatch.setattr(push, "mark_telegram_delivery_sent", _capture_async(delivery_calls))
+    monkeypatch.setattr(push, "mark_telegram_delivery_failed", _capture_async([]))
     monkeypatch.setattr(
         push.AnalyticsRepo,
         "create_daily_cup_push_event_once",
@@ -25,6 +30,8 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
     assert await push._send_daily_cup_registration_push_once(
         bot=bot,
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+        flow="daily_cup_invite_registration_push",
+        task_name="daily_cup_invite_registration_push",
         user_id=11,
         telegram_user_id=101,
         text="text",
@@ -33,21 +40,25 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
         sent_event_type="sent",
     )
     assert bot.sent == [101]
+    assert cast(str, delivery_calls[0]["idempotency_key"]).startswith("telegram-delivery:")
 
 
 @pytest.mark.asyncio
-async def test_send_daily_cup_registration_push_once_skips_unclaimed_or_failed_send(
+async def test_send_daily_cup_registration_push_once_skips_duplicate_or_failed_send(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push, "prepare_telegram_delivery", _prepare_delivery(False))
     monkeypatch.setattr(
         push.AnalyticsRepo,
         "create_daily_cup_push_event_once",
-        _async_return(False),
+        _unexpected_async("analytics must not be written for skipped delivery"),
     )
     assert not await push._send_daily_cup_registration_push_once(
         bot=_Bot([]),
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+        flow="daily_cup_invite_registration_push",
+        task_name="daily_cup_invite_registration_push",
         user_id=11,
         telegram_user_id=101,
         text="text",
@@ -56,14 +67,14 @@ async def test_send_daily_cup_registration_push_once_skips_unclaimed_or_failed_s
         sent_event_type="sent",
     )
 
-    monkeypatch.setattr(
-        push.AnalyticsRepo,
-        "create_daily_cup_push_event_once",
-        _async_return(True),
-    )
+    failed_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(push, "prepare_telegram_delivery", _prepare_delivery(True))
+    monkeypatch.setattr(push, "mark_telegram_delivery_failed", _capture_async(failed_calls))
     assert not await push._send_daily_cup_registration_push_once(
         bot=_Bot([RuntimeError("send failed")]),
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+        flow="daily_cup_invite_registration_push",
+        task_name="daily_cup_invite_registration_push",
         user_id=11,
         telegram_user_id=101,
         text="text",
@@ -71,6 +82,7 @@ async def test_send_daily_cup_registration_push_once_skips_unclaimed_or_failed_s
         happened_at=NOW_UTC,
         sent_event_type="sent",
     )
+    assert cast(BaseException, failed_calls[0]["exc"]).args == ("send failed",)
 
 
 @pytest.mark.asyncio
@@ -95,6 +107,7 @@ async def test_send_daily_cup_registration_push_async_counts_targets(
         return kwargs["user_id"] == 22
 
     monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push, "record_telegram_delivery_skipped", _capture_async([]))
     monkeypatch.setattr(push, "ensure_daily_cup_registration_tournament", _async_return(tournament))
     monkeypatch.setattr(push.UsersRepo, "list_daily_cup_push_targets", _targets)
     monkeypatch.setattr(push, "list_already_pushed_user_ids", _async_return({11}))
@@ -156,5 +169,29 @@ class _Bot:
 def _async_return(value: object):
     async def _inner(*_args, **_kwargs):
         return value
+
+    return _inner
+
+
+def _prepare_delivery(should_send: bool):
+    async def _inner(**kwargs):
+        return SimpleNamespace(
+            should_send=should_send,
+            idempotency_key=kwargs["target"].idempotency_key,
+        )
+
+    return _inner
+
+
+def _capture_async(calls: list[dict[str, object]]):
+    async def _inner(**kwargs):
+        calls.append(kwargs)
+
+    return _inner
+
+
+def _unexpected_async(message: str):
+    async def _inner(*_args, **_kwargs):
+        raise AssertionError(message)
 
     return _inner

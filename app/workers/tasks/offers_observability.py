@@ -12,8 +12,8 @@ from app.services.offers_observability import (
     evaluate_offer_alert_state,
     get_offer_alert_thresholds,
 )
-from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
+from app.workers.task_heartbeat import run_tracked_async_job
 
 logger = structlog.get_logger(__name__)
 
@@ -91,7 +91,12 @@ async def run_offers_funnel_alerts_async() -> dict[str, object]:
 
 @celery_app.task(name="app.workers.tasks.offers_observability.run_offers_funnel_alerts")
 def run_offers_funnel_alerts() -> dict[str, object]:
-    return run_async_job(run_offers_funnel_alerts_async())
+    task_name = "app.workers.tasks.offers_observability.run_offers_funnel_alerts"
+    return run_tracked_async_job(
+        task_name=task_name,
+        schedule_key="offers-funnel-alerts-every-15-minutes",
+        awaitable=run_offers_funnel_alerts_async(),
+    )
 
 
 celery_app.conf.beat_schedule = celery_app.conf.beat_schedule or {}

@@ -3,11 +3,17 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from aiogram.exceptions import TelegramForbiddenError
+from app.services.telegram_delivery import (
+    TelegramDeliveryTarget,
+    build_delivery_idempotency_key,
+    mark_telegram_delivery_failed,
+    mark_telegram_delivery_sent,
+    prepare_telegram_delivery,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +37,7 @@ class ReminderBatch:
 class ReminderDeliveryResult:
     sent_total: int
     failed_total: int
+    skipped_total: int
     sent_user_ids_by_tournament: dict[UUID, list[int]]
 
 
@@ -114,11 +121,18 @@ async def deliver_reminders(
 ) -> ReminderDeliveryResult:
     sent_total = 0
     failed_total = 0
+    skipped_total = 0
     sent_user_ids_by_tournament: dict[UUID, list[int]] = defaultdict(list)
+    happened_at = datetime.now(timezone.utc)
 
     bot = build_bot_fn()
     try:
         for reminder in reminders:
+            target = _turn_reminder_delivery_target(reminder=reminder)
+            delivery = await prepare_telegram_delivery(target=target, happened_at=happened_at)
+            if not delivery.should_send:
+                skipped_total += 1
+                continue
             keyboard = build_keyboard(
                 tournament_id=str(reminder.tournament_id),
                 can_join=False,
@@ -137,9 +151,12 @@ async def deliver_reminders(
                 )
                 sent_total += 1
                 sent_user_ids_by_tournament[reminder.tournament_id].append(reminder.target_user_id)
-            except TelegramForbiddenError:
-                failed_total += 1
             except Exception as exc:
+                await mark_telegram_delivery_failed(
+                    idempotency_key=target.idempotency_key,
+                    happened_at=happened_at,
+                    exc=exc,
+                )
                 logger.warning(
                     "daily_cup_turn_reminder_send_failed",
                     challenge_id=reminder.challenge_id,
@@ -147,13 +164,44 @@ async def deliver_reminders(
                     error_type=type(exc).__name__,
                 )
                 failed_total += 1
+                continue
+            await mark_telegram_delivery_sent(
+                idempotency_key=target.idempotency_key,
+                happened_at=happened_at,
+            )
     finally:
         await bot.session.close()
 
     return ReminderDeliveryResult(
         sent_total=sent_total,
         failed_total=failed_total,
+        skipped_total=skipped_total,
         sent_user_ids_by_tournament=sent_user_ids_by_tournament,
+    )
+
+
+def _turn_reminder_delivery_target(*, reminder: ReminderItem) -> TelegramDeliveryTarget:
+    target_id = f"{reminder.challenge_id}:{reminder.target_user_id}"
+    correlation_id = str(reminder.tournament_id)
+    return TelegramDeliveryTarget(
+        flow="daily_cup_turn_reminder",
+        task_name="daily_cup.send_turn_reminders",
+        correlation_id=correlation_id,
+        target_type="challenge_user",
+        target_id=target_id,
+        idempotency_key=build_delivery_idempotency_key(
+            flow="daily_cup_turn_reminder",
+            correlation_id=correlation_id,
+            target_type="challenge_user",
+            target_id=target_id,
+        ),
+        telegram_user_id=reminder.target_chat_id,
+        chat_id=reminder.target_chat_id,
+        safe_context={
+            "tournament_id": correlation_id,
+            "challenge_id": reminder.challenge_id,
+            "target_user_id": reminder.target_user_id,
+        },
     )
 
 
