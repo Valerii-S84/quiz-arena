@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any
-
 from app.db.repo.production_reliability_repo import TelegramDeliveryAttemptsRepo, hash_chat_id
-from app.db.session import SessionLocal
 from app.services.telegram_delivery_errors import classify_telegram_delivery_exception
-from app.services.telegram_delivery_records import attempt_create, record_skipped
-from app.services.telegram_delivery_retry import (
-    begin_telegram_delivery_dispatch,
-    claim_controlled_retry,
+from app.services.telegram_delivery_outcomes import (
+    mark_telegram_delivery_failed,
+    mark_telegram_delivery_failed_with_classification,
+    mark_telegram_delivery_sent,
+    record_telegram_delivery_skipped,
 )
+from app.services.telegram_delivery_preparation import prepare_telegram_delivery
+from app.services.telegram_delivery_retry import begin_telegram_delivery_dispatch
 from app.services.telegram_delivery_types import (
     BLOCKED_CANDIDATE_TTL,
     FAILURE_CODE_BAD_REQUEST,
@@ -31,157 +30,6 @@ from app.services.telegram_delivery_types import (
     TelegramDeliveryTarget,
     build_delivery_idempotency_key,
 )
-
-
-async def prepare_telegram_delivery(
-    *,
-    target: TelegramDeliveryTarget,
-    happened_at: datetime,
-    session_local: Any = SessionLocal,
-) -> DeliveryPreparation:
-    if target.chat_id is None:
-        return await record_skipped(
-            target=target,
-            happened_at=happened_at,
-            failure_code=SKIP_CODE_NO_CHAT,
-            failure_reason="target has no chat id",
-            session_local=session_local,
-            attempts_repo=TelegramDeliveryAttemptsRepo,
-        )
-
-    async with session_local.begin() as session:
-        if (
-            target.telegram_user_id is not None
-            and await TelegramDeliveryAttemptsRepo.has_blocked_candidate(
-                session,
-                telegram_user_id=target.telegram_user_id,
-                blocked_since=happened_at - BLOCKED_CANDIDATE_TTL,
-            )
-        ):
-            attempt, created = await TelegramDeliveryAttemptsRepo.create_pending_once(
-                session,
-                item=attempt_create(target),
-            )
-            if created or attempt.status == "PENDING":
-                updated = await TelegramDeliveryAttemptsRepo.mark_skipped(
-                    session,
-                    idempotency_key=target.idempotency_key,
-                    skipped_at=happened_at,
-                    failure_code=FAILURE_CODE_BLOCKED,
-                    failure_reason="known blocked candidate",
-                )
-                _require_terminal_update(updated, "skipped")
-            return DeliveryPreparation(
-                idempotency_key=target.idempotency_key,
-                should_send=False,
-                status="SKIPPED",
-                created=created,
-            )
-
-        attempt, created = await TelegramDeliveryAttemptsRepo.create_pending_once(
-            session,
-            item=attempt_create(target),
-        )
-        retry_claimed = False
-        if created:
-            should_send = True
-        else:
-            should_send, retry_claimed = await claim_controlled_retry(
-                session,
-                idempotency_key=target.idempotency_key,
-                happened_at=happened_at,
-                attempt=attempt,
-                attempts_repo=TelegramDeliveryAttemptsRepo,
-            )
-        return DeliveryPreparation(
-            idempotency_key=target.idempotency_key,
-            should_send=should_send,
-            status=str(attempt.status),
-            created=created,
-            retry_claimed=retry_claimed,
-        )
-
-
-async def mark_telegram_delivery_sent(
-    *,
-    idempotency_key: str,
-    happened_at: datetime,
-    session_local: Any = SessionLocal,
-) -> None:
-    async with session_local.begin() as session:
-        updated = await TelegramDeliveryAttemptsRepo.mark_sent(
-            session,
-            idempotency_key=idempotency_key,
-            sent_at=happened_at,
-        )
-        _require_terminal_update(updated, "sent")
-
-
-async def mark_telegram_delivery_failed(
-    *,
-    idempotency_key: str,
-    happened_at: datetime,
-    exc: BaseException,
-    session_local: Any = SessionLocal,
-) -> TelegramDeliveryFailure:
-    failure = classify_telegram_delivery_exception(exc)
-    async with session_local.begin() as session:
-        updated = await TelegramDeliveryAttemptsRepo.mark_failed(
-            session,
-            idempotency_key=idempotency_key,
-            failed_at=happened_at,
-            failure_code=failure.failure_code,
-            failure_reason=failure.failure_reason,
-            telegram_error_code=failure.telegram_error_code,
-            is_blocked_candidate=failure.is_blocked_candidate,
-        )
-        _require_terminal_update(updated, "failed")
-    return failure
-
-
-async def mark_telegram_delivery_failed_with_classification(
-    *,
-    idempotency_key: str,
-    happened_at: datetime,
-    failure: TelegramDeliveryFailure,
-    failure_reason: str,
-    session_local: Any = SessionLocal,
-) -> None:
-    async with session_local.begin() as session:
-        updated = await TelegramDeliveryAttemptsRepo.mark_failed(
-            session,
-            idempotency_key=idempotency_key,
-            failed_at=happened_at,
-            failure_code=failure.failure_code,
-            failure_reason=failure_reason,
-            telegram_error_code=failure.telegram_error_code,
-            is_blocked_candidate=failure.is_blocked_candidate,
-        )
-        _require_terminal_update(updated, "failed")
-
-
-def _require_terminal_update(updated: int, status: str) -> None:
-    if updated != 1:
-        raise RuntimeError(f"telegram delivery {status} terminal lease was lost")
-
-
-async def record_telegram_delivery_skipped(
-    *,
-    target: TelegramDeliveryTarget,
-    happened_at: datetime,
-    failure_code: str,
-    failure_reason: str,
-    session_local: Any = SessionLocal,
-) -> DeliveryPreparation:
-    return await record_skipped(
-        target=target,
-        happened_at=happened_at,
-        failure_code=failure_code,
-        failure_reason=failure_reason,
-        session_local=session_local,
-        attempts_repo=TelegramDeliveryAttemptsRepo,
-    )
-
 
 __all__ = [
     "BLOCKED_CANDIDATE_TTL",
