@@ -591,7 +591,7 @@ Scope: close only the three Codex findings reported after commit
 
 ## PR #246 post-CI review cleanup - 2026-07-12
 
-Status: `LOCAL_GATES_GREEN_PENDING_COMMIT_PUSH_AND_GITHUB_CI`.
+Status: `CODE_READY_FOR_FINAL_ACCEPTANCE_AUDIT`.
 
 Scope: close only the four Codex findings from the review of
 `abaea5934b04027c4cd305e27553e3bcae7bdcbd`.
@@ -618,8 +618,11 @@ Scope: close only the four Codex findings from the review of
 
 ### CI result
 
-- GitHub CI: pending until this follow-up is committed and pushed.
-- Required checks: `lint_unit`, `integration`, `tournament_regression`.
+- Code commit `4fddb588b215d89b254bd3c69bb42d3bb4d087cc` passed both triggered CI runs:
+  `lint_unit`, `integration`, and `tournament_regression` all completed with `success`.
+- Codex review threads for private persistence, repair freshness, and registration analytics are
+  outdated after the fixes. The script thread remains unresolved but its finding is covered by the
+  repo-root bootstrap and non-repo-cwd subprocess regression; no thread was replied to or resolved.
 
 ### Agent statuses
 
