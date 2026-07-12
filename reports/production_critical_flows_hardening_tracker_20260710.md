@@ -491,3 +491,52 @@ Scope: close only the six Codex findings from review commit `87483600b8` on PR #
 - No manual messaging.
 - No `.env*`, secrets, production config, `docker-compose.prod.yml`, workflow, or deploy changes.
 - PR not merged by this pass; draft/readiness state not changed by this pass.
+
+## PR #246 final review follow-up - 2026-07-12
+
+Status: `LOCAL_GATES_GREEN_PENDING_COMMIT_PUSH_AND_GITHUB_CI`.
+
+Scope: close only the four Codex findings on review commit
+`5537236a0a0ae02f98ebef4d44fab97ee4d890f1`.
+
+### Findings and fixes
+
+| Finding | Fix summary | Regression evidence |
+| --- | --- | --- |
+| P1 heartbeat grace resets in one-shot checker processes | The existing unapplied `m56` migration seeds a durable apply-time baseline row in `worker_task_heartbeats`. Missing task rows use that persisted timestamp for grace; repeated script/cron processes cannot reset it. The checker remains read-only. | `tests/services/test_production_invariant_final_edges.py`: migration contains the seed, missing heartbeat is OK with a fresh baseline and fails after the task stale interval; stale rows, fresh success, and consecutive failures retain prior behavior. |
+| P2 fallback sends are missing from repair targets | Repair matching normalizes only the delivery operation suffix inside the same user/content phase. A terminal fallback send accounts for the replacement message phase, while a fallback from a previous phase does not suppress the current target. | `tests/services/test_messaging_repair_planner.py`: current-phase fallback is complete/no replay; previous-phase fallback remains missing/replay candidate. |
+| P1 transient Telegram send failures stay permanently suppressed | Added `TELEGRAM_TRANSIENT_SEND_ERROR` for Telegram network/server errors, timeout, and connection failures. Only this code and retry-after are bounded-retry candidates. Generic `TELEGRAM_SEND_ERROR`, forbidden, and bad-request failures remain non-retryable; `MAX_DELIVERY_ATTEMPTS` remains enforced. | `tests/services/test_telegram_delivery.py` and `tests/services/test_messaging_repair_planner.py`: network failure retryable, generic/permanent failures not retryable, transient repair replay allowed below the cap and blocked at the cap. |
+| P2 stale pending delivery checks cover only scheduled offers | Replaced the scheduled-offer-only check with `telegram_delivery_pending_stale`, covering every durable Telegram delivery flow using the existing 15-minute stale-pending horizon and `updated_at`. | `tests/services/test_production_invariant_final_edges.py` and `tests/services/test_production_invariants.py`: stale non-offer pending row fails; fresh pending and terminal rows are OK; SQL has no flow filter and remains read-only. |
+
+### Local gate evidence
+
+- Focused four-finding suite: `76 passed` before transient classification review.
+- Post-review transient retry/planner/repo suite: `40 passed`.
+- Invariant/alert suite: `47 passed`.
+- Repair/delivery repo suite: `40 passed`.
+- Daily Cup/heartbeat/premium/messaging suite: `24 passed`.
+- Payment reliability checker: `20 passed`.
+- Targeted Ruff, Black, isort: PASS.
+- `git diff --check`: PASS.
+- `CI=1 FORCE_GROWTH_CHECK=1 BASE_REF=origin/main bash scripts/check_line_limits.sh`: PASS with warning-only output and no errors.
+- Full non-integration pytest: `2190 passed, 1 skipped`.
+- Full Ruff: PASS.
+- Full Black: PASS (`1411 files would be left unchanged`).
+- Full isort: PASS.
+- Full mypy: `Success: no issues found in 1395 source files`.
+- Local PostgreSQL migration cycle: downgrade `b6c7d8e9f012 -> ac12bd34ef56`, upgrade
+  `ac12bd34ef56 -> b6c7d8e9f012`, then `heartbeat_grace_baseline_rows=1`.
+
+### Agent statuses
+
+- Agent A - Executor: PASS. Implemented only the four current review findings and direct regression evidence.
+- Agent B - Scope/Safety Controller: PASS after transient/permanent classification separation. No false/missed P1, unsafe replay, unbounded retry, task enablement, or scope drift found.
+- Agent C - Code Reviewer: PASS after transient/permanent classification separation. Generic/permanent errors remain non-retryable; transient retries and repair candidates remain bounded by the existing attempt cap.
+- Agent D - Invariant Auditor: PASS. All four findings have positive and negative regression evidence; checker SQL remains read-only and file limits pass.
+- Agent E - Final Gate: `CODE_READY_FOR_FINAL_ACCEPTANCE_AUDIT` for the local code state; commit, push, and GitHub CI remain pending.
+
+### Production safety
+
+- Existing migration file changed only to persist the apply-time grace baseline; no new schema surface or migration revision was added.
+- The migration was not run in production. No production DB write, deploy, restart, replay, messaging, config, secret, workflow, or readiness-state change was performed.
+- PR remains unmerged. GitHub CI is pending until commit and push.

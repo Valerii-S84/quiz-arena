@@ -1,11 +1,18 @@
 from __future__ import annotations
 
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
+from aiogram.exceptions import (
+    TelegramBadRequest,
+    TelegramForbiddenError,
+    TelegramNetworkError,
+    TelegramRetryAfter,
+    TelegramServerError,
+)
 
 from app.services.telegram_delivery_types import (
     FAILURE_CODE_BAD_REQUEST,
     FAILURE_CODE_FORBIDDEN,
     FAILURE_CODE_RETRY_AFTER,
+    FAILURE_CODE_TRANSIENT,
     FAILURE_CODE_UNKNOWN,
     TelegramDeliveryFailure,
 )
@@ -32,6 +39,13 @@ def classify_telegram_delivery_exception(exc: BaseException) -> TelegramDelivery
             failure_code=FAILURE_CODE_RETRY_AFTER,
             failure_reason=message,
             telegram_error_code=429,
+            is_blocked_candidate=False,
+        )
+    if isinstance(exc, (TelegramNetworkError, TelegramServerError, TimeoutError, ConnectionError)):
+        return TelegramDeliveryFailure(
+            failure_code=FAILURE_CODE_TRANSIENT,
+            failure_reason=message,
+            telegram_error_code=None,
             is_blocked_candidate=False,
         )
     return TelegramDeliveryFailure(

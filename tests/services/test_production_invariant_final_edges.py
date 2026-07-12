@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 from app.services.production_invariant_checks.delivery_daily import build_daily_cup_delivery_checks
 from app.services.production_invariant_checks.freshness import build_freshness_checks
@@ -11,14 +12,23 @@ from app.workers.task_heartbeat import CriticalTaskHeartbeat, get_critical_task_
 NOW_UTC = datetime(2026, 7, 12, 12, 0, tzinfo=UTC)
 
 
-def test_missing_heartbeat_is_graceful_immediately_after_checker_start() -> None:
-    count = _heartbeat_count("", grace_started_at=NOW_UTC)
+def test_reliability_migration_seeds_persistent_heartbeat_grace_baseline() -> None:
+    migration = Path(
+        "alembic/versions/b6c7d8e9f012_m56_production_reliability_foundation.py"
+    ).read_text()
+
+    assert "INSERT INTO worker_task_heartbeats" in migration
+    assert "__production_reliability_migration_baseline__" in migration
+
+
+def test_missing_heartbeat_is_graceful_immediately_after_migration() -> None:
+    count = _heartbeat_count(_heartbeat_baseline_row(NOW_UTC))
 
     assert count == 0
 
 
 def test_missing_heartbeat_after_grace_window_is_stale() -> None:
-    count = _heartbeat_count("", grace_started_at=NOW_UTC - timedelta(minutes=3))
+    count = _heartbeat_count(_heartbeat_baseline_row(NOW_UTC - timedelta(minutes=3)))
 
     assert count == 1
 
@@ -30,7 +40,6 @@ def test_existing_stale_heartbeat_row_is_stale() -> None:
             'task', 'schedule', '2026-07-12 11:57:00+00:00', 0
         );
         """,
-        grace_started_at=NOW_UTC,
     )
 
     assert count == 1
@@ -43,7 +52,6 @@ def test_fresh_success_heartbeat_row_is_ok() -> None:
             'task', 'schedule', '2026-07-12 11:59:30+00:00', 0
         );
         """,
-        grace_started_at=NOW_UTC,
     )
 
     assert count == 0
@@ -56,7 +64,6 @@ def test_consecutive_heartbeat_failures_are_stale_even_with_fresh_success() -> N
             'task', 'schedule', '2026-07-12 11:59:30+00:00', 2
         );
         """,
-        grace_started_at=NOW_UTC,
     )
 
     assert count == 1
@@ -66,7 +73,6 @@ def test_disabled_premium_expiry_does_not_create_stale_heartbeat_check() -> None
     checks = build_heartbeat_checks(
         NOW_UTC,
         get_critical_task_heartbeats(premium_expiry_schedule_enabled=False),
-        missing_heartbeat_grace_started_at=NOW_UTC - timedelta(hours=3),
     )
 
     schedule_keys = {check.safe_context["schedule_key"] for check in checks}
@@ -83,10 +89,43 @@ def test_enabled_premium_expiry_missing_after_grace_is_stale() -> None:
     check = build_heartbeat_checks(
         NOW_UTC,
         (premium_row,),
-        missing_heartbeat_grace_started_at=NOW_UTC - timedelta(hours=3),
     )[0]
 
-    assert _run_invariant_sql(check.sql, check.params, _heartbeat_table_sql()) == 1
+    assert (
+        _run_invariant_sql(
+            check.sql,
+            check.params,
+            _heartbeat_table_sql() + _heartbeat_baseline_row(NOW_UTC - timedelta(hours=3)),
+        )
+        == 1
+    )
+
+
+def test_stale_pending_non_offer_delivery_is_detected_globally() -> None:
+    assert (
+        _telegram_pending_count(
+            """
+        INSERT INTO telegram_delivery_attempts VALUES (
+            'arena_beaten_notification', 'PENDING', '2026-07-12 11:00:00+00:00'
+        );
+        """
+        )
+        == 1
+    )
+
+
+def test_fresh_or_terminal_delivery_attempts_are_not_stale_pending() -> None:
+    assert (
+        _telegram_pending_count(
+            """
+        INSERT INTO telegram_delivery_attempts VALUES
+            ('daily_cup_registration_push', 'PENDING', '2026-07-12 11:50:00+00:00'),
+            ('daily_cup_cancel_message', 'SENT', '2026-07-12 11:00:00+00:00'),
+            ('daily_cup_turn_reminder', 'FAILED', '2026-07-12 11:00:00+00:00');
+        """
+        )
+        == 0
+    )
 
 
 def test_old_manual_review_open_outbox_row_is_not_queue_stale() -> None:
@@ -210,7 +249,7 @@ def test_canceled_daily_cup_still_does_not_require_round_outcomes() -> None:
     assert count == 0
 
 
-def _heartbeat_count(rows_sql: str, *, grace_started_at: datetime) -> int:
+def _heartbeat_count(rows_sql: str) -> int:
     check = build_heartbeat_checks(
         NOW_UTC,
         (
@@ -220,7 +259,6 @@ def _heartbeat_count(rows_sql: str, *, grace_started_at: datetime) -> int:
                 stale_after_seconds=120,
             ),
         ),
-        missing_heartbeat_grace_started_at=grace_started_at,
     )[0]
     return _run_invariant_sql(
         check.sql,
@@ -239,6 +277,29 @@ def _freshness_queue_count(rows_sql: str) -> int:
         check.sql,
         check.params,
         "CREATE TABLE outbox_events (event_type TEXT, status TEXT, created_at TEXT);" + rows_sql,
+    )
+
+
+def _heartbeat_baseline_row(baseline_at: datetime) -> str:
+    return f"""
+        INSERT INTO worker_task_heartbeats VALUES (
+            '__system__', '__production_reliability_migration_baseline__',
+            '{baseline_at.isoformat(sep=" ")}', 0
+        );
+    """
+
+
+def _telegram_pending_count(rows_sql: str) -> int:
+    check = next(
+        check
+        for check in build_freshness_checks(NOW_UTC, date(2026, 7, 12))
+        if check.name == "telegram_delivery_pending_stale"
+    )
+    return _run_invariant_sql(
+        check.sql,
+        check.params,
+        "CREATE TABLE telegram_delivery_attempts (flow TEXT, status TEXT, updated_at TEXT);"
+        + rows_sql,
     )
 
 

@@ -13,6 +13,7 @@ from app.services.messaging_repair_planner import (
 from app.services.telegram_delivery_types import (
     FAILURE_CODE_FORBIDDEN,
     FAILURE_CODE_RETRY_AFTER,
+    FAILURE_CODE_TRANSIENT,
     MAX_DELIVERY_ATTEMPTS,
 )
 
@@ -163,6 +164,65 @@ def test_repair_plan_keeps_phase_specific_delivery_target_ids() -> None:
     ]
 
 
+def test_repair_plan_counts_fallback_send_for_current_phase() -> None:
+    expected_target = "1:phase:round:2:status:round_2:edit:902"
+    plan = build_messaging_repair_plan(
+        flow="daily_cup_round_messaging",
+        correlation_id="cup-1",
+        expected_targets=[RepairTarget(target_type="user", target_id=expected_target)],
+        existing_attempts=[
+            ExistingDeliveryOutcome(
+                target_type="user",
+                target_id="1:phase:round:2:status:round_2:fallback_send_after_edit:101",
+                status="SENT",
+            )
+        ],
+    )
+
+    assert plan.missing_targets == []
+    assert plan.safe_replay_candidates == []
+
+
+def test_repair_plan_does_not_count_fallback_send_from_previous_phase() -> None:
+    expected_target = "1:phase:round:2:status:round_2:edit:902"
+    plan = build_messaging_repair_plan(
+        flow="daily_cup_round_messaging",
+        correlation_id="cup-1",
+        expected_targets=[RepairTarget(target_type="user", target_id=expected_target)],
+        existing_attempts=[
+            ExistingDeliveryOutcome(
+                target_type="user",
+                target_id="1:phase:round:1:status:round_1:fallback_send_after_edit:101",
+                status="SENT",
+            )
+        ],
+    )
+
+    assert plan.missing_targets == [RepairTarget(target_type="user", target_id=expected_target)]
+    assert plan.safe_replay_candidates == [
+        RepairTarget(target_type="user", target_id=expected_target)
+    ]
+
+
+def test_repair_plan_allows_transient_send_error_replay() -> None:
+    target = RepairTarget(target_type="user", target_id="1")
+    plan = build_messaging_repair_plan(
+        flow="private_tournament_round_messaging",
+        correlation_id="tournament-1",
+        expected_targets=[target],
+        existing_attempts=[
+            ExistingDeliveryOutcome(
+                target_type="user",
+                target_id="1",
+                status="FAILED",
+                failure_code=FAILURE_CODE_TRANSIENT,
+            )
+        ],
+    )
+
+    assert plan.safe_replay_candidates == [target]
+
+
 def test_repair_plan_excludes_permanent_failures_from_safe_replay() -> None:
     target_id = "1:phase:status:completed:send"
     plan = build_messaging_repair_plan(
@@ -195,7 +255,7 @@ def test_repair_plan_excludes_retryable_failures_after_max_attempts() -> None:
                 target_id=target_id,
                 status="FAILED",
                 attempt_count=MAX_DELIVERY_ATTEMPTS,
-                failure_code=FAILURE_CODE_RETRY_AFTER,
+                failure_code=FAILURE_CODE_TRANSIENT,
             ),
         ],
     )

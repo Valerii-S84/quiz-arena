@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import cast
 
-from aiogram.exceptions import TelegramForbiddenError
+from aiogram.exceptions import TelegramForbiddenError, TelegramNetworkError
 from aiogram.methods import SendMessage
 
 from app.db.repo.production_reliability_repo import DeliveryAttemptCreate, hash_chat_id
@@ -369,6 +369,7 @@ def test_forbidden_error_is_blocked_candidate() -> None:
     result = delivery.classify_telegram_delivery_exception(exc)
 
     assert result.failure_code == delivery.FAILURE_CODE_FORBIDDEN
+    assert result.failure_code not in delivery.RETRYABLE_FAILURE_CODES
     assert result.telegram_error_code == 403
     assert result.is_blocked_candidate is True
 
@@ -377,5 +378,20 @@ def test_generic_error_is_not_blocked_candidate() -> None:
     result = delivery.classify_telegram_delivery_exception(RuntimeError("boom"))
 
     assert result.failure_code == delivery.FAILURE_CODE_UNKNOWN
+    assert result.failure_code not in delivery.RETRYABLE_FAILURE_CODES
+    assert result.telegram_error_code is None
+    assert result.is_blocked_candidate is False
+
+
+def test_network_error_is_retryable_without_becoming_blocked_candidate() -> None:
+    exc = TelegramNetworkError(
+        method=SendMessage(chat_id=101, text="x"),
+        message="connection reset",
+    )
+
+    result = delivery.classify_telegram_delivery_exception(exc)
+
+    assert result.failure_code == delivery.FAILURE_CODE_TRANSIENT
+    assert result.failure_code in delivery.RETRYABLE_FAILURE_CODES
     assert result.telegram_error_code is None
     assert result.is_blocked_candidate is False

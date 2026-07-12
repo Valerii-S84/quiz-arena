@@ -38,7 +38,7 @@ Exit code:
 - `streak_update_stale`
 - `global_best_streak_source_inconsistent`
 - `analytics_daily_stale`
-- `scheduled_offer_zero_delivery`
+- `telegram_delivery_pending_stale`
 
 ## Safety
 

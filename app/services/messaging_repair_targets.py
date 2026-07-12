@@ -14,6 +14,15 @@ def phase_repair_target_id(
     return f"{user_id}:phase:{content_version}:{operation}"
 
 
+def phase_repair_match_id(target_id: str) -> str:
+    for operation_marker in (":fallback_send_after_edit:", ":edit:"):
+        if operation_marker in target_id:
+            return target_id.rsplit(operation_marker, 1)[0]
+    if target_id.endswith(":send"):
+        return target_id[: -len(":send")]
+    return target_id
+
+
 def _content_version(*, status: str, current_round: int, flow: str) -> str:
     normalized_status = status.lower()
     if normalized_status == "completed":
@@ -23,4 +32,4 @@ def _content_version(*, status: str, current_round: int, flow: str) -> str:
     return f"round:{max(1, current_round)}:status:{normalized_status}"
 
 
-__all__ = ["phase_repair_target_id"]
+__all__ = ["phase_repair_match_id", "phase_repair_target_id"]

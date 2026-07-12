@@ -114,6 +114,17 @@ def upgrade() -> None:
         "worker_task_heartbeats",
         ["last_failed_at"],
     )
+    op.execute(
+        sa.text(
+            """
+            INSERT INTO worker_task_heartbeats (
+                task_name, schedule_key, last_started_at, last_success_at
+            ) VALUES (
+                '__system__', '__production_reliability_migration_baseline__', now(), now()
+            )
+            """
+        )
+    )
 
     op.create_table(
         "production_invariant_alerts",

@@ -54,7 +54,7 @@ def test_production_invariant_checks_include_required_p1_surfaces() -> None:
         "streak_update_stale",
         "global_best_streak_source_inconsistent",
         "analytics_daily_stale",
-        "scheduled_offer_zero_delivery",
+        "telegram_delivery_pending_stale",
     }.issubset(names)
 
 
@@ -69,18 +69,18 @@ def test_production_invariant_sql_is_read_only() -> None:
         assert forbidden.search(sql) is None
 
 
-def test_scheduled_offer_check_uses_delivery_attempt_expectation_only() -> None:
+def test_stale_pending_check_covers_all_telegram_delivery_flows() -> None:
     check = next(
         check
         for check in build_invariant_checks(NOW_UTC)
-        if check.name == "scheduled_offer_zero_delivery"
+        if check.name == "telegram_delivery_pending_stale"
     )
 
     assert "telegram_delivery_attempts" in check.sql
-    assert "scheduled_offer_delivery" in check.sql
+    assert "flow =" not in check.sql
     assert "status = 'PENDING'" in check.sql
     assert "offers_impressions" not in check.sql
-    assert "scheduled_offer_pending_cutoff" in check.params
+    assert "telegram_delivery_pending_cutoff" in check.params
 
 
 def test_daily_cup_delivery_gap_is_per_active_participant_and_not_canceled() -> None:

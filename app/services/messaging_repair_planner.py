@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.messaging_repair_targets import phase_repair_target_id
+from app.services.messaging_repair_targets import phase_repair_match_id, phase_repair_target_id
 from app.services.telegram_delivery_types import MAX_DELIVERY_ATTEMPTS, RETRYABLE_FAILURE_CODES
 
 
@@ -91,7 +91,8 @@ def build_messaging_repair_plan(
             for candidate in safe_replay_candidates
         ):
             continue
-        safe_replay_candidates.append(RepairTarget(target_type=key[0], target_id=key[1]))
+        replay_target = RepairTarget(target_type=attempt.target_type, target_id=attempt.target_id)
+        safe_replay_candidates.append(replay_target)
 
     return MessagingRepairPlan(
         flow=flow,
@@ -108,7 +109,7 @@ def build_messaging_repair_plan(
 
 
 def _repair_match_key(*, target_type: str, target_id: str) -> tuple[str, str]:
-    return (target_type, target_id)
+    return (target_type, phase_repair_match_id(target_id))
 
 
 def _failed_attempt_is_replay_safe(attempt: ExistingDeliveryOutcome) -> bool:

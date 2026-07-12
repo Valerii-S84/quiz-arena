@@ -83,16 +83,15 @@ def build_freshness_checks(now_utc: datetime, local_today_berlin: date) -> list[
             description="Daily analytics aggregate is stale for the Berlin day.",
         ),
         build_check(
-            name="scheduled_offer_zero_delivery",
+            name="telegram_delivery_pending_stale",
             severity=SEVERITY_P2,
             sql="""
                 SELECT count(*)
                 FROM telegram_delivery_attempts
-                WHERE flow = 'scheduled_offer_delivery'
-                  AND status = 'PENDING'
-                  AND created_at <= :scheduled_offer_pending_cutoff
+                WHERE status = 'PENDING'
+                  AND updated_at <= :telegram_delivery_pending_cutoff
             """,
-            params={"scheduled_offer_pending_cutoff": now_utc - timedelta(minutes=30)},
-            description="Scheduled offer delivery attempt remains pending without a terminal outcome.",
+            params={"telegram_delivery_pending_cutoff": now_utc - timedelta(minutes=15)},
+            description="Telegram delivery attempt remains pending without a terminal outcome.",
         ),
     ]
