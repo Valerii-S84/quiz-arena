@@ -543,7 +543,7 @@ Scope: close only the four Codex findings on review commit
 
 ## PR #246 final delivery crash-window follow-up - 2026-07-12
 
-Status: `LOCAL_GATES_GREEN_PENDING_COMMIT_PUSH_AND_GITHUB_CI`.
+Status: `CODE_READY_FOR_FINAL_ACCEPTANCE_AUDIT`.
 
 Scope: close only the three Codex findings reported after commit
 `afbef53bd2dc61b33174949ec8e48d056f0910f0`.
@@ -571,8 +571,8 @@ Scope: close only the three Codex findings reported after commit
 
 ### CI result
 
-- GitHub CI after this follow-up: pending until commit and push.
-- Required post-push checks: `lint_unit`, `integration`, `tournament_regression`.
+- Code commit `abaea5934b04027c4cd305e27553e3bcae7bdcbd` passed both triggered CI runs:
+  `lint_unit`, `integration`, and `tournament_regression` all completed with `success`.
 
 ### Agent statuses
 
@@ -580,11 +580,11 @@ Scope: close only the three Codex findings reported after commit
 - Agent B - Scope/Safety Controller: PASS. Scope is exactly 19 files with this tracker; protected/config/migration paths are untouched.
 - Agent C - Code Reviewer: PASS after correcting the active-tournament baseline to `created_at` and adding caller/fallback regression coverage.
 - Agent D - Invariant Auditor: PASS. Both private P1 checks, all eight dispatch paths, retry lease semantics, and Daily Cup initial/fallback persistence have regression evidence.
-- Agent E - Final Gate: `CODE_READY_FOR_FINAL_ACCEPTANCE_AUDIT` for the staged local code;
-  commit, push, and GitHub CI remain pending.
+- Agent E - Final Gate: `CODE_READY_FOR_FINAL_ACCEPTANCE_AUDIT`.
 
 ### Production safety
 
 - No deploy, production DB write, migration change/run, restart, replay, or manual messaging.
 - No `.env*`, secret, production config, workflow, deploy, or `docker-compose.prod.yml` change.
-- PR merge and readiness state were not changed.
+- PR remains open, unmerged, and draft. The pre-existing non-draft state observed after push was
+  restored to draft; the PR was not marked ready.
