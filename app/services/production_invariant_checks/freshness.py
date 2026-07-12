@@ -9,6 +9,8 @@ from app.services.production_invariant_checks.types import (
     build_check,
 )
 
+MANUAL_REVIEW_OUTBOX_EVENT_TYPES = ("payments_telegram_stars_reconciliation_review",)
+
 
 def build_freshness_checks(now_utc: datetime, local_today_berlin: date) -> list[InvariantCheck]:
     return [
@@ -20,9 +22,19 @@ def build_freshness_checks(now_utc: datetime, local_today_berlin: date) -> list[
                 FROM outbox_events
                 WHERE status IN ('NEW','PENDING','OPEN','RETRY')
                   AND created_at <= :queue_old_cutoff
+                  AND NOT (
+                    status = 'OPEN'
+                    AND event_type IN ('payments_telegram_stars_reconciliation_review')
+                  )
             """,
-            params={"queue_old_cutoff": now_utc - timedelta(minutes=15)},
+            params={
+                "queue_old_cutoff": now_utc - timedelta(minutes=15),
+            },
             description="Outbox queue has messages older than 15 minutes.",
+            safe_context={
+                "manual_review_event_types_excluded": MANUAL_REVIEW_OUTBOX_EVENT_TYPES,
+                "exclusion_reason": "operator-owned payment reconciliation reviews stay OPEN",
+            },
         ),
         build_check(
             name="streak_update_stale",

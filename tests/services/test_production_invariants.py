@@ -44,6 +44,7 @@ def test_production_invariant_checks_include_required_p1_surfaces() -> None:
         "reconciliation_diff_nonzero",
         "daily_cup_expected_delivery_zero_outcomes",
         "daily_cup_round_delivery_gap",
+        "daily_cup_cancel_message_gap",
         "tournament_round_expected_delivery_zero_outcomes",
         "private_tournament_round_delivery_gap",
         "telegram_delivery_failure_rate",

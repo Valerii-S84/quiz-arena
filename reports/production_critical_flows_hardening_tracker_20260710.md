@@ -434,3 +434,60 @@ Behavior-preservation checks:
 - No `.env*`, secrets, deploy config, `.github/workflows/**`, `deploy/**`, `docker-compose.prod.yml`, or migration files were modified in this extraction pass.
 
 Full gate results are recorded in the final PR report.
+
+## PR #246 final false-alert / missed-alert pass - 2026-07-12
+
+Status: `LOCAL_GATES_GREEN_PENDING_COMMIT_PUSH_AND_GITHUB_CI`.
+
+Scope: close only the six Codex findings from review commit `87483600b8` on PR #246.
+
+### Findings and fixes
+
+| Finding | Fix summary | Regression evidence |
+| --- | --- | --- |
+| P1 heartbeat checker false-alert on first deploy | `worker_task_heartbeat_stale` now uses checker/app-start grace for missing heartbeat rows, while existing stale rows and `consecutive_failures > 0` still fail. | `tests/services/test_production_invariant_final_edges.py`: empty table immediate OK, missing after grace fails, stale row fails, fresh success OK, consecutive failures fail. |
+| P1 queue staleness false-alert from manual review outbox rows | Queue freshness excludes intentional `OPEN` `payments_telegram_stars_reconciliation_review` rows and documents the operator-owned review reason in safe context; real `NEW`/`PENDING`/`RETRY`/non-review `OPEN` rows still count. | `tests/services/test_production_invariant_final_edges.py`: old manual review OK, old retryable row fails, mixed manual+real counts only the real stuck row, empty queue OK. |
+| P2 disabled premium expiry schedule still monitored | `get_critical_task_heartbeats()` includes `premium-expiry-lifecycle-hourly` only when `premium_expiry_schedule_enabled` is true. No beat schedule or config default was changed. | `tests/workers/test_task_heartbeat.py` and `tests/services/test_production_invariant_final_edges.py`: disabled registry excludes premium expiry and creates no stale check; enabled registry includes it and missing-after-grace fails. |
+| P2 Daily Cup turn reminder idempotency not versioned per reminder window | Turn reminder delivery target ID now includes `window_key`, derived from the previous persisted `expires_last_chance_notified_at` (`initial` for first window). Later windows can send; duplicate same-window attempts stay idempotent. | `tests/workers/test_daily_cup_turn_reminder_delivery.py` plus existing turn reminder worker tests: first window sent, second window same user sent, duplicate same second window skipped, different user unaffected. |
+| P2 repair planner treats `PENDING` attempts as safe replay | Repair planner now accounts for `PENDING` attempts separately, classifies stale pending attempts, and blocks safe replay when any pending attempt exists for the same target. Retryable `FAILED` remains replay-safe only when no `SENT`/`PENDING` target exists and retry policy allows it. | `tests/services/test_messaging_repair_planner.py`: absent target missing, fresh pending not replay, stale pending classified but not replay, pending blocks retryable failed replay, retryable failed replay allowed, permanent failed/SENT not replay. |
+| P2 canceled Daily Cups excluded from cancel-message outcome check | Added `daily_cup_cancel_message_gap` for `CANCELED` Daily Cups with active target users. Round-message checks remain limited to active/completed rounds and do not false-alert canceled cups. | `tests/services/test_production_invariant_final_edges.py` and `tests/services/test_production_invariants.py`: canceled missing cancel outcome fails, terminal cancel outcome OK, no active target OK, canceled cup does not require round outcome. |
+
+### Local gate evidence
+
+- Initial `pytest` without `-s` hit the known local WSL pytest capture cleanup `FileNotFoundError`; the same suites were rerun with `.venv/bin/python -m pytest -q -s`.
+- `.venv/bin/python -m pytest -q -s tests/services/test_production_invariant_final_edges.py tests/services/test_production_invariants.py` -> `34 passed`.
+- `.venv/bin/python -m pytest -q -s tests/services/test_messaging_repair_planner.py` -> `12 passed`.
+- `.venv/bin/python -m pytest -q -s tests/workers/test_daily_cup_turn_reminder_delivery.py tests/workers/test_daily_cup_turn_reminder_worker.py tests/workers/test_task_heartbeat.py tests/workers/test_premium_expiry_task.py` -> `13 passed`.
+- `.venv/bin/python -m pytest -q -s tests/scripts/test_payment_reliability_checks.py` -> `20 passed`.
+- `.venv/bin/python -m pytest -q -s tests/workers/test_daily_cup_core_async_units.py tests/workers/test_daily_cup_delivery_units_more.py tests/workers/test_daily_cup_messaging_orchestration_more.py` -> `8 passed`.
+- `.venv/bin/python -m pytest -q -s tests/services/test_production_invariant_delivery_tournaments.py` -> `5 passed`.
+- `.venv/bin/ruff check app tests scripts` -> PASS.
+- `.venv/bin/black --check app tests scripts` -> PASS.
+- `.venv/bin/isort --check-only app tests scripts` -> PASS.
+- `.venv/bin/mypy app tests` -> `Success: no issues found in 1395 source files`.
+- `git diff --check` -> PASS.
+- `CI=1 FORCE_GROWTH_CHECK=1 BASE_REF=origin/main bash scripts/check_line_limits.sh` -> PASS with soft `WARNING:` lines only and no `ERROR:` lines.
+
+### CI result
+
+- GitHub CI after this pass: pending until the local commit is pushed.
+- Required post-push checks: `lint_unit`, `integration`, `tournament_regression`.
+
+### Agent statuses
+
+- Agent A - Виконавець: PASS. Implemented only checker/registry/planner/delivery target logic and regression tests for the six listed findings.
+- Agent B - Scope/Safety Controller: PASS locally. No `.env*`, secrets, production config, deploy files, workflow files, `docker-compose.prod.yml`, migrations, production writes, replay, messaging, auto-recovery, or live reconciliation changes.
+- Agent C - Code Reviewer: PASS locally. Edge cases covered: first-deploy empty heartbeat table, disabled premium expiry registry, manual review outbox rows, repeated turn reminder windows, pending repair candidates, and canceled Daily Cup cancel-message checks.
+- Agent D - Invariant Auditor: PASS locally. Each finding has at least one regression test, and P1 checks still fail for stale heartbeat, real stale queue rows, missing enabled heartbeat after grace, and missing cancel-message outcomes.
+- Agent E - Final Gate: `BLOCKED_ON_GITHUB_CI_PENDING` until commit, push, and GitHub CI complete. Target final status after green CI: `CODE_READY_FOR_FINAL_ACCEPTANCE_AUDIT`.
+
+### Production safety
+
+- No deploy.
+- No production DB writes.
+- No production migrations.
+- No production restarts.
+- No task replay.
+- No manual messaging.
+- No `.env*`, secrets, production config, `docker-compose.prod.yml`, workflow, or deploy changes.
+- PR not merged by this pass; draft/readiness state not changed by this pass.

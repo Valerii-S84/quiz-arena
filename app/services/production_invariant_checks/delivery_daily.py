@@ -71,4 +71,28 @@ def build_daily_cup_delivery_checks(recent_cutoff: datetime) -> list[InvariantCh
             params={"recent_cutoff": recent_cutoff},
             description="Daily Cup participant is missing a terminal round delivery outcome.",
         ),
+        build_check(
+            name="daily_cup_cancel_message_gap",
+            severity=SEVERITY_P1,
+            sql="""
+                SELECT count(*)
+                FROM tournament_participants p
+                JOIN tournaments t ON t.id = p.tournament_id
+                JOIN users u ON u.id = p.user_id
+                WHERE t.type = 'DAILY_ARENA'
+                  AND t.status = 'CANCELED'
+                  AND t.created_at >= :recent_cutoff
+                  AND u.status = 'ACTIVE'
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM telegram_delivery_attempts d
+                    WHERE d.flow = 'daily_cup_cancel_message'
+                      AND d.correlation_id = t.id::text
+                      AND d.telegram_user_id = u.telegram_user_id
+                      AND d.status IN ('SENT','FAILED','SKIPPED')
+                  )
+            """,
+            params={"recent_cutoff": recent_cutoff},
+            description="Canceled Daily Cup participant is missing a terminal cancel message.",
+        ),
     ]

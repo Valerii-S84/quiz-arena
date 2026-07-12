@@ -33,6 +33,45 @@ def test_repair_plan_finds_missing_daily_cup_targets() -> None:
     assert plan.dry_run is True
     assert plan.missing_targets == [RepairTarget(target_type="user", target_id="2")]
     assert plan.safe_replay_candidates == [RepairTarget(target_type="user", target_id="2")]
+    assert plan.pending_targets == []
+    assert plan.stale_pending_targets == []
+
+
+def test_repair_plan_keeps_fresh_pending_out_of_safe_replay() -> None:
+    plan = build_messaging_repair_plan(
+        flow="daily_cup_round_messaging",
+        correlation_id="cup-1",
+        expected_targets=[RepairTarget(target_type="user", target_id="1")],
+        existing_attempts=[
+            ExistingDeliveryOutcome(target_type="user", target_id="1", status="PENDING"),
+        ],
+    )
+
+    assert plan.missing_targets == []
+    assert [target.target_id for target in plan.pending_targets] == ["1"]
+    assert plan.stale_pending_targets == []
+    assert plan.safe_replay_candidates == []
+
+
+def test_repair_plan_classifies_stale_pending_without_blind_replay() -> None:
+    plan = build_messaging_repair_plan(
+        flow="daily_cup_round_messaging",
+        correlation_id="cup-1",
+        expected_targets=[RepairTarget(target_type="user", target_id="1")],
+        existing_attempts=[
+            ExistingDeliveryOutcome(
+                target_type="user",
+                target_id="1",
+                status="PENDING",
+                is_stale_pending=True,
+            ),
+        ],
+    )
+
+    assert plan.missing_targets == []
+    assert [target.target_id for target in plan.pending_targets] == ["1"]
+    assert [target.target_id for target in plan.stale_pending_targets] == ["1"]
+    assert plan.safe_replay_candidates == []
 
 
 def test_repair_plan_finds_failed_tournament_targets_without_sent_duplicates() -> None:
@@ -57,6 +96,26 @@ def test_repair_plan_finds_failed_tournament_targets_without_sent_duplicates() -
     assert plan.missing_targets == []
     assert [target.target_id for target in plan.safe_replay_candidates] == ["2"]
     assert [target.target_id for target in plan.failed_targets] == ["2"]
+
+
+def test_repair_plan_keeps_retryable_failed_out_of_replay_when_pending_exists() -> None:
+    plan = build_messaging_repair_plan(
+        flow="private_tournament_round_messaging",
+        correlation_id="tournament-1",
+        expected_targets=[RepairTarget(target_type="user", target_id="1")],
+        existing_attempts=[
+            ExistingDeliveryOutcome(
+                target_type="user",
+                target_id="1",
+                status="FAILED",
+                failure_code=FAILURE_CODE_RETRY_AFTER,
+            ),
+            ExistingDeliveryOutcome(target_type="user", target_id="1", status="PENDING"),
+        ],
+    )
+
+    assert [target.target_id for target in plan.pending_targets] == ["1"]
+    assert plan.safe_replay_candidates == []
 
 
 def test_repair_plan_never_replays_target_with_sent_outcome() -> None:

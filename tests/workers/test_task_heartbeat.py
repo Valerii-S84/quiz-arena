@@ -135,3 +135,15 @@ def test_critical_task_heartbeat_registry_marks_on_demand_without_stale_alert() 
         and row.severity == "P1"
         for row in rows
     )
+
+
+def test_premium_expiry_heartbeat_registry_is_schedule_flag_gated() -> None:
+    disabled_rows = task_heartbeat.get_critical_task_heartbeats(
+        premium_expiry_schedule_enabled=False,
+    )
+    enabled_rows = task_heartbeat.get_critical_task_heartbeats(
+        premium_expiry_schedule_enabled=True,
+    )
+
+    assert not any(row.schedule_key == "premium-expiry-lifecycle-hourly" for row in disabled_rows)
+    assert any(row.schedule_key == "premium-expiry-lifecycle-hourly" for row in enabled_rows)

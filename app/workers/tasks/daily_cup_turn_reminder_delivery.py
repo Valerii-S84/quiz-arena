@@ -22,6 +22,7 @@ class ReminderItem:
     challenge_id: str
     target_user_id: int
     target_chat_id: int
+    window_key: str
     opponent_label: str
     deadline_text: str
 
@@ -72,6 +73,7 @@ async def prepare_reminder_batch(
     skipped_total = 0
     for match, challenge in candidates:
         scanned_total += 1
+        window_key = _window_key(challenge.expires_last_chance_notified_at)
         challenge.expires_last_chance_notified_at = now_utc_value
         challenge.updated_at = now_utc_value
 
@@ -95,6 +97,7 @@ async def prepare_reminder_batch(
                     challenge_id=str(challenge.id),
                     target_user_id=target_user_id,
                     target_chat_id=target_chat_id,
+                    window_key=window_key,
                     opponent_label=resolve_opponent_label_fn(
                         target_user_id=target_user_id,
                         opponent_user_id=opponent_user_id,
@@ -181,7 +184,7 @@ async def deliver_reminders(
 
 
 def _turn_reminder_delivery_target(*, reminder: ReminderItem) -> TelegramDeliveryTarget:
-    target_id = f"{reminder.challenge_id}:{reminder.target_user_id}"
+    target_id = f"{reminder.challenge_id}:{reminder.target_user_id}:{reminder.window_key}"
     correlation_id = str(reminder.tournament_id)
     return TelegramDeliveryTarget(
         flow="daily_cup_turn_reminder",
@@ -201,14 +204,17 @@ def _turn_reminder_delivery_target(*, reminder: ReminderItem) -> TelegramDeliver
             "tournament_id": correlation_id,
             "challenge_id": reminder.challenge_id,
             "target_user_id": reminder.target_user_id,
+            "window_key": reminder.window_key,
         },
     )
 
 
-__all__ = [
-    "ReminderBatch",
-    "ReminderDeliveryResult",
-    "ReminderItem",
-    "deliver_reminders",
-    "prepare_reminder_batch",
-]
+def _window_key(value: datetime | None) -> str:
+    if value is None:
+        return "initial"
+    return value.astimezone(timezone.utc).replace(microsecond=0).isoformat()
+
+
+__all__ = (
+    "ReminderBatch ReminderDeliveryResult ReminderItem " "deliver_reminders prepare_reminder_batch"
+).split()

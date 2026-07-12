@@ -22,6 +22,7 @@ class ExistingDeliveryOutcome:
     status: str
     attempt_count: int = 0
     failure_code: str | None = None
+    is_stale_pending: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +32,8 @@ class MessagingRepairPlan:
     expected_targets: list[RepairTarget]
     existing_attempts: list[ExistingDeliveryOutcome]
     missing_targets: list[RepairTarget]
+    pending_targets: list[ExistingDeliveryOutcome]
+    stale_pending_targets: list[ExistingDeliveryOutcome]
     failed_targets: list[ExistingDeliveryOutcome]
     skipped_targets: list[ExistingDeliveryOutcome]
     safe_replay_candidates: list[RepairTarget]
@@ -44,32 +47,41 @@ def build_messaging_repair_plan(
     expected_targets: list[RepairTarget],
     existing_attempts: list[ExistingDeliveryOutcome],
 ) -> MessagingRepairPlan:
-    terminal_by_target: dict[tuple[str, str], ExistingDeliveryOutcome] = {}
+    accounted_by_target: dict[tuple[str, str], ExistingDeliveryOutcome] = {}
     sent_target_keys: set[tuple[str, str]] = set()
+    pending_target_keys: set[tuple[str, str]] = set()
+    pending_targets: list[ExistingDeliveryOutcome] = []
+    stale_pending_targets: list[ExistingDeliveryOutcome] = []
     failed_targets: list[ExistingDeliveryOutcome] = []
     skipped_targets: list[ExistingDeliveryOutcome] = []
     for attempt in existing_attempts:
         key = _repair_match_key(target_type=attempt.target_type, target_id=attempt.target_id)
         if attempt.status == "SENT":
-            terminal_by_target[key] = attempt
+            accounted_by_target[key] = attempt
             sent_target_keys.add(key)
+        elif attempt.status == "PENDING":
+            pending_targets.append(attempt)
+            pending_target_keys.add(key)
+            accounted_by_target.setdefault(key, attempt)
+            if attempt.is_stale_pending:
+                stale_pending_targets.append(attempt)
         elif attempt.status == "FAILED":
             failed_targets.append(attempt)
-            terminal_by_target.setdefault(key, attempt)
+            accounted_by_target.setdefault(key, attempt)
         elif attempt.status == "SKIPPED":
             skipped_targets.append(attempt)
-            terminal_by_target.setdefault(key, attempt)
+            accounted_by_target.setdefault(key, attempt)
 
     missing_targets = [
         target
         for target in expected_targets
         if _repair_match_key(target_type=target.target_type, target_id=target.target_id)
-        not in terminal_by_target
+        not in accounted_by_target
     ]
     safe_replay_candidates = list(missing_targets)
     for attempt in failed_targets:
         key = _repair_match_key(target_type=attempt.target_type, target_id=attempt.target_id)
-        if key in sent_target_keys:
+        if key in sent_target_keys or key in pending_target_keys:
             continue
         if not _failed_attempt_is_replay_safe(attempt):
             continue
@@ -87,6 +99,8 @@ def build_messaging_repair_plan(
         expected_targets=expected_targets,
         existing_attempts=existing_attempts,
         missing_targets=missing_targets,
+        pending_targets=pending_targets,
+        stale_pending_targets=stale_pending_targets,
         failed_targets=failed_targets,
         skipped_targets=skipped_targets,
         safe_replay_candidates=safe_replay_candidates,
@@ -176,7 +190,8 @@ async def _load_delivery_attempts(
     result = await session.execute(
         text(
             """
-            SELECT target_type, target_id, status, attempt_count, failure_code
+            SELECT target_type, target_id, status, attempt_count, failure_code,
+              status = 'PENDING' AND created_at <= now() - interval '15 minutes'
             FROM telegram_delivery_attempts
             WHERE flow = :flow
               AND correlation_id = :correlation_id
@@ -192,15 +207,13 @@ async def _load_delivery_attempts(
             status=str(row[2]),
             attempt_count=int(row[3] or 0),
             failure_code=None if row[4] is None else str(row[4]),
+            is_stale_pending=bool(row[5]) if len(row) > 5 else False,
         )
         for row in result.all()
     ]
 
 
-__all__ = [
-    "ExistingDeliveryOutcome",
-    "MessagingRepairPlan",
-    "RepairTarget",
-    "build_messaging_repair_plan",
-    "plan_tournament_messaging_repair",
-]
+__all__ = (
+    "ExistingDeliveryOutcome MessagingRepairPlan RepairTarget "
+    "build_messaging_repair_plan plan_tournament_messaging_repair"
+).split()
