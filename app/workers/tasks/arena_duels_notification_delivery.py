@@ -11,6 +11,7 @@ from app.game.arena_duels.types import ArenaBeatenNotification
 from app.services.telegram_delivery import (
     SKIP_CODE_DUPLICATE,
     TelegramDeliveryTarget,
+    begin_telegram_delivery_dispatch,
     build_delivery_idempotency_key,
     mark_telegram_delivery_failed,
     mark_telegram_delivery_sent,
@@ -83,6 +84,11 @@ async def send_arena_beaten_notification_with_bot(
         )
         if not delivery.should_send:
             return {"sent_total": 0, "failed_total": 0, "skipped_total": 1}
+        await begin_telegram_delivery_dispatch(
+            delivery,
+            happened_at=happened_at,
+            session_local=deps.session_local,
+        )
         try:
             await _send_notification_message(bot, notification, previous_user, new_best_user)
         except Exception as exc:

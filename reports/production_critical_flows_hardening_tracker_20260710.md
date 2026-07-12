@@ -540,3 +540,51 @@ Scope: close only the four Codex findings on review commit
 - Existing migration file changed only to persist the apply-time grace baseline; no new schema surface or migration revision was added.
 - The migration was not run in production. No production DB write, deploy, restart, replay, messaging, config, secret, workflow, or readiness-state change was performed.
 - PR remains unmerged. GitHub CI is pending until commit and push.
+
+## PR #246 final delivery crash-window follow-up - 2026-07-12
+
+Status: `LOCAL_GATES_GREEN_PENDING_COMMIT_PUSH_AND_GITHUB_CI`.
+
+Scope: close only the three Codex findings reported after commit
+`afbef53bd2dc61b33174949ec8e48d056f0910f0`.
+
+### Findings and fixes
+
+| Finding | Fix summary | Regression evidence |
+| --- | --- | --- |
+| P1 Daily Cup message ID can be lost after terminal `SENT` | Initial and fallback sends persist the returned Telegram message ID before marking the durable delivery attempt `SENT`. Persistence failure leaves the attempt non-terminal. | `tests/workers/test_telegram_delivery_outcomes_units.py`: caller invokes persistence, helper orders `persist -> SENT`, and persistence failure does not mark `SENT`. `tests/services/test_telegram_delivery_retry_claim.py`: fallback uses `replace_existing=True` and persists the replacement ID before `SENT`. |
+| P2 retry claim can strand a retryable `FAILED` attempt as `PENDING` | Retry claim now keeps the row `FAILED` under a stale-time lease. A compare-and-set transition to `PENDING` occurs immediately before Telegram I/O. Death before dispatch leaves the retryable failure reclaimable; lease loss blocks the send; death after dispatch remains non-replayable unless the existing explicit pending replay policy allows it. | `tests/db/repo/test_production_reliability_repo.py` and `tests/services/test_telegram_delivery_retry_claim.py`: bounded lease SQL, exact dispatch transition, lease-loss failure, no-op for new deliveries, and an 8-path prepare/dispatch caller contract. |
+| P2 active private delivery checks include pre-instrumentation history | Both private P1 checks use the durable reliability migration baseline and require active tournaments to have `created_at` at or after that baseline. Pre-instrumentation tournaments remain excluded even with future deadlines; post-baseline tournaments remain monitored after the sliding recent cutoff. | `tests/services/test_production_invariant_delivery_tournaments.py`: both P1 checks ignore pre-baseline active history with a future deadline, detect post-baseline long-lived active tournaments, and preserve completed/current-phase behavior. |
+
+### Local gate evidence
+
+- Core finding suite: `40 passed`, then strengthened final suite: `38 passed`.
+- Delivery caller suite: `34 passed`.
+- Production invariant, repair planner, heartbeat, premium expiry, payment reliability, and Daily Cup suite: `116 passed`.
+- Full non-integration pytest after final review fixes: `2206 passed, 1 skipped`.
+- `.venv/bin/ruff check app tests scripts` -> PASS.
+- `.venv/bin/black --check app tests scripts` -> PASS (`1414 files would be left unchanged`).
+- `.venv/bin/isort --check-only app tests scripts` -> PASS.
+- `.venv/bin/mypy app tests` -> `Success: no issues found in 1398 source files`.
+- `git diff --check` -> PASS.
+- `CI=1 FORCE_GROWTH_CHECK=1 BASE_REF=origin/main bash scripts/check_line_limits.sh` -> PASS with warning-only output and no errors.
+
+### CI result
+
+- GitHub CI after this follow-up: pending until commit and push.
+- Required post-push checks: `lint_unit`, `integration`, `tournament_regression`.
+
+### Agent statuses
+
+- Agent A - Executor: PASS. Implemented only the three current findings and their direct tests.
+- Agent B - Scope/Safety Controller: PASS. Scope is exactly 19 files with this tracker; protected/config/migration paths are untouched.
+- Agent C - Code Reviewer: PASS after correcting the active-tournament baseline to `created_at` and adding caller/fallback regression coverage.
+- Agent D - Invariant Auditor: PASS. Both private P1 checks, all eight dispatch paths, retry lease semantics, and Daily Cup initial/fallback persistence have regression evidence.
+- Agent E - Final Gate: `CODE_READY_FOR_FINAL_ACCEPTANCE_AUDIT` for the staged local code;
+  commit, push, and GitHub CI remain pending.
+
+### Production safety
+
+- No deploy, production DB write, migration change/run, restart, replay, or manual messaging.
+- No `.env*`, secret, production config, workflow, deploy, or `docker-compose.prod.yml` change.
+- PR merge and readiness state were not changed.

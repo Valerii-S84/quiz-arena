@@ -6,16 +6,32 @@ from app.services.production_invariant_checks.types import SEVERITY_P1, Invarian
 
 
 def build_tournament_delivery_checks(recent_cutoff: datetime) -> list[InvariantCheck]:
+    baseline_schedule_key = "__production_reliability_migration_baseline__"
     return [
         build_check(
             name="tournament_round_expected_delivery_zero_outcomes",
             severity=SEVERITY_P1,
             sql="""
+                WITH reliability_baseline AS (
+                  SELECT COALESCE(
+                    (
+                      SELECT last_success_at
+                      FROM worker_task_heartbeats
+                      WHERE schedule_key = :baseline_schedule_key
+                      LIMIT 1
+                    ),
+                    :recent_cutoff
+                  ) AS started_at
+                )
                 SELECT count(*)
                 FROM tournaments t
+                CROSS JOIN reliability_baseline b
                 WHERE t.type = 'PRIVATE'
                   AND (
-                    t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','BRACKET_LIVE')
+                    (
+                      t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','BRACKET_LIVE')
+                      AND t.created_at >= b.started_at
+                    )
                     OR (
                       t.status = 'COMPLETED'
                       AND (
@@ -43,19 +59,37 @@ def build_tournament_delivery_checks(recent_cutoff: datetime) -> list[InvariantC
                       AND d.status IN ('SENT','FAILED','SKIPPED')
                   )
             """,
-            params={"recent_cutoff": recent_cutoff},
+            params={
+                "recent_cutoff": recent_cutoff,
+                "baseline_schedule_key": baseline_schedule_key,
+            },
             description="Recent private tournament expected messaging has zero durable outcomes.",
         ),
         build_check(
             name="private_tournament_round_delivery_gap",
             severity=SEVERITY_P1,
             sql="""
+                WITH reliability_baseline AS (
+                  SELECT COALESCE(
+                    (
+                      SELECT last_success_at
+                      FROM worker_task_heartbeats
+                      WHERE schedule_key = :baseline_schedule_key
+                      LIMIT 1
+                    ),
+                    :recent_cutoff
+                  ) AS started_at
+                )
                 SELECT count(*)
                 FROM tournament_participants p
                 JOIN tournaments t ON t.id = p.tournament_id
+                CROSS JOIN reliability_baseline b
                 WHERE t.type = 'PRIVATE'
                   AND (
-                    t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','BRACKET_LIVE')
+                    (
+                      t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','BRACKET_LIVE')
+                      AND t.created_at >= b.started_at
+                    )
                     OR (
                       t.status = 'COMPLETED'
                       AND (
@@ -88,7 +122,10 @@ def build_tournament_delivery_checks(recent_cutoff: datetime) -> list[InvariantC
                       AND d.status IN ('SENT','FAILED','SKIPPED')
                   )
             """,
-            params={"recent_cutoff": recent_cutoff},
+            params={
+                "recent_cutoff": recent_cutoff,
+                "baseline_schedule_key": baseline_schedule_key,
+            },
             description="Private tournament participant is missing a terminal delivery outcome.",
         ),
     ]

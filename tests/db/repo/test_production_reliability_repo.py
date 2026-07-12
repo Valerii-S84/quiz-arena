@@ -128,7 +128,8 @@ async def test_delivery_attempt_retry_claim_is_bounded_to_retryable_failures() -
     assert "telegram_delivery_attempts.attempt_count < %(attempt_count_1)s" in sql
     assert "telegram_delivery_attempts.failure_code IN" in sql
     assert "telegram_delivery_attempts.is_blocked_candidate IS false" in sql
-    assert "telegram_delivery_attempts.updated_at <= %(updated_at_1)s" not in sql
+    assert "telegram_delivery_attempts.updated_at <= %(updated_at_1)s" in sql
+    assert "status=%(status)s" not in sql
 
 
 async def test_delivery_attempt_retry_claim_can_include_safe_stale_pending() -> None:
@@ -147,6 +148,25 @@ async def test_delivery_attempt_retry_claim_can_include_safe_stale_pending() -> 
     sql = compile_parameterized_statement(session.statement)
     assert "telegram_delivery_attempts.status = %(status_2)s" in sql
     assert "telegram_delivery_attempts.updated_at <= %(updated_at_1)s" in sql
+
+
+async def test_delivery_attempt_retry_dispatch_requires_exact_failed_lease() -> None:
+    session = RecordingSession(SimpleNamespace(rowcount=1))
+
+    await TelegramDeliveryAttemptsRepo.mark_retry_dispatched(
+        session,
+        idempotency_key="delivery:retry",
+        claimed_at=NOW_UTC,
+        retryable_failure_codes=frozenset({"TELEGRAM_RETRY_AFTER"}),
+        max_attempts=3,
+    )
+
+    sql = compile_parameterized_statement(session.statement)
+    assert "telegram_delivery_attempts.status = %(status_1)s" in sql
+    assert "telegram_delivery_attempts.updated_at = %(updated_at_1)s" in sql
+    assert "telegram_delivery_attempts.failure_code IN" in sql
+    assert "telegram_delivery_attempts.attempt_count < %(attempt_count_1)s" in sql
+    assert "status=%(status)s" in sql
 
 
 async def test_blocked_candidate_ignores_rows_with_newer_user_activity() -> None:

@@ -11,11 +11,13 @@ from app.db.models.tournament_participants import TournamentParticipant
 from app.db.models.tournaments import Tournament
 from app.game.tournaments.constants import daily_cup_max_rounds_for_participants
 from app.services.telegram_delivery import (
+    begin_telegram_delivery_dispatch,
     mark_telegram_delivery_failed,
     mark_telegram_delivery_sent,
     prepare_telegram_delivery,
 )
 from app.workers.tasks import messaging_fallback_delivery as fallback_delivery
+from app.workers.tasks.daily_cup_message_delivery_persistence import persist_daily_cup_sent_message
 from app.workers.tasks.daily_cup_messaging_delivery_targets import (
     daily_cup_content_version,
     daily_cup_delivery_result,
@@ -54,18 +56,15 @@ async def deliver_daily_cup_messages(
     replaced_message_ids: dict[int, int] = {}
     rounds_total = daily_cup_max_rounds_for_participants(participants_total=participants_total)
     happened_at = datetime.now(timezone.utc)
-    flow = "daily_cup_round_messaging"
     task_name = "daily_cup.run_daily_cup_round_messaging"
-    correlation_id = str(tournament.id)
     content_version = daily_cup_content_version(tournament=tournament)
-
     for user_id in standings_user_ids:
         chat_id = telegram_targets.get(user_id)
         existing_message_id = participant_rows[user_id].standings_message_id
         target = daily_cup_round_delivery_target(
-            flow=flow,
+            flow="daily_cup_round_messaging",
             task_name=task_name,
-            correlation_id=correlation_id,
+            correlation_id=str(tournament.id),
             user_id=user_id,
             chat_id=chat_id,
             delivery_operation=delivery_operation(existing_message_id),
@@ -78,11 +77,11 @@ async def deliver_daily_cup_messages(
         if not delivery.should_send:
             skipped += 1
             continue
-
         play_challenge_id, opponent_user_id = resolve_match_context(
             round_matches=round_matches,
             viewer_user_id=user_id,
         )
+        opponent_label = labels.get(opponent_user_id) if opponent_user_id is not None else None
         standings_lines = build_standings_lines(
             standings_user_ids=standings_user_ids,
             labels=labels,
@@ -101,9 +100,7 @@ async def deliver_daily_cup_messages(
                 round_no=max(1, int(tournament.current_round)),
                 rounds_total=rounds_total,
                 deadline_text=format_deadline(tournament.round_deadline),
-                opponent_label=(
-                    labels.get(opponent_user_id) if opponent_user_id is not None else None
-                ),
+                opponent_label=opponent_label,
                 standings_lines=standings_lines,
             )
         keyboard = build_daily_cup_lobby_keyboard(
@@ -126,6 +123,7 @@ async def deliver_daily_cup_messages(
                 else None
             ),
         )
+        await begin_telegram_delivery_dispatch(delivery, happened_at=happened_at)
         if existing_message_id is None:
             try:
                 message = await bot.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
@@ -137,12 +135,11 @@ async def deliver_daily_cup_messages(
                     exc=exc,
                 )
                 continue
-            await mark_telegram_delivery_sent(
-                idempotency_key=target.idempotency_key,
-                happened_at=happened_at,
+            message_id = await persist_daily_cup_sent_message(
+                target, tournament.id, user_id, message, happened_at
             )
             sent += 1
-            new_message_ids[user_id] = int(message.message_id)
+            new_message_ids[user_id] = message_id
             continue
         try:
             await bot.edit_message_text(
@@ -165,9 +162,9 @@ async def deliver_daily_cup_messages(
                 edited += 1
                 continue
             fallback_target = daily_cup_round_delivery_target(
-                flow=flow,
+                flow="daily_cup_round_messaging",
                 task_name=task_name,
-                correlation_id=correlation_id,
+                correlation_id=str(tournament.id),
                 user_id=user_id,
                 chat_id=chat_id,
                 delivery_operation=fallback_delivery_operation(existing_message_id),
@@ -188,6 +185,7 @@ async def deliver_daily_cup_messages(
                     fallback_status=fallback_decision.status,
                 )
                 continue
+            await begin_telegram_delivery_dispatch(fallback_decision, happened_at=happened_at)
             try:
                 message = await bot.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
             except Exception as send_exc:
@@ -203,17 +201,20 @@ async def deliver_daily_cup_messages(
                     failure=failure,
                 )
                 continue
-            await mark_telegram_delivery_sent(
-                idempotency_key=fallback_target.idempotency_key,
-                happened_at=happened_at,
+            message_id = await persist_daily_cup_sent_message(
+                fallback_target,
+                tournament.id,
+                user_id,
+                message,
+                happened_at,
+                replace_existing=True,
             )
             await fallback_delivery.record_original_edit_skipped_after_fallback_success(
                 target=target,
                 happened_at=happened_at,
             )
             sent += 1
-            replaced_message_ids[user_id] = int(message.message_id)
-
+            replaced_message_ids[user_id] = message_id
     return daily_cup_delivery_result(
         sent, edited, failed, skipped, new_message_ids, replaced_message_ids
     )

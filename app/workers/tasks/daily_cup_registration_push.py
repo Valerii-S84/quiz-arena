@@ -13,6 +13,7 @@ from app.db.session import SessionLocal
 from app.game.tournaments.constants import TOURNAMENT_STATUS_REGISTRATION
 from app.services.telegram_delivery import (
     SKIP_CODE_DUPLICATE,
+    begin_telegram_delivery_dispatch,
     mark_telegram_delivery_failed,
     mark_telegram_delivery_sent,
     prepare_telegram_delivery,
@@ -52,6 +53,7 @@ async def _send_daily_cup_registration_push_once(
     if not delivery.should_send:
         return False
 
+    await begin_telegram_delivery_dispatch(delivery, happened_at=happened_at)
     try:
         try:
             await bot.send_message(

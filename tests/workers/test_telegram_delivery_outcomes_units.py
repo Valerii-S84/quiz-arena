@@ -7,6 +7,7 @@ from uuid import UUID
 
 import pytest
 
+from app.workers.tasks import daily_cup_message_delivery_persistence as daily_persistence
 from app.workers.tasks import daily_cup_messaging_delivery as daily_delivery
 from app.workers.tasks import tournaments_messaging_delivery as private_delivery
 
@@ -37,8 +38,63 @@ class _WorkerBot(_Bot):
     session = _Session()
 
 
+@pytest.mark.asyncio
+async def test_daily_cup_message_id_persists_before_sent(monkeypatch) -> None:
+    calls: list[str] = []
+
+    async def _persist(**_kwargs) -> None:
+        calls.append("persist")
+
+    async def _sent(**_kwargs) -> None:
+        calls.append("sent")
+
+    monkeypatch.setattr(daily_persistence, "persist_daily_cup_standings_message_ids", _persist)
+    monkeypatch.setattr(daily_persistence, "mark_telegram_delivery_sent", _sent)
+
+    result = await daily_persistence.persist_daily_cup_sent_message(
+        cast(Any, SimpleNamespace(idempotency_key="delivery-key")),
+        UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        1,
+        SimpleNamespace(message_id=501),
+        NOW_UTC,
+    )
+
+    assert result == 501
+    assert calls == ["persist", "sent"]
+
+
+@pytest.mark.asyncio
+async def test_daily_cup_persistence_failure_does_not_mark_sent(monkeypatch) -> None:
+    sent_calls: list[object] = []
+
+    async def _persist(**_kwargs) -> None:
+        raise RuntimeError("db unavailable")
+
+    async def _sent(**_kwargs) -> None:
+        sent_calls.append(object())
+
+    monkeypatch.setattr(daily_persistence, "persist_daily_cup_standings_message_ids", _persist)
+    monkeypatch.setattr(daily_persistence, "mark_telegram_delivery_sent", _sent)
+
+    with pytest.raises(RuntimeError, match="db unavailable"):
+        await daily_persistence.persist_daily_cup_sent_message(
+            cast(Any, SimpleNamespace(idempotency_key="delivery-key")),
+            UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            1,
+            SimpleNamespace(message_id=501),
+            NOW_UTC,
+        )
+
+    assert sent_calls == []
+
+
 def _patch_delivery_tracking(monkeypatch, module):
-    calls: dict[str, list[dict[str, object]]] = {"sent": [], "failed": []}
+    calls: dict[str, list[dict[str, object]]] = {
+        "sent": [],
+        "failed": [],
+        "dispatch": [],
+        "persisted": [],
+    }
 
     async def _prepare(**kwargs):
         target = kwargs["target"]
@@ -50,11 +106,22 @@ def _patch_delivery_tracking(monkeypatch, module):
     async def _sent(**kwargs):
         calls["sent"].append(kwargs)
 
+    async def _dispatch(delivery, **_kwargs):
+        calls["dispatch"].append({"idempotency_key": delivery.idempotency_key})
+
+    async def _persist_sent(target, *_args, **_kwargs) -> int:
+        calls["persisted"].append({"idempotency_key": target.idempotency_key})
+        calls["sent"].append({"idempotency_key": target.idempotency_key})
+        return int(_args[2].message_id)
+
     async def _failed(**kwargs):
         calls["failed"].append(kwargs)
 
     monkeypatch.setattr(module, "prepare_telegram_delivery", _prepare)
+    monkeypatch.setattr(module, "begin_telegram_delivery_dispatch", _dispatch)
     monkeypatch.setattr(module, "mark_telegram_delivery_sent", _sent)
+    if hasattr(module, "persist_daily_cup_sent_message"):
+        monkeypatch.setattr(module, "persist_daily_cup_sent_message", _persist_sent)
     monkeypatch.setattr(module, "mark_telegram_delivery_failed", _failed)
     monkeypatch.setattr(module, "record_telegram_delivery_skipped", _sent, raising=False)
     _patch_fallback_terminal_helpers(monkeypatch, module, _sent, _failed)
@@ -79,8 +146,13 @@ def _patch_idempotent_prepare(monkeypatch, module):
     async def _mark_terminal(**_kwargs) -> None:
         return None
 
+    async def _persist_sent(_target, *_args, **_kwargs) -> int:
+        return int(_args[2].message_id)
+
     monkeypatch.setattr(module, "prepare_telegram_delivery", _prepare)
     monkeypatch.setattr(module, "mark_telegram_delivery_sent", _mark_terminal)
+    if hasattr(module, "persist_daily_cup_sent_message"):
+        monkeypatch.setattr(module, "persist_daily_cup_sent_message", _persist_sent)
     monkeypatch.setattr(module, "mark_telegram_delivery_failed", _mark_terminal)
     monkeypatch.setattr(
         module,
@@ -166,6 +238,8 @@ async def test_daily_cup_round_delivery_records_sent_failed_and_skipped(monkeypa
     assert result["failed"] == 1
     assert result["skipped"] == 1
     assert result["new_message_ids"] == {1: 510}
+    assert len(calls["dispatch"]) == 2
+    assert len(calls["persisted"]) == 1
     assert len(calls["sent"]) == 1
     assert len(calls["failed"]) == 1
 

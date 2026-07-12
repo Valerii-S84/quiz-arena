@@ -22,6 +22,7 @@ from app.game.tournaments.constants import (
 from app.game.tournaments.internal import generate_invite_code
 from app.services.telegram_delivery import (
     TelegramDeliveryTarget,
+    begin_telegram_delivery_dispatch,
     build_delivery_idempotency_key,
     hash_chat_id,
     mark_telegram_delivery_failed,
@@ -127,6 +128,7 @@ async def send_daily_cup_canceled_messages(
             delivery = await prepare_telegram_delivery(target=target, happened_at=happened_at)
             if not delivery.should_send:
                 continue
+            await begin_telegram_delivery_dispatch(delivery, happened_at=happened_at)
             try:
                 await bot.send_message(chat_id=chat_id, text=TEXTS_DE["msg.daily_cup.canceled"])
             except Exception as exc:

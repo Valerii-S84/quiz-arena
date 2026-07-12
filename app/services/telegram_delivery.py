@@ -7,7 +7,10 @@ from app.db.repo.production_reliability_repo import TelegramDeliveryAttemptsRepo
 from app.db.session import SessionLocal
 from app.services.telegram_delivery_errors import classify_telegram_delivery_exception
 from app.services.telegram_delivery_records import attempt_create, record_skipped
-from app.services.telegram_delivery_retry import claim_controlled_retry
+from app.services.telegram_delivery_retry import (
+    begin_telegram_delivery_dispatch,
+    claim_controlled_retry,
+)
 from app.services.telegram_delivery_types import (
     BLOCKED_CANDIDATE_TTL,
     FAILURE_CODE_BAD_REQUEST,
@@ -78,18 +81,23 @@ async def prepare_telegram_delivery(
             session,
             item=attempt_create(target),
         )
-        should_send = created or await claim_controlled_retry(
-            session,
-            idempotency_key=target.idempotency_key,
-            happened_at=happened_at,
-            attempt=attempt,
-            attempts_repo=TelegramDeliveryAttemptsRepo,
-        )
+        retry_claimed = False
+        if created:
+            should_send = True
+        else:
+            should_send, retry_claimed = await claim_controlled_retry(
+                session,
+                idempotency_key=target.idempotency_key,
+                happened_at=happened_at,
+                attempt=attempt,
+                attempts_repo=TelegramDeliveryAttemptsRepo,
+            )
         return DeliveryPreparation(
             idempotency_key=target.idempotency_key,
             should_send=should_send,
             status=str(attempt.status),
             created=created,
+            retry_claimed=retry_claimed,
         )
 
 
@@ -186,6 +194,7 @@ __all__ = [
     "TelegramDeliveryFailure",
     "TelegramDeliveryTarget",
     "build_delivery_idempotency_key",
+    "begin_telegram_delivery_dispatch",
     "classify_telegram_delivery_exception",
     "hash_chat_id",
     "mark_telegram_delivery_failed",

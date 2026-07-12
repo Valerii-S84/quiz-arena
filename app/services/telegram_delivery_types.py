@@ -38,6 +38,7 @@ class DeliveryPreparation:
     should_send: bool
     status: str
     created: bool
+    retry_claimed: bool = False
 
 
 @dataclass(frozen=True, slots=True)

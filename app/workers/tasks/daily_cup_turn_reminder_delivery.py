@@ -9,6 +9,7 @@ from uuid import UUID
 
 from app.services.telegram_delivery import (
     TelegramDeliveryTarget,
+    begin_telegram_delivery_dispatch,
     build_delivery_idempotency_key,
     mark_telegram_delivery_failed,
     mark_telegram_delivery_sent,
@@ -66,7 +67,6 @@ async def prepare_reminder_batch(
         for user in users
     }
     telegram_targets = {int(user.id): int(user.telegram_user_id) for user in users}
-
     reminders: list[ReminderItem] = []
     queued_target_keys: set[tuple[UUID, int]] = set()
     scanned_total = 0
@@ -146,6 +146,7 @@ async def deliver_reminders(
                 opponent_label=reminder.opponent_label,
                 deadline_text=reminder.deadline_text,
             )
+            await begin_telegram_delivery_dispatch(delivery, happened_at=happened_at)
             try:
                 await bot.send_message(
                     chat_id=reminder.target_chat_id,
@@ -215,6 +216,4 @@ def _window_key(value: datetime | None) -> str:
     return value.astimezone(timezone.utc).replace(microsecond=0).isoformat()
 
 
-__all__ = (
-    "ReminderBatch ReminderDeliveryResult ReminderItem " "deliver_reminders prepare_reminder_batch"
-).split()
+__all__ = "ReminderBatch ReminderDeliveryResult ReminderItem deliver_reminders prepare_reminder_batch".split()

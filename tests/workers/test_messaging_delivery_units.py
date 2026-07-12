@@ -46,6 +46,10 @@ def _patch_delivery_tracking(
         calls.append(("sent", kwargs["idempotency_key"], None))
         return None
 
+    async def _persist_sent(target, *_args, **_kwargs) -> int:
+        calls.append(("sent", target.idempotency_key, None))
+        return int(_args[2].message_id)
+
     async def _mark_original_failed(**kwargs) -> None:
         calls.append(("original_failed", kwargs["idempotency_key"], kwargs["failure"].failure_code))
 
@@ -54,6 +58,8 @@ def _patch_delivery_tracking(
 
     monkeypatch.setattr(module, "prepare_telegram_delivery", _prepare)
     monkeypatch.setattr(module, "mark_telegram_delivery_sent", _mark_sent)
+    if hasattr(module, "persist_daily_cup_sent_message"):
+        monkeypatch.setattr(module, "persist_daily_cup_sent_message", _persist_sent)
     monkeypatch.setattr(module, "mark_telegram_delivery_failed", _mark_failed)
     if hasattr(module, "fallback_delivery"):
         monkeypatch.setattr(

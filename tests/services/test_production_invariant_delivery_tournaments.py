@@ -17,6 +17,8 @@ def test_private_tournament_delivery_gap_is_current_phase_specific() -> None:
     assert "':status:' || lower(t.status)" in check.sql
     assert "t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','BRACKET_LIVE')" in check.sql
     assert "FROM tournament_matches m" in check.sql
+    assert "FROM worker_task_heartbeats" in check.sql
+    assert "t.created_at >= b.started_at" in check.sql
 
 
 def test_private_tournament_gap_counts_missing_current_phase_participant() -> None:
@@ -52,6 +54,10 @@ def test_private_tournament_gap_includes_long_running_active_round() -> None:
         check.params,
         _private_schema()
         + """
+        INSERT INTO worker_task_heartbeats VALUES (
+            '__production_reliability_migration_baseline__',
+            '2026-07-04 10:00:00+00:00'
+        );
         INSERT INTO tournaments VALUES (
             't-old-active', 'PRIVATE', 'ROUND_3', 3, '2026-07-12 12:00:00+00:00',
             '2026-07-05 11:00:00+00:00'
@@ -105,6 +111,54 @@ def test_private_tournament_gap_ignores_ancient_completed_tournament() -> None:
     assert count == 0
 
 
+def test_private_checks_ignore_active_tournament_before_instrumentation() -> None:
+    setup_sql = (
+        _private_schema()
+        + """
+        INSERT INTO worker_task_heartbeats VALUES (
+            '__production_reliability_migration_baseline__',
+            '2026-07-10 10:00:00+00:00'
+        );
+        INSERT INTO tournaments VALUES (
+            't-pre-instrumentation', 'PRIVATE', 'ROUND_2', 2,
+            '2026-07-12 18:00:00+00:00', '2026-07-01 11:00:00+00:00'
+        );
+        INSERT INTO tournament_participants VALUES ('t-pre-instrumentation', 1);
+    """
+    )
+
+    for name in (
+        "tournament_round_expected_delivery_zero_outcomes",
+        "private_tournament_round_delivery_gap",
+    ):
+        check = _check_by_name(name)
+        assert _run_invariant_sql(check.sql, check.params, setup_sql) == 0
+
+
+def test_private_checks_include_active_tournament_after_instrumentation() -> None:
+    setup_sql = (
+        _private_schema()
+        + """
+        INSERT INTO worker_task_heartbeats VALUES (
+            '__production_reliability_migration_baseline__',
+            '2026-07-01 10:00:00+00:00'
+        );
+        INSERT INTO tournaments VALUES (
+            't-post-instrumentation', 'PRIVATE', 'ROUND_2', 2,
+            '2026-07-03 18:00:00+00:00', '2026-07-02 11:00:00+00:00'
+        );
+        INSERT INTO tournament_participants VALUES ('t-post-instrumentation', 1);
+    """
+    )
+
+    for name in (
+        "tournament_round_expected_delivery_zero_outcomes",
+        "private_tournament_round_delivery_gap",
+    ):
+        check = _check_by_name(name)
+        assert _run_invariant_sql(check.sql, check.params, setup_sql) == 1
+
+
 def _check_by_name(name: str) -> InvariantCheck:
     return next(check for check in build_invariant_checks(NOW_UTC) if check.name == name)
 
@@ -136,4 +190,5 @@ def _private_schema() -> str:
         flow TEXT, correlation_id TEXT, target_id TEXT, status TEXT
     );
     CREATE TABLE tournament_matches (tournament_id TEXT, deadline TEXT);
+    CREATE TABLE worker_task_heartbeats (schedule_key TEXT, last_success_at TEXT);
     """

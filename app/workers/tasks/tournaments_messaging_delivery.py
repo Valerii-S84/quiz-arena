@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.services.telegram_delivery import (
+    begin_telegram_delivery_dispatch,
     mark_telegram_delivery_failed,
     mark_telegram_delivery_sent,
     prepare_telegram_delivery,
@@ -96,6 +97,7 @@ async def deliver_round_messages(
                 add_share_button_fn=add_share_button_fn,
                 build_share_url_fn=build_share_url_fn,
             )
+            await begin_telegram_delivery_dispatch(delivery, happened_at=happened_at)
             if existing_message_id is None:
                 try:
                     message = await bot.send_message(
@@ -163,6 +165,7 @@ async def deliver_round_messages(
                         fallback_status=fallback_delivery.status,
                     )
                     continue
+                await begin_telegram_delivery_dispatch(fallback_delivery, happened_at=happened_at)
                 try:
                     message = await bot.send_message(
                         chat_id=chat_id,
