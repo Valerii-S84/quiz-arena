@@ -63,13 +63,14 @@ async def prepare_telegram_delivery(
                 item=attempt_create(target),
             )
             if created or attempt.status == "PENDING":
-                await TelegramDeliveryAttemptsRepo.mark_skipped(
+                updated = await TelegramDeliveryAttemptsRepo.mark_skipped(
                     session,
                     idempotency_key=target.idempotency_key,
                     skipped_at=happened_at,
                     failure_code=FAILURE_CODE_BLOCKED,
                     failure_reason="known blocked candidate",
                 )
+                _require_terminal_update(updated, "skipped")
             return DeliveryPreparation(
                 idempotency_key=target.idempotency_key,
                 should_send=False,
@@ -108,11 +109,12 @@ async def mark_telegram_delivery_sent(
     session_local: Any = SessionLocal,
 ) -> None:
     async with session_local.begin() as session:
-        await TelegramDeliveryAttemptsRepo.mark_sent(
+        updated = await TelegramDeliveryAttemptsRepo.mark_sent(
             session,
             idempotency_key=idempotency_key,
             sent_at=happened_at,
         )
+        _require_terminal_update(updated, "sent")
 
 
 async def mark_telegram_delivery_failed(
@@ -124,7 +126,7 @@ async def mark_telegram_delivery_failed(
 ) -> TelegramDeliveryFailure:
     failure = classify_telegram_delivery_exception(exc)
     async with session_local.begin() as session:
-        await TelegramDeliveryAttemptsRepo.mark_failed(
+        updated = await TelegramDeliveryAttemptsRepo.mark_failed(
             session,
             idempotency_key=idempotency_key,
             failed_at=happened_at,
@@ -133,6 +135,7 @@ async def mark_telegram_delivery_failed(
             telegram_error_code=failure.telegram_error_code,
             is_blocked_candidate=failure.is_blocked_candidate,
         )
+        _require_terminal_update(updated, "failed")
     return failure
 
 
@@ -145,7 +148,7 @@ async def mark_telegram_delivery_failed_with_classification(
     session_local: Any = SessionLocal,
 ) -> None:
     async with session_local.begin() as session:
-        await TelegramDeliveryAttemptsRepo.mark_failed(
+        updated = await TelegramDeliveryAttemptsRepo.mark_failed(
             session,
             idempotency_key=idempotency_key,
             failed_at=happened_at,
@@ -154,6 +157,12 @@ async def mark_telegram_delivery_failed_with_classification(
             telegram_error_code=failure.telegram_error_code,
             is_blocked_candidate=failure.is_blocked_candidate,
         )
+        _require_terminal_update(updated, "failed")
+
+
+def _require_terminal_update(updated: int, status: str) -> None:
+    if updated != 1:
+        raise RuntimeError(f"telegram delivery {status} terminal lease was lost")
 
 
 async def record_telegram_delivery_skipped(

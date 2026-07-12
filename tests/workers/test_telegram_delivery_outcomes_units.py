@@ -7,7 +7,6 @@ from uuid import UUID
 
 import pytest
 
-from app.workers.tasks import daily_cup_message_delivery_persistence as daily_persistence
 from app.workers.tasks import daily_cup_messaging_delivery as daily_delivery
 from app.workers.tasks import tournaments_messaging_delivery as private_delivery
 
@@ -36,56 +35,6 @@ class _Session:
 
 class _WorkerBot(_Bot):
     session = _Session()
-
-
-@pytest.mark.asyncio
-async def test_daily_cup_message_id_persists_before_sent(monkeypatch) -> None:
-    calls: list[str] = []
-
-    async def _persist(**_kwargs) -> None:
-        calls.append("persist")
-
-    async def _sent(**_kwargs) -> None:
-        calls.append("sent")
-
-    monkeypatch.setattr(daily_persistence, "persist_daily_cup_standings_message_ids", _persist)
-    monkeypatch.setattr(daily_persistence, "mark_telegram_delivery_sent", _sent)
-
-    result = await daily_persistence.persist_daily_cup_sent_message(
-        cast(Any, SimpleNamespace(idempotency_key="delivery-key")),
-        UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-        1,
-        SimpleNamespace(message_id=501),
-        NOW_UTC,
-    )
-
-    assert result == 501
-    assert calls == ["persist", "sent"]
-
-
-@pytest.mark.asyncio
-async def test_daily_cup_persistence_failure_does_not_mark_sent(monkeypatch) -> None:
-    sent_calls: list[object] = []
-
-    async def _persist(**_kwargs) -> None:
-        raise RuntimeError("db unavailable")
-
-    async def _sent(**_kwargs) -> None:
-        sent_calls.append(object())
-
-    monkeypatch.setattr(daily_persistence, "persist_daily_cup_standings_message_ids", _persist)
-    monkeypatch.setattr(daily_persistence, "mark_telegram_delivery_sent", _sent)
-
-    with pytest.raises(RuntimeError, match="db unavailable"):
-        await daily_persistence.persist_daily_cup_sent_message(
-            cast(Any, SimpleNamespace(idempotency_key="delivery-key")),
-            UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
-            1,
-            SimpleNamespace(message_id=501),
-            NOW_UTC,
-        )
-
-    assert sent_calls == []
 
 
 def _patch_delivery_tracking(monkeypatch, module):

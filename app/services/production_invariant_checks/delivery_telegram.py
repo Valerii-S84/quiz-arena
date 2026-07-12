@@ -21,7 +21,7 @@ def build_telegram_delivery_checks(now_utc: datetime) -> list[InvariantCheck]:
                     count(*) AS total,
                     count(*) FILTER (WHERE status = 'FAILED') AS failed
                   FROM telegram_delivery_attempts
-                  WHERE created_at >= :delivery_window_start
+                  WHERE coalesce(failed_at, updated_at, created_at) >= :delivery_window_start
                 )
                 SELECT CASE
                   WHEN total >= :min_delivery_attempts

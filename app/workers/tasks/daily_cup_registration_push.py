@@ -54,44 +54,32 @@ async def _send_daily_cup_registration_push_once(
 
     await begin_telegram_delivery_dispatch(delivery, happened_at=happened_at)
     try:
-        try:
-            await bot.send_message(
-                chat_id=telegram_user_id,
-                text=text,
-                reply_markup=build_daily_cup_registration_keyboard(
-                    tournament_id=tournament_id_text
-                ),
-            )
-        except Exception as exc:
-            await mark_telegram_delivery_failed(
-                idempotency_key=target.idempotency_key,
-                happened_at=happened_at,
-                exc=exc,
-            )
-            logger.warning(
-                "daily_cup_registration_push_send_failed",
-                event_type=sent_event_type,
-                tournament_id=tournament_id_text,
-                user_id=user_id,
-                error_type=type(exc).__name__,
-            )
-            return False
-        await record_daily_cup_registration_push_sent(
-            target=target,
-            user_id=user_id,
-            event_type=sent_event_type,
-            tournament_id=tournament_id_text,
-            happened_at=happened_at,
+        await bot.send_message(
+            chat_id=telegram_user_id,
+            text=text,
+            reply_markup=build_daily_cup_registration_keyboard(tournament_id=tournament_id_text),
         )
     except Exception as exc:
+        await mark_telegram_delivery_failed(
+            idempotency_key=target.idempotency_key,
+            happened_at=happened_at,
+            exc=exc,
+        )
         logger.warning(
-            "daily_cup_registration_push_delivery_record_failed",
+            "daily_cup_registration_push_send_failed",
             event_type=sent_event_type,
             tournament_id=tournament_id_text,
             user_id=user_id,
             error_type=type(exc).__name__,
         )
         return False
+    await record_daily_cup_registration_push_sent(
+        target=target,
+        user_id=user_id,
+        event_type=sent_event_type,
+        tournament_id=tournament_id_text,
+        happened_at=happened_at,
+    )
     return True
 
 

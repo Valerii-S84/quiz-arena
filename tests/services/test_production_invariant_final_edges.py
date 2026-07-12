@@ -37,7 +37,7 @@ def test_existing_stale_heartbeat_row_is_stale() -> None:
     count = _heartbeat_count(
         """
         INSERT INTO worker_task_heartbeats VALUES (
-            'task', 'schedule', '2026-07-12 11:57:00+00:00', 0
+            'task', 'schedule', '2026-07-12 11:57:00+00:00', 0, NULL
         );
         """,
     )
@@ -49,7 +49,7 @@ def test_fresh_success_heartbeat_row_is_ok() -> None:
     count = _heartbeat_count(
         """
         INSERT INTO worker_task_heartbeats VALUES (
-            'task', 'schedule', '2026-07-12 11:59:30+00:00', 0
+            'task', 'schedule', '2026-07-12 11:59:30+00:00', 0, NULL
         );
         """,
     )
@@ -61,7 +61,7 @@ def test_consecutive_heartbeat_failures_are_stale_even_with_fresh_success() -> N
     count = _heartbeat_count(
         """
         INSERT INTO worker_task_heartbeats VALUES (
-            'task', 'schedule', '2026-07-12 11:59:30+00:00', 2
+            'task', 'schedule', '2026-07-12 11:59:30+00:00', 2, NULL
         );
         """,
     )
@@ -238,6 +238,9 @@ def test_canceled_daily_cup_still_does_not_require_round_outcomes() -> None:
         CREATE TABLE telegram_delivery_attempts (
             flow TEXT, correlation_id TEXT, target_id TEXT, status TEXT
         );
+        CREATE TABLE worker_task_heartbeats (
+            schedule_key TEXT, last_success_at TEXT
+        );
         INSERT INTO tournaments VALUES (
             'cup-1', 'DAILY_ARENA', 'CANCELED', 0, '2026-07-12 11:00:00+00:00'
         );
@@ -284,7 +287,7 @@ def _heartbeat_baseline_row(baseline_at: datetime) -> str:
     return f"""
         INSERT INTO worker_task_heartbeats VALUES (
             '__system__', '__production_reliability_migration_baseline__',
-            '{baseline_at.isoformat(sep=" ")}', 0
+            '{baseline_at.isoformat(sep=" ")}', 0, NULL
         );
     """
 
@@ -321,6 +324,9 @@ def _daily_cancel_count(rows_sql: str) -> int:
         CREATE TABLE telegram_delivery_attempts (
             flow TEXT, correlation_id TEXT, telegram_user_id INTEGER, status TEXT
         );
+        CREATE TABLE worker_task_heartbeats (
+            schedule_key TEXT, last_success_at TEXT
+        );
         """
         + rows_sql,
     )
@@ -348,6 +354,7 @@ def _heartbeat_table_sql() -> str:
             task_name TEXT,
             schedule_key TEXT,
             last_success_at TEXT,
-            consecutive_failures INTEGER
+            consecutive_failures INTEGER,
+            last_started_at TEXT
         );
         """

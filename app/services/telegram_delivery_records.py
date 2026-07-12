@@ -22,13 +22,15 @@ async def record_skipped(
             item=attempt_create(target),
         )
         if created or attempt.status == "PENDING":
-            await attempts_repo.mark_skipped(
+            updated = await attempts_repo.mark_skipped(
                 session,
                 idempotency_key=target.idempotency_key,
                 skipped_at=happened_at,
                 failure_code=failure_code,
                 failure_reason=failure_reason,
             )
+            if updated != 1:
+                raise RuntimeError("telegram delivery skipped terminal lease was lost")
         return DeliveryPreparation(
             idempotency_key=target.idempotency_key,
             should_send=False,

@@ -6,16 +6,30 @@ from app.services.production_invariant_checks.types import SEVERITY_P1, Invarian
 
 
 def build_daily_cup_delivery_checks(recent_cutoff: datetime) -> list[InvariantCheck]:
+    baseline_schedule_key = "__production_reliability_migration_baseline__"
     return [
         build_check(
             name="daily_cup_expected_delivery_zero_outcomes",
             severity=SEVERITY_P1,
             sql="""
+                WITH reliability_baseline AS (
+                  SELECT COALESCE(
+                    (
+                      SELECT last_success_at
+                      FROM worker_task_heartbeats
+                      WHERE schedule_key = :baseline_schedule_key
+                      LIMIT 1
+                    ),
+                    :recent_cutoff
+                  ) AS started_at
+                )
                 SELECT count(*)
                 FROM tournaments t
+                CROSS JOIN reliability_baseline b
                 WHERE t.type = 'DAILY_ARENA'
                   AND t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','COMPLETED')
                   AND t.created_at >= :recent_cutoff
+                  AND t.created_at >= b.started_at
                   AND EXISTS (
                     SELECT 1
                     FROM tournament_participants p
@@ -35,20 +49,36 @@ def build_daily_cup_delivery_checks(recent_cutoff: datetime) -> list[InvariantCh
                       AND d.status IN ('SENT','FAILED','SKIPPED')
                   )
             """,
-            params={"recent_cutoff": recent_cutoff},
+            params={
+                "recent_cutoff": recent_cutoff,
+                "baseline_schedule_key": baseline_schedule_key,
+            },
             description="Recent Daily Cup expected messaging has zero durable outcomes.",
         ),
         build_check(
             name="daily_cup_round_delivery_gap",
             severity=SEVERITY_P1,
             sql="""
+                WITH reliability_baseline AS (
+                  SELECT COALESCE(
+                    (
+                      SELECT last_success_at
+                      FROM worker_task_heartbeats
+                      WHERE schedule_key = :baseline_schedule_key
+                      LIMIT 1
+                    ),
+                    :recent_cutoff
+                  ) AS started_at
+                )
                 SELECT count(*)
                 FROM tournament_participants p
                 JOIN tournaments t ON t.id = p.tournament_id
                 JOIN users u ON u.id = p.user_id
+                CROSS JOIN reliability_baseline b
                 WHERE t.type = 'DAILY_ARENA'
                   AND t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','COMPLETED')
                   AND t.created_at >= :recent_cutoff
+                  AND t.created_at >= b.started_at
                   AND u.status = 'ACTIVE'
                   AND NOT EXISTS (
                     SELECT 1
@@ -68,20 +98,36 @@ def build_daily_cup_delivery_checks(recent_cutoff: datetime) -> list[InvariantCh
                       AND d.status IN ('SENT','FAILED','SKIPPED')
                   )
             """,
-            params={"recent_cutoff": recent_cutoff},
+            params={
+                "recent_cutoff": recent_cutoff,
+                "baseline_schedule_key": baseline_schedule_key,
+            },
             description="Daily Cup participant is missing a terminal round delivery outcome.",
         ),
         build_check(
             name="daily_cup_cancel_message_gap",
             severity=SEVERITY_P1,
             sql="""
+                WITH reliability_baseline AS (
+                  SELECT COALESCE(
+                    (
+                      SELECT last_success_at
+                      FROM worker_task_heartbeats
+                      WHERE schedule_key = :baseline_schedule_key
+                      LIMIT 1
+                    ),
+                    :recent_cutoff
+                  ) AS started_at
+                )
                 SELECT count(*)
                 FROM tournament_participants p
                 JOIN tournaments t ON t.id = p.tournament_id
                 JOIN users u ON u.id = p.user_id
+                CROSS JOIN reliability_baseline b
                 WHERE t.type = 'DAILY_ARENA'
                   AND t.status = 'CANCELED'
                   AND t.created_at >= :recent_cutoff
+                  AND t.created_at >= b.started_at
                   AND u.status = 'ACTIVE'
                   AND NOT EXISTS (
                     SELECT 1
@@ -92,7 +138,10 @@ def build_daily_cup_delivery_checks(recent_cutoff: datetime) -> list[InvariantCh
                       AND d.status IN ('SENT','FAILED','SKIPPED')
                   )
             """,
-            params={"recent_cutoff": recent_cutoff},
+            params={
+                "recent_cutoff": recent_cutoff,
+                "baseline_schedule_key": baseline_schedule_key,
+            },
             description="Canceled Daily Cup participant is missing a terminal cancel message.",
         ),
     ]

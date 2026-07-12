@@ -150,19 +150,21 @@ async def test_daily_cup_fallback_persists_replacement_before_sent(monkeypatch) 
         persisted.update(kwargs)
         calls.append("persist")
 
-    async def _sent(**_kwargs) -> None:
+    async def _sent(*_args, **_kwargs) -> int:
         calls.append("sent")
+        return 1
 
     monkeypatch.setattr(
         daily_cup_message_delivery_persistence,
-        "persist_daily_cup_standings_message_ids",
+        "persist_standings_message_ids",
         _persist,
     )
     monkeypatch.setattr(
-        daily_cup_message_delivery_persistence,
-        "mark_telegram_delivery_sent",
+        daily_cup_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        "mark_sent",
         _sent,
     )
+    monkeypatch.setattr(daily_cup_message_delivery_persistence, "SessionLocal", SessionLocal)
     await daily_cup_message_delivery_persistence.persist_daily_cup_sent_message(
         cast(Any, SimpleNamespace(idempotency_key="fallback")),
         UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),

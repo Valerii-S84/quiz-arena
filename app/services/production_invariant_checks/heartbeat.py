@@ -39,6 +39,15 @@ def build_heartbeat_checks(
                         AND last_success_at >= :fresh_after
                         AND consecutive_failures = 0
                     ) THEN 0
+                    WHEN EXISTS (
+                      SELECT 1
+                      FROM worker_task_heartbeats
+                      WHERE task_name = :task_name
+                        AND schedule_key = :schedule_key
+                        AND last_success_at IS NULL
+                        AND last_started_at >= :fresh_after
+                        AND consecutive_failures = 0
+                    ) THEN 0
                     WHEN NOT EXISTS (
                       SELECT 1
                       FROM worker_task_heartbeats

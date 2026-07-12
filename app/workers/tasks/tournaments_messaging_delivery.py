@@ -126,11 +126,6 @@ async def deliver_round_messages(
                     text=text,
                     reply_markup=keyboard,
                 )
-                await mark_telegram_delivery_sent(
-                    idempotency_key=target.idempotency_key,
-                    happened_at=happened_at,
-                )
-                edited += 1
             except Exception as exc:
                 if is_message_not_modified_error_fn(exc):
                     await mark_telegram_delivery_sent(
@@ -194,13 +189,12 @@ async def deliver_round_messages(
                 )
                 sent += 1
                 replaced_message_ids[user_id] = message_id
-    except Exception as exc:
-        logger.warning(
-            "private_tournament_round_message_failed",
-            tournament_id=str(context.parsed_tournament_id),
-            error_type=type(exc).__name__,
-        )
-        failed += 1
+            else:
+                await mark_telegram_delivery_sent(
+                    idempotency_key=target.idempotency_key,
+                    happened_at=happened_at,
+                )
+                edited += 1
     finally:
         await bot.session.close()
     return TournamentRoundDeliveryResult(

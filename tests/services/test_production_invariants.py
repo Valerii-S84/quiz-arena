@@ -190,6 +190,7 @@ def test_daily_cup_gap_counts_missing_current_phase_participant() -> None:
         CREATE TABLE telegram_delivery_attempts (
             flow TEXT, correlation_id TEXT, target_id TEXT, status TEXT
         );
+        CREATE TABLE worker_task_heartbeats (schedule_key TEXT, last_success_at TEXT);
         INSERT INTO tournaments VALUES ('cup-1', 'DAILY_ARENA', 'ROUND_2', 2, '2026-07-10 11:00:00+00:00');
         INSERT INTO users VALUES (1, 'ACTIVE'), (2, 'ACTIVE');
         INSERT INTO tournament_participants VALUES ('cup-1', 1), ('cup-1', 2);
@@ -221,6 +222,7 @@ def test_daily_cup_gap_ignores_inactive_and_canceled_without_false_alert() -> No
         CREATE TABLE telegram_delivery_attempts (
             flow TEXT, correlation_id TEXT, target_id TEXT, status TEXT
         );
+        CREATE TABLE worker_task_heartbeats (schedule_key TEXT, last_success_at TEXT);
         INSERT INTO tournaments VALUES ('cup-1', 'DAILY_ARENA', 'ROUND_2', 2, '2026-07-10 11:00:00+00:00');
         INSERT INTO tournaments VALUES ('cup-2', 'DAILY_ARENA', 'CANCELED', 0, '2026-07-10 11:00:00+00:00');
         INSERT INTO users VALUES (1, 'BLOCKED'), (2, 'ACTIVE');
