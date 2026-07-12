@@ -1,11 +1,34 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from argparse import Namespace
+from pathlib import Path
 
 import pytest
 
 from app.services.production_invariants import InvariantResult
 from scripts import production_critical_invariants
+
+
+def test_production_invariants_script_bootstraps_repo_root(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [sys.executable, str(Path(production_critical_invariants.__file__).resolve()), "--help"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+        env={
+            **os.environ,
+            "TELEGRAM_BOT_TOKEN": "123456:test-token",
+            "TELEGRAM_WEBHOOK_SECRET": "test-webhook-secret",
+        },
+    )
+
+    assert result.returncode == 0
+    assert "Run read-only production critical invariants" in result.stdout
+    assert "ModuleNotFoundError" not in result.stderr
 
 
 @pytest.mark.asyncio

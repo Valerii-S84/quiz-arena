@@ -588,3 +588,49 @@ Scope: close only the three Codex findings reported after commit
 - No `.env*`, secret, production config, workflow, deploy, or `docker-compose.prod.yml` change.
 - PR remains open, unmerged, and draft. The pre-existing non-draft state observed after push was
   restored to draft; the PR was not marked ready.
+
+## PR #246 post-CI review cleanup - 2026-07-12
+
+Status: `LOCAL_GATES_GREEN_PENDING_COMMIT_PUSH_AND_GITHUB_CI`.
+
+Scope: close only the four Codex findings from the review of
+`abaea5934b04027c4cd305e27553e3bcae7bdcbd`.
+
+### Findings and fixes
+
+| Finding | Fix summary | Regression evidence |
+| --- | --- | --- |
+| P1 private tournament message ID can be lost after terminal `SENT` | Initial sends atomically persist the participant message ID and terminal delivery. Fallback sends atomically persist the replacement ID, mark fallback `SENT`, and mark the original edit `SKIPPED`. All CAS rowcounts are enforced so a lost lease rolls back the transaction. | `tests/services/test_telegram_delivery_retry_claim.py`, `tests/workers/test_messaging_delivery_units.py`, and `tests/workers/test_telegram_delivery_outcomes_units.py`: initial/fallback helper use, persistence-before-terminal order, persistence failure, fallback `mark_sent == 0`, and original `mark_skipped == 0`. |
+| P1 production invariant script fails when invoked by path | The script inserts the repository root into `sys.path` before importing `app`, matching the documented `.venv/bin/python scripts/production_critical_invariants.py` invocation. | `tests/scripts/test_production_critical_invariants.py`: subprocess runs the script from a temporary cwd outside the repository and receives successful `--help` output. |
+| P2 repair planner uses creation time for stale pending | Stale `PENDING` classification now uses `updated_at`, matching retry lease refresh and the production checker. Retry dispatch refreshes `updated_at` with database `now()` so long batches do not immediately appear stale. | `tests/services/test_messaging_repair_planner.py` asserts the loader SQL uses `updated_at`; `tests/db/repo/test_production_reliability_repo.py` asserts dispatch writes `updated_at=now()`. |
+| P2 registration push can terminalize before analytics | Registration analytics and terminal delivery are written in one transaction, with analytics first. Analytics failure or `mark_sent == 0` prevents a successful terminal outcome. | `tests/workers/test_daily_cup_registration_push_units.py`: caller uses the outcome helper, order is `analytics -> SENT`, analytics failure does not mark sent, and lost terminal CAS raises. |
+
+### Local gate evidence
+
+- Final targeted review matrix: `71 passed`.
+- Full non-integration pytest: `2216 passed, 1 skipped`.
+- `.venv/bin/ruff check app tests scripts` -> PASS.
+- `.venv/bin/black --check app tests scripts` -> PASS (`1416 files would be left unchanged`).
+- `.venv/bin/isort --check-only app tests scripts` -> PASS.
+- `.venv/bin/mypy app tests` -> `Success: no issues found in 1400 source files`.
+- `git diff --check` -> PASS.
+- `CI=1 FORCE_GROWTH_CHECK=1 BASE_REF=origin/main bash scripts/check_line_limits.sh` -> PASS with warning-only output and no errors.
+
+### CI result
+
+- GitHub CI: pending until this follow-up is committed and pushed.
+- Required checks: `lint_unit`, `integration`, `tournament_regression`.
+
+### Agent statuses
+
+- Agent A - Executor: PASS. Implemented only the four fresh review findings and direct negative-path tests.
+- Agent B - Scope/Safety Controller: PASS, including final staged-index verification.
+- Agent C - Code Reviewer: PASS, including final staged-index verification.
+- Agent D - Invariant Auditor: PASS, including final staged-index verification.
+- Agent E - Final Gate: `CODE_READY_FOR_FINAL_ACCEPTANCE_AUDIT` for the staged local code.
+
+### Production safety
+
+- No deploy, production DB write, migration change/run, restart, replay, or manual messaging.
+- No `.env*`, secret, production config, workflow, deploy, or `docker-compose.prod.yml` change.
+- PR remains open, unmerged, and draft.

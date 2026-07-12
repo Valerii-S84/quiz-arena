@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 from uuid import uuid4
 
 import pytest
 
 from app.workers.tasks import daily_cup_registration_push as push
+from app.workers.tasks import daily_cup_registration_push_outcome as push_outcome
 from tests.game.tournaments_unit_support import NOW_UTC
 from tests.workers.payments_reliability_async_support import SessionLocalStub
 
@@ -19,13 +20,10 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
     delivery_calls: list[dict[str, object]] = []
     monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
     monkeypatch.setattr(push, "prepare_telegram_delivery", _prepare_delivery(True))
-    monkeypatch.setattr(push, "mark_telegram_delivery_sent", _capture_async(delivery_calls))
-    monkeypatch.setattr(push, "mark_telegram_delivery_failed", _capture_async([]))
     monkeypatch.setattr(
-        push.AnalyticsRepo,
-        "create_daily_cup_push_event_once",
-        _async_return(True),
+        push, "record_daily_cup_registration_push_sent", _capture_async(delivery_calls)
     )
+    monkeypatch.setattr(push, "mark_telegram_delivery_failed", _capture_async([]))
 
     assert await push._send_daily_cup_registration_push_once(
         bot=bot,
@@ -40,7 +38,7 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
         sent_event_type="sent",
     )
     assert bot.sent == [101]
-    assert cast(str, delivery_calls[0]["idempotency_key"]).startswith("telegram-delivery:")
+    assert cast(Any, delivery_calls[0]["target"]).idempotency_key.startswith("telegram-delivery:")
 
 
 @pytest.mark.asyncio
@@ -50,8 +48,8 @@ async def test_send_daily_cup_registration_push_once_skips_duplicate_or_failed_s
     monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
     monkeypatch.setattr(push, "prepare_telegram_delivery", _prepare_delivery(False))
     monkeypatch.setattr(
-        push.AnalyticsRepo,
-        "create_daily_cup_push_event_once",
+        push,
+        "record_daily_cup_registration_push_sent",
         _unexpected_async("analytics must not be written for skipped delivery"),
     )
     assert not await push._send_daily_cup_registration_push_once(
@@ -83,6 +81,85 @@ async def test_send_daily_cup_registration_push_once_skips_duplicate_or_failed_s
         sent_event_type="sent",
     )
     assert cast(BaseException, failed_calls[0]["exc"]).args == ("send failed",)
+
+
+@pytest.mark.asyncio
+async def test_registration_push_outcome_records_event_before_terminal_sent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    async def _analytics(*_args, **_kwargs) -> bool:
+        calls.append("analytics")
+        return True
+
+    async def _sent(*_args, **_kwargs) -> int:
+        calls.append("sent")
+        return 1
+
+    monkeypatch.setattr(push_outcome.AnalyticsRepo, "create_daily_cup_push_event_once", _analytics)
+    monkeypatch.setattr(push_outcome.TelegramDeliveryAttemptsRepo, "mark_sent", _sent)
+    await push_outcome.record_daily_cup_registration_push_sent(
+        target=cast(Any, SimpleNamespace(idempotency_key="push")),
+        user_id=11,
+        event_type="sent",
+        tournament_id="tid",
+        happened_at=NOW_UTC,
+        session_local=SessionLocalStub(),
+    )
+
+    assert calls == ["analytics", "sent"]
+
+
+@pytest.mark.asyncio
+async def test_registration_push_outcome_does_not_mark_sent_when_event_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sent_calls: list[object] = []
+
+    async def _analytics(*_args, **_kwargs) -> bool:
+        raise RuntimeError("analytics failed")
+
+    async def _sent(*_args, **_kwargs) -> int:
+        sent_calls.append(object())
+        return 1
+
+    monkeypatch.setattr(push_outcome.AnalyticsRepo, "create_daily_cup_push_event_once", _analytics)
+    monkeypatch.setattr(push_outcome.TelegramDeliveryAttemptsRepo, "mark_sent", _sent)
+    with pytest.raises(RuntimeError, match="analytics failed"):
+        await push_outcome.record_daily_cup_registration_push_sent(
+            target=cast(Any, SimpleNamespace(idempotency_key="push")),
+            user_id=11,
+            event_type="sent",
+            tournament_id="tid",
+            happened_at=NOW_UTC,
+            session_local=SessionLocalStub(),
+        )
+
+    assert sent_calls == []
+
+
+@pytest.mark.asyncio
+async def test_registration_push_outcome_fails_when_terminal_cas_is_lost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _analytics(*_args, **_kwargs) -> bool:
+        return True
+
+    async def _sent(*_args, **_kwargs) -> int:
+        return 0
+
+    monkeypatch.setattr(push_outcome.AnalyticsRepo, "create_daily_cup_push_event_once", _analytics)
+    monkeypatch.setattr(push_outcome.TelegramDeliveryAttemptsRepo, "mark_sent", _sent)
+    with pytest.raises(RuntimeError, match="terminal lease was lost"):
+        await push_outcome.record_daily_cup_registration_push_sent(
+            target=cast(Any, SimpleNamespace(idempotency_key="push")),
+            user_id=11,
+            event_type="sent",
+            tournament_id="tid",
+            happened_at=NOW_UTC,
+            session_local=SessionLocalStub(),
+        )
 
 
 @pytest.mark.asyncio

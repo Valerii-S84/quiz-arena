@@ -14,7 +14,9 @@ from app.services.telegram_delivery import (
 from app.workers.tasks.messaging_fallback_delivery import (
     mark_original_edit_failed_after_fallback_failure,
     record_original_edit_skipped_after_fallback_skip,
-    record_original_edit_skipped_after_fallback_success,
+)
+from app.workers.tasks.tournaments_message_delivery_persistence import (
+    persist_private_tournament_sent_message,
 )
 from app.workers.tasks.tournaments_messaging_context import TournamentRoundMessagingContext
 from app.workers.tasks.tournaments_messaging_delivery_content import build_round_message_payload
@@ -62,7 +64,6 @@ async def deliver_round_messages(
     task_name = "tournaments_messaging.run_private_tournament_round_messaging"
     correlation_id = str(context.parsed_tournament_id)
     content_version = private_round_content_version(tournament=context.tournament)
-
     bot = build_bot_fn()
     try:
         for user_id in context.standings_user_ids:
@@ -84,7 +85,6 @@ async def deliver_round_messages(
             if not delivery.should_send:
                 skipped += 1
                 continue
-
             text, keyboard = build_round_message_payload(
                 context=context,
                 user_id=user_id,
@@ -113,14 +113,12 @@ async def deliver_round_messages(
                         exc=exc,
                     )
                     continue
-                await mark_telegram_delivery_sent(
-                    idempotency_key=target.idempotency_key,
-                    happened_at=happened_at,
+                message_id = await persist_private_tournament_sent_message(
+                    target, context.parsed_tournament_id, user_id, message, happened_at
                 )
                 sent += 1
-                new_message_ids[user_id] = int(message.message_id)
+                new_message_ids[user_id] = message_id
                 continue
-
             try:
                 await bot.edit_message_text(
                     chat_id=chat_id,
@@ -185,16 +183,17 @@ async def deliver_round_messages(
                         failure=failure,
                     )
                     continue
-                await mark_telegram_delivery_sent(
-                    idempotency_key=fallback_target.idempotency_key,
-                    happened_at=happened_at,
-                )
-                await record_original_edit_skipped_after_fallback_success(
-                    target=target,
-                    happened_at=happened_at,
+                message_id = await persist_private_tournament_sent_message(
+                    fallback_target,
+                    context.parsed_tournament_id,
+                    user_id,
+                    message,
+                    happened_at,
+                    replace_existing=True,
+                    original_target=target,
                 )
                 sent += 1
-                replaced_message_ids[user_id] = int(message.message_id)
+                replaced_message_ids[user_id] = message_id
     except Exception as exc:
         logger.warning(
             "private_tournament_round_message_failed",
@@ -204,7 +203,6 @@ async def deliver_round_messages(
         failed += 1
     finally:
         await bot.session.close()
-
     return TournamentRoundDeliveryResult(
         sent=sent,
         edited=edited,

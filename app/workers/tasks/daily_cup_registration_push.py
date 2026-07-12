@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from zoneinfo import ZoneInfo
 
 from app.bot.application import build_bot
 from app.bot.keyboards.daily_cup import build_daily_cup_registration_keyboard
 from app.bot.texts.de import TEXTS_DE
-from app.core.analytics_events import BERLIN_TIMEZONE, EVENT_SOURCE_WORKER
-from app.db.repo.analytics_repo import AnalyticsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.constants import TOURNAMENT_STATUS_REGISTRATION
@@ -15,7 +12,6 @@ from app.services.telegram_delivery import (
     SKIP_CODE_DUPLICATE,
     begin_telegram_delivery_dispatch,
     mark_telegram_delivery_failed,
-    mark_telegram_delivery_sent,
     prepare_telegram_delivery,
     record_telegram_delivery_skipped,
 )
@@ -25,6 +21,9 @@ from app.workers.tasks.daily_cup_config import (
 )
 from app.workers.tasks.daily_cup_core import ensure_daily_cup_registration_tournament
 from app.workers.tasks.daily_cup_push_events import list_already_pushed_user_ids
+from app.workers.tasks.daily_cup_registration_push_outcome import (
+    record_daily_cup_registration_push_sent,
+)
 from app.workers.tasks.daily_cup_registration_push_targets import daily_cup_delivery_target
 from app.workers.tasks.daily_cup_time import format_close_time_local
 
@@ -77,8 +76,11 @@ async def _send_daily_cup_registration_push_once(
                 error_type=type(exc).__name__,
             )
             return False
-        await mark_telegram_delivery_sent(
-            idempotency_key=target.idempotency_key,
+        await record_daily_cup_registration_push_sent(
+            target=target,
+            user_id=user_id,
+            event_type=sent_event_type,
+            tournament_id=tournament_id_text,
             happened_at=happened_at,
         )
     except Exception as exc:
@@ -90,17 +92,6 @@ async def _send_daily_cup_registration_push_once(
             error_type=type(exc).__name__,
         )
         return False
-
-    async with SessionLocal.begin() as session:
-        await AnalyticsRepo.create_daily_cup_push_event_once(
-            session,
-            event_type=sent_event_type,
-            source=EVENT_SOURCE_WORKER,
-            user_id=user_id,
-            local_date_berlin=happened_at.astimezone(ZoneInfo(BERLIN_TIMEZONE)).date(),
-            payload={"tournament_id": tournament_id_text},
-            happened_at=happened_at,
-        )
     return True
 
 

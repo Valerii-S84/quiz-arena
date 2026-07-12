@@ -89,12 +89,7 @@ async def test_daily_cup_persistence_failure_does_not_mark_sent(monkeypatch) -> 
 
 
 def _patch_delivery_tracking(monkeypatch, module):
-    calls: dict[str, list[dict[str, object]]] = {
-        "sent": [],
-        "failed": [],
-        "dispatch": [],
-        "persisted": [],
-    }
+    calls: dict[str, list[dict[str, object]]] = dict(sent=[], failed=[], dispatch=[], persisted=[])
 
     async def _prepare(**kwargs):
         target = kwargs["target"]
@@ -122,6 +117,9 @@ def _patch_delivery_tracking(monkeypatch, module):
     monkeypatch.setattr(module, "mark_telegram_delivery_sent", _sent)
     if hasattr(module, "persist_daily_cup_sent_message"):
         monkeypatch.setattr(module, "persist_daily_cup_sent_message", _persist_sent)
+    monkeypatch.setattr(
+        module, "persist_private_tournament_sent_message", _persist_sent, raising=False
+    )
     monkeypatch.setattr(module, "mark_telegram_delivery_failed", _failed)
     monkeypatch.setattr(module, "record_telegram_delivery_skipped", _sent, raising=False)
     _patch_fallback_terminal_helpers(monkeypatch, module, _sent, _failed)
@@ -153,6 +151,9 @@ def _patch_idempotent_prepare(monkeypatch, module):
     monkeypatch.setattr(module, "mark_telegram_delivery_sent", _mark_terminal)
     if hasattr(module, "persist_daily_cup_sent_message"):
         monkeypatch.setattr(module, "persist_daily_cup_sent_message", _persist_sent)
+    monkeypatch.setattr(
+        module, "persist_private_tournament_sent_message", _persist_sent, raising=False
+    )
     monkeypatch.setattr(module, "mark_telegram_delivery_failed", _mark_terminal)
     monkeypatch.setattr(
         module,
@@ -233,7 +234,6 @@ async def test_daily_cup_round_delivery_records_sent_failed_and_skipped(monkeypa
         ),
         participants_total=3,
     )
-
     assert result["sent"] == 1
     assert result["failed"] == 1
     assert result["skipped"] == 1

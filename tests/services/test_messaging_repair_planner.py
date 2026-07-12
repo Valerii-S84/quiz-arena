@@ -315,6 +315,7 @@ async def test_repair_plan_loader_builds_current_phase_targets() -> None:
         "1:phase:round:2:status:round_2:edit:101",
         "2:phase:round:2:status:round_2:send",
     ]
+    assert "status = 'PENDING' AND updated_at" in session.statements[1]
 
 
 def test_repair_plan_keeps_skipped_out_of_replay_candidates() -> None:
@@ -351,6 +352,8 @@ class _RepairPlanSession:
         existing_rows: list[tuple[object, ...]],
     ) -> None:
         self._results = [_RowsResult(expected_rows), _RowsResult(existing_rows)]
+        self.statements: list[str] = []
 
-    async def execute(self, *_args, **_kwargs) -> _RowsResult:
+    async def execute(self, statement, *_args, **_kwargs) -> _RowsResult:
+        self.statements.append(str(statement))
         return self._results.pop(0)

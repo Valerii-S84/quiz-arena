@@ -167,6 +167,7 @@ async def test_delivery_attempt_retry_dispatch_requires_exact_failed_lease() -> 
     assert "telegram_delivery_attempts.failure_code IN" in sql
     assert "telegram_delivery_attempts.attempt_count < %(attempt_count_1)s" in sql
     assert "status=%(status)s" in sql
+    assert "updated_at=now()" in sql
 
 
 async def test_blocked_candidate_ignores_rows_with_newer_user_activity() -> None:

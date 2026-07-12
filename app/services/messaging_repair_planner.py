@@ -192,7 +192,7 @@ async def _load_delivery_attempts(
         text(
             """
             SELECT target_type, target_id, status, attempt_count, failure_code,
-              status = 'PENDING' AND created_at <= now() - interval '15 minutes'
+              status = 'PENDING' AND updated_at <= now() - interval '15 minutes'
             FROM telegram_delivery_attempts
             WHERE flow = :flow
               AND correlation_id = :correlation_id

@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+from app.db.repo.production_reliability_repo import TelegramDeliveryAttemptsRepo
+from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
+from app.db.session import SessionLocal
+from app.services.telegram_delivery import SKIP_CODE_EDIT_REPLACED_BY_SEND, TelegramDeliveryTarget
+from app.workers.tasks.tournaments_messaging_persistence import persist_standings_message_ids
+
+
+async def persist_private_tournament_sent_message(
+    target: TelegramDeliveryTarget,
+    tournament_id: UUID,
+    user_id: int,
+    message: Any,
+    happened_at: datetime,
+    *,
+    replace_existing: bool = False,
+    original_target: TelegramDeliveryTarget | None = None,
+) -> int:
+    message_id = int(message.message_id)
+    async with SessionLocal.begin() as session:
+        await persist_standings_message_ids(
+            session=session,
+            parsed_tournament_id=tournament_id,
+            participants_repo=TournamentParticipantsRepo,
+            new_message_ids={} if replace_existing else {user_id: message_id},
+            replaced_message_ids={user_id: message_id} if replace_existing else {},
+        )
+        sent = await TelegramDeliveryAttemptsRepo.mark_sent(
+            session,
+            idempotency_key=target.idempotency_key,
+            sent_at=happened_at,
+        )
+        if sent != 1:
+            raise RuntimeError("private tournament delivery terminal lease was lost")
+        if original_target is not None:
+            skipped = await TelegramDeliveryAttemptsRepo.mark_skipped(
+                session,
+                idempotency_key=original_target.idempotency_key,
+                skipped_at=happened_at,
+                failure_code=SKIP_CODE_EDIT_REPLACED_BY_SEND,
+                failure_reason="edit delivery replaced by fallback send",
+            )
+            if skipped != 1:
+                raise RuntimeError("private tournament original edit lease was lost")
+    return message_id
+
+
+__all__ = ["persist_private_tournament_sent_message"]

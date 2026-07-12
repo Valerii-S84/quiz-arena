@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import and_, or_, update
+from sqlalchemy import and_, func, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.production_reliability import TelegramDeliveryAttempt
@@ -72,6 +72,7 @@ class TelegramDeliveryRetryRepo:
                 failure_code=None,
                 failure_reason=None,
                 telegram_error_code=None,
+                updated_at=func.now(),
             )
         )
         result = await session.execute(stmt)
