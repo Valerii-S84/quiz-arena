@@ -56,7 +56,8 @@ def _patch_delivery_tracking(monkeypatch, module):
     monkeypatch.setattr(module, "prepare_telegram_delivery", _prepare)
     monkeypatch.setattr(module, "mark_telegram_delivery_sent", _sent)
     monkeypatch.setattr(module, "mark_telegram_delivery_failed", _failed)
-    monkeypatch.setattr(module, "record_telegram_delivery_skipped", _sent)
+    monkeypatch.setattr(module, "record_telegram_delivery_skipped", _sent, raising=False)
+    _patch_fallback_terminal_helpers(monkeypatch, module, _sent, _failed)
     return calls
 
 
@@ -81,8 +82,52 @@ def _patch_idempotent_prepare(monkeypatch, module):
     monkeypatch.setattr(module, "prepare_telegram_delivery", _prepare)
     monkeypatch.setattr(module, "mark_telegram_delivery_sent", _mark_terminal)
     monkeypatch.setattr(module, "mark_telegram_delivery_failed", _mark_terminal)
-    monkeypatch.setattr(module, "record_telegram_delivery_skipped", _mark_terminal)
+    monkeypatch.setattr(
+        module,
+        "record_telegram_delivery_skipped",
+        _mark_terminal,
+        raising=False,
+    )
+    _patch_fallback_terminal_helpers(monkeypatch, module, _mark_terminal, _mark_terminal)
     return prepared
+
+
+def _patch_fallback_terminal_helpers(monkeypatch, module, skipped_handler, failed_handler) -> None:
+    if hasattr(module, "fallback_delivery"):
+        monkeypatch.setattr(
+            module.fallback_delivery,
+            "record_original_edit_skipped_after_fallback_success",
+            skipped_handler,
+        )
+        monkeypatch.setattr(
+            module.fallback_delivery,
+            "record_original_edit_skipped_after_fallback_skip",
+            skipped_handler,
+        )
+        monkeypatch.setattr(
+            module.fallback_delivery,
+            "mark_original_edit_failed_after_fallback_failure",
+            failed_handler,
+        )
+        return
+    monkeypatch.setattr(
+        module,
+        "record_original_edit_skipped_after_fallback_success",
+        skipped_handler,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        module,
+        "record_original_edit_skipped_after_fallback_skip",
+        skipped_handler,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        module,
+        "mark_original_edit_failed_after_fallback_failure",
+        failed_handler,
+        raising=False,
+    )
 
 
 @pytest.mark.asyncio

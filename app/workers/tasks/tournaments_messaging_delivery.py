@@ -6,11 +6,14 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.services.telegram_delivery import (
-    SKIP_CODE_EDIT_REPLACED_BY_SEND,
     mark_telegram_delivery_failed,
     mark_telegram_delivery_sent,
     prepare_telegram_delivery,
-    record_telegram_delivery_skipped,
+)
+from app.workers.tasks.messaging_fallback_delivery import (
+    mark_original_edit_failed_after_fallback_failure,
+    record_original_edit_skipped_after_fallback_skip,
+    record_original_edit_skipped_after_fallback_success,
 )
 from app.workers.tasks.tournaments_messaging_context import TournamentRoundMessagingContext
 from app.workers.tasks.tournaments_messaging_delivery_content import build_round_message_payload
@@ -154,13 +157,11 @@ async def deliver_round_messages(
                 )
                 if not fallback_delivery.should_send:
                     skipped += 1
-                    if fallback_delivery.status == "SENT":
-                        await record_telegram_delivery_skipped(
-                            target=target,
-                            happened_at=happened_at,
-                            failure_code=SKIP_CODE_EDIT_REPLACED_BY_SEND,
-                            failure_reason="edit delivery already replaced by fallback send",
-                        )
+                    await record_original_edit_skipped_after_fallback_skip(
+                        target=target,
+                        happened_at=happened_at,
+                        fallback_status=fallback_delivery.status,
+                    )
                     continue
                 try:
                     message = await bot.send_message(
@@ -170,21 +171,24 @@ async def deliver_round_messages(
                     )
                 except Exception as send_exc:
                     failed += 1
-                    await mark_telegram_delivery_failed(
+                    failure = await mark_telegram_delivery_failed(
                         idempotency_key=fallback_target.idempotency_key,
                         happened_at=happened_at,
                         exc=send_exc,
+                    )
+                    await mark_original_edit_failed_after_fallback_failure(
+                        idempotency_key=target.idempotency_key,
+                        happened_at=happened_at,
+                        failure=failure,
                     )
                     continue
                 await mark_telegram_delivery_sent(
                     idempotency_key=fallback_target.idempotency_key,
                     happened_at=happened_at,
                 )
-                await record_telegram_delivery_skipped(
+                await record_original_edit_skipped_after_fallback_success(
                     target=target,
                     happened_at=happened_at,
-                    failure_code=SKIP_CODE_EDIT_REPLACED_BY_SEND,
-                    failure_reason="edit delivery replaced by fallback send",
                 )
                 sent += 1
                 replaced_message_ids[user_id] = int(message.message_id)

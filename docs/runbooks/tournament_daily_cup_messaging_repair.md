@@ -38,7 +38,12 @@ Use `app.services.messaging_repair_planner.plan_tournament_messaging_repair` wit
 - `flow="daily_cup_round_messaging"` for Daily Cup round/final messaging;
 - `flow="private_tournament_round_messaging"` for private tournament round messaging.
 
-The planner is dry-run only. It normalizes operation-shaped delivery ids such as `user_id:send` and `user_id:edit:<message_id>` so a target with any `SENT` outcome is not replayed.
+The planner is dry-run only. It preserves the full phase-specific target id, so
+an older `round:1` `SENT` outcome does not suppress a missing current `round:2`,
+`status:completed`, or cancel-phase target. Safe replay candidates are limited
+to missing expected targets or retryable failures that remain below the delivery
+attempt limit. Permanent Telegram failures such as forbidden, blocked user, chat
+not found, and permanent bad request are not safe replay candidates.
 
 ## Escalation
 

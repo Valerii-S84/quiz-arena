@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Any, cast
 
 from sqlalchemy.dialects import postgresql
 
@@ -239,6 +240,22 @@ async def test_invariant_alert_reopen_terminal_rows_reuses_type_key() -> None:
     assert "resolved_at=%(resolved_at)s" in sql
     assert "acked_at=%(acked_at)s" in sql
     assert "count=(production_invariant_alerts.count + %(count_1)s)" in sql
+
+
+async def test_invariant_alert_reopen_terminal_lookup_includes_acked_rows() -> None:
+    session = RecordingSession(ScalarResult(None), ScalarResult(42), SimpleNamespace(rowcount=1))
+
+    await ProductionInvariantAlertsRepo._reopen_existing_terminal(
+        session,
+        severity="P1",
+        alert_type="worker_task_heartbeat_stale",
+        correlation_key="task:daily-cup-round-advance",
+        seen_at=NOW_UTC,
+        safe_context={"task_name": "task"},
+    )
+
+    compiled = cast(Any, session.statements[1]).compile(dialect=postgresql.dialect())
+    assert compiled.params["status_1"] == ["RESOLVED", "ACKED"]
 
 
 async def test_invariant_alert_record_open_returns_after_successful_reopen() -> None:

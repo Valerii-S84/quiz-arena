@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from app.workers.tasks import premium_expiry
@@ -56,8 +58,17 @@ def test_expire_premium_entitlements_task_wrapper(monkeypatch: pytest.MonkeyPatc
     assert captured["schedule_key"] == premium_expiry.SCHEDULE_KEY
 
 
-def test_premium_expiry_schedule_registered() -> None:
-    schedule = premium_expiry.celery_app.conf.beat_schedule[premium_expiry.SCHEDULE_KEY]
+def test_premium_expiry_schedule_not_registered_by_default() -> None:
+    schedule = premium_expiry.celery_app.conf.beat_schedule or {}
+
+    assert premium_expiry.SCHEDULE_KEY not in schedule
+
+
+def test_premium_expiry_schedule_registered_when_enabled() -> None:
+    app = SimpleNamespace(conf=SimpleNamespace(beat_schedule={}))
+
+    premium_expiry.configure_premium_expiry_schedule(app, enabled=True)
+    schedule = app.conf.beat_schedule[premium_expiry.SCHEDULE_KEY]
 
     assert schedule == {
         "task": premium_expiry.TASK_NAME,

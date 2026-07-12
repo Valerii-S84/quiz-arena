@@ -127,6 +127,26 @@ async def mark_telegram_delivery_failed(
     return failure
 
 
+async def mark_telegram_delivery_failed_with_classification(
+    *,
+    idempotency_key: str,
+    happened_at: datetime,
+    failure: TelegramDeliveryFailure,
+    failure_reason: str,
+    session_local: Any = SessionLocal,
+) -> None:
+    async with session_local.begin() as session:
+        await TelegramDeliveryAttemptsRepo.mark_failed(
+            session,
+            idempotency_key=idempotency_key,
+            failed_at=happened_at,
+            failure_code=failure.failure_code,
+            failure_reason=failure_reason,
+            telegram_error_code=failure.telegram_error_code,
+            is_blocked_candidate=failure.is_blocked_candidate,
+        )
+
+
 async def record_telegram_delivery_skipped(
     *,
     target: TelegramDeliveryTarget,
@@ -167,6 +187,7 @@ __all__ = [
     "classify_telegram_delivery_exception",
     "hash_chat_id",
     "mark_telegram_delivery_failed",
+    "mark_telegram_delivery_failed_with_classification",
     "mark_telegram_delivery_sent",
     "prepare_telegram_delivery",
     "record_telegram_delivery_skipped",

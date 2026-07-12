@@ -5,6 +5,9 @@ from dataclasses import dataclass
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.messaging_repair_targets import phase_repair_target_id
+from app.services.telegram_delivery_types import MAX_DELIVERY_ATTEMPTS, RETRYABLE_FAILURE_CODES
+
 
 @dataclass(frozen=True, slots=True)
 class RepairTarget:
@@ -68,6 +71,8 @@ def build_messaging_repair_plan(
         key = _repair_match_key(target_type=attempt.target_type, target_id=attempt.target_id)
         if key in sent_target_keys:
             continue
+        if not _failed_attempt_is_replay_safe(attempt):
+            continue
         if any(
             _repair_match_key(target_type=candidate.target_type, target_id=candidate.target_id)
             == key
@@ -89,9 +94,14 @@ def build_messaging_repair_plan(
 
 
 def _repair_match_key(*, target_type: str, target_id: str) -> tuple[str, str]:
-    if target_type == "user":
-        return (target_type, target_id.split(":", 1)[0])
     return (target_type, target_id)
+
+
+def _failed_attempt_is_replay_safe(attempt: ExistingDeliveryOutcome) -> bool:
+    return (
+        attempt.failure_code in RETRYABLE_FAILURE_CODES
+        and attempt.attempt_count < MAX_DELIVERY_ATTEMPTS
+    )
 
 
 async def plan_tournament_messaging_repair(
@@ -102,7 +112,11 @@ async def plan_tournament_messaging_repair(
 ) -> MessagingRepairPlan:
     if flow not in {"daily_cup_round_messaging", "private_tournament_round_messaging"}:
         raise ValueError("unsupported repair flow")
-    expected_targets = await _load_tournament_expected_targets(session, tournament_id=tournament_id)
+    expected_targets = await _load_tournament_expected_targets(
+        session,
+        flow=flow,
+        tournament_id=tournament_id,
+    )
     existing_attempts = await _load_delivery_attempts(
         session,
         flow=flow,
@@ -119,20 +133,38 @@ async def plan_tournament_messaging_repair(
 async def _load_tournament_expected_targets(
     session: AsyncSession,
     *,
+    flow: str,
     tournament_id: str,
 ) -> list[RepairTarget]:
     result = await session.execute(
         text(
             """
-            SELECT user_id::text
-            FROM tournament_participants
-            WHERE tournament_id = :tournament_id
-            ORDER BY user_id
+            SELECT
+              p.user_id,
+              p.standings_message_id,
+              t.status,
+              t.current_round
+            FROM tournament_participants p
+            JOIN tournaments t ON t.id = p.tournament_id
+            WHERE p.tournament_id = :tournament_id
+            ORDER BY p.user_id
             """
         ),
         {"tournament_id": tournament_id},
     )
-    return [RepairTarget(target_type="user", target_id=str(row[0])) for row in result.all()]
+    return [
+        RepairTarget(
+            target_type="user",
+            target_id=phase_repair_target_id(
+                user_id=int(row[0]),
+                standings_message_id=None if row[1] is None else int(row[1]),
+                status=str(row[2]),
+                current_round=int(row[3] or 0),
+                flow=flow,
+            ),
+        )
+        for row in result.all()
+    ]
 
 
 async def _load_delivery_attempts(

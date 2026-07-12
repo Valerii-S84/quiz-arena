@@ -14,8 +14,22 @@ def build_tournament_delivery_checks(recent_cutoff: datetime) -> list[InvariantC
                 SELECT count(*)
                 FROM tournaments t
                 WHERE t.type = 'PRIVATE'
-                  AND t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','BRACKET_LIVE','COMPLETED')
-                  AND t.created_at >= :recent_cutoff
+                  AND (
+                    t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','BRACKET_LIVE')
+                    OR (
+                      t.status = 'COMPLETED'
+                      AND (
+                        t.created_at >= :recent_cutoff
+                        OR t.round_deadline >= :recent_cutoff
+                        OR EXISTS (
+                          SELECT 1
+                          FROM tournament_matches m
+                          WHERE m.tournament_id = t.id
+                            AND m.deadline >= :recent_cutoff
+                        )
+                      )
+                    )
+                  )
                   AND EXISTS (
                     SELECT 1
                     FROM tournament_participants p
@@ -40,8 +54,22 @@ def build_tournament_delivery_checks(recent_cutoff: datetime) -> list[InvariantC
                 FROM tournament_participants p
                 JOIN tournaments t ON t.id = p.tournament_id
                 WHERE t.type = 'PRIVATE'
-                  AND t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','BRACKET_LIVE','COMPLETED')
-                  AND t.created_at >= :recent_cutoff
+                  AND (
+                    t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','BRACKET_LIVE')
+                    OR (
+                      t.status = 'COMPLETED'
+                      AND (
+                        t.created_at >= :recent_cutoff
+                        OR t.round_deadline >= :recent_cutoff
+                        OR EXISTS (
+                          SELECT 1
+                          FROM tournament_matches m
+                          WHERE m.tournament_id = t.id
+                            AND m.deadline >= :recent_cutoff
+                        )
+                      )
+                    )
+                  )
                   AND NOT EXISTS (
                     SELECT 1
                     FROM telegram_delivery_attempts d

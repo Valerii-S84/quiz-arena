@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 import structlog
 
+from app.core.config import get_settings
 from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.session import SessionLocal
 from app.workers.celery_app import celery_app
@@ -48,21 +49,31 @@ def expire_premium_entitlements(batch_size: int = 500) -> dict[str, int]:
     )
 
 
-celery_app.conf.beat_schedule = celery_app.conf.beat_schedule or {}
-celery_app.conf.beat_schedule.update(
-    {
-        SCHEDULE_KEY: {
-            "task": TASK_NAME,
-            "schedule": 3600.0,
-            "options": {"queue": "q_normal"},
-        },
-    }
-)
+def configure_premium_expiry_schedule(app=celery_app, *, enabled: bool | None = None) -> None:
+    schedule_enabled = (
+        get_settings().premium_expiry_schedule_enabled if enabled is None else enabled
+    )
+    if not schedule_enabled:
+        return
+    app.conf.beat_schedule = app.conf.beat_schedule or {}
+    app.conf.beat_schedule.update(
+        {
+            SCHEDULE_KEY: {
+                "task": TASK_NAME,
+                "schedule": 3600.0,
+                "options": {"queue": "q_normal"},
+            },
+        }
+    )
+
+
+configure_premium_expiry_schedule(celery_app)
 
 
 __all__ = [
     "SCHEDULE_KEY",
     "TASK_NAME",
+    "configure_premium_expiry_schedule",
     "expire_premium_entitlements",
     "expire_premium_entitlements_async",
 ]

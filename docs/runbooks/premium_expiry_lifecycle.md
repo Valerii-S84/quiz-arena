@@ -20,7 +20,9 @@ Preferred lifecycle is implemented in code:
 - expired `ACTIVE` premium entitlement rows can be transitioned to `EXPIRED`;
 - task is idempotent;
 - effective lookup still requires `starts_at <= now` and `ends_at > now`;
-- no production task run is performed by this PR.
+- no production task run is performed by this PR;
+- the beat schedule is default-off unless `PREMIUM_EXPIRY_SCHEDULE_ENABLED=true`
+  is enabled in a separate approved deploy/ops decision.
 
 ## What To Check
 
@@ -40,13 +42,17 @@ Preferred lifecycle is implemented in code:
 
 ## Controlled Task
 
-After controlled deploy and approval, the scheduled task is:
+After controlled deploy and approval, the task can be run explicitly as:
 
 ```python
 app.workers.tasks.premium_expiry.expire_premium_entitlements
 ```
 
 It marks only `ACTIVE` `PREMIUM` rows with `ends_at <= now` as `EXPIRED`.
+
+Scheduled hourly execution is registered only when
+`PREMIUM_EXPIRY_SCHEDULE_ENABLED=true`. Importing the Celery task module with the
+default flag value must not register `premium-expiry-lifecycle-hourly`.
 
 ## Escalation
 
@@ -58,4 +64,6 @@ Escalate when:
 
 ## Rollback / Disable
 
-If expiry transition is suspected to be wrong, stop the scheduled task through a separate approved deploy/config change and use DB backup/review before any data repair.
+If expiry transition is suspected to be wrong, disable the schedule through a
+separate approved deploy/config change and use DB backup/review before any data
+repair. Do not patch production data to compensate for an unapproved run.

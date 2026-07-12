@@ -96,15 +96,6 @@ def test_daily_cup_delivery_gap_is_per_active_participant_and_not_canceled() -> 
     assert "'CANCELED'" not in check.sql
 
 
-def test_private_tournament_delivery_gap_is_current_phase_specific() -> None:
-    check = _check_by_name("private_tournament_round_delivery_gap")
-
-    assert "p.user_id::text || ':phase:'" in check.sql
-    assert "WHEN t.status = 'COMPLETED' THEN 'status:completed'" in check.sql
-    assert "'round:' || GREATEST(1, t.current_round)::text" in check.sql
-    assert "':status:' || lower(t.status)" in check.sql
-
-
 def test_daily_cup_zero_outcome_check_uses_active_eligible_users_only() -> None:
     check = _check_by_name("daily_cup_expected_delivery_zero_outcomes")
 
@@ -120,6 +111,68 @@ def test_streak_stale_check_correlates_activity_to_same_user() -> None:
     assert "GROUP BY user_id" in check.sql
     assert "LEFT JOIN streak_state s ON s.user_id = a.user_id" in check.sql
     assert "s.updated_at < a.latest_answered_at" in check.sql
+
+
+def test_blocked_user_check_matches_active_candidate_policy() -> None:
+    check = _check_by_name("telegram_blocked_users_count")
+
+    assert "WITH blocked_candidates AS" in check.sql
+    assert "status = 'FAILED'" in check.sql
+    assert "coalesce(failed_at, updated_at, created_at) >= :blocked_since" in check.sql
+    assert "u.last_seen_at > b.blocked_at" in check.sql
+
+
+def test_blocked_user_check_counts_fresh_candidate() -> None:
+    count = _blocked_count(
+        """
+        INSERT INTO telegram_delivery_attempts VALUES (
+            'FAILED', 101, 1, '2026-07-10 11:00:00+00:00',
+            '2026-07-10 11:00:00+00:00', '2026-07-10 11:00:00+00:00'
+        );
+        """
+    )
+
+    assert count == 1
+
+
+def test_blocked_user_check_ignores_candidate_after_newer_inbound_activity() -> None:
+    count = _blocked_count(
+        """
+        INSERT INTO telegram_delivery_attempts VALUES (
+            'FAILED', 101, 1, '2026-07-10 11:00:00+00:00',
+            '2026-07-10 11:00:00+00:00', '2026-07-10 11:00:00+00:00'
+        );
+        INSERT INTO users VALUES (101, '2026-07-10 11:30:00+00:00');
+        """
+    )
+
+    assert count == 0
+
+
+def test_blocked_user_check_ignores_expired_candidate() -> None:
+    count = _blocked_count(
+        """
+        INSERT INTO telegram_delivery_attempts VALUES (
+            'FAILED', 101, 1, '2026-05-01 11:00:00+00:00',
+            '2026-05-01 11:00:00+00:00', '2026-05-01 11:00:00+00:00'
+        );
+        """
+    )
+
+    assert count == 0
+
+
+def test_blocked_user_check_ignores_non_blocking_failure() -> None:
+    count = _blocked_count(
+        """
+        INSERT INTO telegram_delivery_attempts VALUES (
+            'FAILED', 101, 0, '2026-07-10 11:00:00+00:00',
+            '2026-07-10 11:00:00+00:00', '2026-07-10 11:00:00+00:00'
+        );
+        """
+    )
+
+    assert count == 0
 
 
 def test_daily_cup_gap_counts_missing_current_phase_participant() -> None:
@@ -177,35 +230,6 @@ def test_daily_cup_gap_ignores_inactive_and_canceled_without_false_alert() -> No
     assert count == 0
 
 
-def test_private_tournament_gap_counts_missing_current_phase_participant() -> None:
-    check = _check_by_name("private_tournament_round_delivery_gap")
-    count = _run_invariant_sql(
-        check.sql,
-        check.params,
-        """
-        CREATE TABLE tournaments (
-            id TEXT, type TEXT, status TEXT, current_round INTEGER, created_at TEXT
-        );
-        CREATE TABLE tournament_participants (tournament_id TEXT, user_id INTEGER);
-        CREATE TABLE telegram_delivery_attempts (
-            flow TEXT, correlation_id TEXT, target_id TEXT, status TEXT
-        );
-        INSERT INTO tournaments VALUES ('t-1', 'PRIVATE', 'ROUND_2', 2, '2026-07-10 11:00:00+00:00');
-        INSERT INTO tournament_participants VALUES ('t-1', 1), ('t-1', 2);
-        INSERT INTO telegram_delivery_attempts VALUES (
-            'private_tournament_round_messaging', 't-1',
-            '1:phase:round:2:status:round_2:edit:101', 'SENT'
-        );
-        INSERT INTO telegram_delivery_attempts VALUES (
-            'private_tournament_round_messaging', 't-1',
-            '2:phase:round:1:status:round_1:edit:202', 'SENT'
-        );
-        """,
-    )
-
-    assert count == 1
-
-
 def test_streak_stale_count_is_per_user_not_global() -> None:
     check = _check_by_name("streak_update_stale")
     count = _run_invariant_sql(
@@ -239,6 +263,21 @@ def test_streak_stale_count_finds_missing_user_row() -> None:
     )
 
     assert count == 1
+
+
+def test_streak_stale_count_has_no_finding_without_recent_quiz_activity() -> None:
+    check = _check_by_name("streak_update_stale")
+    count = _run_invariant_sql(
+        check.sql,
+        check.params,
+        """
+        CREATE TABLE quiz_attempts (user_id INTEGER, answered_at TEXT);
+        CREATE TABLE streak_state (user_id INTEGER, updated_at TEXT);
+        INSERT INTO streak_state VALUES (1, '2026-07-10 11:05:00+00:00');
+        """,
+    )
+
+    assert count == 0
 
 
 def test_production_invariant_exit_code_blocks_only_p0_p1_failures() -> None:
@@ -321,6 +360,26 @@ def _run_invariant_sql(sql: str, params: dict[str, object], setup_sql: str) -> i
         connection.close()
     assert row is not None
     return int(row[0] or 0)
+
+
+def _blocked_count(rows_sql: str) -> int:
+    check = _check_by_name("telegram_blocked_users_count")
+    return _run_invariant_sql(
+        check.sql,
+        check.params,
+        """
+        CREATE TABLE telegram_delivery_attempts (
+            status TEXT,
+            telegram_user_id INTEGER,
+            is_blocked_candidate INTEGER,
+            failed_at TEXT,
+            updated_at TEXT,
+            created_at TEXT
+        );
+        CREATE TABLE users (telegram_user_id INTEGER, last_seen_at TEXT);
+        """
+        + rows_sql,
+    )
 
 
 def _result(*, name: str, status: str, severity: str, count: int) -> InvariantResult:

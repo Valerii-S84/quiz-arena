@@ -11,12 +11,11 @@ from app.db.models.tournament_participants import TournamentParticipant
 from app.db.models.tournaments import Tournament
 from app.game.tournaments.constants import daily_cup_max_rounds_for_participants
 from app.services.telegram_delivery import (
-    SKIP_CODE_EDIT_REPLACED_BY_SEND,
     mark_telegram_delivery_failed,
     mark_telegram_delivery_sent,
     prepare_telegram_delivery,
-    record_telegram_delivery_skipped,
 )
+from app.workers.tasks import messaging_fallback_delivery as fallback_delivery
 from app.workers.tasks.daily_cup_messaging_delivery_targets import (
     daily_cup_content_version,
     daily_cup_delivery_result,
@@ -177,39 +176,40 @@ async def deliver_daily_cup_messages(
                 current_round=int(tournament.current_round),
                 pending_replay_safe=False,
             )
-            fallback_delivery = await prepare_telegram_delivery(
+            fallback_decision = await prepare_telegram_delivery(
                 target=fallback_target,
                 happened_at=happened_at,
             )
-            if not fallback_delivery.should_send:
+            if not fallback_decision.should_send:
                 skipped += 1
-                if fallback_delivery.status == "SENT":
-                    await record_telegram_delivery_skipped(
-                        target=target,
-                        happened_at=happened_at,
-                        failure_code=SKIP_CODE_EDIT_REPLACED_BY_SEND,
-                        failure_reason="edit delivery already replaced by fallback send",
-                    )
+                await fallback_delivery.record_original_edit_skipped_after_fallback_skip(
+                    target=target,
+                    happened_at=happened_at,
+                    fallback_status=fallback_decision.status,
+                )
                 continue
             try:
                 message = await bot.send_message(chat_id=chat_id, text=text, reply_markup=keyboard)
             except Exception as send_exc:
                 failed += 1
-                await mark_telegram_delivery_failed(
+                failure = await mark_telegram_delivery_failed(
                     idempotency_key=fallback_target.idempotency_key,
                     happened_at=happened_at,
                     exc=send_exc,
+                )
+                await fallback_delivery.mark_original_edit_failed_after_fallback_failure(
+                    idempotency_key=target.idempotency_key,
+                    happened_at=happened_at,
+                    failure=failure,
                 )
                 continue
             await mark_telegram_delivery_sent(
                 idempotency_key=fallback_target.idempotency_key,
                 happened_at=happened_at,
             )
-            await record_telegram_delivery_skipped(
+            await fallback_delivery.record_original_edit_skipped_after_fallback_success(
                 target=target,
                 happened_at=happened_at,
-                failure_code=SKIP_CODE_EDIT_REPLACED_BY_SEND,
-                failure_reason="edit delivery replaced by fallback send",
             )
             sent += 1
             replaced_message_ids[user_id] = int(message.message_id)

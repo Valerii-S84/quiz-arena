@@ -13,6 +13,188 @@ Safety boundary for this PR:
 - auto-recovery remains off;
 - live reconciliation is not enabled.
 
+## PR #246 Delivery Reliability State Machine Matrix
+
+Agent A implementation lock: code changes remain blocked until Agent C reviews this section
+and returns `PASS`.
+
+Agent B scope/safety controller status: `PASS` for scope boundaries. Allowed write scope is
+limited to the current Codex findings, directly related regression tests, this tracker, and the
+premium-expiry runbook/config code needed to keep the schedule default-off. Forbidden scope remains
+deploy, production writes/migrations/restarts, task replay, manual messaging, `.env*`, secrets,
+production config, `docker-compose.prod.yml`, merge, draft removal, auto-recovery enablement, live
+reconciliation enablement, dependency/CI changes, migrations, broad refactor, and unrelated
+product behavior changes.
+
+### Matrix 1: Delivery attempt lifecycle
+
+Policy constants:
+- retryable failure codes: `TELEGRAM_RETRY_AFTER` only.
+- permanent/non-retryable failure codes: `TELEGRAM_FORBIDDEN`,
+  `TELEGRAM_BAD_REQUEST`, `TELEGRAM_BLOCKED_CANDIDATE`, `MISSING_CHAT_ID`,
+  `EDIT_REPLACED_BY_FALLBACK_SEND`, `DUPLICATE_DELIVERY_ATTEMPT`, and unknown
+  non-policy failures unless explicitly reclassified later.
+- stale pending retry policy: only `PENDING` rows with
+  `safe_context.pending_replay_safe = true`, `updated_at <= now - STALE_PENDING_AFTER`,
+  and `attempt_count < MAX_DELIVERY_ATTEMPTS`.
+- terminal statuses: `SENT`, `FAILED`, `SKIPPED`.
+
+| State | `prepare_telegram_delivery.should_send` | Attempt count | Row create/update | Skipped return | Alert/checker | Tests |
+| --- | --- | --- | --- | --- | --- | --- |
+| no row + chat id | `True` | no increment until `mark_sent`/`mark_failed` | create `PENDING` row | no | no alert until terminal failure or stale invariant | `tests/services/test_telegram_delivery.py::test_prepare_delivery_creates_pending_attempt` |
+| no row + no chat id | `False` | no send increment | create row then mark `SKIPPED` | yes, `MISSING_CHAT_ID` | terminal outcome prevents zero-outcome gap | `tests/services/test_telegram_delivery.py` missing-chat coverage |
+| `PENDING` fresh, unsafe send | `False` | unchanged | existing row unchanged | no | stale checker may alert only after policy window | `tests/services/test_telegram_delivery.py::test_stale_pending_send_delivery_without_safe_context_does_not_retry` |
+| `PENDING` stale, safe edit/replay | `True` only after claim | unchanged at claim; terminal marker increments | update claim to fresh `PENDING` | no | retry bounded by age/attempts | `test_stale_pending_delivery_allows_controlled_retry` |
+| `PENDING` stale, unsafe | `False` | unchanged | unchanged | no | invariant/checker can expose stale row | `test_stale_pending_send_delivery_without_safe_context_does_not_retry` |
+| `SENT` | `False` | unchanged | unchanged | duplicate is blocked by idempotency | no new alert | repair planner duplicate exact-phase test |
+| `FAILED` retryable | `True` if `failure_code in RETRYABLE_FAILURE_CODES`, not blocked, and attempts below max | terminal retry send increments on next mark | claim to `PENDING`, then terminal update | no | still visible as failed until retry succeeds | retryable repair planner + delivery retry tests |
+| `FAILED` non-retryable | `False` | unchanged | unchanged | no | failed terminal counts as durable outcome; repair excludes replay | permanent failure repair tests |
+| `FAILED` blocked | `False` for active blocked candidate | new same-user target is created and marked `SKIPPED` when active block is present | create/update `SKIPPED` for current target | yes, `TELEGRAM_BLOCKED_CANDIDATE` | blocked-user active-only checker counts only active candidates | blocked lifecycle tests |
+| `SKIPPED` | `False` | unchanged | unchanged | yes/terminal | not replayable; counts as durable outcome | skipped repair tests |
+| max attempts reached | `False` | unchanged | unchanged | no | remains terminal failed, not safe replay | retry bounded SQL tests |
+
+Invariant protected: every expected delivery key has at most one send in flight, terminal rows are
+durable outcomes, and retry is limited to explicit retryable failures or explicitly safe stale edit
+attempts.
+
+### Matrix 2: Edit + fallback send lifecycle
+
+Key rule: once an edit attempt row is created, fallback handling must not leave that original edit
+attempt `PENDING` forever. After a completed fallback path it must be `SENT`, `FAILED`, `SKIPPED`,
+or an explicitly retryable stale `PENDING` governed by timestamp/attempt policy.
+
+| Scenario | Original edit attempt final status | Fallback attempt final status | Any lingering `PENDING`? | Retry allowed | Alert/checker visibility | Tests |
+| --- | --- | --- | --- | --- | --- | --- |
+| edit succeeds | `SENT` | no row | no | no | durable outcome present | existing Daily Cup/private messaging tests |
+| edit returns not-modified | `SENT` | no row | no | no | durable outcome present | `test_deliver_round_messages_counts_not_modified_as_edited` |
+| edit fails, fallback send succeeds | `SKIPPED` with `EDIT_REPLACED_BY_FALLBACK_SEND` | `SENT` | no | no | current phase has terminal outcome | Daily Cup and private fallback-success regression tests |
+| edit fails, fallback send fails retryable | `FAILED`; `failure_code` mirrors fallback retryable code and `failure_reason` starts with `fallback_send_failed_after_edit_failed` | `FAILED` with `TELEGRAM_RETRY_AFTER` | no | fallback retry only if retryable policy allows; original edit is not replay-safe | checker sees terminal failure, no stale pending gap | new Daily Cup/private retryable failure tests |
+| edit fails, fallback send fails permanent forbidden | `FAILED`; `failure_code=TELEGRAM_FORBIDDEN`, `failure_reason=fallback_send_failed_after_edit_failed` | `FAILED` with `TELEGRAM_FORBIDDEN`, blocked candidate true | no | no safe replay | repair planner excludes permanent failed fallback; blocked checker counts active candidate only | new Daily Cup/private permanent forbidden tests |
+| edit fails, fallback send fails permanent bad request/chat not found | `FAILED`; `failure_code=TELEGRAM_BAD_REQUEST`, `failure_reason=fallback_send_failed_after_edit_failed` | `FAILED` with `TELEGRAM_BAD_REQUEST`, blocked candidate according to classifier | no | no safe replay | repair planner excludes permanent failed fallback | new Daily Cup/private permanent bad-request tests |
+| edit fails, fallback send fails unknown nonretryable | `FAILED`; `failure_code=TELEGRAM_SEND_ERROR`, `failure_reason=fallback_send_failed_after_edit_failed` | `FAILED` with `TELEGRAM_SEND_ERROR` | no | no safe replay until code explicitly classifies it retryable | failed outcome is terminal; repair excludes unsafe replay | new Daily Cup/private generic failure tests |
+| edit fails, fallback skipped blocked | `SKIPPED` with blocked/fallback-skipped reason | `SKIPPED` blocked | no | no while active blocked candidate remains | blocked checker active-only; delivery gap has durable outcome | blocked fallback skip test if implemented in delivery unit tests |
+| fallback succeeds but mark sent fails after real send | original edit attempt is not marked terminal by the worker; task path must surface failure rather than report success | fallback may remain `PENDING`, but `safe_context.pending_replay_safe` must be false | possible infrastructure `PENDING`, but not replay-safe | no automatic resend of fallback, because the real send may already have happened | stale pending/checker exposes the gap for manual audit instead of duplicate send | mark-sent failure test if this branch is changed; duplicate-send invariant blocks retry |
+| original edit attempt exists `PENDING` from earlier safe edit | `prepare` may claim only when stale and safe | fallback row created only after claimed edit fails again | no permanent pending after fallback terminal path | bounded by safe stale policy | stale pending and terminal rows visible | stale pending retry tests |
+| fallback attempt exists `PENDING` | no new duplicate fallback send unless retry policy claims it | claim only if stale and policy allows; otherwise unchanged | possible only under explicit stale policy | bounded | checker can see stale pending | delivery retry tests |
+| fallback attempt exists `FAILED` retryable | original already terminal or stale-safe | fallback may retry if code is retryable and attempts below max | no new original pending | fallback retry only | repair planner may include retryable failed fallback | repair planner retryable failure test |
+| fallback attempt exists `SENT` | original edit becomes/has `SKIPPED` | `SENT` | no | no | duplicate fallback blocked | fallback duplicate/SENT skip test |
+
+Invariant protected: edit failure plus fallback failure is a terminal durable-outcome path, not a
+silent stale `PENDING` leak.
+
+### Matrix 3: Phase/version idempotency
+
+Daily Cup target contract:
+- flow: `daily_cup_round_messaging`.
+- correlation_id: tournament id.
+- target_type: `user`.
+- target_id: `{user_id}:phase:{content_version}:{operation}`.
+- content_version: `round:{current_round}:status:{status}` or `status:completed` or
+  `status:canceled`.
+- operations: `send`, `edit:{message_id}`, `fallback_send_after_edit:{message_id}`.
+- idempotency key:
+  `telegram-delivery:{flow}:{correlation_id}:user:{target_id}`.
+
+Private tournament target contract:
+- flow: `private_tournament_round_messaging`.
+- correlation_id: tournament id.
+- target_type: `user`.
+- target_id: `{user_id}:phase:{content_version}:{operation}`.
+- content_version: `round:{current_round}:status:{status}` or `status:completed`.
+- operations and idempotency key follow the same shape as Daily Cup.
+
+| Dimension | Daily Cup rule | Private tournament rule | Duplicate block | New phase sends again | Repair/checker target | Tests |
+| --- | --- | --- | --- | --- | --- | --- |
+| tournament id | correlation_id is cup id | correlation_id is private tournament id | same tournament + same target blocks duplicate | different tournament sends independently | checker filters by flow + correlation_id | target builder tests / invariant SQL tests |
+| user id | first target segment, never collapsed alone for repair | same | exact same user+phase+operation only | same user new phase is distinct | repair must preserve full `target_id` | repair phase-specific tests |
+| operation | send/edit/fallback are distinct | same | same operation blocks exact duplicate | fallback send is distinct from edit | fallback terminal rows still count for phase via prefix match | fallback tests |
+| message id | edit/fallback include message id | same | same message id exact operation blocks duplicate | changed message id creates a new operation key | checker phase prefix ignores operation suffix | invariant SQL current-phase tests |
+| round number | embedded in `round:{n}` | embedded in `round:{n}` | round 1 `SENT` does not block round 2 | round change sends again | missing current round visible | current-phase gap tests |
+| tournament status | embedded in status | embedded in status | same status+round duplicate blocked | status transition sends again | completed current phase checked separately | completed tests to add for long-running tournaments |
+| Daily Cup invite/registration push | flow is derived from sent event type, correlation_id is cup id, target_type `user`, target_id `{user_id}` | not used for private tournament | same invite flow+cup+user only | round/final/cancel flows are separate and send again | zero-outcome checker may include relevant Daily Cup flows, repair planner remains round-flow scoped | registration push tests |
+| Daily Cup last-call/prestart reminder | same registration-push target contract with distinct flow from event type | not used for private tournament | same reminder flow+cup+user only | invite vs reminder vs round are distinct flows | delivery attempts are durable per flow | existing reminder/push tests |
+| Daily Cup turn reminder | flow `daily_cup_turn_reminder`, correlation_id cup id, target_type `challenge_user`, target_id `{challenge_id}:{target_user_id}` | not used for private tournament | same challenge+target user only | next challenge/user target sends independently | checker zero-outcome includes turn-reminder flow; repair planner does not collapse into round target | turn reminder delivery tests |
+| Daily Cup final | same `daily_cup_round_messaging` flow with content_version `status:completed` and operation suffix | not used for private tournament | exact completed target only | completed phase sends even if round phase was sent | current phase prefix is `user:phase:status:completed:%` | completed/current-phase tests |
+| Daily Cup cancel | flow `daily_cup_cancel_message`, correlation_id cup id, target_type `chat_hash`, target_id `{hash_chat_id(chat_id)}:status:canceled` | not used for private tournament | same cancel chat hash only | cancel is separate from invite/round/final | cancel delivery terminal row is separate from round repair targets | cancel delivery tests |
+| private tournament invite/reminder | not Daily Cup | no durable Telegram target is introduced by this PR for private invite/reminder; no code path may infer these from round outcomes | n/a | future implementation must use distinct flow/phase keys | out of current Codex findings unless a current flow expects it | n/a |
+| private tournament final | not Daily Cup | same `private_tournament_round_messaging` flow with content_version `status:completed` and operation suffix | exact completed target only | completed phase sends even if prior round was sent | current phase prefix is `user:phase:status:completed:%` | completed/current-phase tests |
+| private tournament cancel | not Daily Cup | no implemented private cancel delivery target in this PR; private canceled tournaments are excluded from round messaging context | n/a | future cancel messaging must use a distinct flow/phase key and cannot be suppressed by round `SENT` | not part of current repair planner/checker scope until delivery target exists | explicit no-current-scope note |
+| standings edit | operation `edit:{message_id}` | same | exact edit duplicate blocked | new round/status edit sends again | current phase prefix match | target builder tests |
+| fallback send | operation `fallback_send_after_edit:{message_id}` | same | exact fallback duplicate blocked | fallback distinct from original edit | original edit terminalized separately | fallback tests |
+
+Invariant protected: previous `SENT` for round 1 or for a user prefix cannot suppress round 2,
+final, cancel, or any current phase. Only exact same flow/correlation/user/phase/operation is
+idempotent.
+
+### Matrix 4: Blocked user lifecycle
+
+Active blocked policy must match delivery skip logic and checker logic:
+`FAILED is_blocked_candidate = true` is active only when its blocked timestamp is within
+`BLOCKED_CANDIDATE_TTL` and no `users.last_seen_at` is newer than that blocked timestamp.
+
+| State | Future send allowed | Future send skipped | Active alert count | Checker behavior | Tests |
+| --- | --- | --- | --- | --- | --- |
+| never blocked | yes | no | no | not counted | normal prepare tests |
+| blocked candidate fresh | no for same Telegram user id | yes, current target becomes `SKIPPED` blocked | yes | counted once by distinct telegram user id, no raw sensitive output | blocked candidate tests |
+| blocked candidate expired by TTL | yes | no | no | not counted | TTL expiry tests |
+| blocked candidate superseded by newer inbound activity | yes | no | no | not counted | newer `users.last_seen_at` tests |
+| blocked candidate after `/start` | yes after `last_seen_at` update | no | no | old candidate suppressed/resolved by checker OK result | recovered-user tests |
+| non-blocking Telegram error | policy-dependent normal retry/failure | no blocked skip | no blocked alert | not counted | non-blocking failure tests |
+| permanent forbidden | no while active blocked candidate remains | yes | yes while active | counted as active blocked | forbidden classification tests |
+| chat not found | no while active blocked candidate remains | yes when classified missing/blocked | yes while active | counted only while active | bad-request missing-chat tests |
+
+Invariant protected: blocked users are not suppressed forever after inbound recovery, and historical
+blocked rows remain audit evidence without keeping the active alert open forever.
+
+### Matrix 5: Production invariant checker scope
+
+| Check | Source tables | Cutoff logic | False positive guard | False negative guard | Severity | Tests |
+| --- | --- | --- | --- | --- | --- | --- |
+| Daily Cup per-participant current phase gap | `tournaments`, `tournament_participants`, `users`, `telegram_delivery_attempts` | recent Daily Cup window | active users only, exclude canceled, terminal statuses count | target prefix includes current round/status/completed phase | P1 | Daily Cup current-phase SQL tests |
+| private tournament current phase gap | `tournaments`, `tournament_participants`, `telegram_delivery_attempts` | active statuses regardless of `created_at`; completed/canceled only when recently updated/relevant deadline in window | avoid ancient completed/canceled tournaments outside window | long-running active ROUND_3 and recently completed old tournaments included | P1 | new long-running private tests |
+| long-running private tournament round | same plus `current_round`, status/update/deadline fields available in schema | status-driven for active rounds | no infinite ancient scan for terminal tournaments | active older-than-2-days still checked | P1 | new ROUND_3 old-created test |
+| canceled below minimum participants | Daily Cup `tournaments`, canceled target chat set from participants/users, `telegram_delivery_attempts` with flow `daily_cup_cancel_message` | recent Daily Cup cancellation window only | do not scan private canceled tournaments or ancient canceled cups | if Daily Cup cancels for low participants and eligible chat targets exist, missing cancel terminal outcomes must be visible | P1 when added to checker scope; currently not widened unless current findings require it | cancel delivery tests; no new checker branch unless implemented in current scope |
+| zero eligible users | `tournaments`, participants, users | recent/current active event window | do not alert when no eligible recipient exists | alert when expected recipients exist and zero outcomes | P1 | zero outcome tests |
+| expected delivery zero outcomes | tournament + delivery attempts | same as corresponding flow scope | participant existence/eligibility required | no terminal outcome for expected flow fails | P1 | zero-outcome tests |
+| stale streak per-user | `quiz_attempts`, `streak_state` | activity in last 6 hours | no recent activity OK | same-user missing/stale row fails; other user update cannot mask | P1 | per-user stale tests |
+| blocked users active only | `telegram_delivery_attempts`, `users` | `BLOCKED_CANDIDATE_TTL` | newer inbound/expired/non-blocking rows excluded | fresh forbidden/chat-not-found counted | P2 | blocked lifecycle checker tests |
+| permanent failure replay exclusion | delivery attempts + repair planner | no time cutoff in pure plan; flow/correlation scoped | terminal permanent failures not marked safe replay | retryable failures/missing targets remain visible | P2 operational repair safety | repair planner tests |
+
+Alert lifecycle submatrix for P3 reopen counting:
+
+| Alert state | `record_open` behavior | Count result | Duplicate insert/upsert? | Tests |
+| --- | --- | --- | --- | --- |
+| no existing alert | insert `OPEN` row | `1` | no | `test_invariant_alert_record_open_dedupes_by_type_key_status` |
+| existing `OPEN` alert | conflict update same `OPEN` row | previous count + 1 | no new row | existing open-repeat test to keep/add |
+| existing `RESOLVED` alert, no `OPEN` | reopen terminal row and return immediately | previous count + 1 | no second insert/upsert, no double count | `test_invariant_alert_record_open_returns_after_successful_reopen` |
+| existing `ACKED` alert, no `OPEN` | reopen terminal row and return immediately | previous count + 1 | no second insert/upsert, no double count | acked reopen regression test to keep/add |
+
+Invariant protected: checker output is read-only, privacy-safe, current-phase specific, avoids
+ancient terminal false positives, and does not miss active long-running tournament gaps.
+
+### Matrix 6: Premium expiry lifecycle
+
+| State | Task import | Beat schedule | Writes allowed automatically | Manual/approved run | Tests |
+| --- | --- | --- | --- | --- | --- |
+| feature flag off/default | task is importable | schedule not registered | no | task body can still be called explicitly by operator/test | default-off schedule test + task body test |
+| feature flag on | task is importable | `premium-expiry-lifecycle-hourly` registered | yes, only after explicit config/deploy decision | task body works | enabled schedule test |
+| task imported by Celery | safe under default config | no schedule unless flag true | no default write loop | n/a | import/default test |
+| beat schedule registered | only when flag true | hourly q_normal entry | controlled scheduled writes | n/a | enabled schedule test |
+| expired `ACTIVE` entitlement | n/a | n/a | only when task invoked/scheduled with approval | mark `EXPIRED` idempotently | existing expiry repo/task tests |
+| non-expired `ACTIVE` entitlement | n/a | n/a | not changed | remains active | existing entitlement expiry tests |
+| expired already `EXPIRED` entitlement | n/a | n/a | not changed | remains expired | existing entitlement expiry tests |
+
+Rules:
+- `PREMIUM_EXPIRY_SCHEDULE_ENABLED=false` by default.
+- If the flag is false, module import registers the Celery task but does not register the beat
+  schedule.
+- If the flag is true, the beat schedule is registered.
+- Manual/approved execution is separate from import and remains possible through the explicit task.
+- No `.env*`, production config, deploy config, or `docker-compose.prod.yml` changes in this PR.
+
+Invariant protected: production deploy cannot accidentally start an entitlement write loop merely
+because Celery imports the module.
+
 ## Gap matrix closure
 
 | Blocker | Code area | Invariant added | Migration | Tests |
