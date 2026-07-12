@@ -10,21 +10,28 @@ from app.game.arena_duels.constants import ARENA_BEATEN_NOTIFICATION_EVENT
 from app.game.arena_duels.types import ArenaBeatenNotification
 from app.services.telegram_delivery import (
     SKIP_CODE_DUPLICATE,
-    TelegramDeliveryTarget,
     begin_telegram_delivery_dispatch,
-    build_delivery_idempotency_key,
     mark_telegram_delivery_failed,
     mark_telegram_delivery_sent,
     prepare_telegram_delivery,
     record_telegram_delivery_skipped,
 )
-from app.workers.tasks.arena_duels_notification_content import (
-    build_arena_beaten_notification_keyboard,
-    build_notification_text,
-    classify_beaten_notification_action_mode,
-    format_user_label,
-)
+from app.workers.tasks import arena_duels_notification_content as notification_content
+from app.workers.tasks import arena_duels_notification_delivery_target as delivery_target
 from app.workers.tasks.arena_duels_notification_payload import notification_payload
+from app.workers.tasks.arena_duels_notification_sender import _send_notification_message
+
+TelegramDeliveryTarget = delivery_target.TelegramDeliveryTarget
+build_delivery_idempotency_key = delivery_target.build_delivery_idempotency_key
+_beaten_delivery_target = delivery_target._beaten_delivery_target
+build_arena_beaten_notification_keyboard = (
+    notification_content.build_arena_beaten_notification_keyboard
+)
+build_notification_text = notification_content.build_notification_text
+classify_beaten_notification_action_mode = (
+    notification_content.classify_beaten_notification_action_mode
+)
+format_user_label = notification_content.format_user_label
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,63 +158,4 @@ async def _load_notification_users(
     return (
         users_by_id.get(notification.previous_best_user_id),
         users_by_id.get(notification.new_best_user_id),
-    )
-
-
-async def _send_notification_message(
-    bot,
-    notification: ArenaBeatenNotification,
-    previous_user,
-    new_best_user,
-) -> None:
-    challenger_label = format_user_label(
-        username=getattr(new_best_user, "username", None),
-        first_name=getattr(new_best_user, "first_name", None),
-        fallback=f"Spieler #{notification.new_best_user_id}",
-    )
-    await bot.send_message(
-        chat_id=int(previous_user.telegram_user_id),
-        text=build_notification_text(
-            notification=notification,
-            challenger_label=challenger_label,
-        ),
-        reply_markup=build_arena_beaten_notification_keyboard(
-            source_attempt_id=str(notification.new_best_attempt_id),
-            action_mode=classify_beaten_notification_action_mode(notification),
-        ),
-    )
-
-
-def _beaten_delivery_target(
-    *,
-    notification: ArenaBeatenNotification,
-    telegram_user_id: int | None,
-) -> TelegramDeliveryTarget:
-    correlation_id = ":".join(
-        (
-            str(notification.arena_duel_id),
-            str(notification.previous_best_attempt_id),
-            str(notification.new_best_attempt_id),
-        )
-    )
-    target_id = str(notification.previous_best_user_id)
-    return TelegramDeliveryTarget(
-        flow="arena_beaten_notification",
-        task_name="arena_duels.send_arena_beaten_notification_task",
-        correlation_id=correlation_id,
-        target_type="user",
-        target_id=target_id,
-        idempotency_key=build_delivery_idempotency_key(
-            flow="arena_beaten_notification",
-            correlation_id=correlation_id,
-            target_type="user",
-            target_id=target_id,
-        ),
-        telegram_user_id=telegram_user_id,
-        chat_id=telegram_user_id,
-        safe_context={
-            "arena_duel_id": str(notification.arena_duel_id),
-            "previous_best_user_id": notification.previous_best_user_id,
-            "new_best_user_id": notification.new_best_user_id,
-        },
     )
