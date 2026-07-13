@@ -71,6 +71,60 @@ async def test_daily_cup_message_persistence_failure_skips_terminal_update(
     assert sent_calls == []
 
 
+async def test_daily_cup_fallback_terminal_writes_roll_back_together(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = {"message_id": 400, "fallback": "PENDING", "original": "PENDING"}
+
+    class _RollbackContext:
+        async def __aenter__(self) -> object:
+            self.snapshot = dict(state)
+            return object()
+
+        async def __aexit__(self, exc_type, exc, tb) -> bool:
+            if exc_type is not None:
+                state.clear()
+                state.update(self.snapshot)
+            return False
+
+    class _RollbackSessionLocal:
+        @staticmethod
+        def begin() -> _RollbackContext:
+            return _RollbackContext()
+
+    async def _persist(**_kwargs) -> None:
+        state["message_id"] = 501
+
+    async def _sent(*_args, **_kwargs) -> int:
+        state["fallback"] = "SENT"
+        return 1
+
+    async def _skipped(*_args, **_kwargs) -> int:
+        raise RuntimeError("failure between terminal writes")
+
+    monkeypatch.setattr(daily_persistence, "persist_standings_message_ids", _persist)
+    monkeypatch.setattr(daily_persistence.TelegramDeliveryAttemptsRepo, "mark_sent", _sent)
+    monkeypatch.setattr(
+        daily_persistence.TelegramDeliveryAttemptsRepo,
+        "mark_skipped",
+        _skipped,
+    )
+    monkeypatch.setattr(daily_persistence, "SessionLocal", _RollbackSessionLocal)
+
+    with pytest.raises(RuntimeError, match="failure between terminal writes"):
+        await daily_persistence.persist_daily_cup_sent_message(
+            cast(Any, SimpleNamespace(idempotency_key="fallback")),
+            UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            1,
+            SimpleNamespace(message_id=501),
+            NOW_UTC,
+            replace_existing=True,
+            original_target=cast(Any, SimpleNamespace(idempotency_key="original")),
+        )
+
+    assert state == {"message_id": 400, "fallback": "PENDING", "original": "PENDING"}
+
+
 async def test_private_tournament_persistence_failure_propagates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

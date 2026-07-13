@@ -135,10 +135,7 @@ async def send_fallback_message(
         message,
         run.happened_at,
         replace_existing=True,
-    )
-    await dependencies.fallback_delivery.record_original_edit_skipped_after_fallback_success(
-        target=delivery.target,
-        happened_at=run.happened_at,
+        original_target=delivery.target,
     )
     state.sent += 1
     state.replaced_message_ids[delivery.user_id] = message_id

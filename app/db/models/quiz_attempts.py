@@ -16,6 +16,7 @@ class QuizAttempt(Base):
         CheckConstraint("response_ms >= 0", name="ck_quiz_attempts_response_ms_non_negative"),
         Index("idx_attempts_session", "session_id"),
         Index("idx_attempts_user_time", "user_id", "answered_at"),
+        Index("idx_attempts_answered_at_user", "answered_at", "user_id"),
         Index("idx_attempts_question", "question_id"),
     )
 

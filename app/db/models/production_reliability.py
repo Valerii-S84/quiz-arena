@@ -45,6 +45,7 @@ class TelegramDeliveryAttempt(Base):
             "is_blocked_candidate",
             "created_at",
         ),
+        Index("idx_telegram_delivery_status_updated_at", "status", "updated_at"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)

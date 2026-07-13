@@ -7,7 +7,7 @@ from uuid import UUID
 from app.db.repo.production_reliability_repo import TelegramDeliveryAttemptsRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.session import SessionLocal
-from app.services.telegram_delivery import TelegramDeliveryTarget
+from app.services.telegram_delivery import SKIP_CODE_EDIT_REPLACED_BY_SEND, TelegramDeliveryTarget
 from app.workers.tasks.tournaments_messaging_persistence import persist_standings_message_ids
 
 
@@ -19,6 +19,7 @@ async def persist_daily_cup_sent_message(
     happened_at: datetime,
     *,
     replace_existing: bool = False,
+    original_target: TelegramDeliveryTarget | None = None,
 ) -> int:
     message_id = int(message.message_id)
     async with SessionLocal.begin() as session:
@@ -36,6 +37,16 @@ async def persist_daily_cup_sent_message(
         )
         if sent != 1:
             raise RuntimeError("daily cup delivery terminal lease was lost")
+        if original_target is not None:
+            skipped = await TelegramDeliveryAttemptsRepo.mark_skipped(
+                session,
+                idempotency_key=original_target.idempotency_key,
+                skipped_at=happened_at,
+                failure_code=SKIP_CODE_EDIT_REPLACED_BY_SEND,
+                failure_reason="edit delivery replaced by fallback send",
+            )
+            if skipped != 1:
+                raise RuntimeError("daily cup original edit terminal lease was lost")
     return message_id
 
 

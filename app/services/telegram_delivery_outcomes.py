@@ -19,14 +19,35 @@ async def mark_telegram_delivery_sent(
     idempotency_key: str,
     happened_at: datetime,
     session_local: Any = SessionLocal,
+    session: Any | None = None,
 ) -> None:
-    async with session_local.begin() as session:
-        updated = await TelegramDeliveryAttemptsRepo.mark_sent(
+    if session is not None:
+        await _mark_telegram_delivery_sent(
             session,
             idempotency_key=idempotency_key,
-            sent_at=happened_at,
+            happened_at=happened_at,
         )
-        _require_terminal_update(updated, "sent")
+        return
+    async with session_local.begin() as session:
+        await _mark_telegram_delivery_sent(
+            session,
+            idempotency_key=idempotency_key,
+            happened_at=happened_at,
+        )
+
+
+async def _mark_telegram_delivery_sent(
+    session: Any,
+    *,
+    idempotency_key: str,
+    happened_at: datetime,
+) -> None:
+    updated = await TelegramDeliveryAttemptsRepo.mark_sent(
+        session,
+        idempotency_key=idempotency_key,
+        sent_at=happened_at,
+    )
+    _require_terminal_update(updated, "sent")
 
 
 async def mark_telegram_delivery_failed(

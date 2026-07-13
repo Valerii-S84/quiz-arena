@@ -86,6 +86,12 @@ def test_critical_constraints_present() -> None:
     assert "uq_daily_run_single_started_session" in quiz_sessions_indexes
     assert "uq_sessions_friend_challenge_user_round" in quiz_sessions_indexes
 
+    quiz_attempts = Base.metadata.tables["quiz_attempts"]
+    answered_at_index = next(
+        index for index in quiz_attempts.indexes if index.name == "idx_attempts_answered_at_user"
+    )
+    assert [column.name for column in answered_at_index.columns] == ["answered_at", "user_id"]
+
     daily_runs = Base.metadata.tables["daily_runs"]
     daily_runs_indexes = {index.name for index in daily_runs.indexes}
     assert "uq_daily_runs_user_date_completed" in daily_runs_indexes
@@ -162,6 +168,17 @@ def test_critical_constraints_present() -> None:
     processed_updates = Base.metadata.tables["processed_updates"]
     processed_updates_indexes = {index.name for index in processed_updates.indexes}
     assert "idx_processed_updates_processed_at" in processed_updates_indexes
+
+    delivery_attempts = Base.metadata.tables["telegram_delivery_attempts"]
+    status_updated_index = next(
+        index
+        for index in delivery_attempts.indexes
+        if index.name == "idx_telegram_delivery_status_updated_at"
+    )
+    assert [column.name for column in status_updated_index.columns] == [
+        "status",
+        "updated_at",
+    ]
 
     analytics_events = Base.metadata.tables["analytics_events"]
     analytics_events_indexes = {index.name for index in analytics_events.indexes}

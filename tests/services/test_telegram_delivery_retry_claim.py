@@ -69,7 +69,10 @@ async def test_failed_attempt_claim_stays_leased_until_dispatch() -> None:
         object(),
         idempotency_key="delivery:retry",
         happened_at=NOW_UTC,
-        attempt=SimpleNamespace(status="FAILED", safe_context={}),
+        attempt=SimpleNamespace(
+            status="FAILED",
+            safe_context={"pending_replay_safe": True},
+        ),
         attempts_repo=RetryRepo,
     )
 
@@ -201,6 +204,10 @@ async def test_daily_cup_fallback_persists_replacement_before_sent(monkeypatch) 
         calls.append("sent")
         return 1
 
+    async def _skipped(*_args, **_kwargs) -> int:
+        calls.append("skipped")
+        return 1
+
     monkeypatch.setattr(
         daily_cup_message_delivery_persistence,
         "persist_standings_message_ids",
@@ -211,6 +218,11 @@ async def test_daily_cup_fallback_persists_replacement_before_sent(monkeypatch) 
         "mark_sent",
         _sent,
     )
+    monkeypatch.setattr(
+        daily_cup_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        "mark_skipped",
+        _skipped,
+    )
     monkeypatch.setattr(daily_cup_message_delivery_persistence, "SessionLocal", SessionLocal)
     await daily_cup_message_delivery_persistence.persist_daily_cup_sent_message(
         cast(Any, SimpleNamespace(idempotency_key="fallback")),
@@ -219,11 +231,12 @@ async def test_daily_cup_fallback_persists_replacement_before_sent(monkeypatch) 
         SimpleNamespace(message_id=501),
         NOW_UTC,
         replace_existing=True,
+        original_target=cast(Any, SimpleNamespace(idempotency_key="original-edit")),
     )
 
     assert persisted["new_message_ids"] == {}
     assert persisted["replaced_message_ids"] == {1: 501}
-    assert calls == ["persist", "sent"]
+    assert calls == ["persist", "sent", "skipped"]
 
 
 @pytest.mark.parametrize("replace_existing", [False, True])

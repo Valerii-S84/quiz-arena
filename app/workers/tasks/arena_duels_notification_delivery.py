@@ -75,6 +75,7 @@ async def send_arena_beaten_notification_with_bot(
             notification=notification,
             happened_at=happened_at,
             deps=deps,
+            session=session,
             previous_user=previous_user,
             new_best_user=new_best_user,
         )
@@ -121,6 +122,7 @@ async def _deliver_notification(
     notification: ArenaBeatenNotification,
     happened_at: datetime,
     deps: ArenaBeatenNotificationDeps,
+    session,
     previous_user,
     new_best_user,
 ) -> dict[str, int] | None:
@@ -154,5 +156,6 @@ async def _deliver_notification(
         idempotency_key=target.idempotency_key,
         happened_at=happened_at,
         session_local=deps.session_local,
+        session=session,
     )
     return None

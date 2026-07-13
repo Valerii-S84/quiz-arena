@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models.production_reliability import TelegramDeliveryAttempt
 from app.db.repo.production_reliability_types import DELIVERY_STATUS_FAILED, DELIVERY_STATUS_PENDING
 
+_REPLAY_SAFE_CONTEXT_KEY = "pending_replay_safe"
+
 
 class TelegramDeliveryRetryRepo:
     @staticmethod
@@ -25,6 +27,7 @@ class TelegramDeliveryRetryRepo:
             TelegramDeliveryAttempt.status == DELIVERY_STATUS_FAILED,
             TelegramDeliveryAttempt.failure_code.in_(tuple(retryable_failure_codes)),
             TelegramDeliveryAttempt.is_blocked_candidate.is_(False),
+            TelegramDeliveryAttempt.safe_context[_REPLAY_SAFE_CONTEXT_KEY].as_boolean().is_(True),
             TelegramDeliveryAttempt.updated_at <= stale_pending_before,
         )
         stale_pending = and_(
@@ -62,6 +65,9 @@ class TelegramDeliveryRetryRepo:
                 TelegramDeliveryAttempt.status == DELIVERY_STATUS_FAILED,
                 TelegramDeliveryAttempt.failure_code.in_(tuple(retryable_failure_codes)),
                 TelegramDeliveryAttempt.is_blocked_candidate.is_(False),
+                TelegramDeliveryAttempt.safe_context[_REPLAY_SAFE_CONTEXT_KEY]
+                .as_boolean()
+                .is_(True),
                 TelegramDeliveryAttempt.attempt_count < max_attempts,
                 TelegramDeliveryAttempt.updated_at == claimed_at,
             )

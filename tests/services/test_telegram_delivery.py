@@ -250,46 +250,6 @@ async def test_stale_pending_send_delivery_without_safe_context_does_not_retry(m
     assert result.should_send is False
 
 
-async def test_retryable_failed_delivery_allows_controlled_retry(monkeypatch) -> None:
-    captured: dict[str, object] = {}
-
-    async def _has_blocked_candidate(_session, **_kwargs) -> bool:
-        return False
-
-    async def _create_pending_once(_session, *, item):
-        return SimpleNamespace(status="FAILED"), False
-
-    async def _claim_retryable_attempt(_session, **kwargs) -> int:
-        captured.update(kwargs)
-        return 1
-
-    monkeypatch.setattr(
-        delivery.TelegramDeliveryAttemptsRepo,
-        "has_blocked_candidate",
-        _has_blocked_candidate,
-    )
-    monkeypatch.setattr(
-        delivery.TelegramDeliveryAttemptsRepo,
-        "create_pending_once",
-        _create_pending_once,
-    )
-    monkeypatch.setattr(
-        delivery.TelegramDeliveryAttemptsRepo,
-        "claim_retryable_attempt",
-        _claim_retryable_attempt,
-    )
-
-    result = await delivery.prepare_telegram_delivery(
-        target=_target(),
-        happened_at=NOW_UTC,
-        session_local=_SessionLocal(),
-    )
-
-    assert result.should_send is True
-    assert captured["retryable_failure_codes"] == delivery.RETRYABLE_FAILURE_CODES
-    assert captured["allow_stale_pending_retry"] is False
-
-
 async def test_nonretryable_failed_delivery_does_not_retry(monkeypatch) -> None:
     async def _has_blocked_candidate(_session, **_kwargs) -> bool:
         return False

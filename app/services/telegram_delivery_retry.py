@@ -25,8 +25,9 @@ async def claim_controlled_retry(
     status = str(attempt.status)
     if status not in {"PENDING", "FAILED"}:
         return False, False
-    allow_stale_pending_retry = status == "PENDING" and pending_replay_safe(attempt)
-    if status == "PENDING" and not allow_stale_pending_retry:
+    replay_safe = pending_replay_safe(attempt)
+    allow_stale_pending_retry = status == "PENDING" and replay_safe
+    if not replay_safe:
         return False, False
     claimed = await attempts_repo.claim_retryable_attempt(
         session,
