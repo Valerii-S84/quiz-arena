@@ -4,14 +4,7 @@ from datetime import datetime
 
 from app.services.production_invariant_checks.types import SEVERITY_P1, InvariantCheck, build_check
 
-
-def build_daily_cup_delivery_checks(recent_cutoff: datetime) -> list[InvariantCheck]:
-    baseline_schedule_key = "__production_reliability_migration_baseline__"
-    return [
-        build_check(
-            name="daily_cup_expected_delivery_zero_outcomes",
-            severity=SEVERITY_P1,
-            sql="""
+_EXPECTED_DELIVERY_ZERO_OUTCOMES_SQL = """
                 WITH reliability_baseline AS (
                   SELECT COALESCE(
                     (
@@ -48,17 +41,9 @@ def build_daily_cup_delivery_checks(recent_cutoff: datetime) -> list[InvariantCh
                       AND d.correlation_id = t.id::text
                       AND d.status IN ('SENT','FAILED','SKIPPED')
                   )
-            """,
-            params={
-                "recent_cutoff": recent_cutoff,
-                "baseline_schedule_key": baseline_schedule_key,
-            },
-            description="Recent Daily Cup expected messaging has zero durable outcomes.",
-        ),
-        build_check(
-            name="daily_cup_round_delivery_gap",
-            severity=SEVERITY_P1,
-            sql="""
+            """
+
+_ROUND_DELIVERY_GAP_SQL = """
                 WITH reliability_baseline AS (
                   SELECT COALESCE(
                     (
@@ -97,17 +82,9 @@ def build_daily_cup_delivery_checks(recent_cutoff: datetime) -> list[InvariantCh
                       )
                       AND d.status IN ('SENT','FAILED','SKIPPED')
                   )
-            """,
-            params={
-                "recent_cutoff": recent_cutoff,
-                "baseline_schedule_key": baseline_schedule_key,
-            },
-            description="Daily Cup participant is missing a terminal round delivery outcome.",
-        ),
-        build_check(
-            name="daily_cup_cancel_message_gap",
-            severity=SEVERITY_P1,
-            sql="""
+            """
+
+_CANCEL_MESSAGE_GAP_SQL = """
                 WITH reliability_baseline AS (
                   SELECT COALESCE(
                     (
@@ -137,7 +114,36 @@ def build_daily_cup_delivery_checks(recent_cutoff: datetime) -> list[InvariantCh
                       AND d.telegram_user_id = u.telegram_user_id
                       AND d.status IN ('SENT','FAILED','SKIPPED')
                   )
-            """,
+            """
+
+
+def build_daily_cup_delivery_checks(recent_cutoff: datetime) -> list[InvariantCheck]:
+    baseline_schedule_key = "__production_reliability_migration_baseline__"
+    return [
+        build_check(
+            name="daily_cup_expected_delivery_zero_outcomes",
+            severity=SEVERITY_P1,
+            sql=_EXPECTED_DELIVERY_ZERO_OUTCOMES_SQL,
+            params={
+                "recent_cutoff": recent_cutoff,
+                "baseline_schedule_key": baseline_schedule_key,
+            },
+            description="Recent Daily Cup expected messaging has zero durable outcomes.",
+        ),
+        build_check(
+            name="daily_cup_round_delivery_gap",
+            severity=SEVERITY_P1,
+            sql=_ROUND_DELIVERY_GAP_SQL,
+            params={
+                "recent_cutoff": recent_cutoff,
+                "baseline_schedule_key": baseline_schedule_key,
+            },
+            description="Daily Cup participant is missing a terminal round delivery outcome.",
+        ),
+        build_check(
+            name="daily_cup_cancel_message_gap",
+            severity=SEVERITY_P1,
+            sql=_CANCEL_MESSAGE_GAP_SQL,
             params={
                 "recent_cutoff": recent_cutoff,
                 "baseline_schedule_key": baseline_schedule_key,

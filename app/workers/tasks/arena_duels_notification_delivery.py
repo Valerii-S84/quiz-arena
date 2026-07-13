@@ -54,63 +54,34 @@ async def send_arena_beaten_notification_with_bot(
 
     async with deps.session_local.begin() as session:
         if await _notification_already_sent(session, notification, payload, deps):
-            await record_telegram_delivery_skipped(
-                target=_beaten_delivery_target(
-                    notification=notification,
-                    telegram_user_id=None,
-                ),
+            return await _record_skipped_notification(
+                notification=notification,
                 happened_at=happened_at,
                 failure_code=SKIP_CODE_DUPLICATE,
                 failure_reason="beaten notification analytics event already exists",
-                session_local=deps.session_local,
+                deps=deps,
             )
-            return {"sent_total": 0, "failed_total": 0, "skipped_total": 1}
 
         previous_user, new_best_user = await _load_notification_users(session, notification, deps)
         if previous_user is None:
-            await record_telegram_delivery_skipped(
-                target=_beaten_delivery_target(
-                    notification=notification,
-                    telegram_user_id=None,
-                ),
+            return await _record_skipped_notification(
+                notification=notification,
                 happened_at=happened_at,
                 failure_code="MISSING_TARGET_USER",
                 failure_reason="target user missing",
-                session_local=deps.session_local,
+                deps=deps,
             )
-            return {"sent_total": 0, "failed_total": 0, "skipped_total": 1}
 
-        target = _beaten_delivery_target(
+        delivery_outcome = await _deliver_notification(
+            bot=bot,
             notification=notification,
-            telegram_user_id=int(previous_user.telegram_user_id),
-        )
-        delivery = await prepare_telegram_delivery(
-            target=target,
             happened_at=happened_at,
-            session_local=deps.session_local,
+            deps=deps,
+            previous_user=previous_user,
+            new_best_user=new_best_user,
         )
-        if not delivery.should_send:
-            return {"sent_total": 0, "failed_total": 0, "skipped_total": 1}
-        await begin_telegram_delivery_dispatch(
-            delivery,
-            happened_at=happened_at,
-            session_local=deps.session_local,
-        )
-        try:
-            await _send_notification_message(bot, notification, previous_user, new_best_user)
-        except Exception as exc:
-            await mark_telegram_delivery_failed(
-                idempotency_key=target.idempotency_key,
-                happened_at=happened_at,
-                exc=exc,
-                session_local=deps.session_local,
-            )
-            return {"sent_total": 0, "failed_total": 1, "skipped_total": 0}
-        await mark_telegram_delivery_sent(
-            idempotency_key=target.idempotency_key,
-            happened_at=happened_at,
-            session_local=deps.session_local,
-        )
+        if delivery_outcome is not None:
+            return delivery_outcome
 
         await deps.analytics_repo.create_arena_beaten_notification_event_once(
             session,
@@ -123,6 +94,70 @@ async def send_arena_beaten_notification_with_bot(
         )
 
     return {"sent_total": 1, "failed_total": 0, "skipped_total": 0}
+
+
+async def _record_skipped_notification(
+    *,
+    notification: ArenaBeatenNotification,
+    happened_at: datetime,
+    failure_code: str,
+    failure_reason: str,
+    deps: ArenaBeatenNotificationDeps,
+) -> dict[str, int]:
+    await record_telegram_delivery_skipped(
+        target=_beaten_delivery_target(
+            notification=notification,
+            telegram_user_id=None,
+        ),
+        happened_at=happened_at,
+        failure_code=failure_code,
+        failure_reason=failure_reason,
+        session_local=deps.session_local,
+    )
+    return {"sent_total": 0, "failed_total": 0, "skipped_total": 1}
+
+
+async def _deliver_notification(
+    *,
+    bot,
+    notification: ArenaBeatenNotification,
+    happened_at: datetime,
+    deps: ArenaBeatenNotificationDeps,
+    previous_user,
+    new_best_user,
+) -> dict[str, int] | None:
+    target = _beaten_delivery_target(
+        notification=notification,
+        telegram_user_id=int(previous_user.telegram_user_id),
+    )
+    delivery = await prepare_telegram_delivery(
+        target=target,
+        happened_at=happened_at,
+        session_local=deps.session_local,
+    )
+    if not delivery.should_send:
+        return {"sent_total": 0, "failed_total": 0, "skipped_total": 1}
+    await begin_telegram_delivery_dispatch(
+        delivery,
+        happened_at=happened_at,
+        session_local=deps.session_local,
+    )
+    try:
+        await _send_notification_message(bot, notification, previous_user, new_best_user)
+    except Exception as exc:
+        await mark_telegram_delivery_failed(
+            idempotency_key=target.idempotency_key,
+            happened_at=happened_at,
+            exc=exc,
+            session_local=deps.session_local,
+        )
+        return {"sent_total": 0, "failed_total": 1, "skipped_total": 0}
+    await mark_telegram_delivery_sent(
+        idempotency_key=target.idempotency_key,
+        happened_at=happened_at,
+        session_local=deps.session_local,
+    )
+    return None
 
 
 async def _notification_already_sent(

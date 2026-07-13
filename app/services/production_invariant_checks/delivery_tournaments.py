@@ -4,14 +4,7 @@ from datetime import datetime
 
 from app.services.production_invariant_checks.types import SEVERITY_P1, InvariantCheck, build_check
 
-
-def build_tournament_delivery_checks(recent_cutoff: datetime) -> list[InvariantCheck]:
-    baseline_schedule_key = "__production_reliability_migration_baseline__"
-    return [
-        build_check(
-            name="tournament_round_expected_delivery_zero_outcomes",
-            severity=SEVERITY_P1,
-            sql="""
+_EXPECTED_DELIVERY_ZERO_OUTCOMES_SQL = """
                 WITH reliability_baseline AS (
                   SELECT COALESCE(
                     (
@@ -58,17 +51,9 @@ def build_tournament_delivery_checks(recent_cutoff: datetime) -> list[InvariantC
                       AND d.correlation_id = t.id::text
                       AND d.status IN ('SENT','FAILED','SKIPPED')
                   )
-            """,
-            params={
-                "recent_cutoff": recent_cutoff,
-                "baseline_schedule_key": baseline_schedule_key,
-            },
-            description="Recent private tournament expected messaging has zero durable outcomes.",
-        ),
-        build_check(
-            name="private_tournament_round_delivery_gap",
-            severity=SEVERITY_P1,
-            sql="""
+            """
+
+_ROUND_DELIVERY_GAP_SQL = """
                 WITH reliability_baseline AS (
                   SELECT COALESCE(
                     (
@@ -121,7 +106,26 @@ def build_tournament_delivery_checks(recent_cutoff: datetime) -> list[InvariantC
                       )
                       AND d.status IN ('SENT','FAILED','SKIPPED')
                   )
-            """,
+            """
+
+
+def build_tournament_delivery_checks(recent_cutoff: datetime) -> list[InvariantCheck]:
+    baseline_schedule_key = "__production_reliability_migration_baseline__"
+    return [
+        build_check(
+            name="tournament_round_expected_delivery_zero_outcomes",
+            severity=SEVERITY_P1,
+            sql=_EXPECTED_DELIVERY_ZERO_OUTCOMES_SQL,
+            params={
+                "recent_cutoff": recent_cutoff,
+                "baseline_schedule_key": baseline_schedule_key,
+            },
+            description="Recent private tournament expected messaging has zero durable outcomes.",
+        ),
+        build_check(
+            name="private_tournament_round_delivery_gap",
+            severity=SEVERITY_P1,
+            sql=_ROUND_DELIVERY_GAP_SQL,
             params={
                 "recent_cutoff": recent_cutoff,
                 "baseline_schedule_key": baseline_schedule_key,
