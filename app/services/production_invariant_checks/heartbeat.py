@@ -6,22 +6,7 @@ from app.services.production_invariant_checks.types import InvariantCheck, build
 from app.workers.task_heartbeat import CriticalTaskHeartbeat
 
 HEARTBEAT_GRACE_BASELINE_SCHEDULE_KEY = "__production_reliability_migration_baseline__"
-
-
-def build_heartbeat_checks(
-    now_utc: datetime,
-    heartbeat_registry: tuple[CriticalTaskHeartbeat, ...],
-) -> list[InvariantCheck]:
-    checks: list[InvariantCheck] = []
-    for row in heartbeat_registry:
-        if not row.enabled or row.stale_after_seconds is None:
-            continue
-        fresh_after = now_utc - timedelta(seconds=row.stale_after_seconds)
-        checks.append(
-            build_check(
-                name="worker_task_heartbeat_stale",
-                severity=row.severity,
-                sql="""
+_HEARTBEAT_STALE_SQL = """
                     SELECT CASE
                     WHEN EXISTS (
                       SELECT 1
@@ -60,7 +45,23 @@ def build_heartbeat_checks(
                         AND last_success_at >= :fresh_after
                     ) THEN 0
                     ELSE 1 END
-                """,
+                """
+
+
+def build_heartbeat_checks(
+    now_utc: datetime,
+    heartbeat_registry: tuple[CriticalTaskHeartbeat, ...],
+) -> list[InvariantCheck]:
+    checks: list[InvariantCheck] = []
+    for row in heartbeat_registry:
+        if not row.enabled or row.stale_after_seconds is None:
+            continue
+        fresh_after = now_utc - timedelta(seconds=row.stale_after_seconds)
+        checks.append(
+            build_check(
+                name="worker_task_heartbeat_stale",
+                severity=row.severity,
+                sql=_HEARTBEAT_STALE_SQL,
                 params={
                     "task_name": row.task_name,
                     "schedule_key": row.schedule_key,
