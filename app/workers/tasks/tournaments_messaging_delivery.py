@@ -10,7 +10,7 @@ from app.services.telegram_delivery import (
     prepare_telegram_delivery,
 )
 from app.workers.tasks.messaging_fallback_delivery import (
-    mark_original_edit_failed_after_fallback_failure,
+    mark_fallback_and_original_edit_failed,
     record_original_edit_skipped_after_fallback_skip,
 )
 from app.workers.tasks.tournaments_message_delivery_persistence import (
@@ -96,7 +96,7 @@ async def deliver_round_messages(
         mark_sent=mark_telegram_delivery_sent,
         persist_initial_message=_persist_initial_round_message,
         persist_replacement_message=_persist_replacement_round_message,
-        mark_original_failed=mark_original_edit_failed_after_fallback_failure,
+        mark_fallback_and_original_failed=mark_fallback_and_original_edit_failed,
         record_original_skipped=record_original_edit_skipped_after_fallback_skip,
         build_target=private_round_delivery_target,
         delivery_operation=delivery_operation,

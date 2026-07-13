@@ -17,6 +17,7 @@ class ExistingDeliveryOutcome:
     attempt_count: int = 0
     failure_code: str | None = None
     is_stale_pending: bool = False
+    pending_replay_safe: bool = False
 
 
 @dataclass(frozen=True, slots=True)

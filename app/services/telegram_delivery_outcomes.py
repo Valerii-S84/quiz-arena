@@ -56,19 +56,26 @@ async def mark_telegram_delivery_failed(
     happened_at: datetime,
     exc: BaseException,
     session_local: Any = SessionLocal,
+    session: Any | None = None,
 ) -> TelegramDeliveryFailure:
     failure = classify_telegram_delivery_exception(exc)
-    async with session_local.begin() as session:
-        updated = await TelegramDeliveryAttemptsRepo.mark_failed(
+    if session is not None:
+        await _mark_telegram_delivery_failed(
             session,
             idempotency_key=idempotency_key,
-            failed_at=happened_at,
-            failure_code=failure.failure_code,
+            happened_at=happened_at,
+            failure=failure,
             failure_reason=failure.failure_reason,
-            telegram_error_code=failure.telegram_error_code,
-            is_blocked_candidate=failure.is_blocked_candidate,
         )
-        _require_terminal_update(updated, "failed")
+        return failure
+    async with session_local.begin() as session:
+        await _mark_telegram_delivery_failed(
+            session,
+            idempotency_key=idempotency_key,
+            happened_at=happened_at,
+            failure=failure,
+            failure_reason=failure.failure_reason,
+        )
     return failure
 
 
@@ -79,18 +86,45 @@ async def mark_telegram_delivery_failed_with_classification(
     failure: TelegramDeliveryFailure,
     failure_reason: str,
     session_local: Any = SessionLocal,
+    session: Any | None = None,
 ) -> None:
-    async with session_local.begin() as session:
-        updated = await TelegramDeliveryAttemptsRepo.mark_failed(
+    if session is not None:
+        await _mark_telegram_delivery_failed(
             session,
             idempotency_key=idempotency_key,
-            failed_at=happened_at,
-            failure_code=failure.failure_code,
+            happened_at=happened_at,
+            failure=failure,
             failure_reason=failure_reason,
-            telegram_error_code=failure.telegram_error_code,
-            is_blocked_candidate=failure.is_blocked_candidate,
         )
-        _require_terminal_update(updated, "failed")
+        return
+    async with session_local.begin() as session:
+        await _mark_telegram_delivery_failed(
+            session,
+            idempotency_key=idempotency_key,
+            happened_at=happened_at,
+            failure=failure,
+            failure_reason=failure_reason,
+        )
+
+
+async def _mark_telegram_delivery_failed(
+    session: Any,
+    *,
+    idempotency_key: str,
+    happened_at: datetime,
+    failure: TelegramDeliveryFailure,
+    failure_reason: str,
+) -> None:
+    updated = await TelegramDeliveryAttemptsRepo.mark_failed(
+        session,
+        idempotency_key=idempotency_key,
+        failed_at=happened_at,
+        failure_code=failure.failure_code,
+        failure_reason=failure_reason,
+        telegram_error_code=failure.telegram_error_code,
+        is_blocked_candidate=failure.is_blocked_candidate,
+    )
+    _require_terminal_update(updated, "failed")
 
 
 def _require_terminal_update(updated: int, status: str) -> None:

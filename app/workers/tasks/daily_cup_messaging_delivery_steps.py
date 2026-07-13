@@ -72,15 +72,11 @@ async def _record_fallback_failure(
     exc: Exception,
 ) -> None:
     state.failed += 1
-    failure = await dependencies.mark_telegram_delivery_failed(
-        idempotency_key=fallback_target.idempotency_key,
+    await dependencies.fallback_delivery.mark_fallback_and_original_edit_failed(
+        fallback_idempotency_key=fallback_target.idempotency_key,
+        original_idempotency_key=delivery.target.idempotency_key,
         happened_at=run.happened_at,
         exc=exc,
-    )
-    await dependencies.fallback_delivery.mark_original_edit_failed_after_fallback_failure(
-        idempotency_key=delivery.target.idempotency_key,
-        happened_at=run.happened_at,
-        failure=failure,
     )
 
 

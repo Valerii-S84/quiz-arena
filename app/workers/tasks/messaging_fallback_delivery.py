@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
+from app.db.session import SessionLocal
 from app.services.telegram_delivery import (
     SKIP_CODE_EDIT_REPLACED_BY_SEND,
     TelegramDeliveryFailure,
     TelegramDeliveryTarget,
+    mark_telegram_delivery_failed,
     mark_telegram_delivery_failed_with_classification,
     record_telegram_delivery_skipped,
 )
@@ -55,7 +58,33 @@ async def mark_original_edit_failed_after_fallback_failure(
     )
 
 
+async def mark_fallback_and_original_edit_failed(
+    *,
+    fallback_idempotency_key: str,
+    original_idempotency_key: str,
+    happened_at: datetime,
+    exc: BaseException,
+    session_local: Any = SessionLocal,
+) -> TelegramDeliveryFailure:
+    async with session_local.begin() as session:
+        failure = await mark_telegram_delivery_failed(
+            idempotency_key=fallback_idempotency_key,
+            happened_at=happened_at,
+            exc=exc,
+            session=session,
+        )
+        await mark_telegram_delivery_failed_with_classification(
+            idempotency_key=original_idempotency_key,
+            happened_at=happened_at,
+            failure=failure,
+            failure_reason=(f"fallback_send_failed_after_edit_failed:{failure.failure_reason}"),
+            session=session,
+        )
+    return failure
+
+
 __all__ = [
+    "mark_fallback_and_original_edit_failed",
     "mark_original_edit_failed_after_fallback_failure",
     "record_original_edit_skipped_after_fallback_skip",
     "record_original_edit_skipped_after_fallback_success",

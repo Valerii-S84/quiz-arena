@@ -62,11 +62,6 @@ async def _edit_existing_message(
             text=delivery.text,
             reply_markup=delivery.keyboard,
         )
-        await dependencies.mark_telegram_delivery_sent(
-            idempotency_key=delivery.target.idempotency_key,
-            happened_at=run.happened_at,
-        )
-        state.edited += 1
     except Exception as exc:
         if dependencies.is_message_not_modified_error(exc):
             await dependencies.mark_telegram_delivery_sent(
@@ -76,6 +71,12 @@ async def _edit_existing_message(
             state.edited += 1
             return
         await send_fallback_message(context, dependencies, state, run, delivery)
+        return
+    await dependencies.mark_telegram_delivery_sent(
+        idempotency_key=delivery.target.idempotency_key,
+        happened_at=run.happened_at,
+    )
+    state.edited += 1
 
 
 async def _deliver_to_user(
@@ -95,18 +96,18 @@ async def _deliver_to_user(
         chat_id=chat_id,
         existing_message_id=existing_message_id,
     )
-    decision = await dependencies.prepare_telegram_delivery(
-        target=target, happened_at=run.happened_at
-    )
-    if not decision.should_send:
-        state.skipped += 1
-        return
     text, keyboard = build_daily_cup_message_payload(
         context=context,
         dependencies=dependencies,
         rounds_total=run.rounds_total,
         user_id=user_id,
     )
+    decision = await dependencies.prepare_telegram_delivery(
+        target=target, happened_at=run.happened_at
+    )
+    if not decision.should_send:
+        state.skipped += 1
+        return
     await dependencies.begin_telegram_delivery_dispatch(decision, happened_at=run.happened_at)
     delivery = DailyCupUserDelivery(
         user_id=user_id,

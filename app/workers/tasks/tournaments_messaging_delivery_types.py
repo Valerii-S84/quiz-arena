@@ -44,7 +44,7 @@ class TournamentRoundDeliveryOperations:
     mark_sent: Callable[..., Any]
     persist_initial_message: Callable[..., Any]
     persist_replacement_message: Callable[..., Any]
-    mark_original_failed: Callable[..., Any]
+    mark_fallback_and_original_failed: Callable[..., Any]
     record_original_skipped: Callable[..., Any]
     build_target: Callable[..., Any]
     delivery_operation: Callable[..., str]

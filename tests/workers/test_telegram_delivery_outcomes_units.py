@@ -128,7 +128,7 @@ def _patch_fallback_terminal_helpers(monkeypatch, module, skipped_handler, faile
         )
         monkeypatch.setattr(
             module.fallback_delivery,
-            "mark_original_edit_failed_after_fallback_failure",
+            "mark_fallback_and_original_edit_failed",
             failed_handler,
         )
         return
@@ -146,7 +146,7 @@ def _patch_fallback_terminal_helpers(monkeypatch, module, skipped_handler, faile
     )
     monkeypatch.setattr(
         module,
-        "mark_original_edit_failed_after_fallback_failure",
+        "mark_fallback_and_original_edit_failed",
         failed_handler,
         raising=False,
     )

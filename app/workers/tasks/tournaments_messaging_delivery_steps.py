@@ -88,15 +88,11 @@ async def _send_fallback_round_message(
         )
     except Exception as exc:
         state.failed += 1
-        failure = await operations.mark_failed(
-            idempotency_key=fallback_target.idempotency_key,
+        await operations.mark_fallback_and_original_failed(
+            fallback_idempotency_key=fallback_target.idempotency_key,
+            original_idempotency_key=attempt.target.idempotency_key,
             happened_at=delivery_context.happened_at,
             exc=exc,
-        )
-        await operations.mark_original_failed(
-            idempotency_key=attempt.target.idempotency_key,
-            happened_at=delivery_context.happened_at,
-            failure=failure,
         )
         return
     message_id = await operations.persist_replacement_message(

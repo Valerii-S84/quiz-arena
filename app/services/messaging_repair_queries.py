@@ -24,10 +24,19 @@ async def load_tournament_expected_targets(
             FROM tournament_participants p
             JOIN tournaments t ON t.id = p.tournament_id
             WHERE p.tournament_id = :tournament_id
+              AND (
+                :flow <> 'daily_cup_round_messaging'
+                OR EXISTS (
+                  SELECT 1
+                  FROM users u
+                  WHERE u.id = p.user_id
+                    AND u.status = 'ACTIVE'
+                )
+              )
             ORDER BY p.user_id
             """
         ),
-        {"tournament_id": tournament_id},
+        {"flow": flow, "tournament_id": tournament_id},
     )
     return [
         RepairTarget(
@@ -54,7 +63,8 @@ async def load_delivery_attempts(
         text(
             """
             SELECT target_type, target_id, status, attempt_count, failure_code,
-              status = 'PENDING' AND updated_at <= now() - interval '15 minutes'
+              status = 'PENDING' AND updated_at <= now() - interval '15 minutes',
+              COALESCE((safe_context ->> 'pending_replay_safe')::boolean, false)
             FROM telegram_delivery_attempts
             WHERE flow = :flow
               AND correlation_id = :correlation_id
@@ -71,6 +81,7 @@ async def load_delivery_attempts(
             attempt_count=int(row[3] or 0),
             failure_code=None if row[4] is None else str(row[4]),
             is_stale_pending=bool(row[5]) if len(row) > 5 else False,
+            pending_replay_safe=bool(row[6]) if len(row) > 6 else False,
         )
         for row in result.all()
     ]

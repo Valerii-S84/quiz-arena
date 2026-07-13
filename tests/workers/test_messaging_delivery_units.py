@@ -52,8 +52,9 @@ def _patch_delivery_tracking(
             calls.append(("original_skipped", original_target.idempotency_key, None))
         return int(_args[2].message_id)
 
-    async def _mark_original_failed(**kwargs) -> None:
-        calls.append(("original_failed", kwargs["idempotency_key"], kwargs["failure"].failure_code))
+    async def _mark_fallback_and_original_failed(**kwargs) -> None:
+        calls.append(("failed", kwargs["fallback_idempotency_key"], failure_code))
+        calls.append(("original_failed", kwargs["original_idempotency_key"], failure_code))
 
     async def _record_original_skipped(**kwargs) -> None:
         calls.append(("original_skipped", kwargs["target"].idempotency_key, None))
@@ -69,8 +70,8 @@ def _patch_delivery_tracking(
     if hasattr(module, "fallback_delivery"):
         monkeypatch.setattr(
             module.fallback_delivery,
-            "mark_original_edit_failed_after_fallback_failure",
-            _mark_original_failed,
+            "mark_fallback_and_original_edit_failed",
+            _mark_fallback_and_original_failed,
         )
         monkeypatch.setattr(
             module.fallback_delivery,
@@ -85,8 +86,8 @@ def _patch_delivery_tracking(
     else:
         monkeypatch.setattr(
             module,
-            "mark_original_edit_failed_after_fallback_failure",
-            _mark_original_failed,
+            "mark_fallback_and_original_edit_failed",
+            _mark_fallback_and_original_failed,
         )
         monkeypatch.setattr(
             module,

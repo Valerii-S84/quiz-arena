@@ -90,6 +90,7 @@ def test_repair_plan_finds_failed_tournament_targets_without_sent_duplicates() -
                 target_id="2",
                 status="FAILED",
                 failure_code=FAILURE_CODE_RETRY_AFTER,
+                pending_replay_safe=True,
             ),
         ],
     )
@@ -216,6 +217,7 @@ def test_repair_plan_allows_transient_send_error_replay() -> None:
                 target_id="1",
                 status="FAILED",
                 failure_code=FAILURE_CODE_TRANSIENT,
+                pending_replay_safe=True,
             )
         ],
     )

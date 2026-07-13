@@ -38,7 +38,12 @@ def build_messaging_repair_plan(
         if _repair_match_key(target_type=target.target_type, target_id=target.target_id)
         not in groups.accounted_by_target
     ]
-    safe_replay_candidates = _build_safe_replay_candidates(missing_targets, groups)
+    safe_replay_candidates = _build_safe_replay_candidates(
+        flow=flow,
+        expected_targets=expected_targets,
+        missing_targets=missing_targets,
+        groups=groups,
+    )
 
     return MessagingRepairPlan(
         flow=flow,
@@ -82,12 +87,21 @@ def _classify_existing_attempts(
 
 
 def _build_safe_replay_candidates(
+    *,
+    flow: str,
+    expected_targets: list[RepairTarget],
     missing_targets: list[RepairTarget],
     groups: _RepairAttemptGroups,
 ) -> list[RepairTarget]:
     safe_replay_candidates = list(missing_targets)
+    expected_target_keys = {
+        _repair_match_key(target_type=target.target_type, target_id=target.target_id)
+        for target in expected_targets
+    }
     for attempt in groups.failed_targets:
         key = _repair_match_key(target_type=attempt.target_type, target_id=attempt.target_id)
+        if flow == "daily_cup_round_messaging" and key not in expected_target_keys:
+            continue
         if key in groups.sent_target_keys or key in groups.pending_target_keys:
             continue
         if not _failed_attempt_is_replay_safe(attempt):
@@ -109,7 +123,8 @@ def _repair_match_key(*, target_type: str, target_id: str) -> tuple[str, str]:
 
 def _failed_attempt_is_replay_safe(attempt: ExistingDeliveryOutcome) -> bool:
     return (
-        attempt.failure_code in RETRYABLE_FAILURE_CODES
+        attempt.pending_replay_safe
+        and attempt.failure_code in RETRYABLE_FAILURE_CODES
         and attempt.attempt_count < MAX_DELIVERY_ATTEMPTS
     )
 
