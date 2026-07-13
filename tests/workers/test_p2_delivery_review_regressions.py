@@ -162,18 +162,28 @@ async def test_registration_persistence_failures_propagate(
     monkeypatch.setattr(registration_push, "record_daily_cup_registration_push_sent", _outcome)
     monkeypatch.setattr(registration_push, "mark_telegram_delivery_failed", _failed)
 
+    run = registration_push.DailyCupRegistrationPushRun(
+        bot=bot,
+        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+        flow="daily_cup_registration_push",
+        task_name="daily_cup_registration_push",
+        text="text",
+        tournament_id_text="cup",
+        happened_at=NOW_UTC,
+        sent_event_type="daily_cup_registration_push_sent",
+    )
+    target = registration_push.daily_cup_delivery_target(
+        flow=run.flow,
+        task_name=run.task_name,
+        tournament_id_text=run.tournament_id_text,
+        user_id=1,
+        telegram_user_id=101,
+    )
     with pytest.raises(RuntimeError, match="persistence failed"):
         await registration_push._send_daily_cup_registration_push_once(
-            bot=bot,
-            logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
-            flow="daily_cup_registration_push",
-            task_name="daily_cup_registration_push",
+            run=run,
+            target=target,
             user_id=1,
-            telegram_user_id=101,
-            text="text",
-            tournament_id_text="cup",
-            happened_at=NOW_UTC,
-            sent_event_type="daily_cup_registration_push_sent",
         )
 
 

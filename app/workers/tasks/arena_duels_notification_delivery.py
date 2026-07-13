@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
 from zoneinfo import ZoneInfo
 
 from app.core.analytics_events import BERLIN_TIMEZONE
@@ -18,6 +16,13 @@ from app.services.telegram_delivery import (
 )
 from app.workers.tasks import arena_duels_notification_content as notification_content
 from app.workers.tasks import arena_duels_notification_delivery_target as delivery_target
+from app.workers.tasks.arena_duels_notification_delivery_queries import ArenaBeatenNotificationDeps
+from app.workers.tasks.arena_duels_notification_delivery_queries import (
+    load_notification_users as _load_notification_users,
+)
+from app.workers.tasks.arena_duels_notification_delivery_queries import (
+    notification_already_sent as _notification_already_sent,
+)
 from app.workers.tasks.arena_duels_notification_payload import notification_payload
 from app.workers.tasks.arena_duels_notification_sender import _send_notification_message
 
@@ -32,13 +37,6 @@ classify_beaten_notification_action_mode = (
     notification_content.classify_beaten_notification_action_mode
 )
 format_user_label = notification_content.format_user_label
-
-
-@dataclass(frozen=True, slots=True)
-class ArenaBeatenNotificationDeps:
-    session_local: Any
-    analytics_repo: Any
-    users_repo: Any
 
 
 async def send_arena_beaten_notification_with_bot(
@@ -158,39 +156,3 @@ async def _deliver_notification(
         session_local=deps.session_local,
     )
     return None
-
-
-async def _notification_already_sent(
-    session,
-    notification: ArenaBeatenNotification,
-    payload: dict[str, object],
-    deps: ArenaBeatenNotificationDeps,
-) -> bool:
-    await deps.analytics_repo.lock_arena_beaten_notification_event_key(
-        session,
-        event_type=ARENA_BEATEN_NOTIFICATION_EVENT,
-        user_id=notification.previous_best_user_id,
-        payload=payload,
-    )
-    return await deps.analytics_repo.has_arena_beaten_notification_event(
-        session,
-        event_type=ARENA_BEATEN_NOTIFICATION_EVENT,
-        user_id=notification.previous_best_user_id,
-        payload=payload,
-    )
-
-
-async def _load_notification_users(
-    session,
-    notification: ArenaBeatenNotification,
-    deps: ArenaBeatenNotificationDeps,
-):
-    users = await deps.users_repo.list_by_ids(
-        session,
-        [notification.previous_best_user_id, notification.new_best_user_id],
-    )
-    users_by_id = {int(user.id): user for user in users}
-    return (
-        users_by_id.get(notification.previous_best_user_id),
-        users_by_id.get(notification.new_best_user_id),
-    )

@@ -87,14 +87,12 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
     enqueue_legacy_round_messaging = False
     events: list[dict[str, object]] = []
     participants_total = canceled = started = 0
-
     async with SessionLocal.begin() as session:
         tournament = await ensure_daily_cup_registration_tournament(
             session=session, now_utc_value=now_utc_value
         )
         if tournament.status != TOURNAMENT_STATUS_REGISTRATION:
             return {"processed": 0, "canceled": 0, "started": 0, "participants_total": 0}
-
         participants = await TournamentParticipantsRepo.list_for_tournament_for_update(
             session,
             tournament_id=tournament.id,

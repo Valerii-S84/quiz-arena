@@ -26,16 +26,9 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
     monkeypatch.setattr(push, "mark_telegram_delivery_failed", _capture_async([]))
 
     assert await push._send_daily_cup_registration_push_once(
-        bot=bot,
-        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
-        flow="daily_cup_invite_registration_push",
-        task_name="daily_cup_invite_registration_push",
+        run=_push_run(bot=bot),
+        target=_push_target(),
         user_id=11,
-        telegram_user_id=101,
-        text="text",
-        tournament_id_text="tid",
-        happened_at=NOW_UTC,
-        sent_event_type="sent",
     )
     assert bot.sent == [101]
     assert cast(Any, delivery_calls[0]["target"]).idempotency_key.startswith("telegram-delivery:")
@@ -53,32 +46,19 @@ async def test_send_daily_cup_registration_push_once_skips_duplicate_or_failed_s
         _unexpected_async("analytics must not be written for skipped delivery"),
     )
     assert not await push._send_daily_cup_registration_push_once(
-        bot=_Bot([]),
-        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
-        flow="daily_cup_invite_registration_push",
-        task_name="daily_cup_invite_registration_push",
+        run=_push_run(bot=_Bot([])),
+        target=_push_target(),
         user_id=11,
-        telegram_user_id=101,
-        text="text",
-        tournament_id_text="tid",
-        happened_at=NOW_UTC,
-        sent_event_type="sent",
     )
 
     failed_calls: list[dict[str, object]] = []
     monkeypatch.setattr(push, "prepare_telegram_delivery", _prepare_delivery(True))
     monkeypatch.setattr(push, "mark_telegram_delivery_failed", _capture_async(failed_calls))
+    failed_bot = _Bot([RuntimeError("send failed")])
     assert not await push._send_daily_cup_registration_push_once(
-        bot=_Bot([RuntimeError("send failed")]),
-        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
-        flow="daily_cup_invite_registration_push",
-        task_name="daily_cup_invite_registration_push",
+        run=_push_run(bot=failed_bot),
+        target=_push_target(),
         user_id=11,
-        telegram_user_id=101,
-        text="text",
-        tournament_id_text="tid",
-        happened_at=NOW_UTC,
-        sent_event_type="sent",
     )
     assert cast(BaseException, failed_calls[0]["exc"]).args == ("send failed",)
 
@@ -241,6 +221,29 @@ class _Bot:
 
     async def _close(self) -> None:
         self.closed = True
+
+
+def _push_run(*, bot: _Bot) -> push.DailyCupRegistrationPushRun:
+    return push.DailyCupRegistrationPushRun(
+        bot=bot,
+        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+        flow="daily_cup_invite_registration_push",
+        task_name="daily_cup_invite_registration_push",
+        text="text",
+        tournament_id_text="tid",
+        happened_at=NOW_UTC,
+        sent_event_type="sent",
+    )
+
+
+def _push_target():
+    return push.daily_cup_delivery_target(
+        flow="daily_cup_invite_registration_push",
+        task_name="daily_cup_invite_registration_push",
+        tournament_id_text="tid",
+        user_id=11,
+        telegram_user_id=101,
+    )
 
 
 def _async_return(value: object):

@@ -59,18 +59,22 @@ def _with_standings_share_button(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def _empty_round_messaging_result() -> dict[str, int]:
+    return {
+        "processed": 0,
+        "participants_total": 0,
+        "sent": 0,
+        "edited": 0,
+        "failed": 0,
+        "skipped": 0,
+    }
+
+
 async def run_private_tournament_round_messaging_async(*, tournament_id: str) -> dict[str, int]:
     try:
         parsed_tournament_id = UUID(tournament_id)
     except ValueError:
-        return {
-            "processed": 0,
-            "participants_total": 0,
-            "sent": 0,
-            "edited": 0,
-            "failed": 0,
-            "skipped": 0,
-        }
+        return _empty_round_messaging_result()
 
     async with SessionLocal.begin() as session:
         context = await load_round_messaging_context(
@@ -85,14 +89,7 @@ async def run_private_tournament_round_messaging_async(*, tournament_id: str) ->
             format_user_label_fn=format_user_label,
         )
         if context is None:
-            return {
-                "processed": 0,
-                "participants_total": 0,
-                "sent": 0,
-                "edited": 0,
-                "failed": 0,
-                "skipped": 0,
-            }
+            return _empty_round_messaging_result()
     delivery_result = await deliver_round_messages(
         context=context,
         build_bot_fn=build_bot,
