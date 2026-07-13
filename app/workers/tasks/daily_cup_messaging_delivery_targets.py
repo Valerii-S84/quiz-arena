@@ -1,43 +1,50 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from app.db.models.tournaments import Tournament
 from app.services.telegram_delivery import TelegramDeliveryTarget, build_delivery_idempotency_key
 
 
+@dataclass(frozen=True, slots=True)
+class DailyCupRoundDeliveryTargetContext:
+    flow: str
+    task_name: str
+    correlation_id: str
+    content_version: str
+    tournament_status: str
+    current_round: int
+
+
 def daily_cup_round_delivery_target(
     *,
-    flow: str,
-    task_name: str,
-    correlation_id: str,
+    context: DailyCupRoundDeliveryTargetContext,
     user_id: int,
     chat_id: int | None,
     delivery_operation: str,
-    content_version: str,
-    tournament_status: str,
-    current_round: int,
     pending_replay_safe: bool,
 ) -> TelegramDeliveryTarget:
-    target_id = f"{user_id}:phase:{content_version}:{delivery_operation}"
+    target_id = f"{user_id}:phase:{context.content_version}:{delivery_operation}"
     return TelegramDeliveryTarget(
-        flow=flow,
-        task_name=task_name,
-        correlation_id=correlation_id,
+        flow=context.flow,
+        task_name=context.task_name,
+        correlation_id=context.correlation_id,
         target_type="user",
         target_id=target_id,
         idempotency_key=build_delivery_idempotency_key(
-            flow=flow,
-            correlation_id=correlation_id,
+            flow=context.flow,
+            correlation_id=context.correlation_id,
             target_type="user",
             target_id=target_id,
         ),
         telegram_user_id=chat_id,
         chat_id=chat_id,
         safe_context={
-            "tournament_id": correlation_id,
+            "tournament_id": context.correlation_id,
             "user_id": user_id,
-            "status": tournament_status,
-            "current_round": current_round,
-            "content_version": content_version,
+            "status": context.tournament_status,
+            "current_round": context.current_round,
+            "content_version": context.content_version,
             "pending_replay_safe": pending_replay_safe,
         },
     )

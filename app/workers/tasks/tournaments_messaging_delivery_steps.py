@@ -45,18 +45,12 @@ def _build_fallback_target(
     attempt: TournamentRoundMessageAttempt,
 ):
     operations = delivery_context.operations
-    tournament = delivery_context.request.context.tournament
     existing_message_id = cast(int, attempt.existing_message_id)
     return operations.build_target(
-        flow=delivery_context.flow,
-        task_name=delivery_context.task_name,
-        correlation_id=delivery_context.correlation_id,
+        delivery_context=delivery_context,
         user_id=attempt.user_id,
         chat_id=attempt.chat_id,
         delivery_operation=operations.fallback_delivery_operation(existing_message_id),
-        content_version=delivery_context.content_version,
-        tournament_status=str(tournament.status),
-        current_round=int(tournament.current_round),
         pending_replay_safe=False,
     )
 

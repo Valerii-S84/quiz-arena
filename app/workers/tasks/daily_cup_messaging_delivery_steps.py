@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from app.workers.tasks.daily_cup_messaging_delivery_targets import (
+    DailyCupRoundDeliveryTargetContext,
+)
 from app.workers.tasks.daily_cup_messaging_delivery_types import (
     DailyCupDeliveryContext,
     DailyCupDeliveryDependencies,
@@ -44,15 +47,17 @@ def build_delivery_target(
         else dependencies.delivery_operation(existing_message_id)
     )
     return dependencies.daily_cup_round_delivery_target(
-        flow="daily_cup_round_messaging",
-        task_name=run.task_name,
-        correlation_id=str(context.tournament.id),
+        context=DailyCupRoundDeliveryTargetContext(
+            flow="daily_cup_round_messaging",
+            task_name=run.task_name,
+            correlation_id=str(context.tournament.id),
+            content_version=run.content_version,
+            tournament_status=str(context.tournament.status),
+            current_round=int(context.tournament.current_round),
+        ),
         user_id=user_id,
         chat_id=chat_id,
         delivery_operation=operation,
-        content_version=run.content_version,
-        tournament_status=str(context.tournament.status),
-        current_round=int(context.tournament.current_round),
         pending_replay_safe=existing_message_id is not None and not fallback,
     )
 

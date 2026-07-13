@@ -22,16 +22,8 @@ def _build_round_payload(
 ) -> tuple[str, object]:
     request = delivery_context.request
     return delivery_context.operations.build_payload(
-        context=request.context,
+        request=request,
         user_id=user_id,
-        resolve_match_context_fn=request.resolve_match_context_fn,
-        build_standings_lines_fn=request.build_standings_lines_fn,
-        build_completed_text_fn=request.build_completed_text_fn,
-        build_round_text_fn=request.build_round_text_fn,
-        format_deadline_fn=request.format_deadline_fn,
-        build_keyboard_fn=request.build_keyboard_fn,
-        add_share_button_fn=request.add_share_button_fn,
-        build_share_url_fn=request.build_share_url_fn,
     )
 
 
@@ -47,15 +39,10 @@ async def _deliver_user_message(
     chat_id = context.telegram_targets.get(user_id)
     existing_message_id = context.participant_rows[user_id].standings_message_id
     target = operations.build_target(
-        flow=delivery_context.flow,
-        task_name=delivery_context.task_name,
-        correlation_id=delivery_context.correlation_id,
+        delivery_context=delivery_context,
         user_id=user_id,
         chat_id=chat_id,
         delivery_operation=operations.delivery_operation(existing_message_id),
-        content_version=delivery_context.content_version,
-        tournament_status=str(context.tournament.status),
-        current_round=int(context.tournament.current_round),
         pending_replay_safe=existing_message_id is not None,
     )
     delivery = await operations.prepare_delivery(
