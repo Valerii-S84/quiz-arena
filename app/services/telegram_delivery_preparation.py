@@ -41,24 +41,10 @@ async def prepare_telegram_delivery(
                 blocked_since=happened_at - BLOCKED_CANDIDATE_TTL,
             )
         ):
-            attempt, created = await TelegramDeliveryAttemptsRepo.create_pending_once(
-                session,
-                item=attempt_create(target),
-            )
-            if created or attempt.status == "PENDING":
-                updated = await TelegramDeliveryAttemptsRepo.mark_skipped(
-                    session,
-                    idempotency_key=target.idempotency_key,
-                    skipped_at=happened_at,
-                    failure_code=FAILURE_CODE_BLOCKED,
-                    failure_reason="known blocked candidate",
-                )
-                _require_terminal_update(updated, "skipped")
-            return DeliveryPreparation(
-                idempotency_key=target.idempotency_key,
-                should_send=False,
-                status="SKIPPED",
-                created=created,
+            return await _prepare_blocked_delivery(
+                session=session,
+                target=target,
+                happened_at=happened_at,
             )
 
         attempt, created = await TelegramDeliveryAttemptsRepo.create_pending_once(
@@ -83,6 +69,33 @@ async def prepare_telegram_delivery(
             created=created,
             retry_claimed=retry_claimed,
         )
+
+
+async def _prepare_blocked_delivery(
+    *,
+    session: Any,
+    target: TelegramDeliveryTarget,
+    happened_at: datetime,
+) -> DeliveryPreparation:
+    attempt, created = await TelegramDeliveryAttemptsRepo.create_pending_once(
+        session,
+        item=attempt_create(target),
+    )
+    if created or attempt.status == "PENDING":
+        updated = await TelegramDeliveryAttemptsRepo.mark_skipped(
+            session,
+            idempotency_key=target.idempotency_key,
+            skipped_at=happened_at,
+            failure_code=FAILURE_CODE_BLOCKED,
+            failure_reason="known blocked candidate",
+        )
+        _require_terminal_update(updated, "skipped")
+    return DeliveryPreparation(
+        idempotency_key=target.idempotency_key,
+        should_send=False,
+        status="SKIPPED",
+        created=created,
+    )
 
 
 def _require_terminal_update(updated: int, status: str) -> None:
