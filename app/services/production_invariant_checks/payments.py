@@ -9,13 +9,7 @@ from app.services.production_invariant_checks.types import (
     build_check,
 )
 
-
-def build_payment_checks(now_utc: datetime) -> list[InvariantCheck]:
-    return [
-        build_check(
-            name="paid_without_entitlement",
-            severity=SEVERITY_P1,
-            sql="""
+_PAID_WITHOUT_ENTITLEMENT_SQL = """
                 SELECT count(*)
                 FROM purchases p
                 WHERE p.status = 'CREDITED'
@@ -26,27 +20,16 @@ def build_payment_checks(now_utc: datetime) -> list[InvariantCheck]:
                     WHERE e.source_purchase_id = p.id
                       AND e.entitlement_type = 'PREMIUM'
                   )
-            """,
-            description="Credited premium purchase has no premium entitlement.",
-        ),
-        build_check(
-            name="paid_uncredited_age_minutes",
-            severity=SEVERITY_P1,
-            sql="""
+            """
+_PAID_UNCREDITED_AGE_SQL = """
                 SELECT count(*)
                 FROM purchases
                 WHERE status = 'PAID_UNCREDITED'
                   AND stars_amount > 0
                   AND paid_at IS NOT NULL
                   AND paid_at <= :paid_uncredited_cutoff
-            """,
-            params={"paid_uncredited_cutoff": now_utc - timedelta(minutes=5)},
-            description="Paid purchase remains PAID_UNCREDITED longer than 5 minutes.",
-        ),
-        build_check(
-            name="paid_without_charge_id",
-            severity=SEVERITY_P1,
-            sql="""
+            """
+_PAID_WITHOUT_CHARGE_ID_SQL = """
                 SELECT count(*)
                 FROM purchases
                 WHERE stars_amount > 0
@@ -57,13 +40,8 @@ def build_payment_checks(now_utc: datetime) -> list[InvariantCheck]:
                     'REFUNDED'
                   )
                   AND telegram_payment_charge_id IS NULL
-            """,
-            description="Paid Stars purchase is missing telegram_payment_charge_id.",
-        ),
-        build_check(
-            name="reconciliation_diff_nonzero",
-            severity=SEVERITY_P1,
-            sql="""
+            """
+_RECONCILIATION_DIFF_NONZERO_SQL = """
                 SELECT COALESCE((
                   SELECT diff_count
                   FROM reconciliation_runs
@@ -71,27 +49,16 @@ def build_payment_checks(now_utc: datetime) -> list[InvariantCheck]:
                   ORDER BY finished_at DESC, id DESC
                   LIMIT 1
                 ), 0)
-            """,
-            description="Latest completed payment reconciliation has a non-zero diff.",
-        ),
-        build_check(
-            name="expired_active_entitlements_count",
-            severity=SEVERITY_P2,
-            sql="""
+            """
+_EXPIRED_ACTIVE_ENTITLEMENTS_SQL = """
                 SELECT count(*)
                 FROM entitlements
                 WHERE entitlement_type = 'PREMIUM'
                   AND status = 'ACTIVE'
                   AND ends_at IS NOT NULL
                   AND ends_at <= :now_utc
-            """,
-            params={"now_utc": now_utc},
-            description="Expired premium entitlement rows still have ACTIVE status.",
-        ),
-        build_check(
-            name="webhook_processing_failed_or_stuck",
-            severity=SEVERITY_P1,
-            sql="""
+            """
+_WEBHOOK_PROCESSING_FAILED_OR_STUCK_SQL = """
                 SELECT (
                   SELECT count(*)
                   FROM processed_updates
@@ -103,7 +70,47 @@ def build_payment_checks(now_utc: datetime) -> list[InvariantCheck]:
                   WHERE event_type = 'telegram_update_failed_final'
                     AND created_at >= :recent_cutoff
                 )
-            """,
+            """
+
+
+def build_payment_checks(now_utc: datetime) -> list[InvariantCheck]:
+    return [
+        build_check(
+            name="paid_without_entitlement",
+            severity=SEVERITY_P1,
+            sql=_PAID_WITHOUT_ENTITLEMENT_SQL,
+            description="Credited premium purchase has no premium entitlement.",
+        ),
+        build_check(
+            name="paid_uncredited_age_minutes",
+            severity=SEVERITY_P1,
+            sql=_PAID_UNCREDITED_AGE_SQL,
+            params={"paid_uncredited_cutoff": now_utc - timedelta(minutes=5)},
+            description="Paid purchase remains PAID_UNCREDITED longer than 5 minutes.",
+        ),
+        build_check(
+            name="paid_without_charge_id",
+            severity=SEVERITY_P1,
+            sql=_PAID_WITHOUT_CHARGE_ID_SQL,
+            description="Paid Stars purchase is missing telegram_payment_charge_id.",
+        ),
+        build_check(
+            name="reconciliation_diff_nonzero",
+            severity=SEVERITY_P1,
+            sql=_RECONCILIATION_DIFF_NONZERO_SQL,
+            description="Latest completed payment reconciliation has a non-zero diff.",
+        ),
+        build_check(
+            name="expired_active_entitlements_count",
+            severity=SEVERITY_P2,
+            sql=_EXPIRED_ACTIVE_ENTITLEMENTS_SQL,
+            params={"now_utc": now_utc},
+            description="Expired premium entitlement rows still have ACTIVE status.",
+        ),
+        build_check(
+            name="webhook_processing_failed_or_stuck",
+            severity=SEVERITY_P1,
+            sql=_WEBHOOK_PROCESSING_FAILED_OR_STUCK_SQL,
             params={
                 "webhook_processing_cutoff": now_utc - timedelta(minutes=10),
                 "recent_cutoff": now_utc - timedelta(hours=24),

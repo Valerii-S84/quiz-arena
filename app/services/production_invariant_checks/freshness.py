@@ -10,14 +10,7 @@ from app.services.production_invariant_checks.types import (
 )
 
 MANUAL_REVIEW_OUTBOX_EVENT_TYPES = ("payments_telegram_stars_reconciliation_review",)
-
-
-def build_freshness_checks(now_utc: datetime, local_today_berlin: date) -> list[InvariantCheck]:
-    return [
-        build_check(
-            name="queue_oldest_message_age_seconds",
-            severity=SEVERITY_P1,
-            sql="""
+_QUEUE_OLDEST_MESSAGE_AGE_SQL = """
                 SELECT count(*)
                 FROM outbox_events
                 WHERE status IN ('NEW','PENDING','OPEN','RETRY')
@@ -26,7 +19,47 @@ def build_freshness_checks(now_utc: datetime, local_today_berlin: date) -> list[
                     status = 'OPEN'
                     AND event_type IN ('payments_telegram_stars_reconciliation_review')
                   )
-            """,
+            """
+_STREAK_UPDATE_STALE_SQL = """
+                WITH recent_activity AS (
+                  SELECT user_id, max(answered_at) AS latest_answered_at
+                  FROM quiz_attempts
+                  WHERE answered_at >= :streak_activity_cutoff
+                  GROUP BY user_id
+                )
+                SELECT count(*)
+                FROM recent_activity a
+                LEFT JOIN streak_state s ON s.user_id = a.user_id
+                WHERE s.user_id IS NULL
+                   OR s.updated_at < a.latest_answered_at
+            """
+_GLOBAL_BEST_STREAK_SOURCE_SQL = """
+                SELECT count(*)
+                FROM streak_state
+                WHERE current_streak > best_streak
+            """
+_ANALYTICS_DAILY_STALE_SQL = """
+                SELECT CASE WHEN EXISTS (
+                  SELECT 1
+                  FROM analytics_daily
+                  WHERE local_date_berlin >= :local_today_berlin
+                    AND calculated_at >= :analytics_fresh_cutoff
+                ) THEN 0 ELSE 1 END
+            """
+_TELEGRAM_DELIVERY_PENDING_STALE_SQL = """
+                SELECT count(*)
+                FROM telegram_delivery_attempts
+                WHERE status = 'PENDING'
+                  AND updated_at <= :telegram_delivery_pending_cutoff
+            """
+
+
+def build_freshness_checks(now_utc: datetime, local_today_berlin: date) -> list[InvariantCheck]:
+    return [
+        build_check(
+            name="queue_oldest_message_age_seconds",
+            severity=SEVERITY_P1,
+            sql=_QUEUE_OLDEST_MESSAGE_AGE_SQL,
             params={
                 "queue_old_cutoff": now_utc - timedelta(minutes=15),
             },
@@ -39,43 +72,20 @@ def build_freshness_checks(now_utc: datetime, local_today_berlin: date) -> list[
         build_check(
             name="streak_update_stale",
             severity=SEVERITY_P1,
-            sql="""
-                WITH recent_activity AS (
-                  SELECT user_id, max(answered_at) AS latest_answered_at
-                  FROM quiz_attempts
-                  WHERE answered_at >= :streak_activity_cutoff
-                  GROUP BY user_id
-                )
-                SELECT count(*)
-                FROM recent_activity a
-                LEFT JOIN streak_state s ON s.user_id = a.user_id
-                WHERE s.user_id IS NULL
-                   OR s.updated_at < a.latest_answered_at
-            """,
+            sql=_STREAK_UPDATE_STALE_SQL,
             params={"streak_activity_cutoff": now_utc - timedelta(hours=6)},
             description="Recent quiz activity exists but the same user's streak_state is stale.",
         ),
         build_check(
             name="global_best_streak_source_inconsistent",
             severity=SEVERITY_P1,
-            sql="""
-                SELECT count(*)
-                FROM streak_state
-                WHERE current_streak > best_streak
-            """,
+            sql=_GLOBAL_BEST_STREAK_SOURCE_SQL,
             description="Global best streak source has rows where current_streak exceeds best_streak.",
         ),
         build_check(
             name="analytics_daily_stale",
             severity=SEVERITY_P2,
-            sql="""
-                SELECT CASE WHEN EXISTS (
-                  SELECT 1
-                  FROM analytics_daily
-                  WHERE local_date_berlin >= :local_today_berlin
-                    AND calculated_at >= :analytics_fresh_cutoff
-                ) THEN 0 ELSE 1 END
-            """,
+            sql=_ANALYTICS_DAILY_STALE_SQL,
             params={
                 "local_today_berlin": local_today_berlin,
                 "analytics_fresh_cutoff": now_utc - timedelta(hours=2),
@@ -85,12 +95,7 @@ def build_freshness_checks(now_utc: datetime, local_today_berlin: date) -> list[
         build_check(
             name="telegram_delivery_pending_stale",
             severity=SEVERITY_P2,
-            sql="""
-                SELECT count(*)
-                FROM telegram_delivery_attempts
-                WHERE status = 'PENDING'
-                  AND updated_at <= :telegram_delivery_pending_cutoff
-            """,
+            sql=_TELEGRAM_DELIVERY_PENDING_STALE_SQL,
             params={"telegram_delivery_pending_cutoff": now_utc - timedelta(minutes=15)},
             description="Telegram delivery attempt remains pending without a terminal outcome.",
         ),

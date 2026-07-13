@@ -76,7 +76,6 @@ async def run_daily_cup_round_messaging_async_with_followups(
         )
     if context is None:
         return _empty_result()
-
     bot = build_bot()
     try:
         delivery = await deliver_daily_cup_messages(
