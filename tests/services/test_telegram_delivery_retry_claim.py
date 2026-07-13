@@ -16,13 +16,16 @@ from app.services.telegram_delivery_retry import (
 from app.services.telegram_delivery_types import DeliveryPreparation
 from app.workers.tasks import (
     arena_duels_notification_delivery,
-    daily_cup_core,
+    daily_cup_cancel_delivery,
     daily_cup_message_delivery_persistence,
-    daily_cup_messaging_delivery,
+    daily_cup_messaging_delivery_runtime,
+    daily_cup_messaging_delivery_steps,
     daily_cup_registration_push,
-    daily_cup_turn_reminder_delivery,
+    daily_cup_turn_reminder_delivery_runtime,
     tournaments_message_delivery_persistence,
     tournaments_messaging_delivery,
+    tournaments_messaging_delivery_runtime,
+    tournaments_messaging_delivery_steps,
 )
 
 NOW_UTC = datetime(2026, 7, 12, 12, 0, tzinfo=UTC)
@@ -119,27 +122,71 @@ async def test_new_delivery_does_not_need_retry_dispatch() -> None:
 
 
 @pytest.mark.parametrize(
-    ("module", "expected_paths"),
+    ("source_modules", "prepare_pattern", "dispatch_pattern", "expected_paths"),
     [
-        (arena_duels_notification_delivery, 1),
-        (daily_cup_core, 1),
-        (daily_cup_messaging_delivery, 2),
-        (daily_cup_registration_push, 1),
-        (daily_cup_turn_reminder_delivery, 1),
-        (tournaments_messaging_delivery, 2),
+        pytest.param(
+            (arena_duels_notification_delivery,),
+            r"prepare_telegram_delivery\(",
+            r"begin_telegram_delivery_dispatch\(",
+            1,
+            id="arena-duels",
+        ),
+        pytest.param(
+            (daily_cup_cancel_delivery,),
+            r"operations\.prepare_delivery\(",
+            r"operations\.begin_dispatch\(",
+            1,
+            id="daily-cup-cancel",
+        ),
+        pytest.param(
+            (daily_cup_messaging_delivery_runtime, daily_cup_messaging_delivery_steps),
+            r"dependencies\.prepare_telegram_delivery\(",
+            r"dependencies\.begin_telegram_delivery_dispatch\(",
+            2,
+            id="daily-cup-messaging",
+        ),
+        pytest.param(
+            (daily_cup_registration_push,),
+            r"prepare_telegram_delivery\(",
+            r"begin_telegram_delivery_dispatch\(",
+            1,
+            id="daily-cup-registration",
+        ),
+        pytest.param(
+            (daily_cup_turn_reminder_delivery_runtime,),
+            r"dependencies\.prepare_telegram_delivery\(",
+            r"dependencies\.begin_telegram_delivery_dispatch\(",
+            1,
+            id="daily-cup-turn-reminder",
+        ),
+        pytest.param(
+            (tournaments_messaging_delivery_runtime, tournaments_messaging_delivery_steps),
+            r"operations\.prepare(?:_fallback)?_delivery\(",
+            r"operations\.begin(?:_fallback)?_dispatch\(",
+            2,
+            id="tournaments-messaging",
+        ),
     ],
 )
 def test_each_delivery_prepare_path_has_a_later_dispatch_gate(
-    module: Any, expected_paths: int
+    source_modules: tuple[Any, ...],
+    prepare_pattern: str,
+    dispatch_pattern: str,
+    expected_paths: int,
 ) -> None:
-    source = inspect.getsource(module)
-    prepares = [match.start() for match in re.finditer(r"prepare_telegram_delivery\(", source)]
-    dispatches = [
-        match.start() for match in re.finditer(r"begin_telegram_delivery_dispatch\(", source)
-    ]
+    path_count = 0
+    for module in source_modules:
+        source = inspect.getsource(module)
+        prepares = [match.start() for match in re.finditer(prepare_pattern, source)]
+        dispatches = [match.start() for match in re.finditer(dispatch_pattern, source)]
 
-    assert len(prepares) == len(dispatches) == expected_paths
-    assert all(prepare < dispatch for prepare, dispatch in zip(prepares, dispatches, strict=True))
+        assert len(prepares) == len(dispatches) == 1
+        assert all(
+            prepare < dispatch for prepare, dispatch in zip(prepares, dispatches, strict=True)
+        )
+        path_count += len(prepares)
+
+    assert path_count == expected_paths
 
 
 async def test_daily_cup_fallback_persists_replacement_before_sent(monkeypatch) -> None:
