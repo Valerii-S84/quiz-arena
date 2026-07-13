@@ -8,7 +8,6 @@ from uuid import UUID, uuid4
 from sqlalchemy import text
 
 from app.bot.application import build_bot
-from app.bot.texts.de import TEXTS_DE
 from app.core.analytics_events import EVENT_SOURCE_WORKER, emit_analytics_event
 from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
@@ -20,16 +19,28 @@ from app.game.tournaments.constants import (
     TOURNAMENT_TYPE_DAILY_ARENA,
 )
 from app.game.tournaments.internal import generate_invite_code
+from app.services.telegram_delivery import TelegramDeliveryTarget, begin_telegram_delivery_dispatch
 from app.services.telegram_delivery import (
-    TelegramDeliveryTarget,
-    begin_telegram_delivery_dispatch,
-    build_delivery_idempotency_key,
-    hash_chat_id,
+    build_delivery_idempotency_key as build_delivery_idempotency_key,
+)
+from app.services.telegram_delivery import hash_chat_id as hash_chat_id
+from app.services.telegram_delivery import (
     mark_telegram_delivery_failed,
     mark_telegram_delivery_sent,
     prepare_telegram_delivery,
 )
+from app.workers.tasks.daily_cup_cancel_delivery import (
+    DailyCupCancelDeliveryOperations,
+    daily_cup_cancel_delivery_target,
+)
+from app.workers.tasks.daily_cup_cancel_delivery import (
+    send_daily_cup_canceled_messages as _send_daily_cup_canceled_messages,
+)
 from app.workers.tasks.daily_cup_config import TOURNAMENT_MAX_PARTICIPANTS
+from app.workers.tasks.daily_cup_persistence import emit_daily_cup_events as _emit_daily_cup_events
+from app.workers.tasks.daily_cup_persistence import (
+    persist_daily_cup_standings_message_ids as _persist_daily_cup_standings_message_ids,
+)
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
 
 
@@ -92,19 +103,13 @@ async def ensure_daily_cup_registration_tournament(
 async def emit_daily_cup_events(
     *, now_utc_value: datetime, events: list[dict[str, object]]
 ) -> None:
-    if not events:
-        return
-    async with SessionLocal.begin() as session:
-        for event in events:
-            payload_raw = event.get("payload")
-            await emit_analytics_event(
-                session,
-                event_type=str(event["event_type"]),
-                source=EVENT_SOURCE_WORKER,
-                happened_at=now_utc_value,
-                user_id=None,
-                payload=(payload_raw if isinstance(payload_raw, dict) else {}),
-            )
+    await _emit_daily_cup_events(
+        now_utc_value=now_utc_value,
+        events=events,
+        session_local=SessionLocal,
+        emit_analytics_event=emit_analytics_event,
+        event_source_worker=EVENT_SOURCE_WORKER,
+    )
 
 
 async def send_daily_cup_canceled_messages(
@@ -113,37 +118,28 @@ async def send_daily_cup_canceled_messages(
     tournament_id: str | None = None,
     bot_factory: Callable[[], Any] | None = None,
 ) -> None:
-    if not telegram_targets:
-        return
-    resolved_bot_factory = bot_factory if bot_factory is not None else build_bot
-    bot = resolved_bot_factory()
-    happened_at = now_utc()
-    correlation_id = tournament_id or "unknown"
-    try:
-        for chat_id in telegram_targets:
-            target = _daily_cup_cancel_delivery_target(
-                correlation_id=correlation_id,
-                chat_id=chat_id,
-            )
-            delivery = await prepare_telegram_delivery(target=target, happened_at=happened_at)
-            if not delivery.should_send:
-                continue
-            await begin_telegram_delivery_dispatch(delivery, happened_at=happened_at)
-            try:
-                await bot.send_message(chat_id=chat_id, text=TEXTS_DE["msg.daily_cup.canceled"])
-            except Exception as exc:
-                await mark_telegram_delivery_failed(
-                    idempotency_key=target.idempotency_key,
-                    happened_at=happened_at,
-                    exc=exc,
-                )
-                continue
-            await mark_telegram_delivery_sent(
-                idempotency_key=target.idempotency_key,
-                happened_at=happened_at,
-            )
-    finally:
-        await bot.session.close()
+    await _send_daily_cup_canceled_messages(
+        telegram_targets=telegram_targets,
+        tournament_id=tournament_id,
+        bot_factory=bot_factory,
+        operations=DailyCupCancelDeliveryOperations(
+            default_bot_factory=build_bot,
+            now_utc=now_utc,
+            prepare_delivery=_prepare_daily_cup_cancel_delivery,
+            begin_dispatch=_begin_daily_cup_cancel_dispatch,
+            mark_failed=mark_telegram_delivery_failed,
+            mark_sent=mark_telegram_delivery_sent,
+            target_factory=_daily_cup_cancel_delivery_target,
+        ),
+    )
+
+
+async def _prepare_daily_cup_cancel_delivery(*args: Any, **kwargs: Any) -> Any:
+    return await prepare_telegram_delivery(*args, **kwargs)
+
+
+async def _begin_daily_cup_cancel_dispatch(*args: Any, **kwargs: Any) -> None:
+    await begin_telegram_delivery_dispatch(*args, **kwargs)
 
 
 def _daily_cup_cancel_delivery_target(
@@ -151,27 +147,9 @@ def _daily_cup_cancel_delivery_target(
     correlation_id: str,
     chat_id: int,
 ) -> TelegramDeliveryTarget:
-    content_version = "status:canceled"
-    target_id = f"{hash_chat_id(chat_id)}:{content_version}"
-    return TelegramDeliveryTarget(
-        flow="daily_cup_cancel_message",
-        task_name="daily_cup.close_registration_and_start",
+    return daily_cup_cancel_delivery_target(
         correlation_id=correlation_id,
-        target_type="chat_hash",
-        target_id=target_id,
-        idempotency_key=build_delivery_idempotency_key(
-            flow="daily_cup_cancel_message",
-            correlation_id=correlation_id,
-            target_type="chat_hash",
-            target_id=target_id,
-        ),
-        telegram_user_id=chat_id,
         chat_id=chat_id,
-        safe_context={
-            "tournament_id": correlation_id,
-            "content_version": content_version,
-            "pending_replay_safe": False,
-        },
     )
 
 
@@ -181,20 +159,10 @@ async def persist_daily_cup_standings_message_ids(
     new_message_ids: dict[int, int],
     replaced_message_ids: dict[int, int],
 ) -> None:
-    if not new_message_ids and not replaced_message_ids:
-        return
-    async with SessionLocal.begin() as session:
-        for user_id, message_id in new_message_ids.items():
-            await TournamentParticipantsRepo.set_standings_message_id_if_missing(
-                session,
-                tournament_id=tournament_id,
-                user_id=user_id,
-                message_id=message_id,
-            )
-        for user_id, message_id in replaced_message_ids.items():
-            await TournamentParticipantsRepo.set_standings_message_id(
-                session,
-                tournament_id=tournament_id,
-                user_id=user_id,
-                message_id=message_id,
-            )
+    await _persist_daily_cup_standings_message_ids(
+        tournament_id=tournament_id,
+        new_message_ids=new_message_ids,
+        replaced_message_ids=replaced_message_ids,
+        session_local=SessionLocal,
+        participants_repo=TournamentParticipantsRepo,
+    )
