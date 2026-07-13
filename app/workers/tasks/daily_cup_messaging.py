@@ -16,7 +16,6 @@ from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.task_heartbeat import run_tracked_async_job
 from app.workers.tasks.daily_cup_config import DAILY_CUP_TIMEZONE
-from app.workers.tasks.daily_cup_core import persist_daily_cup_standings_message_ids
 from app.workers.tasks.daily_cup_messaging_context import load_daily_cup_round_messaging_context
 from app.workers.tasks.daily_cup_messaging_delivery import deliver_daily_cup_messages
 from app.workers.tasks.daily_cup_messaging_followups import handle_daily_cup_completion_followups
@@ -94,11 +93,6 @@ async def run_daily_cup_round_messaging_async_with_followups(
     finally:
         await bot.session.close()
 
-    await persist_daily_cup_standings_message_ids(
-        tournament_id=context.parsed_tournament_id,
-        new_message_ids=dict(delivery["new_message_ids"]),
-        replaced_message_ids=dict(delivery["replaced_message_ids"]),
-    )
     handle_daily_cup_completion_followups(
         is_completed=context.is_completed,
         enqueue_completion_followups=enqueue_completion_followups,

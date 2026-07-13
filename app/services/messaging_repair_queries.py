@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,7 +38,7 @@ async def load_tournament_expected_targets(
             ORDER BY p.user_id
             """
         ),
-        {"flow": flow, "tournament_id": tournament_id},
+        {"flow": flow, "tournament_id": UUID(tournament_id)},
     )
     return [
         RepairTarget(

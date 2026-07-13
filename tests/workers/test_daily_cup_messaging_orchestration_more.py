@@ -10,18 +10,20 @@ from tests.workers.daily_cup_turn_reminder_test_support import session_local_wit
 
 
 class _Bot:
-    def __init__(self) -> None:
+    def __init__(self, calls: list[tuple[str, object]]) -> None:
+        self.calls = calls
         self.session = SimpleNamespace(close=self._close)
         self.closed = False
 
     async def _close(self) -> None:
         self.closed = True
+        self.calls.append(("close", True))
 
 
-def test_run_daily_cup_round_messaging_async_delivers_persists_and_follows_up(monkeypatch) -> None:
+def test_run_daily_cup_round_messaging_async_delivers_closes_and_follows_up(monkeypatch) -> None:
     tournament_id = uuid4()
-    bot = _Bot()
     calls: list[tuple[str, object]] = []
+    bot = _Bot(calls)
     context = SimpleNamespace(
         parsed_tournament_id=tournament_id,
         tournament="tournament",
@@ -53,15 +55,11 @@ def test_run_daily_cup_round_messaging_async_delivers_persists_and_follows_up(mo
             "replaced_message_ids": {2: 22},
         }
 
-    async def _persist(**kwargs):
-        calls.append(("persist", kwargs["new_message_ids"]))
-
     monkeypatch.setattr(daily_cup_messaging, "SessionLocal", session_local_with_sessions("s1"))
     monkeypatch.setattr(
         daily_cup_messaging, "load_daily_cup_round_messaging_context", _load_context
     )
     monkeypatch.setattr(daily_cup_messaging, "deliver_daily_cup_messages", _deliver)
-    monkeypatch.setattr(daily_cup_messaging, "persist_daily_cup_standings_message_ids", _persist)
     monkeypatch.setattr(daily_cup_messaging, "build_bot", lambda: bot)
     monkeypatch.setattr(
         daily_cup_messaging,
@@ -88,7 +86,7 @@ def test_run_daily_cup_round_messaging_async_delivers_persists_and_follows_up(mo
     assert calls == [
         ("session", "s1"),
         ("deliver", bot),
-        ("persist", {1: 11}),
+        ("close", True),
         ("followups", True),
     ]
 

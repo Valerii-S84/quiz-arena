@@ -103,9 +103,6 @@ async def test_daily_arena_messaging_round_pipeline_fetches_round_matches_for_ar
             "replaced_message_ids": {},
         }
 
-    async def _fake_persist(**kwargs) -> None:
-        calls["persist"] = kwargs
-
     monkeypatch.setattr(
         daily_cup_messaging,
         "SessionLocal",
@@ -129,11 +126,6 @@ async def test_daily_arena_messaging_round_pipeline_fetches_round_matches_for_ar
     monkeypatch.setattr(daily_cup_messaging, "deliver_daily_cup_messages", _fake_deliver)
     monkeypatch.setattr(
         daily_cup_messaging,
-        "persist_daily_cup_standings_message_ids",
-        _fake_persist,
-    )
-    monkeypatch.setattr(
-        daily_cup_messaging,
         "handle_daily_cup_completion_followups",
         lambda **kwargs: calls.setdefault("followups", kwargs),
     )
@@ -153,7 +145,6 @@ async def test_daily_arena_messaging_round_pipeline_fetches_round_matches_for_ar
     }
     assert calls["round_no"] == 2
     assert calls["deliver"]["tournament"].type == TOURNAMENT_TYPE_DAILY_ARENA
-    assert calls["persist"]["new_message_ids"] == {101: 1001}
     assert calls["followups"]["is_completed"] is False
     assert bot.session.closed is True
 

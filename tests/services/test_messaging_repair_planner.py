@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import cast
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -291,6 +292,7 @@ def test_repair_plan_keeps_final_and_cancel_targets_distinct() -> None:
 
 
 async def test_repair_plan_loader_builds_current_phase_targets() -> None:
+    tournament_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     session = _RepairPlanSession(
         expected_rows=[
             (1, 101, "ROUND_2", 2),
@@ -310,7 +312,7 @@ async def test_repair_plan_loader_builds_current_phase_targets() -> None:
     plan = await plan_tournament_messaging_repair(
         cast(AsyncSession, session),
         flow="daily_cup_round_messaging",
-        tournament_id="cup-1",
+        tournament_id=tournament_id,
     )
 
     assert [target.target_id for target in plan.missing_targets] == [
@@ -318,6 +320,10 @@ async def test_repair_plan_loader_builds_current_phase_targets() -> None:
         "2:phase:round:2:status:round_2:send",
     ]
     assert "status = 'PENDING' AND updated_at" in session.statements[1]
+    assert session.params == [
+        {"flow": "daily_cup_round_messaging", "tournament_id": UUID(tournament_id)},
+        {"flow": "daily_cup_round_messaging", "correlation_id": tournament_id},
+    ]
 
 
 def test_repair_plan_keeps_skipped_out_of_replay_candidates() -> None:
@@ -355,7 +361,9 @@ class _RepairPlanSession:
     ) -> None:
         self._results = [_RowsResult(expected_rows), _RowsResult(existing_rows)]
         self.statements: list[str] = []
+        self.params: list[dict[str, object]] = []
 
-    async def execute(self, statement, *_args, **_kwargs) -> _RowsResult:
+    async def execute(self, statement, params, *_args, **_kwargs) -> _RowsResult:
         self.statements.append(str(statement))
+        self.params.append(params)
         return self._results.pop(0)

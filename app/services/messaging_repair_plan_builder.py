@@ -100,7 +100,14 @@ def _build_safe_replay_candidates(
     }
     for attempt in groups.failed_targets:
         key = _repair_match_key(target_type=attempt.target_type, target_id=attempt.target_id)
-        if flow == "daily_cup_round_messaging" and key not in expected_target_keys:
+        if (
+            flow
+            in {
+                "daily_cup_round_messaging",
+                "private_tournament_round_messaging",
+            }
+            and key not in expected_target_keys
+        ):
             continue
         if key in groups.sent_target_keys or key in groups.pending_target_keys:
             continue

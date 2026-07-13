@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any, cast
+from uuid import UUID
 
 import pytest
 
@@ -147,34 +148,49 @@ def test_inactive_daily_failed_attempt_is_not_reintroduced_for_replay() -> None:
         expected_targets=[],
         existing_attempts=[inactive_failed],
     )
-    private_plan = build_messaging_repair_plan(
-        flow="private_tournament_round_messaging",
-        correlation_id="private-1",
-        expected_targets=[],
-        existing_attempts=[inactive_failed],
-    )
 
     assert daily_plan.safe_replay_candidates == []
-    assert private_plan.safe_replay_candidates == [
-        RepairTarget(target_type="user", target_id=inactive_failed.target_id)
-    ]
+
+
+def test_private_failed_attempt_from_previous_phase_is_not_replayed() -> None:
+    current_target = RepairTarget(
+        target_type="user",
+        target_id="2:phase:round:2:status:round_2:edit:502",
+    )
+    stale_failed = ExistingDeliveryOutcome(
+        target_type="user",
+        target_id="2:phase:round:1:status:round_1:edit:502",
+        status="FAILED",
+        failure_code=FAILURE_CODE_TRANSIENT,
+        pending_replay_safe=True,
+    )
+
+    plan = build_messaging_repair_plan(
+        flow="private_tournament_round_messaging",
+        correlation_id="private-1",
+        expected_targets=[current_target],
+        existing_attempts=[stale_failed],
+    )
+
+    assert plan.safe_replay_candidates == [current_target]
 
 
 @pytest.mark.asyncio
 async def test_daily_repair_targets_use_active_user_filter() -> None:
+    tournament_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     session = _CaptureSession()
 
     await load_tournament_expected_targets(
         cast(Any, session),
         flow="daily_cup_round_messaging",
-        tournament_id="cup-1",
+        tournament_id=tournament_id,
     )
 
     assert "u.status = 'ACTIVE'" in session.statement
     assert ":flow <> 'daily_cup_round_messaging'" in session.statement
     assert session.params == {
         "flow": "daily_cup_round_messaging",
-        "tournament_id": "cup-1",
+        "tournament_id": UUID(tournament_id),
     }
 
 
