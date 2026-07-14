@@ -70,3 +70,13 @@ Frontend boundary:
 
 - For tasks about repo cleanup, technical debt, stabilization, CI hardening, structural refactor, or follow-up after repository audit, read `.agent/project/TECH_DEBT_REMEDIATION_PLAN.md` before acting.
 - Treat `.agent/project/TECH_DEBT_REMEDIATION_PLAN.md` as the ordered project-specific source of truth for debt-remediation priorities unless the user explicitly overrides the order.
+
+## 8. Mandatory execution failure prevention
+
+- Before any repository work, read
+  `.agent/project/EXECUTION_FAILURE_PREVENTION.md` completely five times.
+- Each pass must follow the distinct purpose defined in that document.
+- Do not start code inspection, commands, edits, or tests until all five passes
+  are complete.
+- The document records only agent decision failures and must not be used to
+  attribute those failures to the repository or the user.

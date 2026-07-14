@@ -65,6 +65,8 @@ rg -n '\[FILL_PER_PROJECT\]' .agent/project
 8. `.agent/core/PRINCIPLES.md`
 9. `.agent/project/PROJECT_CONTEXT.md`
 10. `.agent/project/CODE_STYLE.md`
+11. `.agent/project/EXECUTION_FAILURE_PREVENTION.md` — прочитати повністю
+    п'ять разів за протоколом самого документа.
 
 ### 1.4. Обов'язкова зупинка перед початком роботи
 
@@ -78,6 +80,8 @@ rg -n '\[FILL_PER_PROJECT\]' .agent/project
   `Git settings`;
 - в `.agent/project/CODE_STYLE.md` незаповненими лишились секції
   для мов, які реально використовує репозиторій;
+- файл `.agent/project/EXECUTION_FAILURE_PREVENTION.md` відсутній або агент
+  не завершив п'ять повних проходів його читання;
 - project-specific правила суперечать `core/`.
 
 Виняток:
@@ -539,6 +543,8 @@ B) [дія — наслідок]
 - `.agent/core/PRINCIPLES.md`: universal engineering principles;
 - `.agent/project/PROJECT_CONTEXT.md`: project-specific context;
 - `.agent/project/CODE_STYLE.md`: language-specific style;
+- `.agent/project/EXECUTION_FAILURE_PREVENTION.md`: обов'язковий п'ятикратний
+  startup read і project-specific protocol запобігання execution failures;
 - `.agent/COMPLIANCE_CHECKLIST.md`: optional startup audit helper;
 - `.agent/CHANGELOG.md`: bundle history.
 
@@ -640,6 +646,9 @@ pytest tests/ -q --tb=short
 - Principles: `.agent/core/PRINCIPLES.md`
 - Project context: `.agent/project/PROJECT_CONTEXT.md`
 - Code style: `.agent/project/CODE_STYLE.md`
+- Execution failure prevention:
+  `.agent/project/EXECUTION_FAILURE_PREVENTION.md` — п'ять повних прочитань
+  перед будь-якою роботою
 - Startup audit: `.agent/COMPLIANCE_CHECKLIST.md`
 
 Якщо документ недоступний, застосовуй fallback:
