@@ -18,7 +18,6 @@ from app.workers.celery_app import celery_app
 from app.workers.task_heartbeat import run_tracked_async_job
 from app.workers.tasks.tournaments_messaging_context import load_round_messaging_context
 from app.workers.tasks.tournaments_messaging_delivery import deliver_round_messages
-from app.workers.tasks.tournaments_messaging_persistence import persist_standings_message_ids
 from app.workers.tasks.tournaments_messaging_text import (
     ROUND_STATUSES,
     build_completed_text,
@@ -104,16 +103,6 @@ async def run_private_tournament_round_messaging_async(*, tournament_id: str) ->
         is_message_not_modified_error_fn=is_message_not_modified_error,
         logger=logger,
     )
-
-    if delivery_result.new_message_ids or delivery_result.replaced_message_ids:
-        async with SessionLocal.begin() as session:
-            await persist_standings_message_ids(
-                session=session,
-                parsed_tournament_id=parsed_tournament_id,
-                participants_repo=TournamentParticipantsRepo,
-                new_message_ids=delivery_result.new_message_ids,
-                replaced_message_ids=delivery_result.replaced_message_ids,
-            )
 
     return {
         "processed": 1,

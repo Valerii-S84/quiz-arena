@@ -50,7 +50,7 @@ def test_tournament_messaging_helpers_and_enqueue_fallback(monkeypatch: pytest.M
 
 
 @pytest.mark.asyncio
-async def test_run_private_tournament_round_messaging_async_persists_sent_ids(
+async def test_run_private_tournament_round_messaging_async_does_not_open_second_transaction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tournament_id = uuid4()
@@ -58,9 +58,11 @@ async def test_run_private_tournament_round_messaging_async_persists_sent_ids(
         standings_user_ids=[11, 22],
         parsed_tournament_id=tournament_id,
     )
-    persisted: list[dict[str, object]] = []
-
-    monkeypatch.setattr(tournaments_messaging, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(
+        tournaments_messaging,
+        "SessionLocal",
+        SessionLocalStub(fail_on_commit_calls=(2,)),
+    )
     monkeypatch.setattr(
         tournaments_messaging, "load_round_messaging_context", _async_return(context)
     )
@@ -69,11 +71,6 @@ async def test_run_private_tournament_round_messaging_async_persists_sent_ids(
         "deliver_round_messages",
         _async_return(TournamentRoundDeliveryResult(1, 2, 0, 0, {11: 101}, {22: 202})),
     )
-
-    async def _persist(**kwargs) -> None:
-        persisted.append(kwargs)
-
-    monkeypatch.setattr(tournaments_messaging, "persist_standings_message_ids", _persist)
 
     result = await tournaments_messaging.run_private_tournament_round_messaging_async(
         tournament_id=str(tournament_id),
@@ -87,7 +84,6 @@ async def test_run_private_tournament_round_messaging_async_persists_sent_ids(
         "failed": 0,
         "skipped": 0,
     }
-    assert persisted[0]["new_message_ids"] == {11: 101}
 
 
 @pytest.mark.asyncio
