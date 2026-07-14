@@ -13,10 +13,23 @@ SKIP_CODE_DUPLICATE = "DUPLICATE_DELIVERY_ATTEMPT"
 SKIP_CODE_NO_CHAT = "MISSING_CHAT_ID"
 SKIP_CODE_EDIT_REPLACED_BY_SEND = "EDIT_REPLACED_BY_FALLBACK_SEND"
 RETRYABLE_FAILURE_CODES = frozenset({FAILURE_CODE_RETRY_AFTER, FAILURE_CODE_TRANSIENT})
+GUARANTEED_UNDELIVERED_FAILURE_CODES = frozenset({FAILURE_CODE_RETRY_AFTER})
 STALE_PENDING_AFTER = timedelta(minutes=15)
 BLOCKED_CANDIDATE_TTL = timedelta(days=30)
 MAX_DELIVERY_ATTEMPTS = 3
 PENDING_REPLAY_SAFE_CONTEXT_KEY = "pending_replay_safe"
+
+
+@dataclass(frozen=True, slots=True)
+class TelegramDeliveryRetryPolicy:
+    retryable_failure_codes: frozenset[str]
+    guaranteed_undelivered_failure_codes: frozenset[str]
+
+
+TELEGRAM_DELIVERY_RETRY_POLICY = TelegramDeliveryRetryPolicy(
+    retryable_failure_codes=RETRYABLE_FAILURE_CODES,
+    guaranteed_undelivered_failure_codes=GUARANTEED_UNDELIVERED_FAILURE_CODES,
+)
 
 
 @dataclass(frozen=True, slots=True)

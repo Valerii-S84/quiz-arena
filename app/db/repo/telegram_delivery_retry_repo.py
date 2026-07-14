@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Protocol
 
 from sqlalchemy import and_, func, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,11 @@ from app.db.repo.production_reliability_types import DELIVERY_STATUS_FAILED, DEL
 _REPLAY_SAFE_CONTEXT_KEY = "pending_replay_safe"
 
 
+class RetryFailureCodePolicy(Protocol):
+    retryable_failure_codes: frozenset[str]
+    guaranteed_undelivered_failure_codes: frozenset[str]
+
+
 class TelegramDeliveryRetryRepo:
     @staticmethod
     async def claim_retryable_attempt(
@@ -18,16 +24,23 @@ class TelegramDeliveryRetryRepo:
         *,
         idempotency_key: str,
         claimed_at: datetime,
-        retryable_failure_codes: frozenset[str],
+        retry_policy: RetryFailureCodePolicy,
         stale_pending_before: datetime,
         max_attempts: int,
         allow_stale_pending_retry: bool,
     ) -> int:
         retryable_failed = and_(
             TelegramDeliveryAttempt.status == DELIVERY_STATUS_FAILED,
-            TelegramDeliveryAttempt.failure_code.in_(tuple(retryable_failure_codes)),
+            TelegramDeliveryAttempt.failure_code.in_(tuple(retry_policy.retryable_failure_codes)),
             TelegramDeliveryAttempt.is_blocked_candidate.is_(False),
-            TelegramDeliveryAttempt.safe_context[_REPLAY_SAFE_CONTEXT_KEY].as_boolean().is_(True),
+            or_(
+                TelegramDeliveryAttempt.failure_code.in_(
+                    tuple(retry_policy.guaranteed_undelivered_failure_codes)
+                ),
+                TelegramDeliveryAttempt.safe_context[_REPLAY_SAFE_CONTEXT_KEY]
+                .as_boolean()
+                .is_(True),
+            ),
             TelegramDeliveryAttempt.updated_at <= stale_pending_before,
         )
         stale_pending = and_(
@@ -55,7 +68,7 @@ class TelegramDeliveryRetryRepo:
         *,
         idempotency_key: str,
         claimed_at: datetime,
-        retryable_failure_codes: frozenset[str],
+        retry_policy: RetryFailureCodePolicy,
         max_attempts: int,
     ) -> int:
         stmt = (
@@ -63,11 +76,18 @@ class TelegramDeliveryRetryRepo:
             .where(
                 TelegramDeliveryAttempt.idempotency_key == idempotency_key,
                 TelegramDeliveryAttempt.status == DELIVERY_STATUS_FAILED,
-                TelegramDeliveryAttempt.failure_code.in_(tuple(retryable_failure_codes)),
+                TelegramDeliveryAttempt.failure_code.in_(
+                    tuple(retry_policy.retryable_failure_codes)
+                ),
                 TelegramDeliveryAttempt.is_blocked_candidate.is_(False),
-                TelegramDeliveryAttempt.safe_context[_REPLAY_SAFE_CONTEXT_KEY]
-                .as_boolean()
-                .is_(True),
+                or_(
+                    TelegramDeliveryAttempt.failure_code.in_(
+                        tuple(retry_policy.guaranteed_undelivered_failure_codes)
+                    ),
+                    TelegramDeliveryAttempt.safe_context[_REPLAY_SAFE_CONTEXT_KEY]
+                    .as_boolean()
+                    .is_(True),
+                ),
                 TelegramDeliveryAttempt.attempt_count < max_attempts,
                 TelegramDeliveryAttempt.updated_at == claimed_at,
             )

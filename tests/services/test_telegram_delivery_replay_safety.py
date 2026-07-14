@@ -28,7 +28,12 @@ def _target(*, replay_safe: bool) -> delivery.TelegramDeliveryTarget:
     )
 
 
-async def _prepare_failed_delivery(monkeypatch, *, replay_safe: bool):
+async def _prepare_failed_delivery(
+    monkeypatch,
+    *,
+    replay_safe: bool,
+    failure_code: str | None = None,
+):
     captured: dict[str, object] = {}
 
     async def _has_blocked_candidate(_session, **_kwargs) -> bool:
@@ -38,6 +43,7 @@ async def _prepare_failed_delivery(monkeypatch, *, replay_safe: bool):
         return (
             SimpleNamespace(
                 status="FAILED",
+                failure_code=failure_code,
                 safe_context={"pending_replay_safe": replay_safe},
             ),
             False,
@@ -75,7 +81,8 @@ async def test_replay_safe_failed_delivery_allows_controlled_retry(monkeypatch) 
 
     assert result.should_send is True
     assert result.retry_claimed is True
-    assert captured["retryable_failure_codes"] == delivery.RETRYABLE_FAILURE_CODES
+    retry_policy = captured["retry_policy"]
+    assert getattr(retry_policy, "retryable_failure_codes") == delivery.RETRYABLE_FAILURE_CODES
     assert captured["allow_stale_pending_retry"] is False
 
 
@@ -83,6 +90,35 @@ async def test_failed_send_without_confirmed_replay_safety_blocks_duplicate_send
     monkeypatch,
 ) -> None:
     result, captured = await _prepare_failed_delivery(monkeypatch, replay_safe=False)
+
+    assert result.should_send is False
+    assert result.retry_claimed is False
+    assert captured == {}
+
+
+async def test_retry_after_failed_send_retries_without_replay_safe_flag(monkeypatch) -> None:
+    result, captured = await _prepare_failed_delivery(
+        monkeypatch,
+        replay_safe=False,
+        failure_code=delivery.FAILURE_CODE_RETRY_AFTER,
+    )
+
+    assert result.should_send is True
+    assert result.retry_claimed is True
+    retry_policy = captured["retry_policy"]
+    assert getattr(retry_policy, "guaranteed_undelivered_failure_codes") == frozenset(
+        {delivery.FAILURE_CODE_RETRY_AFTER}
+    )
+
+
+async def test_ambiguous_transient_failure_without_replay_safety_does_not_retry(
+    monkeypatch,
+) -> None:
+    result, captured = await _prepare_failed_delivery(
+        monkeypatch,
+        replay_safe=False,
+        failure_code=delivery.FAILURE_CODE_TRANSIENT,
+    )
 
     assert result.should_send is False
     assert result.retry_claimed is False

@@ -117,7 +117,10 @@ async def test_delivery_attempt_retry_claim_is_bounded_to_retryable_failures() -
         session,
         idempotency_key="delivery:retry",
         claimed_at=NOW_UTC,
-        retryable_failure_codes=frozenset({"TELEGRAM_RETRY_AFTER"}),
+        retry_policy=SimpleNamespace(
+            retryable_failure_codes=frozenset({"TELEGRAM_RETRY_AFTER"}),
+            guaranteed_undelivered_failure_codes=frozenset({"TELEGRAM_RETRY_AFTER"}),
+        ),
         stale_pending_before=NOW_UTC,
         max_attempts=3,
         allow_stale_pending_retry=False,
@@ -128,6 +131,7 @@ async def test_delivery_attempt_retry_claim_is_bounded_to_retryable_failures() -
     assert "telegram_delivery_attempts.attempt_count < %(attempt_count_1)s" in sql
     assert "telegram_delivery_attempts.failure_code IN" in sql
     assert "telegram_delivery_attempts.is_blocked_candidate IS false" in sql
+    assert " OR " in sql
     assert "telegram_delivery_attempts.updated_at <= %(updated_at_1)s" in sql
     assert "status=%(status)s" not in sql
 
@@ -139,7 +143,10 @@ async def test_delivery_attempt_retry_claim_can_include_safe_stale_pending() -> 
         session,
         idempotency_key="delivery:retry",
         claimed_at=NOW_UTC,
-        retryable_failure_codes=frozenset({"TELEGRAM_RETRY_AFTER"}),
+        retry_policy=SimpleNamespace(
+            retryable_failure_codes=frozenset({"TELEGRAM_RETRY_AFTER"}),
+            guaranteed_undelivered_failure_codes=frozenset({"TELEGRAM_RETRY_AFTER"}),
+        ),
         stale_pending_before=NOW_UTC,
         max_attempts=3,
         allow_stale_pending_retry=True,
@@ -157,7 +164,10 @@ async def test_delivery_attempt_retry_dispatch_requires_exact_failed_lease() -> 
         session,
         idempotency_key="delivery:retry",
         claimed_at=NOW_UTC,
-        retryable_failure_codes=frozenset({"TELEGRAM_RETRY_AFTER"}),
+        retry_policy=SimpleNamespace(
+            retryable_failure_codes=frozenset({"TELEGRAM_RETRY_AFTER"}),
+            guaranteed_undelivered_failure_codes=frozenset({"TELEGRAM_RETRY_AFTER"}),
+        ),
         max_attempts=3,
     )
 

@@ -8,8 +8,8 @@ from app.db.session import SessionLocal
 from app.services.telegram_delivery_types import (
     MAX_DELIVERY_ATTEMPTS,
     PENDING_REPLAY_SAFE_CONTEXT_KEY,
-    RETRYABLE_FAILURE_CODES,
     STALE_PENDING_AFTER,
+    TELEGRAM_DELIVERY_RETRY_POLICY,
     DeliveryPreparation,
 )
 
@@ -26,14 +26,19 @@ async def claim_controlled_retry(
     if status not in {"PENDING", "FAILED"}:
         return False, False
     replay_safe = pending_replay_safe(attempt)
+    guaranteed_undelivered = (
+        status == "FAILED"
+        and getattr(attempt, "failure_code", None)
+        in TELEGRAM_DELIVERY_RETRY_POLICY.guaranteed_undelivered_failure_codes
+    )
     allow_stale_pending_retry = status == "PENDING" and replay_safe
-    if not replay_safe:
+    if not replay_safe and not guaranteed_undelivered:
         return False, False
     claimed = await attempts_repo.claim_retryable_attempt(
         session,
         idempotency_key=idempotency_key,
         claimed_at=happened_at,
-        retryable_failure_codes=RETRYABLE_FAILURE_CODES,
+        retry_policy=TELEGRAM_DELIVERY_RETRY_POLICY,
         stale_pending_before=happened_at - STALE_PENDING_AFTER,
         max_attempts=MAX_DELIVERY_ATTEMPTS,
         allow_stale_pending_retry=allow_stale_pending_retry,
@@ -55,7 +60,7 @@ async def begin_telegram_delivery_dispatch(
             session,
             idempotency_key=delivery.idempotency_key,
             claimed_at=happened_at,
-            retryable_failure_codes=RETRYABLE_FAILURE_CODES,
+            retry_policy=TELEGRAM_DELIVERY_RETRY_POLICY,
             max_attempts=MAX_DELIVERY_ATTEMPTS,
         )
         if updated != 1:
