@@ -64,7 +64,7 @@ async def test_send_daily_cup_registration_push_once_skips_duplicate_or_failed_s
 
 
 @pytest.mark.asyncio
-async def test_registration_push_outcome_records_event_before_terminal_sent(
+async def test_registration_push_outcome_commits_terminal_sent_before_event(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[str] = []
@@ -88,11 +88,11 @@ async def test_registration_push_outcome_records_event_before_terminal_sent(
         session_local=SessionLocalStub(),
     )
 
-    assert calls == ["analytics", "sent"]
+    assert calls == ["sent", "analytics"]
 
 
 @pytest.mark.asyncio
-async def test_registration_push_outcome_does_not_mark_sent_when_event_fails(
+async def test_registration_push_outcome_keeps_sent_when_event_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     sent_calls: list[object] = []
@@ -116,7 +116,36 @@ async def test_registration_push_outcome_does_not_mark_sent_when_event_fails(
             session_local=SessionLocalStub(),
         )
 
-    assert sent_calls == []
+    assert len(sent_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_registration_push_outcome_keeps_sent_when_event_commit_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    async def _analytics(*_args, **_kwargs) -> bool:
+        calls.append("analytics")
+        return True
+
+    async def _sent(*_args, **_kwargs) -> int:
+        calls.append("sent")
+        return 1
+
+    monkeypatch.setattr(push_outcome.AnalyticsRepo, "create_daily_cup_push_event_once", _analytics)
+    monkeypatch.setattr(push_outcome.TelegramDeliveryAttemptsRepo, "mark_sent", _sent)
+    with pytest.raises(RuntimeError, match="commit failed"):
+        await push_outcome.record_daily_cup_registration_push_sent(
+            target=cast(Any, SimpleNamespace(idempotency_key="push")),
+            user_id=11,
+            event_type="sent",
+            tournament_id="tid",
+            happened_at=NOW_UTC,
+            session_local=SessionLocalStub(fail_on_commit_calls=(2,)),
+        )
+
+    assert calls == ["sent", "analytics"]
 
 
 @pytest.mark.asyncio

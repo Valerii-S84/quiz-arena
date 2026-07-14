@@ -156,6 +156,5 @@ async def _deliver_notification(
         idempotency_key=target.idempotency_key,
         happened_at=happened_at,
         session_local=deps.session_local,
-        session=session,
     )
     return None

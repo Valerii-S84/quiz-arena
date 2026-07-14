@@ -15,28 +15,48 @@ NOW_UTC = datetime(2026, 7, 13, 12, 0, tzinfo=UTC)
 
 
 class _RollbackContext:
-    def __init__(self, state: dict[str, object], session: object) -> None:
+    def __init__(
+        self,
+        state: dict[str, object],
+        session: object,
+        *,
+        fail_on_commit: bool,
+    ) -> None:
         self.state = state
         self.session = session
+        self.fail_on_commit = fail_on_commit
 
     async def __aenter__(self) -> object:
         self.snapshot = dict(self.state)
         return self.session
 
     async def __aexit__(self, exc_type, exc, tb) -> bool:
-        if exc_type is not None:
+        if exc_type is not None or self.fail_on_commit:
             self.state.clear()
             self.state.update(self.snapshot)
+        if exc_type is None and self.fail_on_commit:
+            raise RuntimeError("analytics commit failed")
         return False
 
 
 class _RollbackSessionLocal:
-    def __init__(self, state: dict[str, object], session: object) -> None:
+    def __init__(
+        self,
+        state: dict[str, object],
+        session: object,
+        *,
+        fail_on_commit: bool = False,
+    ) -> None:
         self.state = state
         self.session = session
+        self.fail_on_commit = fail_on_commit
 
     def begin(self) -> _RollbackContext:
-        return _RollbackContext(self.state, self.session)
+        return _RollbackContext(
+            self.state,
+            self.session,
+            fail_on_commit=self.fail_on_commit,
+        )
 
 
 def _notification() -> ArenaBeatenNotification:
@@ -54,8 +74,13 @@ def _notification() -> ArenaBeatenNotification:
     )
 
 
-async def test_arena_sent_outcome_rolls_back_when_analytics_write_fails(monkeypatch) -> None:
-    state: dict[str, object] = {"delivery": "PENDING", "analytics": False}
+@pytest.mark.parametrize("fail_on_commit", [False, True])
+async def test_arena_sent_outcome_survives_analytics_failure(
+    monkeypatch,
+    fail_on_commit: bool,
+) -> None:
+    analytics_state: dict[str, object] = {"analytics": False}
+    delivery_state = {"status": "PENDING"}
     session = object()
 
     async def _lock(_session, **_kwargs) -> None:
@@ -77,18 +102,25 @@ async def test_arena_sent_outcome_rolls_back_when_analytics_write_fails(monkeypa
         )
 
     async def _sent(**kwargs) -> None:
-        assert kwargs["session"] is session
-        state["delivery"] = "SENT"
+        assert "session" not in kwargs
+        delivery_state["status"] = "SENT"
 
     async def _analytics(_session, **_kwargs) -> bool:
         assert _session is session
-        raise RuntimeError("analytics write failed")
+        analytics_state["analytics"] = True
+        if not fail_on_commit:
+            raise RuntimeError("analytics write failed")
+        return True
 
     async def _send(*_args, **_kwargs) -> None:
         return None
 
     deps = ArenaBeatenNotificationDeps(
-        session_local=_RollbackSessionLocal(state, session),
+        session_local=_RollbackSessionLocal(
+            analytics_state,
+            session,
+            fail_on_commit=fail_on_commit,
+        ),
         analytics_repo=SimpleNamespace(
             lock_arena_beaten_notification_event_key=_lock,
             has_arena_beaten_notification_event=_has_event,
@@ -100,7 +132,8 @@ async def test_arena_sent_outcome_rolls_back_when_analytics_write_fails(monkeypa
     monkeypatch.setattr(arena_delivery, "mark_telegram_delivery_sent", _sent)
     monkeypatch.setattr(arena_delivery, "_send_notification_message", _send)
 
-    with pytest.raises(RuntimeError, match="analytics write failed"):
+    expected_error = "analytics commit failed" if fail_on_commit else "analytics write failed"
+    with pytest.raises(RuntimeError, match=expected_error):
         await arena_delivery.send_arena_beaten_notification_with_bot(
             bot=object(),
             notification=_notification(),
@@ -109,4 +142,5 @@ async def test_arena_sent_outcome_rolls_back_when_analytics_write_fails(monkeypa
             deps=deps,
         )
 
-    assert state == {"delivery": "PENDING", "analytics": False}
+    assert delivery_state["status"] == "SENT"
+    assert analytics_state == {"analytics": False}

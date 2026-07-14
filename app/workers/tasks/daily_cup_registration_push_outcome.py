@@ -21,6 +21,15 @@ async def record_daily_cup_registration_push_sent(
     session_local: Any = SessionLocal,
 ) -> None:
     async with session_local.begin() as session:
+        sent = await TelegramDeliveryAttemptsRepo.mark_sent(
+            session,
+            idempotency_key=target.idempotency_key,
+            sent_at=happened_at,
+        )
+        if sent != 1:
+            raise RuntimeError("registration push delivery terminal lease was lost")
+
+    async with session_local.begin() as session:
         await AnalyticsRepo.create_daily_cup_push_event_once(
             session,
             event_type=event_type,
@@ -30,13 +39,6 @@ async def record_daily_cup_registration_push_sent(
             payload={"tournament_id": tournament_id},
             happened_at=happened_at,
         )
-        sent = await TelegramDeliveryAttemptsRepo.mark_sent(
-            session,
-            idempotency_key=target.idempotency_key,
-            sent_at=happened_at,
-        )
-        if sent != 1:
-            raise RuntimeError("registration push delivery terminal lease was lost")
 
 
 __all__ = ["record_daily_cup_registration_push_sent"]
