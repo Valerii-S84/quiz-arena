@@ -24,6 +24,43 @@ class DailyCupCancelDeliveryOperations:
     target_factory: Callable[..., TelegramDeliveryTarget]
 
 
+async def _send_cancellation_to_recipient(
+    *,
+    chat_id: int,
+    correlation_id: str,
+    bot: Any,
+    happened_at: datetime,
+    operations: DailyCupCancelDeliveryOperations,
+) -> None:
+    target = operations.target_factory(
+        correlation_id=correlation_id,
+        chat_id=chat_id,
+    )
+    delivery = await operations.prepare_delivery(
+        target=target,
+        happened_at=happened_at,
+    )
+    if not delivery.should_send:
+        return
+    await operations.begin_dispatch(delivery, happened_at=happened_at)
+    try:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=TEXTS_DE["msg.daily_cup.canceled"],
+        )
+    except Exception as exc:
+        await operations.mark_failed(
+            idempotency_key=target.idempotency_key,
+            happened_at=happened_at,
+            exc=exc,
+        )
+        return
+    await operations.mark_sent(
+        idempotency_key=target.idempotency_key,
+        happened_at=happened_at,
+    )
+
+
 async def send_daily_cup_canceled_messages(
     *,
     telegram_targets: list[int],
@@ -39,34 +76,24 @@ async def send_daily_cup_canceled_messages(
     bot = resolved_bot_factory()
     happened_at = operations.now_utc()
     correlation_id = tournament_id or "unknown"
+    delivery_errors: list[Exception] = []
     try:
         for chat_id in telegram_targets:
-            target = operations.target_factory(
-                correlation_id=correlation_id,
-                chat_id=chat_id,
-            )
-            delivery = await operations.prepare_delivery(
-                target=target,
-                happened_at=happened_at,
-            )
-            if not delivery.should_send:
-                continue
-            await operations.begin_dispatch(delivery, happened_at=happened_at)
             try:
-                await bot.send_message(chat_id=chat_id, text=TEXTS_DE["msg.daily_cup.canceled"])
-            except Exception as exc:
-                await operations.mark_failed(
-                    idempotency_key=target.idempotency_key,
+                await _send_cancellation_to_recipient(
+                    chat_id=chat_id,
+                    correlation_id=correlation_id,
+                    bot=bot,
                     happened_at=happened_at,
-                    exc=exc,
+                    operations=operations,
                 )
+            except Exception as exc:
+                delivery_errors.append(exc)
                 continue
-            await operations.mark_sent(
-                idempotency_key=target.idempotency_key,
-                happened_at=happened_at,
-            )
     finally:
         await bot.session.close()
+    if delivery_errors:
+        raise delivery_errors[0]
 
 
 def daily_cup_cancel_delivery_target(

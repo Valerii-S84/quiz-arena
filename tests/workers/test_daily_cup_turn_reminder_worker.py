@@ -70,6 +70,7 @@ async def test_turn_reminders_mark_candidates_deduplicate_targets_and_store_even
     bot = RecordingBot()
     info_logs: list[dict[str, object]] = []
     store_calls: list[dict[str, object]] = []
+    notified_calls: list[dict[str, object]] = []
     list_by_ids_calls: list[set[int]] = []
     _patch_delivery_tracking(monkeypatch)
 
@@ -124,11 +125,14 @@ async def test_turn_reminders_mark_candidates_deduplicate_targets_and_store_even
     async def _fake_store_push_sent_events(**kwargs):
         store_calls.append(kwargs)
 
+    async def _fake_mark_notified(_session, **kwargs):
+        notified_calls.append(kwargs)
+
     monkeypatch.setattr(daily_cup_turn_reminder, "now_utc", lambda: now_value)
     monkeypatch.setattr(
         daily_cup_turn_reminder,
         "SessionLocal",
-        session_local_with_sessions(SimpleNamespace()),
+        session_local_with_sessions(SimpleNamespace(), SimpleNamespace()),
     )
     monkeypatch.setattr(
         daily_cup_turn_reminder.TournamentMatchesRepo,
@@ -139,6 +143,11 @@ async def test_turn_reminders_mark_candidates_deduplicate_targets_and_store_even
         daily_cup_turn_reminder.UsersRepo,
         "list_by_ids",
         _fake_list_by_ids,
+    )
+    monkeypatch.setattr(
+        daily_cup_turn_reminder.FriendChallengesRepo,
+        "mark_daily_cup_turn_reminders_notified",
+        _fake_mark_notified,
     )
     monkeypatch.setattr(daily_cup_turn_reminder, "build_bot", lambda: bot)
     monkeypatch.setattr(
@@ -178,8 +187,14 @@ async def test_turn_reminders_mark_candidates_deduplicate_targets_and_store_even
     assert bot.session.closed is True
     assert challenge_primary.expires_last_chance_notified_at == now_value
     assert challenge_primary.updated_at == now_value
-    assert challenge_duplicate.expires_last_chance_notified_at == now_value
-    assert challenge_missing_chat.expires_last_chance_notified_at == now_value
+    assert challenge_duplicate.expires_last_chance_notified_at is None
+    assert challenge_missing_chat.expires_last_chance_notified_at is None
+    assert notified_calls == [
+        {
+            "challenge_ids": {challenge_primary.id},
+            "notified_at": now_value,
+        }
+    ]
     assert store_calls == [
         {
             "event_type": "daily_cup_turn_reminder_sent",
@@ -293,6 +308,8 @@ async def test_turn_reminders_count_send_failures_and_swallow_event_store_errors
     }
     assert [int(message["chat_id"]) for message in bot.messages] == [10010]
     assert bot.session.closed is True
+    assert challenge.expires_last_chance_notified_at is None
+    assert second_challenge.expires_last_chance_notified_at is None
     assert [log["event"] for log in warning_logs] == [
         "daily_cup_turn_reminder_send_failed",
         "daily_cup_turn_reminder_send_failed",

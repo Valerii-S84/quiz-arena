@@ -3,8 +3,13 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from typing import Any, cast
 from uuid import uuid4
 
+import pytest
+
+from app.workers.tasks import daily_cup_messaging_delivery_runtime as daily_runtime
+from app.workers.tasks import daily_cup_registration_push_delivery as registration_delivery
 from app.workers.tasks.daily_cup_nonfinishers_summary_delivery import (
     deliver_daily_cup_nonfinishers_summary,
 )
@@ -26,6 +31,44 @@ class _ParticipantsRepo:
 
     async def set_proof_card_file_id_if_missing(self, _session, **kwargs) -> None:
         self.file_ids.append(kwargs["file_id"])
+
+
+@pytest.mark.asyncio
+async def test_daily_delivery_continues_after_recipient_system_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    processed_user_ids: list[int] = []
+
+    async def _deliver(_context, _dependencies, _state, _run, user_id: int) -> None:
+        processed_user_ids.append(user_id)
+        if user_id == 2:
+            raise RuntimeError("daily persistence failed")
+
+    monkeypatch.setattr(daily_runtime, "_deliver_to_user", _deliver)
+    context = cast(
+        Any,
+        SimpleNamespace(
+            standings_user_ids=[1, 2, 3],
+            participants_total=3,
+            tournament=SimpleNamespace(id="cup-1", status="ROUND_1", current_round=1),
+        ),
+    )
+    dependencies = cast(
+        Any,
+        SimpleNamespace(
+            daily_cup_max_rounds_for_participants=lambda **_kwargs: 3,
+            happened_at=lambda: datetime(2026, 7, 13, tzinfo=timezone.utc),
+            daily_cup_content_version=lambda **_kwargs: "round:1",
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="daily persistence failed"):
+        await daily_runtime.deliver_daily_cup_messages_with_dependencies(
+            context=context,
+            dependencies=dependencies,
+        )
+
+    assert processed_user_ids == [1, 2, 3]
 
 
 def test_deliver_daily_cup_proof_cards_counts_success_missing_and_lock_retry() -> None:
@@ -100,3 +143,44 @@ def test_deliver_daily_cup_nonfinishers_summary_counts_send_failures() -> None:
 
     assert result.sent == 1
     assert result.failed == 2
+
+
+@pytest.mark.asyncio
+async def test_registration_payload_failure_happens_before_pending_claim() -> None:
+    call_order: list[str] = []
+
+    def _keyboard(**_kwargs: Any) -> object:
+        call_order.append("payload")
+        raise RuntimeError("payload failed")
+
+    async def _prepare(**_kwargs: Any) -> object:
+        call_order.append("prepare")
+        return SimpleNamespace(should_send=False)
+
+    run = registration_delivery.DailyCupRegistrationPushRun(
+        bot=SimpleNamespace(),
+        logger=SimpleNamespace(),
+        flow="daily_cup_registration",
+        task_name="daily_cup.registration",
+        text="text",
+        tournament_id_text="cup-1",
+        happened_at=datetime(2026, 7, 14, tzinfo=timezone.utc),
+        sent_event_type="daily_cup_registration_sent",
+    )
+    operations = registration_delivery.DailyCupRegistrationPushOperations(
+        prepare_delivery=_prepare,
+        begin_dispatch=None,
+        mark_failed=None,
+        record_sent=None,
+        build_keyboard=_keyboard,
+    )
+
+    with pytest.raises(RuntimeError, match="payload failed"):
+        await registration_delivery.send_daily_cup_registration_push_once(
+            run=run,
+            target=cast(Any, SimpleNamespace(chat_id=101)),
+            user_id=11,
+            operations=operations,
+        )
+
+    assert call_order == ["payload"]

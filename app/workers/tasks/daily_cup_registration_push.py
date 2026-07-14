@@ -10,7 +10,6 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.constants import TOURNAMENT_STATUS_REGISTRATION
 from app.services.telegram_delivery import (
-    SKIP_CODE_DUPLICATE,
     TelegramDeliveryTarget,
     begin_telegram_delivery_dispatch,
     mark_telegram_delivery_failed,
@@ -26,6 +25,7 @@ from app.workers.tasks.daily_cup_push_events import list_already_pushed_user_ids
 from app.workers.tasks.daily_cup_registration_push_delivery import (
     DailyCupRegistrationPushOperations,
     DailyCupRegistrationPushRun,
+    process_registration_push_target,
     send_daily_cup_registration_push_once,
 )
 from app.workers.tasks.daily_cup_registration_push_outcome import (
@@ -71,6 +71,7 @@ async def _send_daily_cup_registration_push_batches(
 ) -> tuple[int, int, int]:
     scanned_total = sent_total = skipped_total = 0
     last_user_id: int | None = None
+    delivery_errors: list[Exception] = []
     while True:
         async with SessionLocal.begin() as session:
             targets = await UsersRepo.list_daily_cup_push_targets(
@@ -83,38 +84,37 @@ async def _send_daily_cup_registration_push_batches(
         if not targets:
             break
 
-        already_pushed_user_ids = await list_already_pushed_user_ids(
-            event_type=run.sent_event_type,
-            tournament_id=run.tournament_id_text,
-            user_ids=[user_id for user_id, _telegram_user_id in targets],
-        )
+        try:
+            already_pushed_user_ids = await list_already_pushed_user_ids(
+                event_type=run.sent_event_type,
+                tournament_id=run.tournament_id_text,
+                user_ids=[user_id for user_id, _telegram_user_id in targets],
+            )
+        except Exception as exc:
+            delivery_errors.append(exc)
+            scanned_total += len(targets)
+            last_user_id = targets[-1][0]
+            continue
         for user_id, telegram_user_id in targets:
             scanned_total += 1
             last_user_id = user_id
-            target = daily_cup_delivery_target(
-                flow=run.flow,
-                task_name=run.task_name,
-                tournament_id_text=run.tournament_id_text,
-                user_id=user_id,
-                telegram_user_id=telegram_user_id,
-            )
-            if user_id in already_pushed_user_ids:
-                await record_telegram_delivery_skipped(
-                    target=target,
-                    happened_at=run.happened_at,
-                    failure_code=SKIP_CODE_DUPLICATE,
-                    failure_reason="daily cup analytics sent event already exists",
+            try:
+                sent, skipped = await process_registration_push_target(
+                    run=run,
+                    user_id=user_id,
+                    telegram_user_id=telegram_user_id,
+                    already_pushed_user_ids=already_pushed_user_ids,
+                    send_once=_send_daily_cup_registration_push_once,
+                    record_skipped=record_telegram_delivery_skipped,
+                    target_factory=daily_cup_delivery_target,
                 )
-                skipped_total += 1
+                sent_total += sent
+                skipped_total += skipped
+            except Exception as exc:
+                delivery_errors.append(exc)
                 continue
-            if await _send_daily_cup_registration_push_once(
-                run=run,
-                target=target,
-                user_id=user_id,
-            ):
-                sent_total += 1
-            else:
-                skipped_total += 1
+    if delivery_errors:
+        raise delivery_errors[0]
     return scanned_total, sent_total, skipped_total
 
 

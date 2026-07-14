@@ -23,6 +23,8 @@ class ReminderBatch:
     reminders: list[ReminderItem]
     scanned_total: int
     skipped_total: int
+    challenge_rows: list[Any]
+    challenge_ids: set[str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +33,8 @@ class ReminderDeliveryResult:
     failed_total: int
     skipped_total: int
     sent_user_ids_by_tournament: dict[UUID, list[int]]
+    failed_challenge_ids: set[str]
+    system_errors: tuple[Exception, ...]
 
 
 @dataclass(frozen=True, slots=True)

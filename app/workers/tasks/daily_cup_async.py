@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import structlog
 
 from app.bot.application import build_bot
@@ -30,6 +32,21 @@ from app.workers.tasks.daily_cup_time import get_daily_cup_window
 logger = structlog.get_logger("app.workers.tasks.daily_cup")
 
 _now_utc = now_utc
+_CLOSEABLE_STATUSES = {
+    TOURNAMENT_STATUS_REGISTRATION,
+    TOURNAMENT_STATUS_CANCELED,
+}
+
+
+@dataclass(frozen=True, slots=True)
+class _DailyCupCloseTransition:
+    tournament_id: str
+    canceled_telegram_targets: list[int]
+    started_tournament_id: str | None
+    events: list[dict[str, object]]
+    participants_total: int
+    canceled: int
+    started: int
 
 
 async def send_daily_cup_invite_registration_async() -> dict[str, int]:
@@ -80,78 +97,117 @@ async def publish_daily_cup_final_results_async() -> dict[str, int]:
     return {"processed": 1, "published": int(result.get("processed", 0) > 0)}
 
 
+async def _cancellation_targets(session, participants) -> list[int]:
+    users = await UsersRepo.list_by_ids(session, [int(item.user_id) for item in participants])
+    return [int(user.telegram_user_id) for user in users]
+
+
+def _canceled_event(*, tournament_id: str, participants_total: int) -> dict[str, object]:
+    return {
+        "event_type": "daily_cup_canceled",
+        "payload": {"tournament_id": tournament_id, "registered_total": participants_total},
+    }
+
+
+def _started_events(*, tournament_id: str, participants_total: int) -> list[dict[str, object]]:
+    return [
+        {
+            "event_type": "daily_cup_started",
+            "payload": {"tournament_id": tournament_id, "participants_total": participants_total},
+        },
+        {
+            "event_type": "daily_cup_round_started",
+            "payload": {"tournament_id": tournament_id, "round_no": 1},
+        },
+    ]
+
+
+async def _build_close_transition(
+    *,
+    session,
+    tournament,
+    now_utc_value,
+) -> _DailyCupCloseTransition | None:
+    if tournament.status not in _CLOSEABLE_STATUSES:
+        return None
+    participants = await TournamentParticipantsRepo.list_for_tournament_for_update(
+        session,
+        tournament_id=tournament.id,
+    )
+    participants_total = len(participants)
+    tournament_id = str(tournament.id)
+    if tournament.status == TOURNAMENT_STATUS_CANCELED:
+        return _DailyCupCloseTransition(
+            tournament_id=tournament_id,
+            canceled_telegram_targets=await _cancellation_targets(session, participants),
+            started_tournament_id=None,
+            events=[],
+            participants_total=participants_total,
+            canceled=1,
+            started=0,
+        )
+    if participants_total < DAILY_CUP_MIN_PARTICIPANTS:
+        tournament.status = TOURNAMENT_STATUS_CANCELED
+        tournament.round_deadline = None
+        return _DailyCupCloseTransition(
+            tournament_id=tournament_id,
+            canceled_telegram_targets=await _cancellation_targets(session, participants),
+            started_tournament_id=None,
+            events=[
+                _canceled_event(
+                    tournament_id=tournament_id,
+                    participants_total=participants_total,
+                )
+            ],
+            participants_total=participants_total,
+            canceled=1,
+            started=0,
+        )
+    await start_daily_arena_round_one(
+        session,
+        tournament=tournament,
+        participants=participants,
+        now_utc=now_utc_value,
+    )
+    return _DailyCupCloseTransition(
+        tournament_id=tournament_id,
+        canceled_telegram_targets=[],
+        started_tournament_id=tournament_id,
+        events=_started_events(
+            tournament_id=tournament_id,
+            participants_total=participants_total,
+        ),
+        participants_total=participants_total,
+        canceled=0,
+        started=1,
+    )
+
+
 async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
     now_utc_value = _now_utc()
-    canceled_telegram_targets: list[int] = []
-    started_tournament_id: str | None = None
-    enqueue_legacy_round_messaging = False
-    events: list[dict[str, object]] = []
-    participants_total = canceled = started = 0
     async with SessionLocal.begin() as session:
         tournament = await ensure_daily_cup_registration_tournament(
             session=session, now_utc_value=now_utc_value
         )
-        if tournament.status != TOURNAMENT_STATUS_REGISTRATION:
-            return {"processed": 0, "canceled": 0, "started": 0, "participants_total": 0}
-        participants = await TournamentParticipantsRepo.list_for_tournament_for_update(
-            session,
-            tournament_id=tournament.id,
+        transition = await _build_close_transition(
+            session=session,
+            tournament=tournament,
+            now_utc_value=now_utc_value,
         )
-        participants_total = len(participants)
-        if participants_total < DAILY_CUP_MIN_PARTICIPANTS:
-            tournament.status = TOURNAMENT_STATUS_CANCELED
-            tournament.round_deadline = None
-            users = await UsersRepo.list_by_ids(
-                session, [int(item.user_id) for item in participants]
-            )
-            canceled_telegram_targets = [int(user.telegram_user_id) for user in users]
-            canceled = 1
-            events.append(
-                {
-                    "event_type": "daily_cup_canceled",
-                    "payload": {
-                        "tournament_id": str(tournament.id),
-                        "registered_total": participants_total,
-                    },
-                }
-            )
-        else:
-            await start_daily_arena_round_one(
-                session,
-                tournament=tournament,
-                participants=participants,
-                now_utc=now_utc_value,
-            )
-            enqueue_legacy_round_messaging = True
-            started_tournament_id = str(tournament.id)
-            started = 1
-            events.extend(
-                [
-                    {
-                        "event_type": "daily_cup_started",
-                        "payload": {
-                            "tournament_id": started_tournament_id,
-                            "participants_total": participants_total,
-                        },
-                    },
-                    {
-                        "event_type": "daily_cup_round_started",
-                        "payload": {"tournament_id": started_tournament_id, "round_no": 1},
-                    },
-                ]
-            )
+        if transition is None:
+            return {"processed": 0, "canceled": 0, "started": 0, "participants_total": 0}
 
-    await emit_daily_cup_events(now_utc_value=now_utc_value, events=events)
+    await emit_daily_cup_events(now_utc_value=now_utc_value, events=transition.events)
     await send_daily_cup_canceled_messages(
-        telegram_targets=canceled_telegram_targets,
-        tournament_id=str(tournament.id),
+        telegram_targets=transition.canceled_telegram_targets,
+        tournament_id=transition.tournament_id,
         bot_factory=build_bot,
     )
-    if started_tournament_id is not None and enqueue_legacy_round_messaging:
-        enqueue_daily_cup_round_messaging(tournament_id=started_tournament_id)
+    if transition.started_tournament_id is not None:
+        enqueue_daily_cup_round_messaging(tournament_id=transition.started_tournament_id)
     return {
         "processed": 1,
-        "canceled": canceled,
-        "started": started,
-        "participants_total": participants_total,
+        "canceled": transition.canceled,
+        "started": transition.started,
+        "participants_total": transition.participants_total,
     }

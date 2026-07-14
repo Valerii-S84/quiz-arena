@@ -57,13 +57,12 @@ async def prepare_reminder_batch(
     queued_target_keys: set[tuple[Any, int]] = set()
     scanned_total = 0
     skipped_total = 0
+    challenge_ids: set[str] = set()
     for match, challenge in request.candidates:
         scanned_total += 1
         window_key = _window_key(challenge.expires_last_chance_notified_at)
-        challenge.expires_last_chance_notified_at = request.now_utc_value
-        challenge.updated_at = request.now_utc_value
 
-        skipped_total += _queue_candidate_reminders(
+        skipped, fully_queued = _queue_candidate_reminders(
             match=match,
             challenge=challenge,
             window_key=window_key,
@@ -71,11 +70,15 @@ async def prepare_reminder_batch(
             reminders=reminders,
             queued_target_keys=queued_target_keys,
         )
-
+        skipped_total += skipped
+        if fully_queued:
+            challenge_ids.add(str(challenge.id))
     return ReminderBatch(
         reminders=reminders,
         scanned_total=scanned_total,
         skipped_total=skipped_total,
+        challenge_rows=[challenge for _match, challenge in request.candidates],
+        challenge_ids=challenge_ids,
     )
 
 
@@ -101,19 +104,22 @@ def _queue_candidate_reminders(
     context: ReminderPreparationContext,
     reminders: list[ReminderItem],
     queued_target_keys: set[tuple[Any, int]],
-) -> int:
+) -> tuple[int, bool]:
     skipped_total = 0
     resolved_users = context.resolve_turn_reminder_users_fn(challenge=challenge)
     if not resolved_users:
-        return 1
+        return 1, False
+    fully_queued = True
     for target_user_id, opponent_user_id in resolved_users:
         target_chat_id = context.telegram_targets.get(target_user_id)
         if target_chat_id is None:
             skipped_total += 1
+            fully_queued = False
             continue
         target_key = (match.tournament_id, target_user_id)
         if target_key in queued_target_keys:
             skipped_total += 1
+            fully_queued = False
             continue
         queued_target_keys.add(target_key)
         reminders.append(
@@ -127,7 +133,7 @@ def _queue_candidate_reminders(
                 context=context,
             )
         )
-    return skipped_total
+    return skipped_total, fully_queued
 
 
 def _build_reminder_item(

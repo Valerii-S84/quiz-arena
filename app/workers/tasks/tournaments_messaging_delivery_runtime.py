@@ -45,6 +45,7 @@ async def _deliver_user_message(
         delivery_operation=operations.delivery_operation(existing_message_id),
         pending_replay_safe=existing_message_id is not None,
     )
+    text, keyboard = _build_round_payload(delivery_context, user_id)
     delivery = await operations.prepare_delivery(
         target=target,
         happened_at=delivery_context.happened_at,
@@ -52,7 +53,6 @@ async def _deliver_user_message(
     if not delivery.should_send:
         state.skipped += 1
         return
-    text, keyboard = _build_round_payload(delivery_context, user_id)
     await operations.begin_dispatch(delivery, happened_at=delivery_context.happened_at)
     attempt = TournamentRoundMessageAttempt(
         user_id=user_id,
@@ -98,15 +98,22 @@ async def deliver_round_messages_with_dependencies(
         correlation_id=correlation_id,
         content_version=content_version,
     )
+    delivery_errors: list[Exception] = []
     try:
         for user_id in request.context.standings_user_ids:
-            await _deliver_user_message(
-                delivery_context=delivery_context,
-                state=state,
-                user_id=user_id,
-            )
+            try:
+                await _deliver_user_message(
+                    delivery_context=delivery_context,
+                    state=state,
+                    user_id=user_id,
+                )
+            except Exception as exc:
+                delivery_errors.append(exc)
+                continue
     finally:
         await bot.session.close()
+    if delivery_errors:
+        raise delivery_errors[0]
     return state.to_result()
 
 

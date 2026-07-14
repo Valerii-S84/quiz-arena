@@ -74,6 +74,37 @@ async def test_send_daily_cup_canceled_messages_ignores_send_errors(
 
 
 @pytest.mark.asyncio
+async def test_cancellation_continues_after_prepare_error_and_reraises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bot = _Bot([None, None])
+    prepared_chat_ids: list[int] = []
+
+    async def _prepare(**kwargs):
+        chat_id = int(kwargs["target"].chat_id)
+        prepared_chat_ids.append(chat_id)
+        if chat_id == 102:
+            raise RuntimeError("prepare failed")
+        return SimpleNamespace(
+            should_send=True,
+            idempotency_key=kwargs["target"].idempotency_key,
+        )
+
+    monkeypatch.setattr(daily_cup_core, "prepare_telegram_delivery", _prepare)
+    monkeypatch.setattr(daily_cup_core, "mark_telegram_delivery_sent", _async_return(None))
+
+    with pytest.raises(RuntimeError, match="prepare failed"):
+        await daily_cup_core.send_daily_cup_canceled_messages(
+            telegram_targets=[101, 102, 103],
+            bot_factory=lambda: bot,
+        )
+
+    assert prepared_chat_ids == [101, 102, 103]
+    assert bot.sent == [101, 103]
+    assert bot.closed
+
+
+@pytest.mark.asyncio
 async def test_close_daily_cup_registration_cancels_when_too_few_participants(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -113,6 +144,48 @@ async def test_close_daily_cup_registration_cancels_when_too_few_participants(
     assert result["canceled"] == 1
     assert result["started"] == 0
     assert canceled_targets == [0, 101]
+
+
+@pytest.mark.asyncio
+async def test_close_daily_cup_registration_retries_canceled_delivery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tournament = tournament_row(type="DAILY_ARENA", status="CANCELED")
+    participants = [participant_row(tournament_id=tournament.id, user_id=11)]
+    canceled_targets: list[int] = []
+
+    async def _send(*, telegram_targets: list[int], **_kwargs) -> None:
+        canceled_targets.extend(telegram_targets)
+
+    monkeypatch.setattr(daily_cup_async, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: NOW_UTC)
+    monkeypatch.setattr(
+        daily_cup_async,
+        "ensure_daily_cup_registration_tournament",
+        _async_return(tournament),
+    )
+    monkeypatch.setattr(
+        daily_cup_async.TournamentParticipantsRepo,
+        "list_for_tournament_for_update",
+        _async_return(participants),
+    )
+    monkeypatch.setattr(
+        daily_cup_async.UsersRepo,
+        "list_by_ids",
+        _async_return([SimpleNamespace(telegram_user_id=101)]),
+    )
+    monkeypatch.setattr(daily_cup_async, "emit_daily_cup_events", _async_return(None))
+    monkeypatch.setattr(daily_cup_async, "send_daily_cup_canceled_messages", _send)
+
+    result = await daily_cup_async.close_daily_cup_registration_and_start_async()
+
+    assert result == {
+        "processed": 1,
+        "canceled": 1,
+        "started": 0,
+        "participants_total": 1,
+    }
+    assert canceled_targets == [101]
 
 
 @pytest.mark.asyncio

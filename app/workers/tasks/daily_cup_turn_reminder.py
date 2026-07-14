@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
+from uuid import UUID
 
 import structlog
 
@@ -8,6 +9,7 @@ from app.bot.application import build_bot
 from app.bot.keyboards.daily_cup import build_daily_cup_lobby_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.db.models.friend_challenges import FriendChallenge
+from app.db.repo.friend_challenges_repo import FriendChallengesRepo
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
@@ -22,6 +24,10 @@ from app.workers.tasks.daily_cup_push_events import store_push_sent_events
 from app.workers.tasks.daily_cup_turn_reminder_delivery import (
     deliver_reminders,
     prepare_reminder_batch,
+)
+from app.workers.tasks.daily_cup_turn_reminder_delivery_types import (
+    ReminderBatch,
+    ReminderDeliveryResult,
 )
 from app.workers.tasks.daily_cup_turn_reminder_events import store_reminder_events
 from app.workers.tasks.tournaments_messaging_text import format_deadline, format_user_label
@@ -113,6 +119,48 @@ async def _load_reminder_batch(
         )
 
 
+async def _mark_delivered_reminder_candidates(
+    *,
+    batch: ReminderBatch,
+    completed_ids: set[str],
+    delivered_at: datetime,
+) -> None:
+    if not completed_ids:
+        return
+    async with SessionLocal.begin() as session:
+        await FriendChallengesRepo.mark_daily_cup_turn_reminders_notified(
+            session,
+            challenge_ids={UUID(challenge_id) for challenge_id in completed_ids},
+            notified_at=delivered_at,
+        )
+    for challenge in batch.challenge_rows:
+        if str(challenge.id) in completed_ids:
+            challenge.expires_last_chance_notified_at = delivered_at
+            challenge.updated_at = delivered_at
+
+
+async def _finalize_delivered_reminders(
+    *,
+    batch: ReminderBatch,
+    delivery_result: ReminderDeliveryResult,
+    happened_at: datetime,
+) -> None:
+    await _mark_delivered_reminder_candidates(
+        batch=batch,
+        completed_ids=batch.challenge_ids - delivery_result.failed_challenge_ids,
+        delivered_at=happened_at,
+    )
+    await store_reminder_events(
+        sent_user_ids_by_tournament=delivery_result.sent_user_ids_by_tournament,
+        event_type=_REMINDER_EVENT_TYPE,
+        happened_at=happened_at,
+        store_push_sent_events_fn=store_push_sent_events,
+        logger=logger,
+    )
+    if delivery_result.system_errors:
+        raise delivery_result.system_errors[0]
+
+
 async def run_daily_cup_turn_reminders_async(
     *, batch_size: int = DAILY_CUP_PUSH_BATCH_SIZE
 ) -> dict[str, int]:
@@ -120,8 +168,6 @@ async def run_daily_cup_turn_reminders_async(
     remind_before_utc = now_utc_value - timedelta(minutes=DAILY_CUP_TURN_REMINDER_INTERVAL_MINUTES)
     resolved_batch_size = max(1, int(batch_size))
 
-    scanned_total = sent_total = skipped_total = failed_total = 0
-    queued_total = 0
     batch = await _load_reminder_batch(
         now_utc_value=now_utc_value,
         remind_before_utc=remind_before_utc,
@@ -152,12 +198,10 @@ async def run_daily_cup_turn_reminders_async(
     sent_total = delivery_result.sent_total
     failed_total = delivery_result.failed_total
     skipped_total += delivery_result.skipped_total
-    await store_reminder_events(
-        sent_user_ids_by_tournament=delivery_result.sent_user_ids_by_tournament,
-        event_type=_REMINDER_EVENT_TYPE,
+    await _finalize_delivered_reminders(
+        batch=batch,
+        delivery_result=delivery_result,
         happened_at=now_utc_value,
-        store_push_sent_events_fn=store_push_sent_events,
-        logger=logger,
     )
 
     result = _build_turn_reminder_result(

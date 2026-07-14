@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.friend_challenges import FriendChallenge
@@ -12,6 +12,24 @@ from .friend_challenges_repo_core import _DUEL_LIVE_STATUSES
 
 
 class FriendChallengesRepoDeadlineMixin:
+    @staticmethod
+    async def mark_daily_cup_turn_reminders_notified(
+        session: AsyncSession,
+        *,
+        challenge_ids: set[UUID],
+        notified_at: datetime,
+    ) -> None:
+        if not challenge_ids:
+            return
+        await session.execute(
+            update(FriendChallenge)
+            .where(FriendChallenge.id.in_(challenge_ids))
+            .values(
+                expires_last_chance_notified_at=notified_at,
+                updated_at=notified_at,
+            )
+        )
+
     @staticmethod
     async def list_active_due_for_last_chance_for_update(
         session: AsyncSession,

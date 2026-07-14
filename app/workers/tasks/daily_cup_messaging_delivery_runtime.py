@@ -137,6 +137,13 @@ async def deliver_daily_cup_messages_with_dependencies(
         task_name="daily_cup.run_daily_cup_round_messaging",
         content_version=dependencies.daily_cup_content_version(tournament=context.tournament),
     )
+    delivery_errors: list[Exception] = []
     for user_id in context.standings_user_ids:
-        await _deliver_to_user(context, dependencies, state, run, user_id)
+        try:
+            await _deliver_to_user(context, dependencies, state, run, user_id)
+        except Exception as exc:
+            delivery_errors.append(exc)
+            continue
+    if delivery_errors:
+        raise delivery_errors[0]
     return state.to_result(dependencies)

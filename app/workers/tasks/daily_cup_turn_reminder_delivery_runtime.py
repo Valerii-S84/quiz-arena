@@ -34,6 +34,8 @@ class ReminderDeliveryState:
     sent_user_ids_by_tournament: dict[UUID, list[int]] = field(
         default_factory=lambda: defaultdict(list)
     )
+    failed_challenge_ids: set[str] = field(default_factory=set)
+    system_errors: list[Exception] = field(default_factory=list)
 
     def to_result(self) -> ReminderDeliveryResult:
         return ReminderDeliveryResult(
@@ -41,6 +43,8 @@ class ReminderDeliveryState:
             failed_total=self.failed_total,
             skipped_total=self.skipped_total,
             sent_user_ids_by_tournament=self.sent_user_ids_by_tournament,
+            failed_challenge_ids=self.failed_challenge_ids,
+            system_errors=tuple(self.system_errors),
         )
 
 
@@ -82,12 +86,6 @@ async def _deliver_one_reminder(
         reminder=reminder,
         build_delivery_idempotency_key_fn=context.dependencies.build_delivery_idempotency_key,
     )
-    delivery = await context.dependencies.prepare_telegram_delivery(
-        target=target, happened_at=context.happened_at
-    )
-    if not delivery.should_send:
-        state.skipped_total += 1
-        return
     keyboard = context.build_keyboard(
         tournament_id=str(reminder.tournament_id),
         can_join=False,
@@ -98,13 +96,19 @@ async def _deliver_one_reminder(
         opponent_label=reminder.opponent_label,
         deadline_text=reminder.deadline_text,
     )
+    delivery = await context.dependencies.prepare_telegram_delivery(
+        target=target, happened_at=context.happened_at
+    )
+    if not delivery.should_send:
+        state.skipped_total += 1
+        if str(getattr(delivery, "status", "")) != "SENT":
+            state.failed_challenge_ids.add(reminder.challenge_id)
+        return
     await context.dependencies.begin_telegram_delivery_dispatch(
         delivery, happened_at=context.happened_at
     )
     try:
         await _send_reminder(bot=context.bot, reminder=reminder, keyboard=keyboard, text=text)
-        state.sent_total += 1
-        state.sent_user_ids_by_tournament[reminder.tournament_id].append(reminder.target_user_id)
     except Exception as exc:
         await _mark_send_failed(
             dependencies=context.dependencies,
@@ -119,11 +123,14 @@ async def _deliver_one_reminder(
             error_type=type(exc).__name__,
         )
         state.failed_total += 1
+        state.failed_challenge_ids.add(reminder.challenge_id)
         return
     await context.dependencies.mark_telegram_delivery_sent(
         idempotency_key=target.idempotency_key,
         happened_at=context.happened_at,
     )
+    state.sent_total += 1
+    state.sent_user_ids_by_tournament[reminder.tournament_id].append(reminder.target_user_id)
 
 
 async def deliver_reminders_with_dependencies(
@@ -147,7 +154,12 @@ async def deliver_reminders_with_dependencies(
     state = ReminderDeliveryState()
     try:
         for reminder in reminders:
-            await _deliver_one_reminder(context=context, state=state, reminder=reminder)
+            try:
+                await _deliver_one_reminder(context=context, state=state, reminder=reminder)
+            except Exception as exc:
+                state.failed_challenge_ids.add(reminder.challenge_id)
+                state.system_errors.append(exc)
+                continue
     finally:
         await bot.session.close()
     return state.to_result()

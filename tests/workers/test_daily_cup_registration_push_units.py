@@ -213,6 +213,87 @@ async def test_send_daily_cup_registration_push_async_counts_targets(
 
 
 @pytest.mark.asyncio
+async def test_registration_push_skips_page_when_sent_event_lookup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page_calls = 0
+    lookup_calls = 0
+    processed_user_ids: list[int] = []
+
+    async def _targets(_session, **_kwargs):
+        nonlocal page_calls
+        page_calls += 1
+        if page_calls == 1:
+            return [(11, 101)]
+        if page_calls == 2:
+            return [(22, 102)]
+        return []
+
+    async def _already_pushed(**_kwargs):
+        nonlocal lookup_calls
+        lookup_calls += 1
+        if lookup_calls == 1:
+            raise RuntimeError("sent event lookup failed")
+        return set()
+
+    async def _send_once(**kwargs) -> bool:
+        processed_user_ids.append(int(kwargs["user_id"]))
+        return True
+
+    monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push.UsersRepo, "list_daily_cup_push_targets", _targets)
+    monkeypatch.setattr(push, "list_already_pushed_user_ids", _already_pushed)
+    monkeypatch.setattr(push, "_send_daily_cup_registration_push_once", _send_once)
+
+    with pytest.raises(RuntimeError, match="sent event lookup failed"):
+        await push._send_daily_cup_registration_push_batches(
+            run=_push_run(bot=_Bot([])),
+            tournament_id=uuid4(),
+            lookback_start=NOW_UTC,
+        )
+
+    assert processed_user_ids == [22]
+    assert page_calls == 3
+
+
+@pytest.mark.asyncio
+async def test_registration_push_continues_after_recipient_error_and_reraises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tournament_id = uuid4()
+    calls = 0
+    processed_user_ids: list[int] = []
+
+    async def _targets(_session, **_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return [(11, 101), (22, 102), (33, 103)]
+        return []
+
+    async def _send_once(**kwargs) -> bool:
+        user_id = int(kwargs["user_id"])
+        processed_user_ids.append(user_id)
+        if user_id == 22:
+            raise RuntimeError("mark sent failed")
+        return True
+
+    monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push.UsersRepo, "list_daily_cup_push_targets", _targets)
+    monkeypatch.setattr(push, "list_already_pushed_user_ids", _async_return(set()))
+    monkeypatch.setattr(push, "_send_daily_cup_registration_push_once", _send_once)
+
+    with pytest.raises(RuntimeError, match="mark sent failed"):
+        await push._send_daily_cup_registration_push_batches(
+            run=_push_run(bot=_Bot([])),
+            tournament_id=tournament_id,
+            lookback_start=NOW_UTC,
+        )
+
+    assert processed_user_ids == [11, 22, 33]
+
+
+@pytest.mark.asyncio
 async def test_send_daily_cup_registration_push_async_returns_zero_when_closed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
