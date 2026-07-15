@@ -23,19 +23,18 @@ _EXPECTED_DELIVERY_ZERO_OUTCOMES_SQL = """
                   AND (
                     (
                       t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','BRACKET_LIVE')
-                      AND t.created_at >= b.started_at
+                      AND t.round_deadline >= :recent_cutoff
+                      AND t.round_deadline >= b.started_at
                     )
                     OR (
                       t.status = 'COMPLETED'
-                      AND (
-                        t.created_at >= :recent_cutoff
-                        OR t.round_deadline >= :recent_cutoff
-                        OR EXISTS (
-                          SELECT 1
-                          FROM tournament_matches m
-                          WHERE m.tournament_id = t.id
-                            AND m.deadline >= :recent_cutoff
-                        )
+                      AND EXISTS (
+                        SELECT 1
+                        FROM tournament_matches m
+                        WHERE m.tournament_id = t.id
+                          AND m.round_no = t.current_round
+                          AND m.deadline >= :recent_cutoff
+                          AND m.deadline >= b.started_at
                       )
                     )
                   )
@@ -73,19 +72,18 @@ _ROUND_DELIVERY_GAP_SQL = """
                   AND (
                     (
                       t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','BRACKET_LIVE')
-                      AND t.created_at >= b.started_at
+                      AND t.round_deadline >= :recent_cutoff
+                      AND t.round_deadline >= b.started_at
                     )
                     OR (
                       t.status = 'COMPLETED'
-                      AND (
-                        t.created_at >= :recent_cutoff
-                        OR t.round_deadline >= :recent_cutoff
-                        OR EXISTS (
-                          SELECT 1
-                          FROM tournament_matches m
-                          WHERE m.tournament_id = t.id
-                            AND m.deadline >= :recent_cutoff
-                        )
+                      AND EXISTS (
+                        SELECT 1
+                        FROM tournament_matches m
+                        WHERE m.tournament_id = t.id
+                          AND m.round_no = t.current_round
+                          AND m.deadline >= :recent_cutoff
+                          AND m.deadline >= b.started_at
                       )
                     )
                   )

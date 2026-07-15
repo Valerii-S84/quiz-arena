@@ -20,9 +20,22 @@ _EXPECTED_DELIVERY_ZERO_OUTCOMES_SQL = """
                 FROM tournaments t
                 CROSS JOIN reliability_baseline b
                 WHERE t.type = 'DAILY_ARENA'
-                  AND t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','COMPLETED')
-                  AND t.created_at >= :recent_cutoff
-                  AND t.created_at >= b.started_at
+                  AND (
+                    (
+                      t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4')
+                      AND t.round_start_time >= GREATEST(:recent_cutoff, b.started_at)
+                    )
+                    OR (
+                      t.status = 'COMPLETED'
+                      AND EXISTS (
+                        SELECT 1
+                        FROM tournament_matches m
+                        WHERE m.tournament_id = t.id
+                          AND m.round_no = t.current_round
+                          AND m.deadline >= GREATEST(:recent_cutoff, b.started_at)
+                      )
+                    )
+                  )
                   AND EXISTS (
                     SELECT 1
                     FROM tournament_participants p
@@ -61,9 +74,22 @@ _ROUND_DELIVERY_GAP_SQL = """
                 JOIN users u ON u.id = p.user_id
                 CROSS JOIN reliability_baseline b
                 WHERE t.type = 'DAILY_ARENA'
-                  AND t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4','COMPLETED')
-                  AND t.created_at >= :recent_cutoff
-                  AND t.created_at >= b.started_at
+                  AND (
+                    (
+                      t.status IN ('ROUND_1','ROUND_2','ROUND_3','ROUND_4')
+                      AND t.round_start_time >= GREATEST(:recent_cutoff, b.started_at)
+                    )
+                    OR (
+                      t.status = 'COMPLETED'
+                      AND EXISTS (
+                        SELECT 1
+                        FROM tournament_matches m
+                        WHERE m.tournament_id = t.id
+                          AND m.round_no = t.current_round
+                          AND m.deadline >= GREATEST(:recent_cutoff, b.started_at)
+                      )
+                    )
+                  )
                   AND u.status = 'ACTIVE'
                   AND NOT EXISTS (
                     SELECT 1
@@ -103,8 +129,7 @@ _CANCEL_MESSAGE_GAP_SQL = """
                 CROSS JOIN reliability_baseline b
                 WHERE t.type = 'DAILY_ARENA'
                   AND t.status = 'CANCELED'
-                  AND t.created_at >= :recent_cutoff
-                  AND t.created_at >= b.started_at
+                  AND t.registration_deadline >= GREATEST(:recent_cutoff, b.started_at)
                   AND u.status = 'ACTIVE'
                   AND NOT EXISTS (
                     SELECT 1

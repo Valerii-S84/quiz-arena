@@ -21,16 +21,33 @@ NOW_UTC = datetime(2026, 7, 12, 12, 0, tzinfo=UTC)
 
 
 @pytest.mark.parametrize(
-    ("check_name", "status"),
+    ("check_name", "status", "registration_deadline", "round_start_time"),
     [
-        ("daily_cup_expected_delivery_zero_outcomes", "ROUND_1"),
-        ("daily_cup_round_delivery_gap", "ROUND_1"),
-        ("daily_cup_cancel_message_gap", "CANCELED"),
+        (
+            "daily_cup_expected_delivery_zero_outcomes",
+            "ROUND_1",
+            "2026-07-12 11:00:00+00:00",
+            "2026-07-12 09:00:00+00:00",
+        ),
+        (
+            "daily_cup_round_delivery_gap",
+            "ROUND_1",
+            "2026-07-12 11:00:00+00:00",
+            "2026-07-12 09:00:00+00:00",
+        ),
+        (
+            "daily_cup_cancel_message_gap",
+            "CANCELED",
+            "2026-07-12 09:00:00+00:00",
+            None,
+        ),
     ],
 )
-def test_daily_cup_checks_ignore_pre_instrumentation_tournaments(
+def test_daily_cup_checks_ignore_pre_instrumentation_obligations(
     check_name: str,
     status: str,
+    registration_deadline: str,
+    round_start_time: str | None,
 ) -> None:
     check = next(
         check
@@ -43,7 +60,12 @@ def test_daily_cup_checks_ignore_pre_instrumentation_tournaments(
         check.params,
         f"""
         CREATE TABLE tournaments (
-            id TEXT, type TEXT, status TEXT, current_round INTEGER, created_at TEXT
+            id TEXT, type TEXT, status TEXT, current_round INTEGER,
+            registration_deadline TEXT, round_deadline TEXT,
+            round_start_time TEXT, created_at TEXT
+        );
+        CREATE TABLE tournament_matches (
+            tournament_id TEXT, round_no INTEGER, deadline TEXT
         );
         CREATE TABLE tournament_participants (tournament_id TEXT, user_id INTEGER);
         CREATE TABLE users (id INTEGER, telegram_user_id INTEGER, status TEXT);
@@ -58,7 +80,10 @@ def test_daily_cup_checks_ignore_pre_instrumentation_tournaments(
             '__production_reliability_migration_baseline__', '2026-07-12 10:00:00+00:00'
         );
         INSERT INTO tournaments VALUES (
-            'cup-old', 'DAILY_ARENA', '{status}', 1, '2026-07-11 12:00:00+00:00'
+            'cup-old', 'DAILY_ARENA', '{status}', 1,
+            '{registration_deadline}', '2026-07-12 11:30:00+00:00',
+            {f"'{round_start_time}'" if round_start_time else "NULL"},
+            '2026-07-11 12:00:00+00:00'
         );
         INSERT INTO users VALUES (1, 1001, 'ACTIVE');
         INSERT INTO tournament_participants VALUES ('cup-old', 1);
@@ -66,6 +91,115 @@ def test_daily_cup_checks_ignore_pre_instrumentation_tournaments(
     )
 
     assert count == 0
+
+
+@pytest.mark.parametrize(
+    "check_name",
+    [
+        "daily_cup_expected_delivery_zero_outcomes",
+        "daily_cup_round_delivery_gap",
+    ],
+)
+def test_daily_cup_checks_include_precreated_cup_with_post_baseline_round(
+    check_name: str,
+) -> None:
+    check = next(
+        check
+        for check in build_daily_cup_delivery_checks(NOW_UTC - timedelta(days=2))
+        if check.name == check_name
+    )
+
+    count = _run_sql(
+        check.sql,
+        check.params,
+        """
+        CREATE TABLE tournaments (
+            id TEXT, type TEXT, status TEXT, current_round INTEGER,
+            registration_deadline TEXT, round_deadline TEXT,
+            round_start_time TEXT, created_at TEXT
+        );
+        CREATE TABLE tournament_matches (
+            tournament_id TEXT, round_no INTEGER, deadline TEXT
+        );
+        CREATE TABLE tournament_participants (tournament_id TEXT, user_id INTEGER);
+        CREATE TABLE users (id INTEGER, telegram_user_id INTEGER, status TEXT);
+        CREATE TABLE telegram_delivery_attempts (
+            flow TEXT, correlation_id TEXT, target_id TEXT,
+            telegram_user_id INTEGER, status TEXT
+        );
+        CREATE TABLE worker_task_heartbeats (
+            schedule_key TEXT, last_success_at TEXT
+        );
+        INSERT INTO worker_task_heartbeats VALUES (
+            '__production_reliability_migration_baseline__', '2026-07-12 10:00:00+00:00'
+        );
+        INSERT INTO tournaments VALUES (
+            'cup-precreated', 'DAILY_ARENA', 'ROUND_1', 1,
+            '2026-07-12 11:00:00+00:00', '2026-07-12 11:30:00+00:00',
+            '2026-07-12 11:00:00+00:00', '2026-07-12 09:00:00+00:00'
+        );
+        INSERT INTO users VALUES (1, 1001, 'ACTIVE');
+        INSERT INTO tournament_participants VALUES ('cup-precreated', 1);
+        """,
+    )
+
+    assert count == 1
+
+
+@pytest.mark.parametrize(
+    ("final_round_deadline", "expected"),
+    [
+        ("2026-07-12 09:00:00+00:00", 0),
+        ("2026-07-12 11:00:00+00:00", 1),
+    ],
+)
+def test_daily_cup_completed_checks_use_final_round_deadline_baseline(
+    final_round_deadline: str,
+    expected: int,
+) -> None:
+    setup_sql = f"""
+        CREATE TABLE tournaments (
+            id TEXT, type TEXT, status TEXT, current_round INTEGER,
+            registration_deadline TEXT, round_deadline TEXT,
+            round_start_time TEXT, created_at TEXT
+        );
+        CREATE TABLE tournament_matches (
+            tournament_id TEXT, round_no INTEGER, deadline TEXT
+        );
+        CREATE TABLE tournament_participants (tournament_id TEXT, user_id INTEGER);
+        CREATE TABLE users (id INTEGER, telegram_user_id INTEGER, status TEXT);
+        CREATE TABLE telegram_delivery_attempts (
+            flow TEXT, correlation_id TEXT, target_id TEXT,
+            telegram_user_id INTEGER, status TEXT
+        );
+        CREATE TABLE worker_task_heartbeats (
+            schedule_key TEXT, last_success_at TEXT
+        );
+        INSERT INTO worker_task_heartbeats VALUES (
+            '__production_reliability_migration_baseline__', '2026-07-12 10:00:00+00:00'
+        );
+        INSERT INTO tournaments VALUES (
+            'cup-completed', 'DAILY_ARENA', 'COMPLETED', 1,
+            '2026-07-12 08:00:00+00:00', NULL, NULL,
+            '2026-07-11 12:00:00+00:00'
+        );
+        INSERT INTO tournament_matches VALUES (
+            'cup-completed', 1, '{final_round_deadline}'
+        );
+        INSERT INTO users VALUES (1, 1001, 'ACTIVE');
+        INSERT INTO tournament_participants VALUES ('cup-completed', 1);
+    """
+
+    for check_name in (
+        "daily_cup_expected_delivery_zero_outcomes",
+        "daily_cup_round_delivery_gap",
+    ):
+        check = next(
+            check
+            for check in build_daily_cup_delivery_checks(NOW_UTC - timedelta(days=2))
+            if check.name == check_name
+        )
+        assert _run_sql(check.sql, check.params, setup_sql) == expected
 
 
 @pytest.mark.parametrize(

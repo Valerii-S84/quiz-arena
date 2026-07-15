@@ -183,15 +183,16 @@ def test_daily_cup_gap_counts_missing_current_phase_participant() -> None:
         check.params,
         """
         CREATE TABLE tournaments (
-            id TEXT, type TEXT, status TEXT, current_round INTEGER, created_at TEXT
+            id TEXT, type TEXT, status TEXT, current_round INTEGER, round_start_time TEXT, created_at TEXT
         );
+        CREATE TABLE tournament_matches (tournament_id TEXT, round_no INTEGER, deadline TEXT);
         CREATE TABLE tournament_participants (tournament_id TEXT, user_id INTEGER);
         CREATE TABLE users (id INTEGER, status TEXT);
         CREATE TABLE telegram_delivery_attempts (
             flow TEXT, correlation_id TEXT, target_id TEXT, status TEXT
         );
         CREATE TABLE worker_task_heartbeats (schedule_key TEXT, last_success_at TEXT);
-        INSERT INTO tournaments VALUES ('cup-1', 'DAILY_ARENA', 'ROUND_2', 2, '2026-07-10 11:00:00+00:00');
+        INSERT INTO tournaments VALUES ('cup-1', 'DAILY_ARENA', 'ROUND_2', 2, '2026-07-10 11:00:00+00:00', '2026-07-10 09:00:00+00:00');
         INSERT INTO users VALUES (1, 'ACTIVE'), (2, 'ACTIVE');
         INSERT INTO tournament_participants VALUES ('cup-1', 1), ('cup-1', 2);
         INSERT INTO telegram_delivery_attempts VALUES (
@@ -215,16 +216,17 @@ def test_daily_cup_gap_ignores_inactive_and_canceled_without_false_alert() -> No
         check.params,
         """
         CREATE TABLE tournaments (
-            id TEXT, type TEXT, status TEXT, current_round INTEGER, created_at TEXT
+            id TEXT, type TEXT, status TEXT, current_round INTEGER, round_start_time TEXT, created_at TEXT
         );
+        CREATE TABLE tournament_matches (tournament_id TEXT, round_no INTEGER, deadline TEXT);
         CREATE TABLE tournament_participants (tournament_id TEXT, user_id INTEGER);
         CREATE TABLE users (id INTEGER, status TEXT);
         CREATE TABLE telegram_delivery_attempts (
             flow TEXT, correlation_id TEXT, target_id TEXT, status TEXT
         );
         CREATE TABLE worker_task_heartbeats (schedule_key TEXT, last_success_at TEXT);
-        INSERT INTO tournaments VALUES ('cup-1', 'DAILY_ARENA', 'ROUND_2', 2, '2026-07-10 11:00:00+00:00');
-        INSERT INTO tournaments VALUES ('cup-2', 'DAILY_ARENA', 'CANCELED', 0, '2026-07-10 11:00:00+00:00');
+        INSERT INTO tournaments VALUES ('cup-1', 'DAILY_ARENA', 'ROUND_2', 2, '2026-07-10 11:00:00+00:00', '2026-07-10 09:00:00+00:00');
+        INSERT INTO tournaments VALUES ('cup-2', 'DAILY_ARENA', 'CANCELED', 0, NULL, '2026-07-10 09:00:00+00:00');
         INSERT INTO users VALUES (1, 'BLOCKED'), (2, 'ACTIVE');
         INSERT INTO tournament_participants VALUES ('cup-1', 1), ('cup-2', 2);
         """,

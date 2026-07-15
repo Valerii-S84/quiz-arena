@@ -179,7 +179,8 @@ def test_canceled_daily_cup_without_cancel_outcome_is_finding() -> None:
     count = _daily_cancel_count(
         """
         INSERT INTO tournaments VALUES (
-            'cup-1', 'DAILY_ARENA', 'CANCELED', 0, '2026-07-12 11:00:00+00:00'
+            'cup-1', 'DAILY_ARENA', 'CANCELED', 0,
+            '2026-07-12 11:00:00+00:00', '2026-07-12 09:00:00+00:00'
         );
         INSERT INTO users VALUES (1, 1001, 'ACTIVE');
         INSERT INTO tournament_participants VALUES ('cup-1', 1);
@@ -193,7 +194,8 @@ def test_canceled_daily_cup_with_cancel_outcome_is_ok() -> None:
     count = _daily_cancel_count(
         """
         INSERT INTO tournaments VALUES (
-            'cup-1', 'DAILY_ARENA', 'CANCELED', 0, '2026-07-12 11:00:00+00:00'
+            'cup-1', 'DAILY_ARENA', 'CANCELED', 0,
+            '2026-07-12 11:00:00+00:00', '2026-07-12 09:00:00+00:00'
         );
         INSERT INTO users VALUES (1, 1001, 'ACTIVE');
         INSERT INTO tournament_participants VALUES ('cup-1', 1);
@@ -210,7 +212,8 @@ def test_canceled_daily_cup_without_active_targets_is_ok() -> None:
     count = _daily_cancel_count(
         """
         INSERT INTO tournaments VALUES (
-            'cup-1', 'DAILY_ARENA', 'CANCELED', 0, '2026-07-12 11:00:00+00:00'
+            'cup-1', 'DAILY_ARENA', 'CANCELED', 0,
+            '2026-07-12 11:00:00+00:00', '2026-07-12 09:00:00+00:00'
         );
         INSERT INTO users VALUES (1, 1001, 'BLOCKED');
         INSERT INTO tournament_participants VALUES ('cup-1', 1);
@@ -231,7 +234,12 @@ def test_canceled_daily_cup_still_does_not_require_round_outcomes() -> None:
         check.params,
         """
         CREATE TABLE tournaments (
-            id TEXT, type TEXT, status TEXT, current_round INTEGER, created_at TEXT
+            id TEXT, type TEXT, status TEXT, current_round INTEGER,
+            registration_deadline TEXT, round_deadline TEXT,
+            round_start_time TEXT, created_at TEXT
+        );
+        CREATE TABLE tournament_matches (
+            tournament_id TEXT, round_no INTEGER, deadline TEXT
         );
         CREATE TABLE tournament_participants (tournament_id TEXT, user_id INTEGER);
         CREATE TABLE users (id INTEGER, status TEXT, telegram_user_id INTEGER);
@@ -242,7 +250,9 @@ def test_canceled_daily_cup_still_does_not_require_round_outcomes() -> None:
             schedule_key TEXT, last_success_at TEXT
         );
         INSERT INTO tournaments VALUES (
-            'cup-1', 'DAILY_ARENA', 'CANCELED', 0, '2026-07-12 11:00:00+00:00'
+            'cup-1', 'DAILY_ARENA', 'CANCELED', 0,
+            '2026-07-12 11:00:00+00:00', NULL, NULL,
+            '2026-07-12 09:00:00+00:00'
         );
         INSERT INTO users VALUES (1, 'ACTIVE', 1001);
         INSERT INTO tournament_participants VALUES ('cup-1', 1);
@@ -317,7 +327,8 @@ def _daily_cancel_count(rows_sql: str) -> int:
         check.params,
         """
         CREATE TABLE tournaments (
-            id TEXT, type TEXT, status TEXT, current_round INTEGER, created_at TEXT
+            id TEXT, type TEXT, status TEXT, current_round INTEGER,
+            registration_deadline TEXT, created_at TEXT
         );
         CREATE TABLE tournament_participants (tournament_id TEXT, user_id INTEGER);
         CREATE TABLE users (id INTEGER, telegram_user_id INTEGER, status TEXT);
