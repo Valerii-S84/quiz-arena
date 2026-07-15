@@ -51,36 +51,26 @@ async def build_close_transition(
     participants_total = len(participants)
     tournament_id = str(tournament.id)
     if tournament.status == TOURNAMENT_STATUS_CANCELED:
-        return DailyCupCloseTransition(
+        return await _build_canceled_transition(
+            session=session,
+            participants=participants,
             tournament_id=tournament_id,
-            canceled_telegram_targets=await _cancellation_targets(
-                session=session,
-                participants=participants,
-                list_users_by_ids=dependencies.list_users_by_ids,
-            ),
-            started_tournament_id=None,
-            events=[],
             participants_total=participants_total,
-            canceled=1,
-            started=0,
+            events=[],
+            dependencies=dependencies,
         )
     if participants_total < minimum_participants:
         tournament.status = TOURNAMENT_STATUS_CANCELED
         tournament.round_deadline = None
-        return DailyCupCloseTransition(
+        return await _build_canceled_transition(
+            session=session,
+            participants=participants,
             tournament_id=tournament_id,
-            canceled_telegram_targets=await _cancellation_targets(
-                session=session,
-                participants=participants,
-                list_users_by_ids=dependencies.list_users_by_ids,
-            ),
-            started_tournament_id=None,
+            participants_total=participants_total,
             events=[
                 _canceled_event(tournament_id=tournament_id, participants_total=participants_total)
             ],
-            participants_total=participants_total,
-            canceled=1,
-            started=0,
+            dependencies=dependencies,
         )
     await dependencies.start_round_one(
         session,
@@ -96,6 +86,30 @@ async def build_close_transition(
         participants_total=participants_total,
         canceled=0,
         started=1,
+    )
+
+
+async def _build_canceled_transition(
+    *,
+    session: Any,
+    participants: list[Any],
+    tournament_id: str,
+    participants_total: int,
+    events: list[dict[str, object]],
+    dependencies: DailyCupRegistrationCloseDependencies,
+) -> DailyCupCloseTransition:
+    return DailyCupCloseTransition(
+        tournament_id=tournament_id,
+        canceled_telegram_targets=await _cancellation_targets(
+            session=session,
+            participants=participants,
+            list_users_by_ids=dependencies.list_users_by_ids,
+        ),
+        started_tournament_id=None,
+        events=events,
+        participants_total=participants_total,
+        canceled=1,
+        started=0,
     )
 
 
