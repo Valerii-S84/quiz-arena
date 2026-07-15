@@ -210,6 +210,7 @@ async def test_worker_heartbeat_started_uses_task_schedule_conflict_key() -> Non
     assert "INSERT INTO worker_task_heartbeats" in sql
     assert "ON CONFLICT (task_name, schedule_key) DO UPDATE" in sql
     assert "last_started_at" in sql
+    assert "worker_task_heartbeats.last_started_at <= %(last_started_at_1)s" in sql
 
 
 async def test_worker_heartbeat_failure_increments_consecutive_failures() -> None:
@@ -219,6 +220,7 @@ async def test_worker_heartbeat_failure_increments_consecutive_failures() -> Non
         session,
         task_name="task",
         schedule_key="schedule",
+        started_at=NOW_UTC,
         failed_at=NOW_UTC,
         duration_ms=123,
         error_hash=safe_error_hash("boom"),
@@ -228,6 +230,24 @@ async def test_worker_heartbeat_failure_increments_consecutive_failures() -> Non
     assert "INSERT INTO worker_task_heartbeats" in sql
     assert "consecutive_failures" in sql
     assert "(worker_task_heartbeats.consecutive_failures + %(consecutive_failures_1)s)" in sql
+    assert "worker_task_heartbeats.last_started_at <= %(last_started_at_1)s" in sql
+
+
+async def test_worker_heartbeat_success_uses_its_run_start_as_the_generation() -> None:
+    session = RecordingSession(ScalarResult(None))
+
+    await WorkerTaskHeartbeatsRepo.record_success(
+        session,
+        task_name="task",
+        schedule_key="schedule",
+        started_at=NOW_UTC,
+        succeeded_at=NOW_UTC,
+        duration_ms=123,
+    )
+
+    sql = compile_parameterized_statement(session.statement)
+    assert "last_started_at" in sql
+    assert "worker_task_heartbeats.last_started_at <= %(last_started_at_1)s" in sql
 
 
 async def test_invariant_alert_record_open_dedupes_by_type_key_status() -> None:
@@ -251,6 +271,7 @@ async def test_invariant_alert_record_open_dedupes_by_type_key_status() -> None:
     assert "INSERT INTO production_invariant_alerts" in insert_sql
     assert "ON CONFLICT (type, correlation_key, status) DO UPDATE" in insert_sql
     assert "count = (production_invariant_alerts.count + %(count_1)s)" in insert_sql
+    assert "WHERE production_invariant_alerts.updated_at <= %(updated_at_1)s" in insert_sql
 
 
 async def test_invariant_alert_reopen_terminal_rows_reuses_type_key() -> None:
@@ -271,6 +292,7 @@ async def test_invariant_alert_reopen_terminal_rows_reuses_type_key() -> None:
     assert "resolved_at=%(resolved_at)s" in sql
     assert "acked_at=%(acked_at)s" in sql
     assert "count=(production_invariant_alerts.count + %(count_1)s)" in sql
+    assert "production_invariant_alerts.updated_at <= %(updated_at_1)s" in sql
 
 
 async def test_invariant_alert_reopen_terminal_lookup_includes_acked_rows() -> None:
@@ -306,6 +328,21 @@ async def test_invariant_alert_record_open_returns_after_successful_reopen() -> 
     assert "UPDATE production_invariant_alerts" in sql
     assert "count=(production_invariant_alerts.count + %(count_1)s)" in sql
     assert "INSERT INTO production_invariant_alerts" not in sql
+
+
+async def test_invariant_alert_resolution_rejects_an_older_pass() -> None:
+    session = RecordingSession(SimpleNamespace(rowcount=0))
+
+    await ProductionInvariantAlertsRepo.mark_resolved(
+        session,
+        alert_type="worker_task_heartbeat_stale",
+        correlation_key="task:daily-cup-round-advance",
+        resolved_at=NOW_UTC,
+    )
+
+    sql = compile_parameterized_statement(session.statement)
+    assert "production_invariant_alerts.updated_at <= %(updated_at_1)s" in sql
+    assert "last_seen_at=%(last_seen_at)s" in sql
 
 
 def test_reliability_models_are_importable() -> None:

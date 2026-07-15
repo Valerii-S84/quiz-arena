@@ -49,6 +49,7 @@ async def test_run_with_task_heartbeat_records_success(monkeypatch: pytest.Monke
     assert result == {"processed": 1}
     assert [name for name, _payload in calls] == ["started", "success"]
     assert cast(int, calls[1][1]["duration_ms"]) >= 0
+    assert calls[1][1]["started_at"] == calls[0][1]["started_at"]
 
 
 @pytest.mark.asyncio
@@ -82,6 +83,7 @@ async def test_run_with_task_heartbeat_records_failure(monkeypatch: pytest.Monke
 
     assert [name for name, _payload in calls] == ["started", "failure"]
     assert "error_hash" in calls[1][1]
+    assert calls[1][1]["started_at"] == calls[0][1]["started_at"]
 
 
 @pytest.mark.asyncio

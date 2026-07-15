@@ -48,8 +48,19 @@ _ACTIVE_ROUND_STATUSES = frozenset(
 )
 
 
-def _max_rounds_for_tournament(*, participants_total: int) -> int:
-    return daily_cup_max_rounds_for_participants(participants_total=participants_total)
+def _max_rounds_for_tournament(*, tournament_type: str, participants_total: int) -> int:
+    if tournament_type == TOURNAMENT_TYPE_DAILY_ARENA:
+        return daily_cup_max_rounds_for_participants(participants_total=participants_total)
+    return TOURNAMENT_MAX_ROUNDS
+
+
+async def _lock_private_phase_transition(
+    session: AsyncSession,
+    *,
+    tournament: Tournament,
+) -> None:
+    if tournament.type == TOURNAMENT_TYPE_PRIVATE:
+        await lock_standings_phase_transition(session, tournament_id=tournament.id)
 
 
 async def close_expired_registration(
@@ -70,8 +81,7 @@ async def settle_round_and_advance(
     now_utc: datetime,
     round_duration_hours: int = TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS,
 ) -> dict[str, int]:
-    if tournament.type == TOURNAMENT_TYPE_PRIVATE:
-        await lock_standings_phase_transition(session, tournament_id=tournament.id)
+    await _lock_private_phase_transition(session, tournament=tournament)
     current_round = max(1, int(tournament.current_round))
     round_matches = await TournamentMatchesRepo.list_by_tournament_round_for_update(
         session,
@@ -92,10 +102,9 @@ async def settle_round_and_advance(
         session,
         tournament_id=tournament.id,
     )
-    max_rounds = (
-        _max_rounds_for_tournament(participants_total=len(participants))
-        if tournament.type == TOURNAMENT_TYPE_DAILY_ARENA
-        else TOURNAMENT_MAX_ROUNDS
+    max_rounds = _max_rounds_for_tournament(
+        tournament_type=tournament.type,
+        participants_total=len(participants),
     )
     if current_round >= max_rounds:
         mark_tournament_completed(tournament=tournament)

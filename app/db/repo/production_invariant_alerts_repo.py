@@ -20,7 +20,7 @@ class ProductionInvariantAlertsRepo:
         seen_at: datetime,
         safe_context: dict[str, object],
     ) -> None:
-        reopened = await ProductionInvariantAlertsRepo._reopen_existing_terminal(
+        terminal_found = await ProductionInvariantAlertsRepo._reopen_existing_terminal(
             session,
             severity=severity,
             alert_type=alert_type,
@@ -28,7 +28,7 @@ class ProductionInvariantAlertsRepo:
             seen_at=seen_at,
             safe_context=safe_context,
         )
-        if reopened:
+        if terminal_found:
             return
         stmt = (
             insert(ProductionInvariantAlert)
@@ -56,6 +56,7 @@ class ProductionInvariantAlertsRepo:
                     "count": ProductionInvariantAlert.count + 1,
                     "updated_at": seen_at,
                 },
+                where=ProductionInvariantAlert.updated_at <= seen_at,
             )
         )
         await session.execute(stmt)
@@ -69,7 +70,7 @@ class ProductionInvariantAlertsRepo:
         correlation_key: str,
         seen_at: datetime,
         safe_context: dict[str, object],
-    ) -> int:
+    ) -> bool:
         open_stmt = select(ProductionInvariantAlert.id).where(
             ProductionInvariantAlert.type == alert_type,
             ProductionInvariantAlert.correlation_key == correlation_key,
@@ -77,7 +78,7 @@ class ProductionInvariantAlertsRepo:
         )
         open_result = await session.execute(open_stmt)
         if open_result.scalar_one_or_none() is not None:
-            return 0
+            return False
 
         terminal_stmt = (
             select(ProductionInvariantAlert.id)
@@ -94,11 +95,14 @@ class ProductionInvariantAlertsRepo:
         terminal_result = await session.execute(terminal_stmt)
         alert_id = terminal_result.scalar_one_or_none()
         if alert_id is None:
-            return 0
+            return False
 
         stmt = (
             update(ProductionInvariantAlert)
-            .where(ProductionInvariantAlert.id == alert_id)
+            .where(
+                ProductionInvariantAlert.id == alert_id,
+                ProductionInvariantAlert.updated_at <= seen_at,
+            )
             .values(
                 severity=severity,
                 status="OPEN",
@@ -110,8 +114,8 @@ class ProductionInvariantAlertsRepo:
                 updated_at=seen_at,
             )
         )
-        result = await session.execute(stmt)
-        return int(getattr(result, "rowcount", 0) or 0)
+        await session.execute(stmt)
+        return True
 
     @staticmethod
     async def mark_resolved(
@@ -127,8 +131,14 @@ class ProductionInvariantAlertsRepo:
                 ProductionInvariantAlert.type == alert_type,
                 ProductionInvariantAlert.correlation_key == correlation_key,
                 ProductionInvariantAlert.status == "OPEN",
+                ProductionInvariantAlert.updated_at <= resolved_at,
             )
-            .values(status="RESOLVED", resolved_at=resolved_at, updated_at=resolved_at)
+            .values(
+                status="RESOLVED",
+                last_seen_at=resolved_at,
+                resolved_at=resolved_at,
+                updated_at=resolved_at,
+            )
         )
         result = await session.execute(stmt)
         return int(getattr(result, "rowcount", 0) or 0)

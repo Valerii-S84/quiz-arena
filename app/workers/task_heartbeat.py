@@ -42,6 +42,7 @@ async def run_with_task_heartbeat(
         await _record_failure(
             task_name=task_name,
             schedule_key=schedule_key,
+            started_at=started_at,
             failed_at=datetime.now(timezone.utc),
             duration_ms=_duration_ms(monotonic_started),
             exc=exc,
@@ -51,6 +52,7 @@ async def run_with_task_heartbeat(
     await _record_success(
         task_name=task_name,
         schedule_key=schedule_key,
+        started_at=started_at,
         succeeded_at=datetime.now(timezone.utc),
         duration_ms=_duration_ms(monotonic_started),
         session_local=session_local,
@@ -90,6 +92,7 @@ async def _record_success(
     *,
     task_name: str,
     schedule_key: str,
+    started_at,
     succeeded_at,
     duration_ms: int,
     session_local,
@@ -100,6 +103,7 @@ async def _record_success(
                 session,
                 task_name=task_name,
                 schedule_key=schedule_key,
+                started_at=started_at,
                 succeeded_at=succeeded_at,
                 duration_ms=duration_ms,
             )
@@ -116,6 +120,7 @@ async def _record_failure(
     *,
     task_name: str,
     schedule_key: str,
+    started_at,
     failed_at,
     duration_ms: int,
     exc: Exception,
@@ -127,6 +132,7 @@ async def _record_failure(
                 session,
                 task_name=task_name,
                 schedule_key=schedule_key,
+                started_at=started_at,
                 failed_at=failed_at,
                 duration_ms=duration_ms,
                 error_hash=safe_error_hash(exc),
