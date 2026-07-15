@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import structlog
 
 from app.bot.application import build_bot
@@ -9,11 +7,7 @@ from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
-from app.game.tournaments.constants import (
-    TOURNAMENT_STATUS_CANCELED,
-    TOURNAMENT_STATUS_REGISTRATION,
-    TOURNAMENT_TYPE_DAILY_ARENA,
-)
+from app.game.tournaments.constants import TOURNAMENT_TYPE_DAILY_ARENA
 from app.workers.tasks.daily_cup_config import DAILY_CUP_MIN_PARTICIPANTS
 from app.workers.tasks.daily_cup_core import (
     emit_daily_cup_events,
@@ -25,6 +19,13 @@ from app.workers.tasks.daily_cup_messaging import (
     enqueue_daily_cup_round_messaging,
     run_daily_cup_round_messaging_async_with_followups,
 )
+from app.workers.tasks.daily_cup_registration_close import (
+    DailyCupCloseTransition as _DailyCupCloseTransition,
+)
+from app.workers.tasks.daily_cup_registration_close import (
+    DailyCupRegistrationCloseDependencies,
+    build_close_transition,
+)
 from app.workers.tasks.daily_cup_registration_push import send_daily_cup_registration_push_async
 from app.workers.tasks.daily_cup_start import start_daily_arena_round_one
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
@@ -32,21 +33,6 @@ from app.workers.tasks.daily_cup_time import get_daily_cup_window
 logger = structlog.get_logger("app.workers.tasks.daily_cup")
 
 _now_utc = now_utc
-_CLOSEABLE_STATUSES = {
-    TOURNAMENT_STATUS_REGISTRATION,
-    TOURNAMENT_STATUS_CANCELED,
-}
-
-
-@dataclass(frozen=True, slots=True)
-class _DailyCupCloseTransition:
-    tournament_id: str
-    canceled_telegram_targets: list[int]
-    started_tournament_id: str | None
-    events: list[dict[str, object]]
-    participants_total: int
-    canceled: int
-    started: int
 
 
 async def send_daily_cup_invite_registration_async() -> dict[str, int]:
@@ -97,89 +83,22 @@ async def publish_daily_cup_final_results_async() -> dict[str, int]:
     return {"processed": 1, "published": int(result.get("processed", 0) > 0)}
 
 
-async def _cancellation_targets(session, participants) -> list[int]:
-    users = await UsersRepo.list_by_ids(session, [int(item.user_id) for item in participants])
-    return [int(user.telegram_user_id) for user in users]
-
-
-def _canceled_event(*, tournament_id: str, participants_total: int) -> dict[str, object]:
-    return {
-        "event_type": "daily_cup_canceled",
-        "payload": {"tournament_id": tournament_id, "registered_total": participants_total},
-    }
-
-
-def _started_events(*, tournament_id: str, participants_total: int) -> list[dict[str, object]]:
-    return [
-        {
-            "event_type": "daily_cup_started",
-            "payload": {"tournament_id": tournament_id, "participants_total": participants_total},
-        },
-        {
-            "event_type": "daily_cup_round_started",
-            "payload": {"tournament_id": tournament_id, "round_no": 1},
-        },
-    ]
-
-
 async def _build_close_transition(
     *,
     session,
     tournament,
     now_utc_value,
 ) -> _DailyCupCloseTransition | None:
-    if tournament.status not in _CLOSEABLE_STATUSES:
-        return None
-    participants = await TournamentParticipantsRepo.list_for_tournament_for_update(
-        session,
-        tournament_id=tournament.id,
-    )
-    participants_total = len(participants)
-    tournament_id = str(tournament.id)
-    if tournament.status == TOURNAMENT_STATUS_CANCELED:
-        return _DailyCupCloseTransition(
-            tournament_id=tournament_id,
-            canceled_telegram_targets=await _cancellation_targets(session, participants),
-            started_tournament_id=None,
-            events=[],
-            participants_total=participants_total,
-            canceled=1,
-            started=0,
-        )
-    if participants_total < DAILY_CUP_MIN_PARTICIPANTS:
-        tournament.status = TOURNAMENT_STATUS_CANCELED
-        tournament.round_deadline = None
-        return _DailyCupCloseTransition(
-            tournament_id=tournament_id,
-            canceled_telegram_targets=await _cancellation_targets(session, participants),
-            started_tournament_id=None,
-            events=[
-                _canceled_event(
-                    tournament_id=tournament_id,
-                    participants_total=participants_total,
-                )
-            ],
-            participants_total=participants_total,
-            canceled=1,
-            started=0,
-        )
-    await start_daily_arena_round_one(
-        session,
+    return await build_close_transition(
+        session=session,
         tournament=tournament,
-        participants=participants,
-        now_utc=now_utc_value,
-    )
-    return _DailyCupCloseTransition(
-        tournament_id=tournament_id,
-        canceled_telegram_targets=[],
-        started_tournament_id=tournament_id,
-        events=_started_events(
-            tournament_id=tournament_id,
-            participants_total=participants_total,
+        now_utc_value=now_utc_value,
+        minimum_participants=DAILY_CUP_MIN_PARTICIPANTS,
+        dependencies=DailyCupRegistrationCloseDependencies(
+            list_participants_for_update=TournamentParticipantsRepo.list_for_tournament_for_update,
+            list_users_by_ids=UsersRepo.list_by_ids,
+            start_round_one=start_daily_arena_round_one,
         ),
-        participants_total=participants_total,
-        canceled=0,
-        started=1,
     )
 
 

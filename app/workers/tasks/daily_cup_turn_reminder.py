@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from uuid import UUID
+from datetime import timedelta
 
 import structlog
 
@@ -24,6 +23,10 @@ from app.workers.tasks.daily_cup_push_events import store_push_sent_events
 from app.workers.tasks.daily_cup_turn_reminder_delivery import (
     deliver_reminders,
     prepare_reminder_batch,
+)
+from app.workers.tasks.daily_cup_turn_reminder_delivery_finalize import (
+    ReminderDeliveryFinalizationDependencies,
+    finalize_delivered_reminders,
 )
 from app.workers.tasks.daily_cup_turn_reminder_delivery_types import (
     ReminderBatch,
@@ -119,46 +122,25 @@ async def _load_reminder_batch(
         )
 
 
-async def _mark_delivered_reminder_candidates(
-    *,
-    batch: ReminderBatch,
-    completed_ids: set[str],
-    delivered_at: datetime,
-) -> None:
-    if not completed_ids:
-        return
-    async with SessionLocal.begin() as session:
-        await FriendChallengesRepo.mark_daily_cup_turn_reminders_notified(
-            session,
-            challenge_ids={UUID(challenge_id) for challenge_id in completed_ids},
-            notified_at=delivered_at,
-        )
-    for challenge in batch.challenge_rows:
-        if str(challenge.id) in completed_ids:
-            challenge.expires_last_chance_notified_at = delivered_at
-            challenge.updated_at = delivered_at
-
-
 async def _finalize_delivered_reminders(
     *,
     batch: ReminderBatch,
     delivery_result: ReminderDeliveryResult,
-    happened_at: datetime,
+    happened_at,
 ) -> None:
-    await _mark_delivered_reminder_candidates(
+    await finalize_delivered_reminders(
         batch=batch,
-        completed_ids=batch.challenge_ids - delivery_result.failed_challenge_ids,
-        delivered_at=happened_at,
-    )
-    await store_reminder_events(
-        sent_user_ids_by_tournament=delivery_result.sent_user_ids_by_tournament,
-        event_type=_REMINDER_EVENT_TYPE,
+        delivery_result=delivery_result,
         happened_at=happened_at,
-        store_push_sent_events_fn=store_push_sent_events,
-        logger=logger,
+        event_type=_REMINDER_EVENT_TYPE,
+        dependencies=ReminderDeliveryFinalizationDependencies(
+            session_factory=SessionLocal,
+            mark_reminders_notified=FriendChallengesRepo.mark_daily_cup_turn_reminders_notified,
+            store_events=store_reminder_events,
+            store_push_sent_events=store_push_sent_events,
+            logger=logger,
+        ),
     )
-    if delivery_result.system_errors:
-        raise delivery_result.system_errors[0]
 
 
 async def run_daily_cup_turn_reminders_async(
