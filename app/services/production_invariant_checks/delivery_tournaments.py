@@ -48,7 +48,7 @@ _EXPECTED_DELIVERY_ZERO_OUTCOMES_SQL = """
                     FROM telegram_delivery_attempts d
                     WHERE d.flow = 'private_tournament_round_messaging'
                       AND d.correlation_id = t.id::text
-                      AND d.status IN ('SENT','FAILED','SKIPPED')
+                      AND d.status IN ('PENDING','SENT','FAILED','SKIPPED')
                   )
             """
 
@@ -102,7 +102,7 @@ _ROUND_DELIVERY_GAP_SQL = """
                           )
                         END || ':%'
                       )
-                      AND d.status IN ('SENT','FAILED','SKIPPED')
+                      AND d.status IN ('PENDING','SENT','FAILED','SKIPPED')
                   )
             """
 
@@ -118,7 +118,7 @@ def build_tournament_delivery_checks(recent_cutoff: datetime) -> list[InvariantC
                 "recent_cutoff": recent_cutoff,
                 "baseline_schedule_key": baseline_schedule_key,
             },
-            description="Recent private tournament expected messaging has zero durable outcomes.",
+            description="Recent private tournament messaging has zero durable delivery attempts.",
         ),
         build_check(
             name="private_tournament_round_delivery_gap",
@@ -128,6 +128,6 @@ def build_tournament_delivery_checks(recent_cutoff: datetime) -> list[InvariantC
                 "recent_cutoff": recent_cutoff,
                 "baseline_schedule_key": baseline_schedule_key,
             },
-            description="Private tournament participant is missing a terminal delivery outcome.",
+            description="Private tournament participant is missing a durable delivery attempt.",
         ),
     ]

@@ -93,7 +93,7 @@ def test_daily_cup_delivery_gap_is_per_active_participant_and_not_canceled() -> 
     assert "WHEN t.status = 'COMPLETED' THEN 'status:completed'" in check.sql
     assert "'round:' || GREATEST(1, t.current_round)::text" in check.sql
     assert "':status:' || lower(t.status)" in check.sql
-    assert "d.status IN ('SENT','FAILED','SKIPPED')" in check.sql
+    assert "d.status IN ('PENDING','SENT','FAILED','SKIPPED')" in check.sql
     assert "'CANCELED'" not in check.sql
 
 

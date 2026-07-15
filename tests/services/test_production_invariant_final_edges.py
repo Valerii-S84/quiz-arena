@@ -208,6 +208,24 @@ def test_canceled_daily_cup_with_cancel_outcome_is_ok() -> None:
     assert count == 0
 
 
+def test_canceled_daily_cup_with_pending_cancel_attempt_is_in_flight() -> None:
+    count = _daily_cancel_count(
+        """
+        INSERT INTO tournaments VALUES (
+            'cup-1', 'DAILY_ARENA', 'CANCELED', 0,
+            '2026-07-12 11:00:00+00:00', '2026-07-12 09:00:00+00:00'
+        );
+        INSERT INTO users VALUES (1, 1001, 'ACTIVE');
+        INSERT INTO tournament_participants VALUES ('cup-1', 1);
+        INSERT INTO telegram_delivery_attempts VALUES (
+            'daily_cup_cancel_message', 'cup-1', 1001, 'PENDING'
+        );
+        """
+    )
+
+    assert count == 0
+
+
 def test_canceled_daily_cup_without_active_targets_is_ok() -> None:
     count = _daily_cancel_count(
         """

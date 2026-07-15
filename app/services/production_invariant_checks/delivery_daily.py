@@ -52,7 +52,7 @@ _EXPECTED_DELIVERY_ZERO_OUTCOMES_SQL = """
                       'daily_cup_turn_reminder'
                     )
                       AND d.correlation_id = t.id::text
-                      AND d.status IN ('SENT','FAILED','SKIPPED')
+                      AND d.status IN ('PENDING','SENT','FAILED','SKIPPED')
                   )
             """
 
@@ -106,7 +106,7 @@ _ROUND_DELIVERY_GAP_SQL = """
                           )
                         END || ':%'
                       )
-                      AND d.status IN ('SENT','FAILED','SKIPPED')
+                      AND d.status IN ('PENDING','SENT','FAILED','SKIPPED')
                   )
             """
 
@@ -137,7 +137,7 @@ _CANCEL_MESSAGE_GAP_SQL = """
                     WHERE d.flow = 'daily_cup_cancel_message'
                       AND d.correlation_id = t.id::text
                       AND d.telegram_user_id = u.telegram_user_id
-                      AND d.status IN ('SENT','FAILED','SKIPPED')
+                      AND d.status IN ('PENDING','SENT','FAILED','SKIPPED')
                   )
             """
 
@@ -153,7 +153,7 @@ def build_daily_cup_delivery_checks(recent_cutoff: datetime) -> list[InvariantCh
                 "recent_cutoff": recent_cutoff,
                 "baseline_schedule_key": baseline_schedule_key,
             },
-            description="Recent Daily Cup expected messaging has zero durable outcomes.",
+            description="Recent Daily Cup expected messaging has zero durable delivery attempts.",
         ),
         build_check(
             name="daily_cup_round_delivery_gap",
@@ -163,7 +163,7 @@ def build_daily_cup_delivery_checks(recent_cutoff: datetime) -> list[InvariantCh
                 "recent_cutoff": recent_cutoff,
                 "baseline_schedule_key": baseline_schedule_key,
             },
-            description="Daily Cup participant is missing a terminal round delivery outcome.",
+            description="Daily Cup participant is missing a durable round delivery attempt.",
         ),
         build_check(
             name="daily_cup_cancel_message_gap",
@@ -173,6 +173,6 @@ def build_daily_cup_delivery_checks(recent_cutoff: datetime) -> list[InvariantCh
                 "recent_cutoff": recent_cutoff,
                 "baseline_schedule_key": baseline_schedule_key,
             },
-            description="Canceled Daily Cup participant is missing a terminal cancel message.",
+            description="Canceled Daily Cup participant is missing a durable cancel delivery attempt.",
         ),
     ]
