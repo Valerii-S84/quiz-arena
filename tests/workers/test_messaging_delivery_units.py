@@ -50,7 +50,8 @@ def _patch_delivery_tracking(
         calls.append(("sent", target.idempotency_key, None))
         if original_target := _kwargs.get("original_target"):
             calls.append(("original_skipped", original_target.idempotency_key, None))
-        return int(_args[2].message_id)
+        message = _args[-2]
+        return int(message if isinstance(message, int) else message.message_id)
 
     async def _mark_fallback_and_original_failed(**kwargs) -> None:
         calls.append(("failed", kwargs["fallback_idempotency_key"], failure_code))
@@ -60,7 +61,7 @@ def _patch_delivery_tracking(
         calls.append(("original_skipped", kwargs["target"].idempotency_key, None))
 
     monkeypatch.setattr(module, "prepare_telegram_delivery", _prepare)
-    monkeypatch.setattr(module, "mark_telegram_delivery_sent", _mark_sent)
+    monkeypatch.setattr(module, "mark_telegram_delivery_sent", _mark_sent, raising=False)
     if hasattr(module, "persist_daily_cup_sent_message"):
         monkeypatch.setattr(module, "persist_daily_cup_sent_message", _persist_sent)
     monkeypatch.setattr(

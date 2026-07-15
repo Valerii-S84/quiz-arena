@@ -6,7 +6,6 @@ from typing import Any
 from app.services.telegram_delivery import (
     begin_telegram_delivery_dispatch,
     mark_telegram_delivery_failed,
-    mark_telegram_delivery_sent,
     prepare_telegram_delivery,
 )
 from app.workers.tasks.messaging_fallback_delivery import (
@@ -54,6 +53,10 @@ async def _persist_initial_round_message(*args: Any, **kwargs: Any) -> int:
     return await persist_private_tournament_sent_message(*args, **kwargs)
 
 
+async def _persist_edited_round_message(*args: Any, **kwargs: Any) -> int:
+    return await persist_private_tournament_sent_message(*args, **kwargs)
+
+
 async def _persist_replacement_round_message(*args: Any, **kwargs: Any) -> int:
     return await persist_private_tournament_sent_message(*args, **kwargs)
 
@@ -93,8 +96,8 @@ async def deliver_round_messages(
         begin_dispatch=_begin_round_delivery_dispatch,
         begin_fallback_dispatch=_begin_fallback_round_delivery_dispatch,
         mark_failed=mark_telegram_delivery_failed,
-        mark_sent=mark_telegram_delivery_sent,
         persist_initial_message=_persist_initial_round_message,
+        persist_edited_message=_persist_edited_round_message,
         persist_replacement_message=_persist_replacement_round_message,
         mark_fallback_and_original_failed=mark_fallback_and_original_edit_failed,
         record_original_skipped=record_original_edit_skipped_after_fallback_skip,

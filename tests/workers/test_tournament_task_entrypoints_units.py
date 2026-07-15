@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -50,18 +51,21 @@ def test_tournament_messaging_helpers_and_enqueue_fallback(monkeypatch: pytest.M
 
 
 @pytest.mark.asyncio
-async def test_run_private_tournament_round_messaging_async_does_not_open_second_transaction(
+async def test_run_private_tournament_round_messaging_async_reloads_inside_mutex(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tournament_id = uuid4()
+    tournament = tournament_row(id=tournament_id, status="ROUND_1", current_round=1)
     context = SimpleNamespace(
         standings_user_ids=[11, 22],
         parsed_tournament_id=tournament_id,
+        tournament=tournament,
     )
+    session_local = SessionLocalStub()
     monkeypatch.setattr(
         tournaments_messaging,
         "SessionLocal",
-        SessionLocalStub(fail_on_commit_calls=(2,)),
+        session_local,
     )
     monkeypatch.setattr(
         tournaments_messaging, "load_round_messaging_context", _async_return(context)
@@ -70,6 +74,11 @@ async def test_run_private_tournament_round_messaging_async_does_not_open_second
         tournaments_messaging,
         "deliver_round_messages",
         _async_return(TournamentRoundDeliveryResult(1, 2, 0, 0, {11: 101}, {22: 202})),
+    )
+    monkeypatch.setattr(
+        tournaments_messaging,
+        "private_tournament_standings_mutex",
+        _unlocked_mutex,
     )
 
     result = await tournaments_messaging.run_private_tournament_round_messaging_async(
@@ -84,6 +93,7 @@ async def test_run_private_tournament_round_messaging_async_does_not_open_second
         "failed": 0,
         "skipped": 0,
     }
+    assert session_local._call_count == 2
 
 
 @pytest.mark.asyncio
@@ -168,3 +178,8 @@ def _record_and_close(target: list[object]):
         coro.close()
 
     return _inner
+
+
+@asynccontextmanager
+async def _unlocked_mutex(_tournament_id):
+    yield

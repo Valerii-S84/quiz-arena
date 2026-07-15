@@ -2,11 +2,28 @@ from __future__ import annotations
 
 from typing import cast
 
+from app.workers.tasks.tournaments_message_delivery_persistence import (
+    PrivateTournamentStandingsFence,
+)
 from app.workers.tasks.tournaments_messaging_delivery_types import (
     TournamentRoundDeliveryContext,
     TournamentRoundDeliveryState,
     TournamentRoundMessageAttempt,
 )
+
+
+def _persistence_fence(
+    delivery_context: TournamentRoundDeliveryContext,
+    attempt: TournamentRoundMessageAttempt,
+) -> PrivateTournamentStandingsFence:
+    tournament = delivery_context.request.context.tournament
+    return PrivateTournamentStandingsFence(
+        tournament_id=delivery_context.request.context.parsed_tournament_id,
+        user_id=attempt.user_id,
+        expected_message_id=attempt.existing_message_id,
+        expected_status=str(tournament.status),
+        expected_round=int(tournament.current_round),
+    )
 
 
 async def send_initial_round_message(
@@ -31,8 +48,7 @@ async def send_initial_round_message(
         return
     message_id = await delivery_context.operations.persist_initial_message(
         attempt.target,
-        delivery_context.request.context.parsed_tournament_id,
-        attempt.user_id,
+        _persistence_fence(delivery_context, attempt),
         message,
         delivery_context.happened_at,
     )
@@ -62,7 +78,6 @@ async def _send_fallback_round_message(
     attempt: TournamentRoundMessageAttempt,
 ) -> None:
     operations = delivery_context.operations
-    context = delivery_context.request.context
     fallback_target = _build_fallback_target(delivery_context, attempt)
     fallback_delivery = await operations.prepare_fallback_delivery(
         target=fallback_target,
@@ -97,11 +112,9 @@ async def _send_fallback_round_message(
         return
     message_id = await operations.persist_replacement_message(
         fallback_target,
-        context.parsed_tournament_id,
-        attempt.user_id,
+        _persistence_fence(delivery_context, attempt),
         message,
         delivery_context.happened_at,
-        replace_existing=True,
         original_target=attempt.target,
     )
     state.sent += 1
@@ -123,9 +136,11 @@ async def edit_or_replace_round_message(
         )
     except Exception as exc:
         if delivery_context.request.is_message_not_modified_error_fn(exc):
-            await delivery_context.operations.mark_sent(
-                idempotency_key=attempt.target.idempotency_key,
-                happened_at=delivery_context.happened_at,
+            await delivery_context.operations.persist_edited_message(
+                attempt.target,
+                _persistence_fence(delivery_context, attempt),
+                int(cast(int, attempt.existing_message_id)),
+                delivery_context.happened_at,
             )
             state.edited += 1
             return
@@ -135,9 +150,11 @@ async def edit_or_replace_round_message(
             attempt=attempt,
         )
         return
-    await delivery_context.operations.mark_sent(
-        idempotency_key=attempt.target.idempotency_key,
-        happened_at=delivery_context.happened_at,
+    await delivery_context.operations.persist_edited_message(
+        attempt.target,
+        _persistence_fence(delivery_context, attempt),
+        int(cast(int, attempt.existing_message_id)),
+        delivery_context.happened_at,
     )
     state.edited += 1
 

@@ -56,14 +56,15 @@ def _patch_delivery_tracking(monkeypatch, module):
     async def _persist_sent(target, *_args, **_kwargs) -> int:
         calls["persisted"].append({"idempotency_key": target.idempotency_key})
         calls["sent"].append({"idempotency_key": target.idempotency_key})
-        return int(_args[2].message_id)
+        message = _args[-2]
+        return int(message if isinstance(message, int) else message.message_id)
 
     async def _failed(**kwargs):
         calls["failed"].append(kwargs)
 
     monkeypatch.setattr(module, "prepare_telegram_delivery", _prepare)
     monkeypatch.setattr(module, "begin_telegram_delivery_dispatch", _dispatch)
-    monkeypatch.setattr(module, "mark_telegram_delivery_sent", _sent)
+    monkeypatch.setattr(module, "mark_telegram_delivery_sent", _sent, raising=False)
     if hasattr(module, "persist_daily_cup_sent_message"):
         monkeypatch.setattr(module, "persist_daily_cup_sent_message", _persist_sent)
     monkeypatch.setattr(
@@ -94,10 +95,16 @@ def _patch_idempotent_prepare(monkeypatch, module):
         return None
 
     async def _persist_sent(_target, *_args, **_kwargs) -> int:
-        return int(_args[2].message_id)
+        message = _args[-2]
+        return int(message if isinstance(message, int) else message.message_id)
 
     monkeypatch.setattr(module, "prepare_telegram_delivery", _prepare)
-    monkeypatch.setattr(module, "mark_telegram_delivery_sent", _mark_terminal)
+    monkeypatch.setattr(
+        module,
+        "mark_telegram_delivery_sent",
+        _mark_terminal,
+        raising=False,
+    )
     if hasattr(module, "persist_daily_cup_sent_message"):
         monkeypatch.setattr(module, "persist_daily_cup_sent_message", _persist_sent)
     monkeypatch.setattr(

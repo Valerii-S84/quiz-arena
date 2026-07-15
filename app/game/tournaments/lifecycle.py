@@ -19,6 +19,7 @@ from app.game.tournaments.constants import (
     TOURNAMENT_STATUS_ROUND_3,
     TOURNAMENT_STATUS_ROUND_4,
     TOURNAMENT_TYPE_DAILY_ARENA,
+    TOURNAMENT_TYPE_PRIVATE,
     daily_cup_max_rounds_for_participants,
 )
 from app.game.tournaments.lifecycle_state import (
@@ -35,6 +36,7 @@ from app.game.tournaments.rounds import (
     create_round_matches,
 )
 from app.game.tournaments.settlement import settle_pending_match_from_duel
+from app.game.tournaments.standings_delivery_coordination import lock_standings_phase_transition
 
 _ACTIVE_ROUND_STATUSES = frozenset(
     {
@@ -68,6 +70,8 @@ async def settle_round_and_advance(
     now_utc: datetime,
     round_duration_hours: int = TOURNAMENT_DEFAULT_ROUND_DURATION_HOURS,
 ) -> dict[str, int]:
+    if tournament.type == TOURNAMENT_TYPE_PRIVATE:
+        await lock_standings_phase_transition(session, tournament_id=tournament.id)
     current_round = max(1, int(tournament.current_round))
     round_matches = await TournamentMatchesRepo.list_by_tournament_round_for_update(
         session,

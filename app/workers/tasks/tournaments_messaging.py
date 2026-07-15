@@ -13,11 +13,16 @@ from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
+from app.game.tournaments.standings_delivery_coordination import private_tournament_standings_mutex
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.task_heartbeat import run_tracked_async_job
-from app.workers.tasks.tournaments_messaging_context import load_round_messaging_context
+from app.workers.tasks.tournaments_messaging_context import (
+    TournamentRoundMessagingContext,
+    load_round_messaging_context,
+)
 from app.workers.tasks.tournaments_messaging_delivery import deliver_round_messages
+from app.workers.tasks.tournaments_messaging_delivery_targets import private_round_content_version
 from app.workers.tasks.tournaments_messaging_text import (
     ROUND_STATUSES,
     build_completed_text,
@@ -69,14 +74,11 @@ def _empty_round_messaging_result() -> dict[str, int]:
     }
 
 
-async def run_private_tournament_round_messaging_async(*, tournament_id: str) -> dict[str, int]:
-    try:
-        parsed_tournament_id = UUID(tournament_id)
-    except ValueError:
-        return _empty_round_messaging_result()
-
+async def _load_round_context(
+    parsed_tournament_id: UUID,
+) -> TournamentRoundMessagingContext | None:
     async with SessionLocal.begin() as session:
-        context = await load_round_messaging_context(
+        return await load_round_messaging_context(
             session=session,
             parsed_tournament_id=parsed_tournament_id,
             tournaments_repo=TournamentsRepo,
@@ -87,22 +89,40 @@ async def run_private_tournament_round_messaging_async(*, tournament_id: str) ->
             round_statuses=ROUND_STATUSES,
             format_user_label_fn=format_user_label,
         )
-        if context is None:
+
+
+async def run_private_tournament_round_messaging_async(*, tournament_id: str) -> dict[str, int]:
+    try:
+        parsed_tournament_id = UUID(tournament_id)
+    except ValueError:
+        return _empty_round_messaging_result()
+
+    initial_context = await _load_round_context(parsed_tournament_id)
+    if initial_context is None:
+        return _empty_round_messaging_result()
+    initial_version = private_round_content_version(tournament=initial_context.tournament)
+
+    async with private_tournament_standings_mutex(parsed_tournament_id):
+        context = await _load_round_context(parsed_tournament_id)
+        if (
+            context is None
+            or private_round_content_version(tournament=context.tournament) != initial_version
+        ):
             return _empty_round_messaging_result()
-    delivery_result = await deliver_round_messages(
-        context=context,
-        build_bot_fn=build_bot,
-        resolve_match_context_fn=resolve_match_context,
-        build_standings_lines_fn=build_standings_lines,
-        build_completed_text_fn=build_completed_text,
-        build_round_text_fn=build_round_text,
-        format_deadline_fn=format_deadline,
-        build_keyboard_fn=build_tournament_lobby_keyboard,
-        add_share_button_fn=_with_standings_share_button,
-        build_share_url_fn=_build_standings_share_url,
-        is_message_not_modified_error_fn=is_message_not_modified_error,
-        logger=logger,
-    )
+        delivery_result = await deliver_round_messages(
+            context=context,
+            build_bot_fn=build_bot,
+            resolve_match_context_fn=resolve_match_context,
+            build_standings_lines_fn=build_standings_lines,
+            build_completed_text_fn=build_completed_text,
+            build_round_text_fn=build_round_text,
+            format_deadline_fn=format_deadline,
+            build_keyboard_fn=build_tournament_lobby_keyboard,
+            add_share_button_fn=_with_standings_share_button,
+            build_share_url_fn=_build_standings_share_url,
+            is_message_not_modified_error_fn=is_message_not_modified_error,
+            logger=logger,
+        )
 
     return {
         "processed": 1,

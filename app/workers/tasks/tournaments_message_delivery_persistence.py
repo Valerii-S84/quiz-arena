@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -8,28 +9,38 @@ from app.db.repo.production_reliability_repo import TelegramDeliveryAttemptsRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.session import SessionLocal
 from app.services.telegram_delivery import SKIP_CODE_EDIT_REPLACED_BY_SEND, TelegramDeliveryTarget
-from app.workers.tasks.tournaments_messaging_persistence import persist_standings_message_ids
+
+
+@dataclass(frozen=True, slots=True)
+class PrivateTournamentStandingsFence:
+    tournament_id: UUID
+    user_id: int
+    expected_message_id: int | None
+    expected_status: str
+    expected_round: int
 
 
 async def persist_private_tournament_sent_message(
     target: TelegramDeliveryTarget,
-    tournament_id: UUID,
-    user_id: int,
-    message: Any,
+    fence: PrivateTournamentStandingsFence,
+    message: Any | int,
     happened_at: datetime,
     *,
-    replace_existing: bool = False,
     original_target: TelegramDeliveryTarget | None = None,
 ) -> int:
-    message_id = int(message.message_id)
+    message_id = int(message if isinstance(message, int) else message.message_id)
     async with SessionLocal.begin() as session:
-        await persist_standings_message_ids(
-            session=session,
-            parsed_tournament_id=tournament_id,
-            participants_repo=TournamentParticipantsRepo,
-            new_message_ids={} if replace_existing else {user_id: message_id},
-            replaced_message_ids={user_id: message_id} if replace_existing else {},
+        persisted = await TournamentParticipantsRepo.compare_and_set_standings_message_id(
+            session,
+            tournament_id=fence.tournament_id,
+            user_id=fence.user_id,
+            expected_message_id=fence.expected_message_id,
+            message_id=message_id,
+            expected_status=fence.expected_status,
+            expected_round=fence.expected_round,
         )
+        if persisted != 1:
+            raise RuntimeError("private tournament standings delivery fence was lost")
         sent = await TelegramDeliveryAttemptsRepo.mark_sent(
             session,
             idempotency_key=target.idempotency_key,
@@ -50,4 +61,4 @@ async def persist_private_tournament_sent_message(
     return message_id
 
 
-__all__ = ["persist_private_tournament_sent_message"]
+__all__ = ["PrivateTournamentStandingsFence", "persist_private_tournament_sent_message"]
