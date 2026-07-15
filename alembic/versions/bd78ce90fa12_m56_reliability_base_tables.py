@@ -128,12 +128,6 @@ def upgrade() -> None:
             "status IN ('OPEN','RESOLVED','ACKED')",
             name="ck_production_invariant_alerts_status",
         ),
-        sa.UniqueConstraint(
-            "type",
-            "correlation_key",
-            "status",
-            name="uq_production_invariant_alerts_type_key_status",
-        ),
     )
 
 
