@@ -21,15 +21,16 @@ def upgrade() -> None:
         "telegram_delivery_attempts",
         ["status", "updated_at"],
     )
-    op.create_index(
-        "idx_attempts_answered_at_user",
-        "quiz_attempts",
-        ["answered_at", "user_id"],
-    )
+    with op.get_context().autocommit_block():
+        op.execute(
+            "CREATE INDEX CONCURRENTLY idx_attempts_answered_at_user "
+            "ON quiz_attempts (answered_at, user_id)"
+        )
 
 
 def downgrade() -> None:
-    op.drop_index("idx_attempts_answered_at_user", table_name="quiz_attempts")
+    with op.get_context().autocommit_block():
+        op.execute("DROP INDEX CONCURRENTLY idx_attempts_answered_at_user")
     op.drop_index(
         "idx_telegram_delivery_status_updated_at",
         table_name="telegram_delivery_attempts",
