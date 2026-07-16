@@ -30,6 +30,8 @@ class TelegramDeliveryAttemptsRepo:
                 target_type=attempt.target_type,
                 target_id=attempt.target_id,
                 safe_context=attempt.safe_context,
+                attempt_count=1,
+                updated_at=func.now(),
             )
             .on_conflict_do_nothing(index_elements=[TelegramDeliveryAttempt.idempotency_key])
             .returning(TelegramDeliveryAttempt)
