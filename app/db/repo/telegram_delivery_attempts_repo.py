@@ -67,7 +67,10 @@ class TelegramDeliveryAttemptsRepo:
     ) -> bool:
         stmt = (
             update(TelegramDeliveryAttempt)
-            .where(TelegramDeliveryAttempt.idempotency_key == idempotency_key)
+            .where(
+                TelegramDeliveryAttempt.idempotency_key == idempotency_key,
+                TelegramDeliveryAttempt.status != "SENT",
+            )
             .values(
                 status="SENT",
                 sent_at=func.now(),
@@ -82,7 +85,15 @@ class TelegramDeliveryAttemptsRepo:
             .returning(TelegramDeliveryAttempt.id)
         )
         result = await session.execute(stmt)
-        return result.scalar_one_or_none() is not None
+        if result.scalar_one_or_none() is not None:
+            return True
+
+        replay_stmt = select(TelegramDeliveryAttempt.id).where(
+            TelegramDeliveryAttempt.idempotency_key == idempotency_key,
+            TelegramDeliveryAttempt.status == "SENT",
+        )
+        replay_result = await session.execute(replay_stmt)
+        return replay_result.scalar_one_or_none() is not None
 
     @staticmethod
     async def mark_failed(
@@ -100,6 +111,7 @@ class TelegramDeliveryAttemptsRepo:
             .values(
                 status="FAILED",
                 failed_at=func.now(),
+                skipped_at=None,
                 failure_code=failure.failure_code,
                 failure_reason=failure.failure_reason,
                 telegram_error_code=failure.telegram_error_code,
