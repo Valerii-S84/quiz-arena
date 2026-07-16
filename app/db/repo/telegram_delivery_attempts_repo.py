@@ -93,7 +93,10 @@ class TelegramDeliveryAttemptsRepo:
     ) -> bool:
         stmt = (
             update(TelegramDeliveryAttempt)
-            .where(TelegramDeliveryAttempt.idempotency_key == idempotency_key)
+            .where(
+                TelegramDeliveryAttempt.idempotency_key == idempotency_key,
+                TelegramDeliveryAttempt.status != "SENT",
+            )
             .values(
                 status="FAILED",
                 failed_at=func.now(),
@@ -118,7 +121,10 @@ class TelegramDeliveryAttemptsRepo:
     ) -> bool:
         stmt = (
             update(TelegramDeliveryAttempt)
-            .where(TelegramDeliveryAttempt.idempotency_key == idempotency_key)
+            .where(
+                TelegramDeliveryAttempt.idempotency_key == idempotency_key,
+                TelegramDeliveryAttempt.status != "SENT",
+            )
             .values(
                 status="SKIPPED",
                 skipped_at=func.now(),
