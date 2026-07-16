@@ -128,8 +128,11 @@ class TelegramDeliveryAttemptsRepo:
             .values(
                 status="SKIPPED",
                 skipped_at=func.now(),
+                failed_at=None,
                 failure_code=failure_code,
                 failure_reason=failure_reason,
+                telegram_error_code=None,
+                is_blocked_candidate=False,
                 updated_at=func.now(),
             )
             .returning(TelegramDeliveryAttempt.id)
