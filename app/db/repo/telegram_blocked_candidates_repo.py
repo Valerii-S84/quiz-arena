@@ -20,6 +20,7 @@ class TelegramBlockedCandidatesRepo:
         stmt = (
             select(TelegramDeliveryAttempt)
             .where(
+                TelegramDeliveryAttempt.status == "FAILED",
                 TelegramDeliveryAttempt.is_blocked_candidate.is_(True),
                 TelegramDeliveryAttempt.failed_at >= since_utc,
             )
