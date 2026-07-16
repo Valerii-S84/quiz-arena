@@ -76,6 +76,20 @@ async def test_delivery_attempt_status_updates_are_scoped_by_idempotency_key() -
     assert "UPDATE telegram_delivery_attempts SET" in sent_sql
     assert "status='SENT'" in sent_sql
     assert "telegram_delivery_attempts.idempotency_key = 'delivery:daily:1'" in sent_sql
+    assert "telegram_delivery_attempts.status != 'SENT'" in sent_sql
+
+    replay_sent_session = RecordingSession(ScalarResult(None), ScalarResult(1))
+    assert (
+        await TelegramDeliveryAttemptsRepo.mark_sent(
+            replay_sent_session,
+            idempotency_key="delivery:daily:1",
+        )
+        is True
+    )
+    replay_update_sql = compile_statement(replay_sent_session.statements[0])
+    replay_select_sql = compile_statement(replay_sent_session.statements[1])
+    assert "telegram_delivery_attempts.status != 'SENT'" in replay_update_sql
+    assert "telegram_delivery_attempts.status = 'SENT'" in replay_select_sql
 
     failed_session = RecordingSession(ScalarResult(1))
     assert (
@@ -93,6 +107,7 @@ async def test_delivery_attempt_status_updates_are_scoped_by_idempotency_key() -
     )
     failed_sql = compile_statement(failed_session.statement)
     assert "status='FAILED'" in failed_sql
+    assert "skipped_at=NULL" in failed_sql
     assert "failure_code='TELEGRAM_FORBIDDEN'" in failed_sql
     assert "is_blocked_candidate=true" in failed_sql
     assert "telegram_delivery_attempts.status != 'SENT'" in failed_sql
