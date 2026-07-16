@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.db.repo.production_reliability_types import TelegramDeliveryAttemptCreate
 from app.workers.tasks import daily_cup_registration_push as push
 from tests.game.tournaments_unit_support import NOW_UTC
 from tests.workers.payments_reliability_async_support import SessionLocalStub
@@ -15,9 +16,11 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     bot = _Bot([])
-    attempts: list[object] = []
+    attempts: list[TelegramDeliveryAttemptCreate] = []
 
-    async def _deliver_once(_session_local, *, attempt, send, **_kwargs):
+    async def _deliver_once(
+        _session_local, *, attempt: TelegramDeliveryAttemptCreate, send, **_kwargs
+    ):
         attempts.append(attempt)
         await send()
         return SimpleNamespace(status="SENT")
