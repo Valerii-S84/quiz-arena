@@ -129,6 +129,21 @@ async def test_delivery_attempt_status_updates_are_scoped_by_idempotency_key() -
     assert "is_blocked_candidate=false" in skipped_sql
     assert "telegram_delivery_attempts.status != 'SENT'" in skipped_sql
 
+    deferred_session = RecordingSession(ScalarResult(1))
+    assert (
+        await TelegramDeliveryAttemptsRepo.defer_retry_after(
+            deferred_session,
+            idempotency_key="delivery:daily:1",
+            retry_after_seconds=7,
+            claim_ttl_seconds=60,
+        )
+        is True
+    )
+    deferred_sql = compile_statement(deferred_session.statement)
+    assert "attempt_count=(telegram_delivery_attempts.attempt_count + 1)" in deferred_sql
+    assert "make_interval" in deferred_sql
+    assert "telegram_delivery_attempts.status = 'PENDING'" in deferred_sql
+
 
 async def test_blocked_candidates_query_filters_candidates_since_timestamp() -> None:
     since_utc = datetime(2026, 7, 16, 12, 0, tzinfo=UTC)
