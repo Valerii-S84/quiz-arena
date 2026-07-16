@@ -59,6 +59,8 @@ async def test_delivery_attempt_create_once_uses_idempotency_key() -> None:
     assert was_created is True
     sql = compile_parameterized_statement(session.statement)
     assert "INSERT INTO telegram_delivery_attempts" in sql
+    assert "attempt_count" in sql
+    assert "now()" in sql
     assert "ON CONFLICT (idempotency_key) DO NOTHING" in sql
     assert "raw_payload" not in sql
 
