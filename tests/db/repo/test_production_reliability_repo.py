@@ -95,6 +95,21 @@ async def test_delivery_attempt_status_updates_are_scoped_by_idempotency_key() -
     assert "status='FAILED'" in failed_sql
     assert "failure_code='TELEGRAM_FORBIDDEN'" in failed_sql
     assert "is_blocked_candidate=true" in failed_sql
+    assert "telegram_delivery_attempts.status != 'SENT'" in failed_sql
+
+    skipped_session = RecordingSession(ScalarResult(1))
+    assert (
+        await TelegramDeliveryAttemptsRepo.mark_skipped(
+            skipped_session,
+            idempotency_key="delivery:daily:1",
+            failure_code="DUPLICATE",
+            failure_reason="already handled",
+        )
+        is True
+    )
+    skipped_sql = compile_statement(skipped_session.statement)
+    assert "status='SKIPPED'" in skipped_sql
+    assert "telegram_delivery_attempts.status != 'SENT'" in skipped_sql
 
 
 async def test_blocked_candidates_query_filters_candidates_since_timestamp() -> None:
@@ -111,8 +126,9 @@ async def test_blocked_candidates_query_filters_candidates_since_timestamp() -> 
 
     sql = compile_statement(session.statement)
     assert "telegram_delivery_attempts.is_blocked_candidate IS true" in sql
-    assert "telegram_delivery_attempts.created_at >= '2026-07-16 12:00:00+00:00'" in sql
+    assert "telegram_delivery_attempts.failed_at >= '2026-07-16 12:00:00+00:00'" in sql
     assert "telegram_delivery_attempts.flow = 'daily_cup'" in sql
+    assert "telegram_delivery_attempts.failed_at DESC" in sql
     assert "LIMIT 1" in sql
 
 
@@ -124,10 +140,13 @@ async def test_retry_claim_uses_pending_rows_with_skip_locked() -> None:
         session,
         flow="daily_cup",
         limit=10,
+        claim_ttl_seconds=60,
     ) == [row]
 
     sql = compile_statement(session.statement)
     assert "UPDATE telegram_delivery_attempts SET" in sql
     assert "attempt_count=(telegram_delivery_attempts.attempt_count + 1)" in sql
     assert "telegram_delivery_attempts.status = 'PENDING'" in sql
+    assert "telegram_delivery_attempts.attempt_count = 0" in sql
+    assert ">= 60" in sql
     assert "FOR UPDATE SKIP LOCKED" in sql
