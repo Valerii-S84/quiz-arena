@@ -19,6 +19,24 @@ class TelegramDeliveryExceptionOutcome:
     retry_after_seconds: int | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class TelegramDeliverySkip:
+    failure_code: str
+    failure_reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TelegramDeliveryOutcome:
+    status: TelegramDeliveryOutcomeStatus
+    created: bool
+    attempted: bool
+    replayed: bool = False
+    failure_code: str | None = None
+    failure_reason: str | None = None
+    telegram_error_code: int | None = None
+    retry_after_seconds: int | None = None
+
+
 def classify_telegram_delivery_exception(
     exc: Exception,
 ) -> TelegramDeliveryExceptionOutcome | None:
@@ -57,6 +75,8 @@ def _failure_reason(exc: Exception) -> str:
 __all__ = [
     "TELEGRAM_DELIVERY_TERMINAL_STATUSES",
     "TelegramDeliveryExceptionOutcome",
+    "TelegramDeliveryOutcome",
     "TelegramDeliveryOutcomeStatus",
+    "TelegramDeliverySkip",
     "classify_telegram_delivery_exception",
 ]
