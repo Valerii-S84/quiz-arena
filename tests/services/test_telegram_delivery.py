@@ -6,7 +6,10 @@ import pytest
 from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
 from aiogram.methods import SendMessage
 
-from app.db.repo.production_reliability_types import TelegramDeliveryAttemptCreate
+from app.db.repo.production_reliability_types import (
+    TelegramDeliveryAttemptCreate,
+    TelegramDeliveryFailure,
+)
 from app.services.telegram_delivery import (
     TelegramDeliverySkip,
     claim_telegram_delivery_retries,
@@ -20,8 +23,9 @@ class _AttemptsRepo:
         self.row = row
         self.created = created
         self.sent: list[str] = []
-        self.failed: list[object] = []
+        self.failed: list[TelegramDeliveryFailure] = []
         self.skipped: list[tuple[str, str | None]] = []
+        self.deferred: list[tuple[str, int, int]] = []
 
     async def create_once(self, _session, *, attempt):
         return self.row, self.created
@@ -43,6 +47,17 @@ class _AttemptsRepo:
         failure_reason: str | None = None,
     ) -> bool:
         self.skipped.append((failure_code, failure_reason))
+        return True
+
+    async def defer_retry_after(
+        self,
+        _session,
+        *,
+        idempotency_key: str,
+        retry_after_seconds: int,
+        claim_ttl_seconds: int,
+    ) -> bool:
+        self.deferred.append((idempotency_key, retry_after_seconds, claim_ttl_seconds))
         return True
 
 
@@ -100,6 +115,61 @@ async def test_deliver_telegram_once_preserves_sent_replay_behind_skip_gate() ->
     assert repo.sent == []
     assert repo.failed == []
     assert repo.skipped == []
+    assert repo.deferred == []
+
+
+@pytest.mark.asyncio
+async def test_deliver_telegram_once_blocks_pending_replay_without_sending() -> None:
+    repo = _AttemptsRepo(row=SimpleNamespace(status="PENDING"), created=False)
+
+    async def _send() -> object:
+        pytest.fail("pending replay must not send concurrently")
+
+    outcome = await deliver_telegram_once(
+        AsyncSessionStub(),
+        attempt=_attempt(),
+        send=_send,
+        attempts_repo=repo,
+    )
+
+    assert outcome.status == "RETRY"
+    assert outcome.failure_code == "PENDING_REPLAY"
+    assert outcome.replayed is True
+    assert outcome.attempted is False
+    assert repo.sent == []
+    assert repo.failed == []
+    assert repo.skipped == []
+    assert repo.deferred == []
+
+
+@pytest.mark.asyncio
+async def test_deliver_telegram_once_preserves_terminal_failure_metadata() -> None:
+    repo = _AttemptsRepo(
+        row=SimpleNamespace(
+            status="FAILED",
+            failure_code="TELEGRAM_FORBIDDEN",
+            failure_reason="blocked",
+            telegram_error_code=403,
+        ),
+        created=False,
+    )
+
+    async def _send() -> object:
+        pytest.fail("terminal replay must not send again")
+
+    outcome = await deliver_telegram_once(
+        AsyncSessionStub(),
+        attempt=_attempt(),
+        send=_send,
+        attempts_repo=repo,
+    )
+
+    assert outcome.status == "FAILED"
+    assert outcome.failure_code == "TELEGRAM_FORBIDDEN"
+    assert outcome.failure_reason == "blocked"
+    assert outcome.telegram_error_code == 403
+    assert outcome.replayed is True
+    assert outcome.attempted is False
 
 
 @pytest.mark.asyncio
@@ -180,7 +250,7 @@ async def test_deliver_telegram_once_records_forbidden_as_blocked_failure() -> N
 
 @pytest.mark.asyncio
 async def test_deliver_telegram_once_keeps_retry_after_pending_for_retry() -> None:
-    repo = _AttemptsRepo(row=SimpleNamespace(status="PENDING"), created=False)
+    repo = _AttemptsRepo(row=SimpleNamespace(status="PENDING"), created=True)
 
     async def _send() -> object:
         raise TelegramRetryAfter(
@@ -199,10 +269,11 @@ async def test_deliver_telegram_once_keeps_retry_after_pending_for_retry() -> No
     assert outcome.status == "RETRY"
     assert outcome.retry_after_seconds == 7
     assert outcome.attempted is True
-    assert outcome.replayed is True
+    assert outcome.replayed is False
     assert repo.sent == []
     assert repo.failed == []
     assert repo.skipped == []
+    assert repo.deferred == [("delivery:daily:1:101", 7, 300)]
 
 
 @pytest.mark.asyncio
@@ -227,14 +298,17 @@ async def test_deliver_telegram_once_reraises_unclassified_failures() -> None:
 
 @pytest.mark.asyncio
 async def test_claim_telegram_delivery_retries_delegates_pending_claim() -> None:
-    rows = [SimpleNamespace(id=1)]
+    rows: list[object] = [SimpleNamespace(id=1)]
     repo = _RetryRepo(rows)
 
-    assert await claim_telegram_delivery_retries(
-        AsyncSessionStub(),
-        flow="daily_cup",
-        limit=25,
-        claim_ttl_seconds=120,
-        retry_repo=repo,
-    ) == rows
+    assert (
+        await claim_telegram_delivery_retries(
+            AsyncSessionStub(),
+            flow="daily_cup",
+            limit=25,
+            claim_ttl_seconds=120,
+            retry_repo=repo,
+        )
+        == rows
+    )
     assert repo.calls == [("daily_cup", 25, 120)]
