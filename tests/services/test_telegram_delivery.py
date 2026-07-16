@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
+from types import SimpleNamespace, TracebackType
 
 import pytest
 from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
@@ -78,6 +78,34 @@ class _RetryRepo:
         return self.rows
 
 
+class _SessionBegin:
+    def __init__(self, events: list[str] | None = None) -> None:
+        self.events = events
+
+    async def __aenter__(self) -> AsyncSessionStub:
+        if self.events is not None:
+            self.events.append("begin")
+        return AsyncSessionStub()
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> bool:
+        if self.events is not None:
+            self.events.append("rollback" if exc_type is not None else "commit")
+        return False
+
+
+class _SessionLocal:
+    def __init__(self, events: list[str] | None = None) -> None:
+        self.events = events
+
+    def begin(self) -> _SessionBegin:
+        return _SessionBegin(self.events)
+
+
 def _attempt() -> TelegramDeliveryAttemptCreate:
     return TelegramDeliveryAttemptCreate(
         flow="daily_cup",
@@ -99,7 +127,7 @@ async def test_deliver_telegram_once_preserves_sent_replay_behind_skip_gate() ->
         pytest.fail("sent replay must not send again")
 
     outcome = await deliver_telegram_once(
-        AsyncSessionStub(),
+        _SessionLocal(),
         attempt=_attempt(),
         send=_send,
         skip=TelegramDeliverySkip(
@@ -126,7 +154,7 @@ async def test_deliver_telegram_once_blocks_pending_replay_without_sending() -> 
         pytest.fail("pending replay must not send concurrently")
 
     outcome = await deliver_telegram_once(
-        AsyncSessionStub(),
+        _SessionLocal(),
         attempt=_attempt(),
         send=_send,
         attempts_repo=repo,
@@ -140,6 +168,32 @@ async def test_deliver_telegram_once_blocks_pending_replay_without_sending() -> 
     assert repo.failed == []
     assert repo.skipped == []
     assert repo.deferred == []
+
+
+@pytest.mark.asyncio
+async def test_deliver_telegram_once_allows_claimed_pending_retry_to_send() -> None:
+    repo = _AttemptsRepo(row=SimpleNamespace(status="PENDING"), created=False)
+    sends = 0
+
+    async def _send() -> object:
+        nonlocal sends
+        sends += 1
+        return object()
+
+    outcome = await deliver_telegram_once(
+        _SessionLocal(),
+        attempt=_attempt(),
+        send=_send,
+        allow_pending_replay_send=True,
+        attempts_repo=repo,
+    )
+
+    assert outcome.status == "SENT"
+    assert outcome.created is False
+    assert outcome.replayed is True
+    assert outcome.attempted is True
+    assert sends == 1
+    assert repo.sent == ["delivery:daily:1:101"]
 
 
 @pytest.mark.asyncio
@@ -158,7 +212,7 @@ async def test_deliver_telegram_once_preserves_terminal_failure_metadata() -> No
         pytest.fail("terminal replay must not send again")
 
     outcome = await deliver_telegram_once(
-        AsyncSessionStub(),
+        _SessionLocal(),
         attempt=_attempt(),
         send=_send,
         attempts_repo=repo,
@@ -180,7 +234,7 @@ async def test_deliver_telegram_once_marks_pending_skip_without_sending() -> Non
         pytest.fail("skipped delivery must not call Telegram")
 
     outcome = await deliver_telegram_once(
-        AsyncSessionStub(),
+        _SessionLocal(),
         attempt=_attempt(),
         send=_send,
         skip=TelegramDeliverySkip(failure_code="NO_CHAT_ID", failure_reason="missing target"),
@@ -206,7 +260,7 @@ async def test_deliver_telegram_once_marks_sent_after_successful_send() -> None:
         return object()
 
     outcome = await deliver_telegram_once(
-        AsyncSessionStub(),
+        _SessionLocal(),
         attempt=_attempt(),
         send=_send,
         attempts_repo=repo,
@@ -221,6 +275,27 @@ async def test_deliver_telegram_once_marks_sent_after_successful_send() -> None:
 
 
 @pytest.mark.asyncio
+async def test_deliver_telegram_once_commits_claim_before_send() -> None:
+    repo = _AttemptsRepo(row=SimpleNamespace(status="PENDING"), created=True)
+    events: list[str] = []
+
+    async def _send() -> object:
+        events.append("send")
+        return object()
+
+    outcome = await deliver_telegram_once(
+        _SessionLocal(events),
+        attempt=_attempt(),
+        send=_send,
+        attempts_repo=repo,
+    )
+
+    assert outcome.status == "SENT"
+    assert events == ["begin", "commit", "send", "begin", "commit"]
+    assert repo.sent == ["delivery:daily:1:101"]
+
+
+@pytest.mark.asyncio
 async def test_deliver_telegram_once_records_forbidden_as_blocked_failure() -> None:
     repo = _AttemptsRepo(row=SimpleNamespace(status="PENDING"), created=True)
 
@@ -231,7 +306,7 @@ async def test_deliver_telegram_once_records_forbidden_as_blocked_failure() -> N
         )
 
     outcome = await deliver_telegram_once(
-        AsyncSessionStub(),
+        _SessionLocal(),
         attempt=_attempt(),
         send=_send,
         attempts_repo=repo,
@@ -260,7 +335,7 @@ async def test_deliver_telegram_once_keeps_retry_after_pending_for_retry() -> No
         )
 
     outcome = await deliver_telegram_once(
-        AsyncSessionStub(),
+        _SessionLocal(),
         attempt=_attempt(),
         send=_send,
         attempts_repo=repo,
@@ -285,7 +360,7 @@ async def test_deliver_telegram_once_reraises_unclassified_failures() -> None:
 
     with pytest.raises(RuntimeError, match="ambiguous send failure"):
         await deliver_telegram_once(
-            AsyncSessionStub(),
+            _SessionLocal(),
             attempt=_attempt(),
             send=_send,
             attempts_repo=repo,
