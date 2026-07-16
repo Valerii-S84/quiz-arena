@@ -9,8 +9,8 @@ from app.bot.application import build_bot
 from app.bot.keyboards.daily_cup import build_daily_cup_registration_keyboard
 from app.bot.texts.de import TEXTS_DE
 from app.core.analytics_events import BERLIN_TIMEZONE, EVENT_SOURCE_WORKER
-from app.db.repo.production_reliability_types import TelegramDeliveryAttemptCreate
 from app.db.repo.analytics_repo import AnalyticsRepo
+from app.db.repo.production_reliability_types import TelegramDeliveryAttemptCreate
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.constants import TOURNAMENT_STATUS_REGISTRATION

@@ -21,8 +21,8 @@ from app.game.tournaments.constants import (
     TOURNAMENT_STATUS_REGISTRATION,
     TOURNAMENT_TYPE_DAILY_ARENA,
 )
-from app.services.telegram_delivery import deliver_telegram_once
 from app.game.tournaments.internal import generate_invite_code
+from app.services.telegram_delivery import deliver_telegram_once
 from app.workers.tasks.daily_cup_config import TOURNAMENT_MAX_PARTICIPANTS
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
 
