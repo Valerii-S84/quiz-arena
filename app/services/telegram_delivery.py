@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,22 +20,70 @@ from app.services.telegram_delivery_outcomes import (
 TelegramDeliverySend = Callable[[], Awaitable[object]]
 
 
+@dataclass(frozen=True, slots=True)
+class _PreparedDelivery:
+    created: bool
+    replayed: bool
+
+
 async def deliver_telegram_once(
-    session: AsyncSession,
+    session_local: Any,
     *,
     attempt: TelegramDeliveryAttemptCreate,
     send: TelegramDeliverySend,
     skip: TelegramDeliverySkip | None = None,
+    allow_pending_replay_send: bool = False,
     retry_claim_ttl_seconds: int = 300,
     attempts_repo: Any = TelegramDeliveryAttemptsRepo,
 ) -> TelegramDeliveryOutcome:
+    async with session_local.begin() as session:
+        prepared = await _prepare_delivery_attempt(
+            session,
+            attempt=attempt,
+            skip=skip,
+            allow_pending_replay_send=allow_pending_replay_send,
+            attempts_repo=attempts_repo,
+        )
+        if isinstance(prepared, TelegramDeliveryOutcome):
+            return prepared
+
+    try:
+        await send()
+    except Exception as exc:
+        return await _record_send_exception(
+            session_local,
+            exc=exc,
+            idempotency_key=attempt.idempotency_key,
+            prepared=prepared,
+            retry_claim_ttl_seconds=retry_claim_ttl_seconds,
+            attempts_repo=attempts_repo,
+        )
+
+    async with session_local.begin() as session:
+        await attempts_repo.mark_sent(session, idempotency_key=attempt.idempotency_key)
+    return TelegramDeliveryOutcome(
+        status="SENT",
+        created=prepared.created,
+        attempted=True,
+        replayed=prepared.replayed,
+    )
+
+
+async def _prepare_delivery_attempt(
+    session: AsyncSession,
+    *,
+    attempt: TelegramDeliveryAttemptCreate,
+    skip: TelegramDeliverySkip | None,
+    allow_pending_replay_send: bool,
+    attempts_repo: Any,
+) -> TelegramDeliveryOutcome | _PreparedDelivery:
     row, created = await attempts_repo.create_once(session, attempt=attempt)
     current_status = str(getattr(row, "status", "PENDING"))
     replayed = not created
 
     if current_status in TELEGRAM_DELIVERY_TERMINAL_STATUSES:
         return _terminal_replay_outcome(row=row, status=current_status, created=created)
-    if replayed and current_status == "PENDING":
+    if replayed and current_status == "PENDING" and not allow_pending_replay_send:
         return _pending_replay_outcome(created=created)
 
     if skip is not None:
@@ -46,26 +95,7 @@ async def deliver_telegram_once(
         )
         return _skipped_outcome(created=created, replayed=replayed, skip=skip)
 
-    try:
-        await send()
-    except Exception as exc:
-        return await _handle_send_exception(
-            session,
-            exc=exc,
-            idempotency_key=attempt.idempotency_key,
-            created=created,
-            replayed=replayed,
-            retry_claim_ttl_seconds=retry_claim_ttl_seconds,
-            attempts_repo=attempts_repo,
-        )
-
-    await attempts_repo.mark_sent(session, idempotency_key=attempt.idempotency_key)
-    return TelegramDeliveryOutcome(
-        status="SENT",
-        created=created,
-        attempted=True,
-        replayed=replayed,
-    )
+    return _PreparedDelivery(created=created, replayed=replayed)
 
 
 def _terminal_replay_outcome(
@@ -111,13 +141,12 @@ def _skipped_outcome(
     )
 
 
-async def _handle_send_exception(
-    session: AsyncSession,
+async def _record_send_exception(
+    session_local: Any,
     *,
     exc: Exception,
     idempotency_key: str,
-    created: bool,
-    replayed: bool,
+    prepared: _PreparedDelivery,
     retry_claim_ttl_seconds: int,
     attempts_repo: Any,
 ) -> TelegramDeliveryOutcome:
@@ -125,28 +154,30 @@ async def _handle_send_exception(
     if classified is None:
         raise exc
     if classified.status == "RETRY":
-        return await _defer_retry_after(
-            session,
-            idempotency_key=idempotency_key,
-            created=created,
-            replayed=replayed,
-            retry_after_seconds=classified.retry_after_seconds,
-            retry_claim_ttl_seconds=retry_claim_ttl_seconds,
-            attempts_repo=attempts_repo,
-        )
+        async with session_local.begin() as session:
+            return await _defer_retry_after(
+                session,
+                idempotency_key=idempotency_key,
+                created=prepared.created,
+                replayed=prepared.replayed,
+                retry_after_seconds=classified.retry_after_seconds,
+                retry_claim_ttl_seconds=retry_claim_ttl_seconds,
+                attempts_repo=attempts_repo,
+            )
     if classified.failure is None:
         raise exc
 
-    await attempts_repo.mark_failed(
-        session,
-        idempotency_key=idempotency_key,
-        failure=classified.failure,
-    )
+    async with session_local.begin() as session:
+        await attempts_repo.mark_failed(
+            session,
+            idempotency_key=idempotency_key,
+            failure=classified.failure,
+        )
     return TelegramDeliveryOutcome(
         status="FAILED",
-        created=created,
+        created=prepared.created,
         attempted=True,
-        replayed=replayed,
+        replayed=prepared.replayed,
         failure_code=classified.failure.failure_code,
         failure_reason=classified.failure.failure_reason,
         telegram_error_code=classified.failure.telegram_error_code,
