@@ -191,6 +191,30 @@ def test_critical_constraints_present() -> None:
     assert "idx_telegram_delivery_flow_correlation" in telegram_delivery_indexes
     assert "idx_telegram_delivery_target" in telegram_delivery_indexes
     assert "idx_telegram_delivery_blocked_candidate" in telegram_delivery_indexes
+    assert "idx_telegram_delivery_pending_claim" in telegram_delivery_indexes
+    telegram_delivery_index_columns = {
+        index.name: [column.name for column in index.columns]
+        for index in telegram_delivery_attempts.indexes
+    }
+    assert telegram_delivery_index_columns["idx_telegram_delivery_blocked_candidate"] == [
+        "status",
+        "is_blocked_candidate",
+        "failed_at",
+    ]
+    assert telegram_delivery_index_columns["idx_telegram_delivery_pending_claim"] == [
+        "flow",
+        "attempt_count",
+        "updated_at",
+        "created_at",
+        "id",
+    ]
+    pending_claim_index = next(
+        index
+        for index in telegram_delivery_attempts.indexes
+        if index.name == "idx_telegram_delivery_pending_claim"
+    )
+    pending_claim_where = pending_claim_index.dialect_options["postgresql"]["where"]
+    assert str(pending_claim_where) == "status = 'PENDING'"
     telegram_delivery_unique_constraints = {
         constraint.name
         for constraint in telegram_delivery_attempts.constraints
