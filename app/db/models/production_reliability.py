@@ -29,7 +29,21 @@ class TelegramDeliveryAttempt(Base):
         ),
         Index("idx_telegram_delivery_flow_correlation", "flow", "correlation_id", "status"),
         Index("idx_telegram_delivery_target", "target_type", "target_id", "created_at"),
-        Index("idx_telegram_delivery_blocked_candidate", "is_blocked_candidate", "created_at"),
+        Index(
+            "idx_telegram_delivery_blocked_candidate",
+            "status",
+            "is_blocked_candidate",
+            "failed_at",
+        ),
+        Index(
+            "idx_telegram_delivery_pending_claim",
+            "flow",
+            "attempt_count",
+            "updated_at",
+            "created_at",
+            "id",
+            postgresql_where=text("status = 'PENDING'"),
+        ),
         UniqueConstraint(
             "idempotency_key",
             name="uq_telegram_delivery_attempts_idempotency_key",
