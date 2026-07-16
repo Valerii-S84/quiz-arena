@@ -5,8 +5,9 @@ from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
+from aiogram.exceptions import TelegramForbiddenError
 
-from app.workers.tasks import daily_cup_turn_reminder
+from app.workers.tasks import daily_cup_turn_reminder, daily_cup_turn_reminder_delivery
 from tests.workers.daily_cup_turn_reminder_test_support import (
     RecordingBot,
     reminder_candidate,
@@ -155,6 +156,11 @@ async def test_turn_reminders_mark_candidates_deduplicate_targets_and_store_even
         _fake_store_push_sent_events,
     )
     monkeypatch.setattr(
+        daily_cup_turn_reminder_delivery,
+        "deliver_telegram_once",
+        _fake_deliver_once,
+    )
+    monkeypatch.setattr(
         daily_cup_turn_reminder.logger,
         "info",
         lambda event, **kwargs: info_logs.append({"event": event, **kwargs}),
@@ -272,6 +278,11 @@ async def test_turn_reminders_count_send_failures_and_swallow_event_store_errors
         _failing_store_push_sent_events,
     )
     monkeypatch.setattr(
+        daily_cup_turn_reminder_delivery,
+        "deliver_telegram_once",
+        _fake_deliver_once,
+    )
+    monkeypatch.setattr(
         daily_cup_turn_reminder.logger,
         "warning",
         lambda event, **kwargs: warning_logs.append({"event": event, **kwargs}),
@@ -294,3 +305,11 @@ async def test_turn_reminders_count_send_failures_and_swallow_event_store_errors
         "daily_cup_turn_reminder_send_failed",
         "daily_cup_turn_reminder_event_store_failed",
     ]
+
+
+async def _fake_deliver_once(_session_local, *, send, **_kwargs):
+    try:
+        await send()
+    except TelegramForbiddenError:
+        return SimpleNamespace(status="FAILED")
+    return SimpleNamespace(status="SENT")

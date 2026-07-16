@@ -5,13 +5,14 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
-from aiogram.exceptions import TelegramForbiddenError
+import structlog
 from sqlalchemy import text
 
 from app.bot.application import build_bot
 from app.bot.texts.de import TEXTS_DE
 from app.core.analytics_events import EVENT_SOURCE_WORKER, emit_analytics_event
 from app.db.models.tournaments import Tournament
+from app.db.repo.production_reliability_types import TelegramDeliveryAttemptCreate
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.session import SessionLocal
@@ -20,9 +21,12 @@ from app.game.tournaments.constants import (
     TOURNAMENT_STATUS_REGISTRATION,
     TOURNAMENT_TYPE_DAILY_ARENA,
 )
+from app.services.telegram_delivery import deliver_telegram_once
 from app.game.tournaments.internal import generate_invite_code
 from app.workers.tasks.daily_cup_config import TOURNAMENT_MAX_PARTICIPANTS
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
+
+logger = structlog.get_logger("app.workers.tasks.daily_cup_core")
 
 
 def now_utc() -> datetime:
@@ -102,22 +106,66 @@ async def emit_daily_cup_events(
 async def send_daily_cup_canceled_messages(
     *,
     telegram_targets: list[int],
+    tournament_id: str,
     bot_factory: Callable[[], Any] | None = None,
+    session_local: Any | None = None,
+    deliver_once: Any | None = None,
 ) -> None:
     if not telegram_targets:
         return
     resolved_bot_factory = bot_factory if bot_factory is not None else build_bot
+    resolved_session_local = session_local if session_local is not None else SessionLocal
+    resolved_deliver_once = deliver_once if deliver_once is not None else deliver_telegram_once
     bot = resolved_bot_factory()
     try:
         for chat_id in telegram_targets:
-            try:
-                await bot.send_message(chat_id=chat_id, text=TEXTS_DE["msg.daily_cup.canceled"])
-            except TelegramForbiddenError:
-                continue
-            except Exception:
-                continue
+            await _deliver_daily_cup_canceled_message(
+                bot=bot,
+                chat_id=chat_id,
+                tournament_id=tournament_id,
+                session_local=resolved_session_local,
+                deliver_once=resolved_deliver_once,
+            )
     finally:
         await bot.session.close()
+
+
+async def _deliver_daily_cup_canceled_message(
+    *,
+    bot: Any,
+    chat_id: int,
+    tournament_id: str,
+    session_local: Any,
+    deliver_once: Any,
+) -> None:
+    async def _send() -> None:
+        await bot.send_message(chat_id=chat_id, text=TEXTS_DE["msg.daily_cup.canceled"])
+
+    try:
+        await deliver_once(
+            session_local,
+            attempt=_daily_cup_cancel_attempt(tournament_id=tournament_id, chat_id=chat_id),
+            send=_send,
+        )
+    except Exception as exc:
+        logger.warning(
+            "daily_cup_cancel_delivery_failed",
+            tournament_id=tournament_id,
+            error_type=type(exc).__name__,
+        )
+        return
+
+
+def _daily_cup_cancel_attempt(*, tournament_id: str, chat_id: int) -> TelegramDeliveryAttemptCreate:
+    return TelegramDeliveryAttemptCreate(
+        flow="daily_cup",
+        task_name="daily_cup.cancel_delivery",
+        correlation_id=f"daily_cup_cancel:{tournament_id}",
+        idempotency_key=f"daily_cup:cancel:{tournament_id}:{chat_id}",
+        target_type="daily_cup_cancel",
+        target_id=tournament_id,
+        telegram_user_id=chat_id,
+    )
 
 
 async def persist_daily_cup_standings_message_ids(

@@ -15,7 +15,15 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     bot = _Bot([])
+    attempts: list[object] = []
+
+    async def _deliver_once(_session_local, *, attempt, send, **_kwargs):
+        attempts.append(attempt)
+        await send()
+        return SimpleNamespace(status="SENT")
+
     monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push, "deliver_telegram_once", _deliver_once)
     monkeypatch.setattr(
         push.AnalyticsRepo,
         "create_daily_cup_push_event_once",
@@ -25,51 +33,42 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
     assert await push._send_daily_cup_registration_push_once(
         bot=bot,
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
-        user_id=11,
-        telegram_user_id=101,
-        text="text",
-        tournament_id_text="tid",
-        happened_at=NOW_UTC,
-        sent_event_type="sent",
+        item=_push_item(),
     )
     assert bot.sent == [101]
+    assert attempts[0].idempotency_key == "daily_cup:sent:tid:11"
 
 
 @pytest.mark.asyncio
-async def test_send_daily_cup_registration_push_once_skips_unclaimed_or_failed_send(
+async def test_send_daily_cup_registration_push_once_skips_failed_delivery(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    async def _failed_delivery(*_args, **_kwargs):
+        return SimpleNamespace(status="FAILED")
+
     monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
-    monkeypatch.setattr(
-        push.AnalyticsRepo,
-        "create_daily_cup_push_event_once",
-        _async_return(False),
-    )
+    monkeypatch.setattr(push, "deliver_telegram_once", _failed_delivery)
     assert not await push._send_daily_cup_registration_push_once(
         bot=_Bot([]),
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
-        user_id=11,
-        telegram_user_id=101,
-        text="text",
-        tournament_id_text="tid",
-        happened_at=NOW_UTC,
-        sent_event_type="sent",
+        item=_push_item(),
     )
 
-    monkeypatch.setattr(
-        push.AnalyticsRepo,
-        "create_daily_cup_push_event_once",
-        _async_return(True),
-    )
+
+@pytest.mark.asyncio
+async def test_send_daily_cup_registration_push_once_handles_unclassified_send_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _deliver_once(_session_local, *, send, **_kwargs):
+        await send()
+        return SimpleNamespace(status="SENT")
+
+    monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push, "deliver_telegram_once", _deliver_once)
     assert not await push._send_daily_cup_registration_push_once(
         bot=_Bot([RuntimeError("send failed")]),
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
-        user_id=11,
-        telegram_user_id=101,
-        text="text",
-        tournament_id_text="tid",
-        happened_at=NOW_UTC,
-        sent_event_type="sent",
+        item=_push_item(),
     )
 
 
@@ -92,7 +91,7 @@ async def test_send_daily_cup_registration_push_async_counts_targets(
         return []
 
     async def _send_once(**kwargs) -> bool:
-        return kwargs["user_id"] == 22
+        return kwargs["item"].user_id == 22
 
     monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
     monkeypatch.setattr(push, "ensure_daily_cup_registration_tournament", _async_return(tournament))
@@ -158,3 +157,14 @@ def _async_return(value: object):
         return value
 
     return _inner
+
+
+def _push_item() -> push._RegistrationPushItem:
+    return push._RegistrationPushItem(
+        user_id=11,
+        telegram_user_id=101,
+        text="text",
+        tournament_id_text="tid",
+        happened_at=NOW_UTC,
+        sent_event_type="sent",
+    )

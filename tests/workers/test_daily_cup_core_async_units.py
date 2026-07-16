@@ -54,7 +54,10 @@ async def test_send_daily_cup_canceled_messages_ignores_send_errors() -> None:
 
     await daily_cup_core.send_daily_cup_canceled_messages(
         telegram_targets=[101, 102],
+        tournament_id="tid",
         bot_factory=lambda: bot,
+        session_local=SimpleNamespace(),
+        deliver_once=_fake_deliver_once,
     )
 
     assert bot.sent == [102]
@@ -67,13 +70,15 @@ async def test_close_daily_cup_registration_cancels_when_too_few_participants(
 ) -> None:
     tournament = tournament_row(type="DAILY_ARENA")
     canceled_targets: list[int] = []
+    cancel_tournament_ids: list[str] = []
     participants = [participant_row(tournament_id=tournament.id, user_id=11)]
 
     async def _emit(*, events: list[dict[str, object]], **_kwargs) -> None:
         if events:
             canceled_targets.append(0)
 
-    async def _send(*, telegram_targets: list[int], **_kwargs) -> None:
+    async def _send(*, telegram_targets: list[int], tournament_id: str, **_kwargs) -> None:
+        cancel_tournament_ids.append(tournament_id)
         canceled_targets.extend(telegram_targets)
 
     monkeypatch.setattr(daily_cup_async, "SessionLocal", SessionLocalStub())
@@ -101,6 +106,7 @@ async def test_close_daily_cup_registration_cancels_when_too_few_participants(
     assert result["canceled"] == 1
     assert result["started"] == 0
     assert canceled_targets == [0, 101]
+    assert cancel_tournament_ids == [str(tournament.id)]
 
 
 @pytest.mark.asyncio
@@ -148,3 +154,8 @@ def _async_return(value: object):
         return value
 
     return _inner
+
+
+async def _fake_deliver_once(_session_local, *, send, **_kwargs):
+    await send()
+    return SimpleNamespace(status="SENT")
