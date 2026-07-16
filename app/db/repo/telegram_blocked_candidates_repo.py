@@ -21,10 +21,10 @@ class TelegramBlockedCandidatesRepo:
             select(TelegramDeliveryAttempt)
             .where(
                 TelegramDeliveryAttempt.is_blocked_candidate.is_(True),
-                TelegramDeliveryAttempt.created_at >= since_utc,
+                TelegramDeliveryAttempt.failed_at >= since_utc,
             )
             .order_by(
-                TelegramDeliveryAttempt.created_at.desc(),
+                TelegramDeliveryAttempt.failed_at.desc(),
                 TelegramDeliveryAttempt.id.desc(),
             )
             .limit(max(1, int(limit)))
