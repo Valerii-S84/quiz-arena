@@ -83,6 +83,7 @@ async def publish_daily_cup_final_results_async() -> dict[str, int]:
 async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
     now_utc_value = _now_utc()
     canceled_telegram_targets: list[int] = []
+    canceled_tournament_id: str | None = None
     started_tournament_id: str | None = None
     enqueue_legacy_round_messaging = False
     events: list[dict[str, object]] = []
@@ -107,6 +108,7 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
                 session, [int(item.user_id) for item in participants]
             )
             canceled_telegram_targets = [int(user.telegram_user_id) for user in users]
+            canceled_tournament_id = str(tournament.id)
             canceled = 1
             events.append(
                 {
@@ -144,9 +146,12 @@ async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
             )
 
     await emit_daily_cup_events(now_utc_value=now_utc_value, events=events)
-    await send_daily_cup_canceled_messages(
-        telegram_targets=canceled_telegram_targets, bot_factory=build_bot
-    )
+    if canceled_tournament_id is not None:
+        await send_daily_cup_canceled_messages(
+            telegram_targets=canceled_telegram_targets,
+            tournament_id=canceled_tournament_id,
+            bot_factory=build_bot,
+        )
     if started_tournament_id is not None and enqueue_legacy_round_messaging:
         enqueue_daily_cup_round_messaging(tournament_id=started_tournament_id)
     return {

@@ -146,6 +146,22 @@ async def test_delivery_attempt_status_updates_are_scoped_by_idempotency_key() -
     assert "make_interval" in deferred_sql
     assert "telegram_delivery_attempts.status = 'PENDING'" in deferred_sql
 
+    stale_claim_session = RecordingSession(ScalarResult(1))
+    assert (
+        await TelegramDeliveryAttemptsRepo.claim_stale_pending_replay(
+            stale_claim_session,
+            idempotency_key="delivery:daily:1",
+            claim_ttl_seconds=300,
+        )
+        is True
+    )
+    stale_claim_sql = compile_statement(stale_claim_session.statement)
+    assert "attempt_count=(telegram_delivery_attempts.attempt_count + 1)" in stale_claim_sql
+    assert "updated_at=now()" in stale_claim_sql
+    assert "telegram_delivery_attempts.idempotency_key = 'delivery:daily:1'" in stale_claim_sql
+    assert "telegram_delivery_attempts.status = 'PENDING'" in stale_claim_sql
+    assert "make_interval" in stale_claim_sql
+
 
 async def test_blocked_candidates_query_filters_candidates_since_timestamp() -> None:
     since_utc = datetime(2026, 7, 16, 12, 0, tzinfo=UTC)

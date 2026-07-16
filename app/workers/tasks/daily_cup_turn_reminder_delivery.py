@@ -3,11 +3,13 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from aiogram.exceptions import TelegramForbiddenError
+from app.db.repo.production_reliability_types import TelegramDeliveryAttemptCreate
+from app.services.telegram_delivery import deliver_telegram_once
+from app.workers.tasks.daily_cup_config import DAILY_CUP_TURN_REMINDER_INTERVAL_MINUTES
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,6 +20,7 @@ class ReminderItem:
     target_chat_id: int
     opponent_label: str
     deadline_text: str
+    occurrence_key: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,6 +97,7 @@ async def prepare_reminder_batch(
                         user_labels=user_labels,
                     ),
                     deadline_text=format_deadline_fn(match.deadline),
+                    occurrence_key=_reminder_occurrence_key(now_utc_value),
                 )
             )
 
@@ -111,41 +115,30 @@ async def deliver_reminders(
     build_keyboard: Callable[..., object],
     build_text: Callable[..., str],
     logger: Any,
+    session_local: Any,
+    deliver_once: Any | None = None,
 ) -> ReminderDeliveryResult:
     sent_total = 0
     failed_total = 0
     sent_user_ids_by_tournament: dict[UUID, list[int]] = defaultdict(list)
+    resolved_deliver_once = deliver_once if deliver_once is not None else deliver_telegram_once
 
     bot = build_bot_fn()
     try:
         for reminder in reminders:
-            keyboard = build_keyboard(
-                tournament_id=str(reminder.tournament_id),
-                can_join=False,
-                play_challenge_id=reminder.challenge_id,
-                show_share_result=False,
+            delivered = await _deliver_one_reminder(
+                bot=bot,
+                reminder=reminder,
+                build_keyboard=build_keyboard,
+                build_text=build_text,
+                logger=logger,
+                session_local=session_local,
+                deliver_once=resolved_deliver_once,
             )
-            text = build_text(
-                opponent_label=reminder.opponent_label,
-                deadline_text=reminder.deadline_text,
-            )
-            try:
-                await bot.send_message(
-                    chat_id=reminder.target_chat_id,
-                    text=text,
-                    reply_markup=keyboard,
-                )
+            if delivered:
                 sent_total += 1
                 sent_user_ids_by_tournament[reminder.tournament_id].append(reminder.target_user_id)
-            except TelegramForbiddenError:
-                failed_total += 1
-            except Exception as exc:
-                logger.warning(
-                    "daily_cup_turn_reminder_send_failed",
-                    challenge_id=reminder.challenge_id,
-                    user_id=reminder.target_user_id,
-                    error_type=type(exc).__name__,
-                )
+            else:
                 failed_total += 1
     finally:
         await bot.session.close()
@@ -155,6 +148,84 @@ async def deliver_reminders(
         failed_total=failed_total,
         sent_user_ids_by_tournament=sent_user_ids_by_tournament,
     )
+
+
+async def _deliver_one_reminder(
+    *,
+    bot: Any,
+    reminder: ReminderItem,
+    build_keyboard: Callable[..., object],
+    build_text: Callable[..., str],
+    logger: Any,
+    session_local: Any,
+    deliver_once: Any,
+) -> bool:
+    keyboard = _build_reminder_keyboard(reminder=reminder, build_keyboard=build_keyboard)
+    text = build_text(opponent_label=reminder.opponent_label, deadline_text=reminder.deadline_text)
+
+    async def _send() -> None:
+        await bot.send_message(
+            chat_id=reminder.target_chat_id,
+            text=text,
+            reply_markup=keyboard,
+        )
+
+    try:
+        outcome = await deliver_once(
+            session_local,
+            attempt=_turn_reminder_attempt(reminder),
+            send=_send,
+        )
+    except Exception as exc:
+        logger.warning(
+            "daily_cup_turn_reminder_send_failed",
+            challenge_id=reminder.challenge_id,
+            user_id=reminder.target_user_id,
+            error_type=type(exc).__name__,
+        )
+        return False
+    return outcome.status == "SENT"
+
+
+def _build_reminder_keyboard(
+    *,
+    reminder: ReminderItem,
+    build_keyboard: Callable[..., object],
+) -> object:
+    return build_keyboard(
+        tournament_id=str(reminder.tournament_id),
+        can_join=False,
+        play_challenge_id=reminder.challenge_id,
+        show_share_result=False,
+    )
+
+
+def _turn_reminder_attempt(reminder: ReminderItem) -> TelegramDeliveryAttemptCreate:
+    tournament_id = str(reminder.tournament_id)
+    return TelegramDeliveryAttemptCreate(
+        flow="daily_cup",
+        task_name="daily_cup.turn_reminder",
+        correlation_id=f"daily_cup_turn_reminder:{tournament_id}",
+        idempotency_key=(
+            f"daily_cup:turn_reminder:{tournament_id}:"
+            f"{reminder.challenge_id}:{reminder.target_user_id}:{reminder.occurrence_key}"
+        ),
+        target_type="daily_cup_turn_reminder",
+        target_id=reminder.challenge_id,
+        telegram_user_id=reminder.target_chat_id,
+        safe_context={
+            "tournament_id": tournament_id,
+            "target_user_id": reminder.target_user_id,
+            "occurrence_key": reminder.occurrence_key,
+        },
+    )
+
+
+def _reminder_occurrence_key(now_utc_value: datetime) -> str:
+    interval_seconds = max(60, int(DAILY_CUP_TURN_REMINDER_INTERVAL_MINUTES) * 60)
+    if now_utc_value.tzinfo is None:
+        now_utc_value = now_utc_value.replace(tzinfo=timezone.utc)
+    return str(int(now_utc_value.timestamp()) // interval_seconds)
 
 
 __all__ = [

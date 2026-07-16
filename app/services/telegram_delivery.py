@@ -33,6 +33,7 @@ async def deliver_telegram_once(
     send: TelegramDeliverySend,
     skip: TelegramDeliverySkip | None = None,
     allow_pending_replay_send: bool = False,
+    allow_stale_pending_replay_send: bool = False,
     retry_claim_ttl_seconds: int = 300,
     attempts_repo: Any = TelegramDeliveryAttemptsRepo,
 ) -> TelegramDeliveryOutcome:
@@ -42,6 +43,8 @@ async def deliver_telegram_once(
             attempt=attempt,
             skip=skip,
             allow_pending_replay_send=allow_pending_replay_send,
+            allow_stale_pending_replay_send=allow_stale_pending_replay_send,
+            pending_replay_ttl_seconds=retry_claim_ttl_seconds,
             attempts_repo=attempts_repo,
         )
         if isinstance(prepared, TelegramDeliveryOutcome):
@@ -75,6 +78,8 @@ async def _prepare_delivery_attempt(
     attempt: TelegramDeliveryAttemptCreate,
     skip: TelegramDeliverySkip | None,
     allow_pending_replay_send: bool,
+    allow_stale_pending_replay_send: bool,
+    pending_replay_ttl_seconds: int,
     attempts_repo: Any,
 ) -> TelegramDeliveryOutcome | _PreparedDelivery:
     row, created = await attempts_repo.create_once(session, attempt=attempt)
@@ -83,8 +88,16 @@ async def _prepare_delivery_attempt(
 
     if current_status in TELEGRAM_DELIVERY_TERMINAL_STATUSES:
         return _terminal_replay_outcome(row=row, status=current_status, created=created)
-    if replayed and current_status == "PENDING" and not allow_pending_replay_send:
-        return _pending_replay_outcome(created=created)
+    if replayed and current_status == "PENDING":
+        if not await _can_replay_pending(
+            session=session,
+            allow_pending_replay_send=allow_pending_replay_send,
+            allow_stale_pending_replay_send=allow_stale_pending_replay_send,
+            idempotency_key=attempt.idempotency_key,
+            pending_replay_ttl_seconds=pending_replay_ttl_seconds,
+            attempts_repo=attempts_repo,
+        ):
+            return _pending_replay_outcome(created=created)
 
     if skip is not None:
         await attempts_repo.mark_skipped(
@@ -96,6 +109,26 @@ async def _prepare_delivery_attempt(
         return _skipped_outcome(created=created, replayed=replayed, skip=skip)
 
     return _PreparedDelivery(created=created, replayed=replayed)
+
+
+async def _can_replay_pending(
+    *,
+    session: AsyncSession,
+    allow_pending_replay_send: bool,
+    allow_stale_pending_replay_send: bool,
+    idempotency_key: str,
+    pending_replay_ttl_seconds: int,
+    attempts_repo: Any,
+) -> bool:
+    if allow_pending_replay_send:
+        return True
+    if not allow_stale_pending_replay_send:
+        return False
+    return await attempts_repo.claim_stale_pending_replay(
+        session,
+        idempotency_key=idempotency_key,
+        claim_ttl_seconds=pending_replay_ttl_seconds,
+    )
 
 
 def _terminal_replay_outcome(

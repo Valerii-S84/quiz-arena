@@ -179,3 +179,28 @@ class TelegramDeliveryAttemptsRepo:
         )
         result = await session.execute(stmt)
         return result.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def claim_stale_pending_replay(
+        session: AsyncSession,
+        *,
+        idempotency_key: str,
+        claim_ttl_seconds: int = 300,
+    ) -> bool:
+        claim_ttl = max(1, int(claim_ttl_seconds))
+        stmt = (
+            update(TelegramDeliveryAttempt)
+            .where(
+                TelegramDeliveryAttempt.idempotency_key == idempotency_key,
+                TelegramDeliveryAttempt.status == "PENDING",
+                TelegramDeliveryAttempt.updated_at
+                <= func.now() - func.make_interval(0, 0, 0, 0, 0, 0, claim_ttl),
+            )
+            .values(
+                attempt_count=TelegramDeliveryAttempt.attempt_count + 1,
+                updated_at=func.now(),
+            )
+            .returning(TelegramDeliveryAttempt.id)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
