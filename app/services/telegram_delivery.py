@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
 from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,29 +10,13 @@ from app.db.repo.telegram_delivery_attempts_repo import TelegramDeliveryAttempts
 from app.db.repo.telegram_delivery_retry_repo import TelegramDeliveryRetryRepo
 from app.services.telegram_delivery_outcomes import (
     TELEGRAM_DELIVERY_TERMINAL_STATUSES,
+    TelegramDeliveryOutcome,
     TelegramDeliveryOutcomeStatus,
+    TelegramDeliverySkip,
     classify_telegram_delivery_exception,
 )
 
 TelegramDeliverySend = Callable[[], Awaitable[object]]
-
-
-@dataclass(frozen=True, slots=True)
-class TelegramDeliverySkip:
-    failure_code: str
-    failure_reason: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class TelegramDeliveryOutcome:
-    status: TelegramDeliveryOutcomeStatus
-    created: bool
-    attempted: bool
-    replayed: bool = False
-    failure_code: str | None = None
-    failure_reason: str | None = None
-    telegram_error_code: int | None = None
-    retry_after_seconds: int | None = None
 
 
 async def deliver_telegram_once(
@@ -210,12 +193,3 @@ async def claim_telegram_delivery_retries(
         limit=limit,
         claim_ttl_seconds=claim_ttl_seconds,
     )
-
-
-__all__ = [
-    "TelegramDeliveryOutcome",
-    "TelegramDeliverySend",
-    "TelegramDeliverySkip",
-    "claim_telegram_delivery_retries",
-    "deliver_telegram_once",
-]
