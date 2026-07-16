@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.production_reliability import TelegramDeliveryAttempt
@@ -13,12 +13,18 @@ class TelegramDeliveryRetryRepo:
         *,
         flow: str,
         limit: int,
+        claim_ttl_seconds: int = 300,
     ) -> list[TelegramDeliveryAttempt]:
+        claim_age_seconds = func.extract("epoch", func.now() - TelegramDeliveryAttempt.updated_at)
         candidate_ids = (
             select(TelegramDeliveryAttempt.id)
             .where(
                 TelegramDeliveryAttempt.flow == flow,
                 TelegramDeliveryAttempt.status == "PENDING",
+                or_(
+                    TelegramDeliveryAttempt.attempt_count == 0,
+                    claim_age_seconds >= max(1, int(claim_ttl_seconds)),
+                ),
             )
             .order_by(
                 TelegramDeliveryAttempt.created_at.asc(),
