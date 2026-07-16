@@ -201,6 +201,7 @@ def test_critical_constraints_present() -> None:
         "status",
         "is_blocked_candidate",
         "failed_at",
+        "id",
     ]
     pending_claim_index = next(
         index
@@ -209,10 +210,10 @@ def test_critical_constraints_present() -> None:
     )
     assert [str(column.name) for column in pending_claim_index.columns] == [
         "flow",
-        "attempt_count",
-        "updated_at",
         "created_at",
         "id",
+        "attempt_count",
+        "updated_at",
     ]
     pending_claim_where = pending_claim_index.dialect_options["postgresql"]["where"]
     assert str(pending_claim_where) == "status = 'PENDING'"
