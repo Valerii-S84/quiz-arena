@@ -121,7 +121,7 @@ async def _send_daily_cup_registration_push_once(
             user_id=item.user_id,
             error_type=type(exc).__name__,
         )
-    return True
+    return outcome.attempted
 
 
 async def send_daily_cup_registration_push_async(

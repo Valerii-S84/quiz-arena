@@ -25,7 +25,7 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
         attempts.append(attempt)
         delivery_kwargs.append(_kwargs)
         await send()
-        return SimpleNamespace(status="SENT")
+        return SimpleNamespace(status="SENT", attempted=True)
 
     monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
     monkeypatch.setattr(push, "deliver_telegram_once", _deliver_once)
@@ -43,6 +43,38 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
     assert bot.sent == [101]
     assert attempts[0].idempotency_key == "daily_cup:sent:tid:11"
     assert delivery_kwargs[0]["allow_stale_pending_replay_send"] is True
+    assert delivery_kwargs[0]["retry_claim_ttl_seconds"] == 300
+
+
+@pytest.mark.asyncio
+async def test_send_daily_cup_registration_push_once_repairs_sent_replay_without_counting_sent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bot = _Bot([])
+    stored_events: list[str] = []
+
+    async def _sent_replay(*_args, **_kwargs):
+        return SimpleNamespace(status="SENT", attempted=False)
+
+    async def _store_event_once(_session, **kwargs) -> bool:
+        stored_events.append(str(kwargs["event_type"]))
+        return True
+
+    monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push, "deliver_telegram_once", _sent_replay)
+    monkeypatch.setattr(
+        push.AnalyticsRepo,
+        "create_daily_cup_push_event_once",
+        _store_event_once,
+    )
+
+    assert not await push._send_daily_cup_registration_push_once(
+        bot=bot,
+        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+        item=_push_item(),
+    )
+    assert bot.sent == []
+    assert stored_events == ["sent"]
 
 
 @pytest.mark.asyncio
@@ -67,7 +99,7 @@ async def test_send_daily_cup_registration_push_once_handles_unclassified_send_e
 ) -> None:
     async def _deliver_once(_session_local, *, send, **_kwargs):
         await send()
-        return SimpleNamespace(status="SENT")
+        return SimpleNamespace(status="SENT", attempted=True)
 
     monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
     monkeypatch.setattr(push, "deliver_telegram_once", _deliver_once)

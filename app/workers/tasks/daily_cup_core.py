@@ -28,6 +28,8 @@ from app.workers.tasks.daily_cup_time import get_daily_cup_window
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_core")
 
+_CANCEL_DELIVERY_PENDING_REPLAY_TTL_SECONDS = 300
+
 
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -146,6 +148,8 @@ async def _deliver_daily_cup_canceled_message(
             session_local,
             attempt=_daily_cup_cancel_attempt(tournament_id=tournament_id, chat_id=chat_id),
             send=_send,
+            allow_stale_pending_replay_send=True,
+            retry_claim_ttl_seconds=_CANCEL_DELIVERY_PENDING_REPLAY_TTL_SECONDS,
         )
     except Exception as exc:
         logger.warning(

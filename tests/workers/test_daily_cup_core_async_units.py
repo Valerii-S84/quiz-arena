@@ -51,17 +51,25 @@ async def test_daily_cup_core_emits_events_and_persists_message_ids(
 @pytest.mark.asyncio
 async def test_send_daily_cup_canceled_messages_ignores_send_errors() -> None:
     bot = _Bot([RuntimeError("blocked"), None])
+    delivery_kwargs: list[dict[str, object]] = []
+
+    async def _deliver_once(_session_local, *, send, **kwargs):
+        delivery_kwargs.append(kwargs)
+        await send()
+        return SimpleNamespace(status="SENT")
 
     await daily_cup_core.send_daily_cup_canceled_messages(
         telegram_targets=[101, 102],
         tournament_id="tid",
         bot_factory=lambda: bot,
         session_local=SimpleNamespace(),
-        deliver_once=_fake_deliver_once,
+        deliver_once=_deliver_once,
     )
 
     assert bot.sent == [102]
     assert bot.closed
+    assert [kwargs["allow_stale_pending_replay_send"] for kwargs in delivery_kwargs] == [True, True]
+    assert [kwargs["retry_claim_ttl_seconds"] for kwargs in delivery_kwargs] == [300, 300]
 
 
 @pytest.mark.asyncio
@@ -154,8 +162,3 @@ def _async_return(value: object):
         return value
 
     return _inner
-
-
-async def _fake_deliver_once(_session_local, *, send, **_kwargs):
-    await send()
-    return SimpleNamespace(status="SENT")
