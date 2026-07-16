@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
+from aiogram.exceptions import (
+    TelegramBadRequest,
+    TelegramForbiddenError,
+    TelegramNotFound,
+    TelegramRetryAfter,
+)
 from aiogram.methods import SendMessage
 
 from app.services.telegram_delivery_outcomes import classify_telegram_delivery_exception
@@ -35,6 +40,22 @@ def test_classify_telegram_bad_request_as_non_blocked_failure() -> None:
     assert outcome.failure is not None
     assert outcome.failure.failure_code == "TELEGRAM_BAD_REQUEST"
     assert outcome.failure.telegram_error_code == 400
+    assert outcome.failure.is_blocked_candidate is False
+
+
+def test_classify_telegram_not_found_as_terminal_failure() -> None:
+    outcome = classify_telegram_delivery_exception(
+        TelegramNotFound(
+            method=SendMessage(chat_id=101, text="x"),
+            message="chat not found",
+        )
+    )
+
+    assert outcome is not None
+    assert outcome.status == "FAILED"
+    assert outcome.failure is not None
+    assert outcome.failure.failure_code == "TELEGRAM_NOT_FOUND"
+    assert outcome.failure.telegram_error_code == 404
     assert outcome.failure.is_blocked_candidate is False
 
 
