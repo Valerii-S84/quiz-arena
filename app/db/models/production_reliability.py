@@ -34,14 +34,15 @@ class TelegramDeliveryAttempt(Base):
             "status",
             "is_blocked_candidate",
             "failed_at",
+            "id",
         ),
         Index(
             "idx_telegram_delivery_pending_claim",
             "flow",
-            "attempt_count",
-            "updated_at",
             "created_at",
             "id",
+            "attempt_count",
+            "updated_at",
             postgresql_where=text("status = 'PENDING'"),
         ),
         UniqueConstraint(
