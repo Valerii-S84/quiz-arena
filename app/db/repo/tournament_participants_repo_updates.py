@@ -3,10 +3,11 @@ from __future__ import annotations
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import update
+from sqlalchemy import exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.tournament_participants import TournamentParticipant
+from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_participants_updates import update_participant
 
 
@@ -85,6 +86,37 @@ class TournamentParticipantsRepoUpdatesMixin:
             tournament_id=tournament_id,
             user_id=user_id,
             values={"standings_message_id": message_id},
+        )
+
+    @staticmethod
+    async def compare_and_set_standings_message_id(
+        session: AsyncSession,
+        *,
+        tournament_id: UUID,
+        user_id: int,
+        expected_message_id: int | None,
+        message_id: int,
+        expected_status: str,
+        expected_round: int,
+    ) -> int:
+        current_message_filter = (
+            TournamentParticipant.standings_message_id.is_(None)
+            if expected_message_id is None
+            else TournamentParticipant.standings_message_id == expected_message_id
+        )
+        current_generation = exists(
+            select(Tournament.id).where(
+                Tournament.id == tournament_id,
+                Tournament.status == expected_status,
+                Tournament.current_round == expected_round,
+            )
+        )
+        return await update_participant(
+            session,
+            tournament_id=tournament_id,
+            user_id=user_id,
+            values={"standings_message_id": message_id},
+            extra_filters=(current_message_filter, current_generation),
         )
 
     @staticmethod
