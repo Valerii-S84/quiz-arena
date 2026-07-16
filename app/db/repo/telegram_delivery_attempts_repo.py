@@ -151,3 +151,29 @@ class TelegramDeliveryAttemptsRepo:
         )
         result = await session.execute(stmt)
         return result.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def defer_retry_after(
+        session: AsyncSession,
+        *,
+        idempotency_key: str,
+        retry_after_seconds: int,
+        claim_ttl_seconds: int = 300,
+    ) -> bool:
+        retry_after = max(1, int(retry_after_seconds))
+        claim_ttl = max(1, int(claim_ttl_seconds))
+        retry_offset = claim_ttl - retry_after
+        stmt = (
+            update(TelegramDeliveryAttempt)
+            .where(
+                TelegramDeliveryAttempt.idempotency_key == idempotency_key,
+                TelegramDeliveryAttempt.status == "PENDING",
+            )
+            .values(
+                attempt_count=TelegramDeliveryAttempt.attempt_count + 1,
+                updated_at=func.now() - func.make_interval(0, 0, 0, 0, 0, 0, retry_offset),
+            )
+            .returning(TelegramDeliveryAttempt.id)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
