@@ -15,6 +15,7 @@ from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.tournaments.constants import TOURNAMENT_STATUS_REGISTRATION
 from app.services.telegram_delivery import deliver_telegram_once
+from app.services.telegram_delivery_outcomes import classify_telegram_delivery_exception
 from app.workers.tasks.daily_cup_config import (
     DAILY_CUP_ACTIVE_LOOKBACK_DAYS,
     DAILY_CUP_PUSH_BATCH_SIZE,
@@ -22,6 +23,12 @@ from app.workers.tasks.daily_cup_config import (
 from app.workers.tasks.daily_cup_core import ensure_daily_cup_registration_tournament
 from app.workers.tasks.daily_cup_push_events import list_already_pushed_user_ids
 from app.workers.tasks.daily_cup_time import format_close_time_local
+
+_PENDING_REPLAY_TTL_SECONDS = 300
+
+
+class _RegistrationPushSendError(Exception):
+    pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,21 +84,29 @@ async def _send_daily_cup_registration_push_once(
     item: _RegistrationPushItem,
 ) -> bool:
     async def _send() -> None:
-        await _send_registration_push_message(bot=bot, item=item)
+        try:
+            await _send_registration_push_message(bot=bot, item=item)
+        except Exception as exc:
+            if classify_telegram_delivery_exception(exc) is not None:
+                raise
+            raise _RegistrationPushSendError from exc
 
     try:
         outcome = await deliver_telegram_once(
             SessionLocal,
             attempt=_registration_push_attempt(item),
             send=_send,
+            allow_stale_pending_replay_send=True,
+            retry_claim_ttl_seconds=_PENDING_REPLAY_TTL_SECONDS,
         )
-    except Exception as exc:
+    except _RegistrationPushSendError as exc:
+        cause = exc.__cause__ if exc.__cause__ is not None else exc
         logger.warning(
             "daily_cup_registration_push_send_failed",
             event_type=item.sent_event_type,
             tournament_id=item.tournament_id_text,
             user_id=item.user_id,
-            error_type=type(exc).__name__,
+            error_type=type(cause).__name__,
         )
         return False
     if outcome.status != "SENT":

@@ -3,12 +3,13 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
 from app.db.repo.production_reliability_types import TelegramDeliveryAttemptCreate
 from app.services.telegram_delivery import deliver_telegram_once
+from app.workers.tasks.daily_cup_config import DAILY_CUP_TURN_REMINDER_INTERVAL_MINUTES
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,6 +20,7 @@ class ReminderItem:
     target_chat_id: int
     opponent_label: str
     deadline_text: str
+    occurrence_key: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +97,7 @@ async def prepare_reminder_batch(
                         user_labels=user_labels,
                     ),
                     deadline_text=format_deadline_fn(match.deadline),
+                    occurrence_key=_reminder_occurrence_key(now_utc_value),
                 )
             )
 
@@ -205,7 +208,7 @@ def _turn_reminder_attempt(reminder: ReminderItem) -> TelegramDeliveryAttemptCre
         correlation_id=f"daily_cup_turn_reminder:{tournament_id}",
         idempotency_key=(
             f"daily_cup:turn_reminder:{tournament_id}:"
-            f"{reminder.challenge_id}:{reminder.target_user_id}"
+            f"{reminder.challenge_id}:{reminder.target_user_id}:{reminder.occurrence_key}"
         ),
         target_type="daily_cup_turn_reminder",
         target_id=reminder.challenge_id,
@@ -213,8 +216,16 @@ def _turn_reminder_attempt(reminder: ReminderItem) -> TelegramDeliveryAttemptCre
         safe_context={
             "tournament_id": tournament_id,
             "target_user_id": reminder.target_user_id,
+            "occurrence_key": reminder.occurrence_key,
         },
     )
+
+
+def _reminder_occurrence_key(now_utc_value: datetime) -> str:
+    interval_seconds = max(60, int(DAILY_CUP_TURN_REMINDER_INTERVAL_MINUTES) * 60)
+    if now_utc_value.tzinfo is None:
+        now_utc_value = now_utc_value.replace(tzinfo=timezone.utc)
+    return str(int(now_utc_value.timestamp()) // interval_seconds)
 
 
 __all__ = [

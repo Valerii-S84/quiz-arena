@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace, TracebackType
 
 import pytest
@@ -26,6 +27,7 @@ class _AttemptsRepo:
         self.failed: list[TelegramDeliveryFailure] = []
         self.skipped: list[tuple[str, str | None]] = []
         self.deferred: list[tuple[str, int, int]] = []
+        self.stale_claims: list[tuple[str, int]] = []
 
     async def create_once(self, _session, *, attempt):
         return self.row, self.created
@@ -58,6 +60,23 @@ class _AttemptsRepo:
         claim_ttl_seconds: int,
     ) -> bool:
         self.deferred.append((idempotency_key, retry_after_seconds, claim_ttl_seconds))
+        return True
+
+    async def claim_stale_pending_replay(
+        self,
+        _session,
+        *,
+        idempotency_key: str,
+        claim_ttl_seconds: int,
+    ) -> bool:
+        updated_at = getattr(self.row, "updated_at", None)
+        if not isinstance(updated_at, datetime):
+            return False
+        if updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) - updated_at < timedelta(seconds=claim_ttl_seconds):
+            return False
+        self.stale_claims.append((idempotency_key, claim_ttl_seconds))
         return True
 
 
@@ -168,6 +187,63 @@ async def test_deliver_telegram_once_blocks_pending_replay_without_sending() -> 
     assert repo.failed == []
     assert repo.skipped == []
     assert repo.deferred == []
+
+
+@pytest.mark.asyncio
+async def test_deliver_telegram_once_allows_stale_pending_replay_only_after_ttl() -> None:
+    repo = _AttemptsRepo(
+        row=SimpleNamespace(
+            status="PENDING",
+            updated_at=datetime.now(timezone.utc) - timedelta(seconds=301),
+        ),
+        created=False,
+    )
+    sends = 0
+
+    async def _send() -> object:
+        nonlocal sends
+        sends += 1
+        return object()
+
+    outcome = await deliver_telegram_once(
+        _SessionLocal(),
+        attempt=_attempt(),
+        send=_send,
+        allow_stale_pending_replay_send=True,
+        retry_claim_ttl_seconds=300,
+        attempts_repo=repo,
+    )
+
+    assert outcome.status == "SENT"
+    assert outcome.replayed is True
+    assert sends == 1
+    assert repo.sent == ["delivery:daily:1:101"]
+    assert repo.stale_claims == [("delivery:daily:1:101", 300)]
+
+
+@pytest.mark.asyncio
+async def test_deliver_telegram_once_blocks_fresh_pending_with_stale_replay_policy() -> None:
+    repo = _AttemptsRepo(
+        row=SimpleNamespace(status="PENDING", updated_at=datetime.now(timezone.utc)),
+        created=False,
+    )
+
+    async def _send() -> object:
+        pytest.fail("fresh pending replay must not send concurrently")
+
+    outcome = await deliver_telegram_once(
+        _SessionLocal(),
+        attempt=_attempt(),
+        send=_send,
+        allow_stale_pending_replay_send=True,
+        retry_claim_ttl_seconds=300,
+        attempts_repo=repo,
+    )
+
+    assert outcome.status == "RETRY"
+    assert outcome.failure_code == "PENDING_REPLAY"
+    assert repo.sent == []
+    assert repo.stale_claims == []
 
 
 @pytest.mark.asyncio

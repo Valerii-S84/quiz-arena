@@ -307,9 +307,33 @@ async def test_turn_reminders_count_send_failures_and_swallow_event_store_errors
     ]
 
 
+def test_turn_reminder_delivery_key_changes_by_occurrence() -> None:
+    first = _reminder_item(occurrence_key="100")
+    second = _reminder_item(occurrence_key="101")
+
+    first_attempt = daily_cup_turn_reminder_delivery._turn_reminder_attempt(first)
+    second_attempt = daily_cup_turn_reminder_delivery._turn_reminder_attempt(second)
+
+    assert first_attempt.idempotency_key.endswith(":100")
+    assert second_attempt.idempotency_key.endswith(":101")
+    assert first_attempt.idempotency_key != second_attempt.idempotency_key
+
+
 async def _fake_deliver_once(_session_local, *, send, **_kwargs):
     try:
         await send()
     except TelegramForbiddenError:
         return SimpleNamespace(status="FAILED")
     return SimpleNamespace(status="SENT")
+
+
+def _reminder_item(*, occurrence_key: str) -> daily_cup_turn_reminder_delivery.ReminderItem:
+    return daily_cup_turn_reminder_delivery.ReminderItem(
+        tournament_id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        challenge_id="11111111-1111-1111-1111-111111111111",
+        target_user_id=10,
+        target_chat_id=10010,
+        opponent_label="Bert",
+        deadline_text="deadline",
+        occurrence_key=occurrence_key,
+    )

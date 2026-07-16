@@ -17,11 +17,13 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
 ) -> None:
     bot = _Bot([])
     attempts: list[TelegramDeliveryAttemptCreate] = []
+    delivery_kwargs: list[dict[str, object]] = []
 
     async def _deliver_once(
         _session_local, *, attempt: TelegramDeliveryAttemptCreate, send, **_kwargs
     ):
         attempts.append(attempt)
+        delivery_kwargs.append(_kwargs)
         await send()
         return SimpleNamespace(status="SENT")
 
@@ -40,6 +42,7 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
     )
     assert bot.sent == [101]
     assert attempts[0].idempotency_key == "daily_cup:sent:tid:11"
+    assert delivery_kwargs[0]["allow_stale_pending_replay_send"] is True
 
 
 @pytest.mark.asyncio
@@ -73,6 +76,24 @@ async def test_send_daily_cup_registration_push_once_handles_unclassified_send_e
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
         item=_push_item(),
     )
+
+
+@pytest.mark.asyncio
+async def test_send_daily_cup_registration_push_once_propagates_delivery_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _delivery_failure(*_args, **_kwargs):
+        raise RuntimeError("db unavailable")
+
+    monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push, "deliver_telegram_once", _delivery_failure)
+
+    with pytest.raises(RuntimeError, match="db unavailable"):
+        await push._send_daily_cup_registration_push_once(
+            bot=_Bot([]),
+            logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+            item=_push_item(),
+        )
 
 
 @pytest.mark.asyncio
