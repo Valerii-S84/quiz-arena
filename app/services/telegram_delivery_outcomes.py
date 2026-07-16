@@ -3,7 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
+from aiogram.exceptions import (
+    TelegramBadRequest,
+    TelegramForbiddenError,
+    TelegramNotFound,
+    TelegramRetryAfter,
+)
 
 from app.db.repo.production_reliability_types import TelegramDeliveryFailure
 
@@ -62,6 +67,16 @@ def classify_telegram_delivery_exception(
                 failure_code="TELEGRAM_BAD_REQUEST",
                 failure_reason=_failure_reason(exc),
                 telegram_error_code=400,
+                is_blocked_candidate=False,
+            ),
+        )
+    if isinstance(exc, TelegramNotFound):
+        return TelegramDeliveryExceptionOutcome(
+            status="FAILED",
+            failure=TelegramDeliveryFailure(
+                failure_code="TELEGRAM_NOT_FOUND",
+                failure_reason=_failure_reason(exc),
+                telegram_error_code=404,
                 is_blocked_candidate=False,
             ),
         )
