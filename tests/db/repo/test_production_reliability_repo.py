@@ -109,6 +109,9 @@ async def test_delivery_attempt_status_updates_are_scoped_by_idempotency_key() -
     )
     skipped_sql = compile_statement(skipped_session.statement)
     assert "status='SKIPPED'" in skipped_sql
+    assert "failed_at=NULL" in skipped_sql
+    assert "telegram_error_code=NULL" in skipped_sql
+    assert "is_blocked_candidate=false" in skipped_sql
     assert "telegram_delivery_attempts.status != 'SENT'" in skipped_sql
 
 
@@ -125,6 +128,7 @@ async def test_blocked_candidates_query_filters_candidates_since_timestamp() -> 
     ) == [row]
 
     sql = compile_statement(session.statement)
+    assert "telegram_delivery_attempts.status = 'FAILED'" in sql
     assert "telegram_delivery_attempts.is_blocked_candidate IS true" in sql
     assert "telegram_delivery_attempts.failed_at >= '2026-07-16 12:00:00+00:00'" in sql
     assert "telegram_delivery_attempts.flow = 'daily_cup'" in sql
