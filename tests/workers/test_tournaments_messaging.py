@@ -9,6 +9,10 @@ import pytest
 
 from app.workers.tasks import tournaments_messaging
 from app.workers.tasks import tournaments_messaging_delivery_runtime as private_runtime
+from app.workers.tasks import tournaments_messaging_delivery_steps as private_steps
+from app.workers.tasks.tournaments_messaging_delivery_targets import (
+    private_round_delivery_content_key,
+)
 
 
 @pytest.mark.asyncio
@@ -95,7 +99,53 @@ async def test_private_payload_failure_happens_before_pending_claim() -> None:
         )
 
     assert call_order == ["payload"]
-    assert content_key_calls == [{"content_version": "round:1", "delivery_operation": "send"}]
+    assert content_key_calls == []
+
+
+def test_private_content_key_changes_with_standings_text_in_same_phase() -> None:
+    before = private_round_delivery_content_key(
+        content_version="round:1:status:round_1",
+        delivery_operation="edit:222",
+        message_text="A: 2\nB: 1",
+    )
+    after = private_round_delivery_content_key(
+        content_version="round:1:status:round_1",
+        delivery_operation="edit:222",
+        message_text="A: 3\nB: 1",
+    )
+
+    assert before != after
+
+
+def test_private_fallback_target_is_stale_replay_safe() -> None:
+    target_kwargs: dict[str, object] = {}
+
+    def _build_target(**kwargs: object) -> object:
+        target_kwargs.update(kwargs)
+        return object()
+
+    operations = SimpleNamespace(
+        fallback_delivery_operation=lambda _message_id: "fallback_send_after_edit:222",
+        content_key=lambda **_kwargs: "fallback-content",
+        build_target=_build_target,
+    )
+    delivery_context = cast(
+        Any,
+        SimpleNamespace(operations=operations, content_version="round:1"),
+    )
+    attempt = cast(
+        Any,
+        SimpleNamespace(
+            existing_message_id=222,
+            user_id=1,
+            chat_id=101,
+            text="standings",
+        ),
+    )
+
+    private_steps._build_fallback_target(delivery_context, attempt)
+
+    assert target_kwargs["pending_replay_safe"] is True
 
 
 def test_private_tournament_worker_share_url_uses_canonical_telegram_contract() -> None:

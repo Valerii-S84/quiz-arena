@@ -12,6 +12,7 @@ from aiogram.methods import SendMessage
 
 from app.workers.tasks import (
     tournaments_message_delivery_persistence,
+    tournaments_message_delivery_terminal,
     tournaments_messaging_delivery,
 )
 
@@ -171,20 +172,21 @@ async def test_private_prepare_does_not_claim_unsafe_pending_delivery(
     assert claim_calls == []
 
 
-async def test_private_retryable_failure_marks_failed_without_defer(
+async def test_private_retryable_failure_stays_pending_and_deferred(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    failed_calls: list[Any] = []
+    row = SimpleNamespace(failure_code=None, failure_reason=None)
+    deferred_calls: list[dict[str, object]] = []
 
-    async def _mark_failed(_session: object, **kwargs: object) -> bool:
-        failed_calls.append(kwargs["failure"])
+    async def _get_by_idempotency_key(*_args: object, **_kwargs: object) -> object:
+        return row
+
+    async def _defer_retry_after(*_args: object, **kwargs: object) -> bool:
+        deferred_calls.append(kwargs)
         return True
 
-    async def _defer_retry_after(*_args: object, **_kwargs: object) -> bool:
-        raise AssertionError("retryable private delivery must not create orphan pending retry")
-
     repo = tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo
-    monkeypatch.setattr(repo, "mark_failed", _mark_failed)
+    monkeypatch.setattr(repo, "get_by_idempotency_key", _get_by_idempotency_key)
     monkeypatch.setattr(repo, "defer_retry_after", _defer_retry_after)
     monkeypatch.setattr(tournaments_message_delivery_persistence, "SessionLocal", _SessionLocal)
 
@@ -201,8 +203,43 @@ async def test_private_retryable_failure_marks_failed_without_defer(
 
     assert result.status == "RETRY"
     assert result.retry_after_seconds == 7
-    assert len(failed_calls) == 1
-    assert failed_calls[0].failure_code == "TELEGRAM_RETRY_NEEDED"
+    assert row.failure_code == "TELEGRAM_RETRY_NEEDED"
+    assert deferred_calls == [
+        {
+            "idempotency_key": "private",
+            "retry_after_seconds": 7,
+            "claim_ttl_seconds": 300,
+        }
+    ]
+
+
+async def test_private_prepare_claims_deferred_retry_for_unsafe_send(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    row = SimpleNamespace(
+        status="PENDING",
+        failure_code="TELEGRAM_RETRY_NEEDED",
+        failure_reason="retry",
+    )
+
+    async def _create_once(*_args: object, **_kwargs: object) -> tuple[object, bool]:
+        return row, False
+
+    async def _claim_stale(*_args: object, **_kwargs: object) -> bool:
+        return True
+
+    repo = tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo
+    monkeypatch.setattr(repo, "create_once", _create_once)
+    monkeypatch.setattr(repo, "claim_stale_pending_replay", _claim_stale)
+    monkeypatch.setattr(tournaments_message_delivery_persistence, "SessionLocal", _SessionLocal)
+
+    prepared = await tournaments_message_delivery_persistence.prepare_private_tournament_delivery(
+        _delivery_target(pending_replay_safe=False)
+    )
+
+    assert prepared.should_send is True
+    assert row.failure_code is None
+    assert row.failure_reason is None
 
 
 @pytest.mark.parametrize("fallback", [False, True])
@@ -227,26 +264,26 @@ async def test_private_message_id_persists_before_terminal_sent(
         return 1
 
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TournamentParticipantsRepo,
+        tournaments_message_delivery_terminal.TournamentParticipantsRepo,
         "compare_and_set_standings_message_id",
         _persist,
     )
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        tournaments_message_delivery_terminal.TelegramDeliveryAttemptsRepo,
         "mark_sent",
         _sent,
     )
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        tournaments_message_delivery_terminal.TelegramDeliveryAttemptsRepo,
         "mark_skipped",
         _skipped,
     )
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence,
+        tournaments_message_delivery_terminal,
         "SessionLocal",
         _SessionLocal,
     )
-    await tournaments_message_delivery_persistence.persist_private_tournament_sent_message(
+    await tournaments_message_delivery_terminal.persist_private_tournament_sent_message(
         cast(Any, SimpleNamespace(idempotency_key="private")),
         _fence(
             expected_message_id=222 if fallback else None,
@@ -286,22 +323,22 @@ async def test_private_persistence_failure_does_not_mark_terminal_sent(
         return 1
 
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TournamentParticipantsRepo,
+        tournaments_message_delivery_terminal.TournamentParticipantsRepo,
         "compare_and_set_standings_message_id",
         _persist,
     )
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        tournaments_message_delivery_terminal.TelegramDeliveryAttemptsRepo,
         "mark_sent",
         _sent,
     )
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence,
+        tournaments_message_delivery_terminal,
         "SessionLocal",
         _SessionLocal,
     )
     with pytest.raises(RuntimeError, match="persistence failed"):
-        await tournaments_message_delivery_persistence.persist_private_tournament_sent_message(
+        await tournaments_message_delivery_terminal.persist_private_tournament_sent_message(
             cast(Any, SimpleNamespace(idempotency_key="private")),
             _fence(
                 expected_message_id=None,
@@ -325,22 +362,22 @@ async def test_private_terminal_cas_loss_rolls_back_outcome(
         return 0
 
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TournamentParticipantsRepo,
+        tournaments_message_delivery_terminal.TournamentParticipantsRepo,
         "compare_and_set_standings_message_id",
         _persist,
     )
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        tournaments_message_delivery_terminal.TelegramDeliveryAttemptsRepo,
         "mark_sent",
         _sent,
     )
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence,
+        tournaments_message_delivery_terminal,
         "SessionLocal",
         _SessionLocal,
     )
     with pytest.raises(RuntimeError, match="terminal lease was lost"):
-        await tournaments_message_delivery_persistence.persist_private_tournament_sent_message(
+        await tournaments_message_delivery_terminal.persist_private_tournament_sent_message(
             cast(Any, SimpleNamespace(idempotency_key="private")),
             _fence(
                 expected_message_id=None,
@@ -365,27 +402,27 @@ async def test_private_original_edit_cas_loss_rolls_back_fallback_outcome(
         return 0
 
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TournamentParticipantsRepo,
+        tournaments_message_delivery_terminal.TournamentParticipantsRepo,
         "compare_and_set_standings_message_id",
         _persist,
     )
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        tournaments_message_delivery_terminal.TelegramDeliveryAttemptsRepo,
         "mark_sent",
         _sent,
     )
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        tournaments_message_delivery_terminal.TelegramDeliveryAttemptsRepo,
         "mark_skipped",
         _skipped,
     )
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence,
+        tournaments_message_delivery_terminal,
         "SessionLocal",
         _SessionLocal,
     )
     with pytest.raises(RuntimeError, match="original edit lease was lost"):
-        await tournaments_message_delivery_persistence.persist_private_tournament_sent_message(
+        await tournaments_message_delivery_terminal.persist_private_tournament_sent_message(
             cast(Any, SimpleNamespace(idempotency_key="fallback")),
             _fence(
                 expected_message_id=222,

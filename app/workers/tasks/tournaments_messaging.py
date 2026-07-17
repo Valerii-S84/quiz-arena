@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import NotRequired, TypedDict
 from uuid import UUID
 
 import structlog
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from celery import Task
 
 from app.bot.application import build_bot
 from app.bot.keyboards.tournament import build_tournament_lobby_keyboard, build_tournament_share_url
@@ -23,6 +23,11 @@ from app.workers.tasks.tournaments_messaging_context import (
 )
 from app.workers.tasks.tournaments_messaging_delivery import deliver_round_messages
 from app.workers.tasks.tournaments_messaging_delivery_targets import private_round_content_version
+from app.workers.tasks.tournaments_messaging_retry import (
+    PrivateRoundMessagingResult,
+    PrivateTournamentDeliveryRetryNeeded,
+    raise_for_private_delivery_retry_needed,
+)
 from app.workers.tasks.tournaments_messaging_text import (
     ROUND_STATUSES,
     build_completed_text,
@@ -36,21 +41,6 @@ from app.workers.tasks.tournaments_messaging_text import (
 )
 
 logger = structlog.get_logger("app.workers.tasks.tournaments_messaging")
-
-
-class PrivateRoundMessagingResult(TypedDict):
-    processed: int
-    participants_total: int
-    sent: int
-    edited: int
-    failed: int
-    skipped: int
-    retry_count: NotRequired[int]
-    retry_after_seconds: NotRequired[int | None]
-
-
-class PrivateTournamentDeliveryRetryNeeded(RuntimeError):
-    pass
 
 
 def _is_celery_task(task_obj: object) -> bool:
@@ -156,16 +146,6 @@ async def run_private_tournament_round_messaging_async(
     return result
 
 
-def _raise_for_private_delivery_retry_needed(result: PrivateRoundMessagingResult) -> None:
-    retry_count = int(result.get("retry_count") or 0)
-    if retry_count <= 0:
-        return
-    raise PrivateTournamentDeliveryRetryNeeded(
-        "private tournament delivery retry needed"
-        f"; retry_count={retry_count}; retry_after_seconds={result.get('retry_after_seconds')}"
-    )
-
-
 def enqueue_private_tournament_round_messaging(*, tournament_id: str) -> None:
     try:
         if _is_celery_task(run_private_tournament_round_messaging):
@@ -181,14 +161,19 @@ def enqueue_private_tournament_round_messaging(*, tournament_id: str) -> None:
 
 
 @celery_app.task(
-    name="app.workers.tasks.tournaments_messaging.run_private_tournament_round_messaging"
+    name="app.workers.tasks.tournaments_messaging.run_private_tournament_round_messaging",
+    bind=True,
 )
 def run_private_tournament_round_messaging(
+    self: Task,
     *,
     tournament_id: str,
 ) -> PrivateRoundMessagingResult:
     result = run_async_job(
         run_private_tournament_round_messaging_async(tournament_id=tournament_id)
     )
-    _raise_for_private_delivery_retry_needed(result)
+    try:
+        raise_for_private_delivery_retry_needed(result)
+    except PrivateTournamentDeliveryRetryNeeded as exc:
+        raise self.retry(exc=exc, countdown=exc.retry_after_seconds)
     return result

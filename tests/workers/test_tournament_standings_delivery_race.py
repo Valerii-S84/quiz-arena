@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.workers.tasks import tournaments_message_delivery_persistence, tournaments_messaging
+from app.workers.tasks import tournaments_message_delivery_terminal, tournaments_messaging
 from app.workers.tasks.tournaments_messaging_delivery import TournamentRoundDeliveryResult
 from tests.type_helpers import AsyncBeginContext
 
@@ -201,25 +201,25 @@ async def _assert_stale_fence_does_not_mark_sent(
         return 1
 
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TournamentParticipantsRepo,
+        tournaments_message_delivery_terminal.TournamentParticipantsRepo,
         "compare_and_set_standings_message_id",
         _compare_and_set,
     )
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        tournaments_message_delivery_terminal.TelegramDeliveryAttemptsRepo,
         "mark_sent",
         _mark_sent,
     )
     monkeypatch.setattr(
-        tournaments_message_delivery_persistence,
+        tournaments_message_delivery_terminal,
         "SessionLocal",
         _PersistenceSessionLocal,
     )
 
     with pytest.raises(RuntimeError, match="standings delivery fence was lost"):
-        await tournaments_message_delivery_persistence.persist_private_tournament_sent_message(
+        await tournaments_message_delivery_terminal.persist_private_tournament_sent_message(
             cast(Any, SimpleNamespace(idempotency_key="stale")),
-            tournaments_message_delivery_persistence.PrivateTournamentStandingsFence(
+            tournaments_message_delivery_terminal.PrivateTournamentStandingsFence(
                 tournament_id=uuid4(),
                 user_id=11,
                 expected_message_id=expected_message_id,

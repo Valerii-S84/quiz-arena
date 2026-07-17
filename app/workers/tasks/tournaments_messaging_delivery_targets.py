@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import Any
 
 from app.db.repo.production_reliability_types import TelegramDeliveryAttemptCreate
@@ -85,8 +86,10 @@ def private_round_delivery_content_key(
     *,
     content_version: str,
     delivery_operation: str,
+    message_text: str,
 ) -> str:
-    return f"phase:{content_version}:{delivery_operation}"
+    content_digest = sha256(message_text.encode("utf-8")).hexdigest()[:16]
+    return f"phase:{content_version}:c:{content_digest}:{delivery_operation}"
 
 
 def delivery_operation(existing_message_id: int | None) -> str:

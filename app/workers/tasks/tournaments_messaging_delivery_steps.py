@@ -3,8 +3,11 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import cast
 
-from app.workers.tasks.tournaments_message_delivery_persistence import (
-    PrivateTournamentStandingsFence,
+from app.workers.tasks.tournaments_messaging_delivery_preparation import (
+    persistence_fence as _persistence_fence,
+)
+from app.workers.tasks.tournaments_messaging_delivery_preparation import (
+    prepare_delivery as _prepare_delivery,
 )
 from app.workers.tasks.tournaments_messaging_delivery_targets import SKIP_CODE_EDIT_REPLACED_BY_SEND
 from app.workers.tasks.tournaments_messaging_delivery_types import (
@@ -12,36 +15,6 @@ from app.workers.tasks.tournaments_messaging_delivery_types import (
     TournamentRoundDeliveryState,
     TournamentRoundMessageAttempt,
 )
-
-
-def _persistence_fence(
-    delivery_context: TournamentRoundDeliveryContext,
-    attempt: TournamentRoundMessageAttempt,
-) -> PrivateTournamentStandingsFence:
-    tournament = delivery_context.request.context.tournament
-    return PrivateTournamentStandingsFence(
-        tournament_id=delivery_context.request.context.parsed_tournament_id,
-        user_id=attempt.user_id,
-        expected_message_id=attempt.existing_message_id,
-        expected_status=str(tournament.status),
-        expected_round=int(tournament.current_round),
-    )
-
-
-async def _prepare_delivery(
-    *,
-    delivery_context: TournamentRoundDeliveryContext,
-    state: TournamentRoundDeliveryState,
-    attempt: TournamentRoundMessageAttempt,
-) -> bool:
-    preparation = await delivery_context.operations.prepare_delivery(attempt.target)
-    if preparation.should_send:
-        return True
-    if getattr(preparation, "status", None) == "RETRY":
-        state.record_retry(getattr(preparation, "retry_after_seconds", None))
-        return False
-    state.skipped += 1
-    return False
 
 
 async def send_initial_round_message(
@@ -86,6 +59,7 @@ def _build_fallback_target(
     content_key = operations.content_key(
         content_version=delivery_context.content_version,
         delivery_operation=delivery_operation,
+        message_text=attempt.text,
     )
     return operations.build_target(
         delivery_context=delivery_context,
@@ -93,7 +67,7 @@ def _build_fallback_target(
         chat_id=attempt.chat_id,
         delivery_operation=delivery_operation,
         content_key=content_key,
-        pending_replay_safe=False,
+        pending_replay_safe=True,
     )
 
 
@@ -107,16 +81,18 @@ async def _send_fallback_round_message(
     operations = delivery_context.operations
     fallback_target = _build_fallback_target(delivery_context, attempt)
     fallback_attempt = replace(attempt, target=fallback_target)
+    retries_before = state.retry_count
     if not await _prepare_delivery(
         delivery_context=delivery_context,
         state=state,
         attempt=fallback_attempt,
     ):
-        await operations.record_delivery_skipped(
-            attempt.target,
-            failure_code=SKIP_CODE_EDIT_REPLACED_BY_SEND,
-            failure_reason="fallback send skipped after edit failed",
-        )
+        if state.retry_count == retries_before:
+            await operations.record_delivery_skipped(
+                attempt.target,
+                failure_code=SKIP_CODE_EDIT_REPLACED_BY_SEND,
+                failure_reason="fallback send skipped after edit failed",
+            )
         return
     try:
         message = await delivery_context.bot.send_message(

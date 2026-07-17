@@ -96,9 +96,14 @@ async def test_run_private_tournament_round_messaging_async_reloads_inside_mutex
     assert session_local._call_count == 2
 
 
-def test_private_tournament_messaging_wrapper_raises_on_retry_needed(
+def test_private_tournament_messaging_wrapper_schedules_retry_needed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    retry_calls: list[dict[str, object]] = []
+
+    class _RetryScheduled(RuntimeError):
+        pass
+
     def _run(coro):
         coro.close()
         return {
@@ -114,11 +119,22 @@ def test_private_tournament_messaging_wrapper_raises_on_retry_needed(
 
     monkeypatch.setattr(tournaments_messaging, "run_async_job", _run)
 
-    with pytest.raises(
-        tournaments_messaging.PrivateTournamentDeliveryRetryNeeded,
-        match="retry_after_seconds=7",
-    ):
+    def _retry(**kwargs: object) -> None:
+        retry_calls.append(kwargs)
+        raise _RetryScheduled
+
+    monkeypatch.setattr(
+        tournaments_messaging.run_private_tournament_round_messaging, "retry", _retry
+    )
+
+    with pytest.raises(_RetryScheduled):
         tournaments_messaging.run_private_tournament_round_messaging(tournament_id=str(uuid4()))
+
+    assert retry_calls[0]["countdown"] == 7
+    assert isinstance(
+        retry_calls[0]["exc"],
+        tournaments_messaging.PrivateTournamentDeliveryRetryNeeded,
+    )
 
 
 @pytest.mark.asyncio

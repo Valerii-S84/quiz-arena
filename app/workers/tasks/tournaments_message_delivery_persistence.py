@@ -1,35 +1,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any
-from uuid import UUID
 
-from app.db.repo.production_reliability_types import TelegramDeliveryFailure
 from app.db.repo.telegram_delivery_attempts_repo import TelegramDeliveryAttemptsRepo
-from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.session import SessionLocal
 from app.services.telegram_delivery_outcomes import (
     TelegramDeliveryExceptionOutcome,
     classify_telegram_delivery_exception,
 )
+from app.workers.tasks.tournaments_message_delivery_terminal import (
+    PrivateTournamentStandingsFence,
+    persist_private_tournament_sent_message,
+)
 from app.workers.tasks.tournaments_messaging_delivery_targets import (
-    SKIP_CODE_EDIT_REPLACED_BY_SEND,
     SKIP_CODE_NO_CHAT,
     PrivateTournamentDeliveryTarget,
 )
 
 _PENDING_REPLAY_CLAIM_TTL_SECONDS = 300
 _RETRY_NEEDED_FAILURE_CODE = "TELEGRAM_RETRY_NEEDED"
-
-
-@dataclass(frozen=True, slots=True)
-class PrivateTournamentStandingsFence:
-    tournament_id: UUID
-    user_id: int
-    expected_message_id: int | None
-    expected_status: str
-    expected_round: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,13 +58,17 @@ async def prepare_private_tournament_delivery(
                 created=created,
             )
         if not created and current_status == "PENDING":
-            if target.pending_replay_safe:
+            retry_deferred = getattr(row, "failure_code", None) == _RETRY_NEEDED_FAILURE_CODE
+            if target.pending_replay_safe or retry_deferred:
                 claimed = await TelegramDeliveryAttemptsRepo.claim_stale_pending_replay(
                     session,
                     idempotency_key=target.idempotency_key,
                     claim_ttl_seconds=_PENDING_REPLAY_CLAIM_TTL_SECONDS,
                 )
                 if claimed:
+                    if retry_deferred:
+                        row.failure_code = None
+                        row.failure_reason = None
                     return PrivateTournamentDeliveryPreparation(
                         should_send=True,
                         status="RETRY",
@@ -103,15 +96,21 @@ async def record_private_tournament_delivery_failure(
     async with SessionLocal.begin() as session:
         if classified.status == "RETRY":
             retry_after_seconds = max(1, int(classified.retry_after_seconds or 1))
-            failed = await TelegramDeliveryAttemptsRepo.mark_failed(
+            row = await TelegramDeliveryAttemptsRepo.get_by_idempotency_key(
                 session,
                 idempotency_key=target.idempotency_key,
-                failure=TelegramDeliveryFailure(
-                    failure_code=_RETRY_NEEDED_FAILURE_CODE,
-                    failure_reason=f"telegram retry needed after {retry_after_seconds}s",
-                ),
             )
-            if not failed:
+            if row is None:
+                raise RuntimeError("private tournament retry lease was lost")
+            row.failure_code = _RETRY_NEEDED_FAILURE_CODE
+            row.failure_reason = f"telegram retry needed after {retry_after_seconds}s"
+            deferred = await TelegramDeliveryAttemptsRepo.defer_retry_after(
+                session,
+                idempotency_key=target.idempotency_key,
+                retry_after_seconds=retry_after_seconds,
+                claim_ttl_seconds=_PENDING_REPLAY_CLAIM_TTL_SECONDS,
+            )
+            if not deferred:
                 raise RuntimeError("private tournament retry lease was lost")
             return TelegramDeliveryExceptionOutcome(
                 status="RETRY",
@@ -144,46 +143,6 @@ async def record_private_tournament_delivery_skipped(
         )
         if not skipped:
             raise RuntimeError("private tournament skip lease was lost")
-
-
-async def persist_private_tournament_sent_message(
-    target: PrivateTournamentDeliveryTarget,
-    fence: PrivateTournamentStandingsFence,
-    message: Any | int,
-    happened_at: datetime,
-    *,
-    original_target: PrivateTournamentDeliveryTarget | None = None,
-) -> int:
-    del happened_at
-    message_id = int(message if isinstance(message, int) else message.message_id)
-    async with SessionLocal.begin() as session:
-        persisted = await TournamentParticipantsRepo.compare_and_set_standings_message_id(
-            session,
-            tournament_id=fence.tournament_id,
-            user_id=fence.user_id,
-            expected_message_id=fence.expected_message_id,
-            message_id=message_id,
-            expected_status=fence.expected_status,
-            expected_round=fence.expected_round,
-        )
-        if persisted != 1:
-            raise RuntimeError("private tournament standings delivery fence was lost")
-        sent = await TelegramDeliveryAttemptsRepo.mark_sent(
-            session,
-            idempotency_key=target.idempotency_key,
-        )
-        if not sent:
-            raise RuntimeError("private tournament delivery terminal lease was lost")
-        if original_target is not None:
-            skipped = await TelegramDeliveryAttemptsRepo.mark_skipped(
-                session,
-                idempotency_key=original_target.idempotency_key,
-                failure_code=SKIP_CODE_EDIT_REPLACED_BY_SEND,
-                failure_reason="edit delivery replaced by fallback send",
-            )
-            if not skipped:
-                raise RuntimeError("private tournament original edit lease was lost")
-    return message_id
 
 
 __all__ = [
