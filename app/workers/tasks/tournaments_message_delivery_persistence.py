@@ -10,9 +10,9 @@ from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.session import SessionLocal
 from app.services.telegram_delivery_outcomes import classify_telegram_delivery_exception
 from app.workers.tasks.tournaments_messaging_delivery_targets import (
-    PrivateTournamentDeliveryTarget,
     SKIP_CODE_EDIT_REPLACED_BY_SEND,
     SKIP_CODE_NO_CHAT,
+    PrivateTournamentDeliveryTarget,
 )
 
 
