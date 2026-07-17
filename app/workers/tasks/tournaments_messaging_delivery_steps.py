@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from typing import cast
 
-from app.workers.tasks.tournaments_message_delivery_persistence import PrivateTournamentStandingsFence
-from app.workers.tasks.tournaments_messaging_delivery_targets import SKIP_CODE_EDIT_REPLACED_BY_SEND
+from app.workers.tasks.tournaments_message_delivery_persistence import (
+    PrivateTournamentStandingsFence,
+)
+from app.workers.tasks.tournaments_messaging_delivery_targets import (
+    SKIP_CODE_EDIT_REPLACED_BY_SEND,
+)
 from app.workers.tasks.tournaments_messaging_delivery_types import (
     TournamentRoundDeliveryContext,
     TournamentRoundDeliveryState,
@@ -53,7 +57,11 @@ async def send_initial_round_message(
     state: TournamentRoundDeliveryState,
     attempt: TournamentRoundMessageAttempt,
 ) -> None:
-    if not await _prepare_delivery(delivery_context=delivery_context, state=state, attempt=attempt):
+    if not await _prepare_delivery(
+        delivery_context=delivery_context,
+        state=state,
+        attempt=attempt,
+    ):
         return
     try:
         message = await delivery_context.bot.send_message(
@@ -183,7 +191,11 @@ async def edit_or_replace_round_message(
     state: TournamentRoundDeliveryState,
     attempt: TournamentRoundMessageAttempt,
 ) -> None:
-    if not await _prepare_delivery(delivery_context=delivery_context, state=state, attempt=attempt):
+    if not await _prepare_delivery(
+        delivery_context=delivery_context,
+        state=state,
+        attempt=attempt,
+    ):
         return
     try:
         await delivery_context.bot.edit_message_text(
