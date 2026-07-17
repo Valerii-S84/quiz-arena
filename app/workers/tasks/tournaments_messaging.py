@@ -16,7 +16,6 @@ from app.db.session import SessionLocal
 from app.game.tournaments.standings_delivery_coordination import private_tournament_standings_mutex
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
-from app.workers.task_heartbeat import run_tracked_async_job
 from app.workers.tasks.tournaments_messaging_context import (
     TournamentRoundMessagingContext,
     load_round_messaging_context,
@@ -152,9 +151,4 @@ def enqueue_private_tournament_round_messaging(*, tournament_id: str) -> None:
     name="app.workers.tasks.tournaments_messaging.run_private_tournament_round_messaging"
 )
 def run_private_tournament_round_messaging(*, tournament_id: str) -> dict[str, int]:
-    task_name = "app.workers.tasks.tournaments_messaging.run_private_tournament_round_messaging"
-    return run_tracked_async_job(
-        task_name=task_name,
-        schedule_key="private-tournament-round-messaging-on-demand",
-        awaitable=run_private_tournament_round_messaging_async(tournament_id=tournament_id),
-    )
+    return run_async_job(run_private_tournament_round_messaging_async(tournament_id=tournament_id))

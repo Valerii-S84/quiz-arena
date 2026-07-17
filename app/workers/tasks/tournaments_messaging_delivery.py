@@ -3,17 +3,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from app.services.telegram_delivery import (
-    begin_telegram_delivery_dispatch,
-    mark_telegram_delivery_failed,
-    prepare_telegram_delivery,
-)
-from app.workers.tasks.messaging_fallback_delivery import (
-    mark_fallback_and_original_edit_failed,
-    record_original_edit_skipped_after_fallback_skip,
-)
 from app.workers.tasks.tournaments_message_delivery_persistence import (
     persist_private_tournament_sent_message,
+    prepare_private_tournament_delivery,
+    record_private_tournament_delivery_failure,
+    record_private_tournament_delivery_skipped,
 )
 from app.workers.tasks.tournaments_messaging_context import TournamentRoundMessagingContext
 from app.workers.tasks.tournaments_messaging_delivery_content import build_round_message_payload
@@ -34,19 +28,15 @@ from app.workers.tasks.tournaments_messaging_delivery_types import (
 
 
 async def _prepare_round_delivery(*args: Any, **kwargs: Any) -> Any:
-    return await prepare_telegram_delivery(*args, **kwargs)
+    return await prepare_private_tournament_delivery(*args, **kwargs)
 
 
-async def _prepare_fallback_round_delivery(*args: Any, **kwargs: Any) -> Any:
-    return await prepare_telegram_delivery(*args, **kwargs)
+async def _record_round_delivery_failure(*args: Any, **kwargs: Any) -> str:
+    return await record_private_tournament_delivery_failure(*args, **kwargs)
 
 
-async def _begin_round_delivery_dispatch(*args: Any, **kwargs: Any) -> None:
-    await begin_telegram_delivery_dispatch(*args, **kwargs)
-
-
-async def _begin_fallback_round_delivery_dispatch(*args: Any, **kwargs: Any) -> None:
-    await begin_telegram_delivery_dispatch(*args, **kwargs)
+async def _record_round_delivery_skipped(*args: Any, **kwargs: Any) -> None:
+    await record_private_tournament_delivery_skipped(*args, **kwargs)
 
 
 async def _persist_initial_round_message(*args: Any, **kwargs: Any) -> int:
@@ -92,15 +82,11 @@ async def deliver_round_messages(
     )
     operations = TournamentRoundDeliveryOperations(
         prepare_delivery=_prepare_round_delivery,
-        prepare_fallback_delivery=_prepare_fallback_round_delivery,
-        begin_dispatch=_begin_round_delivery_dispatch,
-        begin_fallback_dispatch=_begin_fallback_round_delivery_dispatch,
-        mark_failed=mark_telegram_delivery_failed,
+        record_delivery_failure=_record_round_delivery_failure,
+        record_delivery_skipped=_record_round_delivery_skipped,
         persist_initial_message=_persist_initial_round_message,
         persist_edited_message=_persist_edited_round_message,
         persist_replacement_message=_persist_replacement_round_message,
-        mark_fallback_and_original_failed=mark_fallback_and_original_edit_failed,
-        record_original_skipped=record_original_edit_skipped_after_fallback_skip,
         build_target=private_round_delivery_target,
         delivery_operation=delivery_operation,
         fallback_delivery_operation=fallback_delivery_operation,

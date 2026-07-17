@@ -37,15 +37,11 @@ class TournamentRoundDeliveryRequest:
 @dataclass(frozen=True, slots=True)
 class TournamentRoundDeliveryOperations:
     prepare_delivery: Callable[..., Any]
-    prepare_fallback_delivery: Callable[..., Any]
-    begin_dispatch: Callable[..., Any]
-    begin_fallback_dispatch: Callable[..., Any]
-    mark_failed: Callable[..., Any]
+    record_delivery_failure: Callable[..., Any]
+    record_delivery_skipped: Callable[..., Any]
     persist_initial_message: Callable[..., Any]
     persist_edited_message: Callable[..., Any]
     persist_replacement_message: Callable[..., Any]
-    mark_fallback_and_original_failed: Callable[..., Any]
-    record_original_skipped: Callable[..., Any]
     build_target: Callable[..., Any]
     delivery_operation: Callable[..., str]
     fallback_delivery_operation: Callable[..., str]
