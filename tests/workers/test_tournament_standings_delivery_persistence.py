@@ -46,6 +46,129 @@ def _fence(
     )
 
 
+def _delivery_target(*, pending_replay_safe: bool, chat_id: int | None = 101) -> Any:
+    return SimpleNamespace(
+        attempt=SimpleNamespace(idempotency_key="private"),
+        chat_id=chat_id,
+        pending_replay_safe=pending_replay_safe,
+        idempotency_key="private",
+    )
+
+
+async def test_private_prepare_claims_stale_pending_replay_safe_delivery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    claim_calls: list[dict[str, object]] = []
+
+    async def _create_once(_session: object, *, attempt: object) -> tuple[object, bool]:
+        return SimpleNamespace(status="PENDING"), False
+
+    async def _claim_stale(_session: object, **kwargs: object) -> bool:
+        claim_calls.append(kwargs)
+        return True
+
+    monkeypatch.setattr(
+        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        "create_once",
+        _create_once,
+    )
+    monkeypatch.setattr(
+        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        "claim_stale_pending_replay",
+        _claim_stale,
+    )
+    monkeypatch.setattr(
+        tournaments_message_delivery_persistence,
+        "SessionLocal",
+        _SessionLocal,
+    )
+
+    prepared = await tournaments_message_delivery_persistence.prepare_private_tournament_delivery(
+        _delivery_target(pending_replay_safe=True),
+    )
+
+    assert prepared.should_send is True
+    assert prepared.status == "RETRY"
+    assert prepared.created is False
+    assert claim_calls == [{"idempotency_key": "private", "claim_ttl_seconds": 300}]
+
+
+async def test_private_prepare_keeps_fresh_pending_replay_blocked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    claim_calls: list[dict[str, object]] = []
+
+    async def _create_once(_session: object, *, attempt: object) -> tuple[object, bool]:
+        return SimpleNamespace(status="PENDING"), False
+
+    async def _claim_stale(_session: object, **kwargs: object) -> bool:
+        claim_calls.append(kwargs)
+        return False
+
+    monkeypatch.setattr(
+        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        "create_once",
+        _create_once,
+    )
+    monkeypatch.setattr(
+        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        "claim_stale_pending_replay",
+        _claim_stale,
+    )
+    monkeypatch.setattr(
+        tournaments_message_delivery_persistence,
+        "SessionLocal",
+        _SessionLocal,
+    )
+
+    prepared = await tournaments_message_delivery_persistence.prepare_private_tournament_delivery(
+        _delivery_target(pending_replay_safe=True),
+    )
+
+    assert prepared.should_send is False
+    assert prepared.status == "RETRY"
+    assert prepared.created is False
+    assert claim_calls == [{"idempotency_key": "private", "claim_ttl_seconds": 300}]
+
+
+async def test_private_prepare_does_not_claim_unsafe_pending_delivery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    claim_calls: list[dict[str, object]] = []
+
+    async def _create_once(_session: object, *, attempt: object) -> tuple[object, bool]:
+        return SimpleNamespace(status="PENDING"), False
+
+    async def _claim_stale(_session: object, **kwargs: object) -> bool:
+        claim_calls.append(kwargs)
+        return True
+
+    monkeypatch.setattr(
+        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        "create_once",
+        _create_once,
+    )
+    monkeypatch.setattr(
+        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
+        "claim_stale_pending_replay",
+        _claim_stale,
+    )
+    monkeypatch.setattr(
+        tournaments_message_delivery_persistence,
+        "SessionLocal",
+        _SessionLocal,
+    )
+
+    prepared = await tournaments_message_delivery_persistence.prepare_private_tournament_delivery(
+        _delivery_target(pending_replay_safe=False),
+    )
+
+    assert prepared.should_send is False
+    assert prepared.status == "RETRY"
+    assert prepared.created is False
+    assert claim_calls == []
+
+
 @pytest.mark.parametrize("fallback", [False, True])
 async def test_private_message_id_persists_before_terminal_sent(
     monkeypatch: pytest.MonkeyPatch,
