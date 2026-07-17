@@ -46,14 +46,6 @@ async def _deliver_user_message(
         pending_replay_safe=existing_message_id is not None,
     )
     text, keyboard = _build_round_payload(delivery_context, user_id)
-    delivery = await operations.prepare_delivery(
-        target=target,
-        happened_at=delivery_context.happened_at,
-    )
-    if not delivery.should_send:
-        state.skipped += 1
-        return
-    await operations.begin_dispatch(delivery, happened_at=delivery_context.happened_at)
     attempt = TournamentRoundMessageAttempt(
         user_id=user_id,
         chat_id=chat_id,
