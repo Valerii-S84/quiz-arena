@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
@@ -77,7 +78,7 @@ async def test_private_prepare_keeps_fresh_pending_replay_blocked(
     claim_calls: list[dict[str, object]] = []
 
     async def _create_once(_session: object, *, attempt: object) -> tuple[object, bool]:
-        return SimpleNamespace(status="PENDING"), False
+        return SimpleNamespace(status="PENDING", updated_at=datetime.now(UTC)), False
 
     async def _claim_stale(_session: object, **kwargs: object) -> bool:
         claim_calls.append(kwargs)
@@ -106,6 +107,7 @@ async def test_private_prepare_keeps_fresh_pending_replay_blocked(
     assert prepared.should_send is False
     assert prepared.status == "RETRY"
     assert prepared.created is False
+    assert prepared.retry_after_seconds in {299, 300}
     assert claim_calls == [{"idempotency_key": "private", "claim_ttl_seconds": 300}]
 
 

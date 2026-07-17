@@ -88,6 +88,8 @@ def private_round_delivery_content_key(
     delivery_operation: str,
     message_text: str,
 ) -> str:
+    if not delivery_operation.startswith("edit:"):
+        return f"phase:{content_version}:{delivery_operation}"
     content_digest = sha256(message_text.encode("utf-8")).hexdigest()[:16]
     return f"phase:{content_version}:c:{content_digest}:{delivery_operation}"
 

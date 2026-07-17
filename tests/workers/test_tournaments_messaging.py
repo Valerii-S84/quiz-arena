@@ -117,7 +117,22 @@ def test_private_content_key_changes_with_standings_text_in_same_phase() -> None
     assert before != after
 
 
-def test_private_fallback_target_is_stale_replay_safe() -> None:
+def test_private_initial_send_key_stays_stable_when_standings_text_changes() -> None:
+    before = private_round_delivery_content_key(
+        content_version="round:1:status:round_1",
+        delivery_operation="send",
+        message_text="A: 2\nB: 1",
+    )
+    after = private_round_delivery_content_key(
+        content_version="round:1:status:round_1",
+        delivery_operation="send",
+        message_text="A: 3\nB: 1",
+    )
+
+    assert before == after
+
+
+def test_private_fallback_send_is_not_stale_replay_safe() -> None:
     target_kwargs: dict[str, object] = {}
 
     def _build_target(**kwargs: object) -> object:
@@ -145,7 +160,7 @@ def test_private_fallback_target_is_stale_replay_safe() -> None:
 
     private_steps._build_fallback_target(delivery_context, attempt)
 
-    assert target_kwargs["pending_replay_safe"] is True
+    assert target_kwargs["pending_replay_safe"] is False
 
 
 def test_private_tournament_worker_share_url_uses_canonical_telegram_contract() -> None:

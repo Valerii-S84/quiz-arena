@@ -67,7 +67,7 @@ def _build_fallback_target(
         chat_id=attempt.chat_id,
         delivery_operation=delivery_operation,
         content_key=content_key,
-        pending_replay_safe=True,
+        pending_replay_safe=False,
     )
 
 
@@ -109,7 +109,8 @@ async def _send_fallback_round_message(
         )
     except Exception as exc:
         failure = await operations.record_delivery_failure(fallback_target, exc)
-        await operations.record_delivery_failure(attempt.target, edit_error)
+        if getattr(failure, "status", failure) != "RETRY":
+            await operations.record_delivery_failure(attempt.target, edit_error)
         state.record_failure(failure)
         return
     state.sent += 1

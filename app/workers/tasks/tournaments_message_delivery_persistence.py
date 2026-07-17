@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from math import ceil
 
 from app.db.repo.telegram_delivery_attempts_repo import TelegramDeliveryAttemptsRepo
 from app.db.session import SessionLocal
@@ -26,6 +28,17 @@ class PrivateTournamentDeliveryPreparation:
     should_send: bool
     status: str
     created: bool
+    retry_after_seconds: int | None = None
+
+
+def _pending_retry_after_seconds(row: object) -> int:
+    updated_at = getattr(row, "updated_at", None)
+    if not isinstance(updated_at, datetime):
+        return _PENDING_REPLAY_CLAIM_TTL_SECONDS
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=UTC)
+    age_seconds = (datetime.now(UTC) - updated_at).total_seconds()
+    return max(1, ceil(_PENDING_REPLAY_CLAIM_TTL_SECONDS - age_seconds))
 
 
 async def prepare_private_tournament_delivery(
@@ -78,6 +91,7 @@ async def prepare_private_tournament_delivery(
                 should_send=False,
                 status="RETRY",
                 created=False,
+                retry_after_seconds=_pending_retry_after_seconds(row),
             )
         return PrivateTournamentDeliveryPreparation(
             should_send=True,
