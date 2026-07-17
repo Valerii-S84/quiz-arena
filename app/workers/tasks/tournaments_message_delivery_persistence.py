@@ -15,6 +15,8 @@ from app.workers.tasks.tournaments_messaging_delivery_targets import (
     PrivateTournamentDeliveryTarget,
 )
 
+_PENDING_REPLAY_CLAIM_TTL_SECONDS = 300
+
 
 @dataclass(frozen=True, slots=True)
 class PrivateTournamentStandingsFence:
@@ -62,6 +64,18 @@ async def prepare_private_tournament_delivery(
                 created=created,
             )
         if not created and current_status == "PENDING":
+            if target.pending_replay_safe:
+                claimed = await TelegramDeliveryAttemptsRepo.claim_stale_pending_replay(
+                    session,
+                    idempotency_key=target.idempotency_key,
+                    claim_ttl_seconds=_PENDING_REPLAY_CLAIM_TTL_SECONDS,
+                )
+                if claimed:
+                    return PrivateTournamentDeliveryPreparation(
+                        should_send=True,
+                        status="RETRY",
+                        created=False,
+                    )
             return PrivateTournamentDeliveryPreparation(
                 should_send=False,
                 status="RETRY",
@@ -87,6 +101,7 @@ async def record_private_tournament_delivery_failure(
                 session,
                 idempotency_key=target.idempotency_key,
                 retry_after_seconds=classified.retry_after_seconds or 1,
+                claim_ttl_seconds=_PENDING_REPLAY_CLAIM_TTL_SECONDS,
             )
             if not deferred:
                 raise RuntimeError("private tournament retry lease was lost")
