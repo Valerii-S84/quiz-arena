@@ -38,11 +38,17 @@ async def _deliver_user_message(
     operations = delivery_context.operations
     chat_id = context.telegram_targets.get(user_id)
     existing_message_id = context.participant_rows[user_id].standings_message_id
+    delivery_operation = operations.delivery_operation(existing_message_id)
+    content_key = operations.content_key(
+        content_version=delivery_context.content_version,
+        delivery_operation=delivery_operation,
+    )
     target = operations.build_target(
         delivery_context=delivery_context,
         user_id=user_id,
         chat_id=chat_id,
-        delivery_operation=operations.delivery_operation(existing_message_id),
+        delivery_operation=delivery_operation,
+        content_key=content_key,
         pending_replay_safe=existing_message_id is not None,
     )
     text, keyboard = _build_round_payload(delivery_context, user_id)

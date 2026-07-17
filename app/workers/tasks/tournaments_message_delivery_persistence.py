@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from app.db.repo.production_reliability_types import TelegramDeliveryFailure
 from app.db.repo.telegram_delivery_attempts_repo import TelegramDeliveryAttemptsRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.session import SessionLocal
@@ -14,8 +15,12 @@ from app.workers.tasks.tournaments_messaging_delivery_targets import (
     SKIP_CODE_NO_CHAT,
     PrivateTournamentDeliveryTarget,
 )
+from app.workers.tasks.tournaments_messaging_delivery_types import (
+    TournamentRoundDeliveryFailureResult,
+)
 
 _PENDING_REPLAY_CLAIM_TTL_SECONDS = 300
+_RETRY_NEEDED_FAILURE_CODE = "TELEGRAM_RETRY_NEEDED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,21 +96,27 @@ async def prepare_private_tournament_delivery(
 async def record_private_tournament_delivery_failure(
     target: PrivateTournamentDeliveryTarget,
     exc: Exception,
-) -> str:
+) -> TournamentRoundDeliveryFailureResult:
     classified = classify_telegram_delivery_exception(exc)
     if classified is None:
         raise exc
     async with SessionLocal.begin() as session:
         if classified.status == "RETRY":
-            deferred = await TelegramDeliveryAttemptsRepo.defer_retry_after(
+            retry_after_seconds = max(1, int(classified.retry_after_seconds or 1))
+            failed = await TelegramDeliveryAttemptsRepo.mark_failed(
                 session,
                 idempotency_key=target.idempotency_key,
-                retry_after_seconds=classified.retry_after_seconds or 1,
-                claim_ttl_seconds=_PENDING_REPLAY_CLAIM_TTL_SECONDS,
+                failure=TelegramDeliveryFailure(
+                    failure_code=_RETRY_NEEDED_FAILURE_CODE,
+                    failure_reason=f"telegram retry needed after {retry_after_seconds}s",
+                ),
             )
-            if not deferred:
+            if not failed:
                 raise RuntimeError("private tournament retry lease was lost")
-            return "RETRY"
+            return TournamentRoundDeliveryFailureResult(
+                status="RETRY",
+                retry_after_seconds=retry_after_seconds,
+            )
         if classified.failure is None:
             raise exc
         failed = await TelegramDeliveryAttemptsRepo.mark_failed(
@@ -115,7 +126,7 @@ async def record_private_tournament_delivery_failure(
         )
         if not failed:
             raise RuntimeError("private tournament failure lease was lost")
-        return "FAILED"
+        return TournamentRoundDeliveryFailureResult(status="FAILED")
 
 
 async def record_private_tournament_delivery_skipped(

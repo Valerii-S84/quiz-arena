@@ -68,6 +68,7 @@ async def test_private_payload_failure_happens_before_pending_claim() -> None:
     operations = SimpleNamespace(
         build_target=lambda **_kwargs: SimpleNamespace(idempotency_key="delivery"),
         delivery_operation=lambda _message_id: "send",
+        content_key=lambda **_kwargs: "phase:round:1:send",
         build_payload=_payload,
         prepare_delivery=_prepare,
     )
@@ -77,6 +78,7 @@ async def test_private_payload_failure_happens_before_pending_claim() -> None:
             request=SimpleNamespace(context=context),
             operations=operations,
             happened_at=object(),
+            content_version="round:1",
         ),
     )
 

@@ -4,9 +4,14 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from aiogram.exceptions import TelegramRetryAfter
+from aiogram.methods import SendMessage
 
 from app.workers.tasks import daily_cup_messaging_delivery, tournaments_messaging_delivery
 from app.workers.tasks.tournaments_messaging_context import TournamentRoundMessagingContext
+from app.workers.tasks.tournaments_messaging_delivery_types import (
+    TournamentRoundDeliveryFailureResult,
+)
 from tests.game.tournaments_unit_support import NOW_UTC, match_row, participant_row, tournament_row
 
 
@@ -15,6 +20,17 @@ async def test_deliver_round_messages_sends_edits_replaces_and_counts_missing_ch
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_tournament_delivery_persistence(monkeypatch)
+    content_key_calls: list[dict[str, str]] = []
+
+    def _content_key(**kwargs: str) -> str:
+        content_key_calls.append(kwargs)
+        return f"phase:{kwargs['content_version']}:{kwargs['delivery_operation']}"
+
+    monkeypatch.setattr(
+        tournaments_messaging_delivery,
+        "private_round_delivery_content_key",
+        _content_key,
+    )
     tournament = tournament_row(status="COMPLETED")
     context = TournamentRoundMessagingContext(
         parsed_tournament_id=tournament.id,
@@ -55,6 +71,13 @@ async def test_deliver_round_messages_sends_edits_replaces_and_counts_missing_ch
     assert result.skipped == 1
     assert result.new_message_ids == {11: 901}
     assert result.replaced_message_ids == {33: 902}
+    assert [item["delivery_operation"] for item in content_key_calls] == [
+        "send",
+        "edit:222",
+        "edit:333",
+        "fallback_send_after_edit:333",
+        "edit:444",
+    ]
     assert bot.closed
 
 
@@ -96,6 +119,63 @@ async def test_deliver_round_messages_counts_not_modified_as_edited(
     assert result.edited == 1
     assert result.failed == 0
     assert result.skipped == 0
+
+
+@pytest.mark.asyncio
+async def test_deliver_round_messages_surfaces_initial_retryable_send(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_tournament_delivery_persistence(
+        monkeypatch,
+        failure_result=TournamentRoundDeliveryFailureResult(
+            status="RETRY",
+            retry_after_seconds=7,
+        ),
+    )
+    tournament = tournament_row(status="ROUND_1", current_round=1, round_deadline=NOW_UTC)
+    context = TournamentRoundMessagingContext(
+        parsed_tournament_id=tournament.id,
+        tournament=tournament,
+        standings_user_ids=[11],
+        points_by_user={11: "2"},
+        place_by_user={11: 1},
+        participant_rows={11: SimpleNamespace(standings_message_id=None)},
+        telegram_targets={11: 101},
+        labels={11: "A"},
+        round_matches=[],
+    )
+    bot = _Bot(
+        edit_outcomes=[],
+        send_outcomes=[
+            TelegramRetryAfter(
+                method=SendMessage(chat_id=101, text="round"),
+                message="flood",
+                retry_after=7,
+            )
+        ],
+    )
+
+    result = await tournaments_messaging_delivery.deliver_round_messages(
+        context=context,
+        build_bot_fn=lambda: bot,
+        resolve_match_context_fn=lambda **_kwargs: (None, None),
+        build_standings_lines_fn=lambda **_kwargs: ["standings"],
+        build_completed_text_fn=lambda **_kwargs: "completed",
+        build_round_text_fn=lambda **_kwargs: "round",
+        format_deadline_fn=lambda _deadline: "deadline",
+        build_keyboard_fn=lambda **_kwargs: "keyboard",
+        add_share_button_fn=lambda **_kwargs: "share-keyboard",
+        build_share_url_fn=lambda **_kwargs: "https://example.test",
+        is_message_not_modified_error_fn=lambda _exc: False,
+        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+    )
+
+    assert result.sent == 0
+    assert result.failed == 1
+    assert result.skipped == 0
+    assert result.retry_count == 1
+    assert result.retry_after_seconds == 7
+    assert bot.closed
 
 
 @pytest.mark.asyncio
@@ -145,12 +225,16 @@ async def test_deliver_daily_cup_messages_handles_send_edit_and_missing_chat(
     assert result["replaced_message_ids"] == {22: 902}
 
 
-def _patch_tournament_delivery_persistence(monkeypatch: pytest.MonkeyPatch) -> None:
+def _patch_tournament_delivery_persistence(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    failure_result: object = TournamentRoundDeliveryFailureResult(status="FAILED"),
+) -> None:
     async def _prepare_delivery(target):
         return SimpleNamespace(should_send=target.chat_id is not None)
 
     async def _record_delivery_failure(_target, _exc):
-        return "FAILED"
+        return failure_result
 
     async def _record_delivery_skipped(*_args, **_kwargs):
         return None
@@ -181,13 +265,25 @@ def _patch_tournament_delivery_persistence(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 class _Bot:
-    def __init__(self, *, edit_outcomes: list[object]) -> None:
+    def __init__(
+        self,
+        *,
+        edit_outcomes: list[object],
+        send_outcomes: list[object] | None = None,
+    ) -> None:
         self._message_id = 900
         self._edit_outcomes = edit_outcomes
+        self._send_outcomes = list(send_outcomes or [])
         self.closed = False
         self.session = SimpleNamespace(close=self._close)
 
     async def send_message(self, **_kwargs):
+        if self._send_outcomes:
+            outcome = self._send_outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            if isinstance(outcome, int):
+                return SimpleNamespace(message_id=outcome)
         self._message_id += 1
         return SimpleNamespace(message_id=self._message_id)
 

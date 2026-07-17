@@ -92,8 +92,35 @@ async def test_run_private_tournament_round_messaging_async_reloads_inside_mutex
         "edited": 2,
         "failed": 0,
         "skipped": 0,
+        "retry_count": 0,
+        "retry_after_seconds": None,
     }
     assert session_local._call_count == 2
+
+
+def test_private_tournament_messaging_wrapper_raises_on_retry_needed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _run(coro):
+        coro.close()
+        return {
+            "processed": 1,
+            "participants_total": 1,
+            "sent": 0,
+            "edited": 0,
+            "failed": 1,
+            "skipped": 0,
+            "retry_count": 1,
+            "retry_after_seconds": 7,
+        }
+
+    monkeypatch.setattr(tournaments_messaging, "run_async_job", _run)
+
+    with pytest.raises(
+        tournaments_messaging.PrivateTournamentDeliveryRetryNeeded,
+        match="retry_after_seconds=7",
+    ):
+        tournaments_messaging.run_private_tournament_round_messaging(tournament_id=str(uuid4()))
 
 
 @pytest.mark.asyncio

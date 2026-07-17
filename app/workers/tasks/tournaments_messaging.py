@@ -36,6 +36,18 @@ from app.workers.tasks.tournaments_messaging_text import (
 
 logger = structlog.get_logger("app.workers.tasks.tournaments_messaging")
 
+PrivateRoundMessagingResult = dict[str, int | None]
+
+
+class PrivateTournamentDeliveryRetryNeeded(RuntimeError):
+    def __init__(self, *, retry_count: int, retry_after_seconds: int | None) -> None:
+        self.retry_count = retry_count
+        self.retry_after_seconds = retry_after_seconds
+        detail = f"private tournament delivery retry needed for {retry_count} recipient(s)"
+        if retry_after_seconds is not None:
+            detail = f"{detail}; retry_after_seconds={retry_after_seconds}"
+        super().__init__(detail)
+
 
 def _is_celery_task(task_obj: object) -> bool:
     return type(task_obj).__module__.startswith("celery.")
@@ -47,7 +59,7 @@ def _build_standings_share_url(
     tournament_name: str | None,
 ) -> str:
     invite_link = public_bot_start_link(start_param=f"tournament_{invite_code}")
-    share_text = f"🏆 Ich spiele im {tournament_name or 'Deutsch-Turnier'}! " "Komm dazu →"
+    share_text = f"🏆 Ich spiele im {tournament_name or 'Deutsch-Turnier'}! Komm dazu →"
     return build_tournament_share_url(base_link=invite_link, share_text=share_text)
 
 
@@ -62,7 +74,7 @@ def _with_standings_share_button(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def _empty_round_messaging_result() -> dict[str, int]:
+def _empty_round_messaging_result() -> PrivateRoundMessagingResult:
     return {
         "processed": 0,
         "participants_total": 0,
@@ -70,6 +82,8 @@ def _empty_round_messaging_result() -> dict[str, int]:
         "edited": 0,
         "failed": 0,
         "skipped": 0,
+        "retry_count": 0,
+        "retry_after_seconds": None,
     }
 
 
@@ -90,7 +104,10 @@ async def _load_round_context(
         )
 
 
-async def run_private_tournament_round_messaging_async(*, tournament_id: str) -> dict[str, int]:
+async def run_private_tournament_round_messaging_async(
+    *,
+    tournament_id: str,
+) -> PrivateRoundMessagingResult:
     try:
         parsed_tournament_id = UUID(tournament_id)
     except ValueError:
@@ -130,7 +147,23 @@ async def run_private_tournament_round_messaging_async(*, tournament_id: str) ->
         "edited": delivery_result.edited,
         "failed": delivery_result.failed,
         "skipped": delivery_result.skipped,
+        "retry_count": delivery_result.retry_count,
+        "retry_after_seconds": delivery_result.retry_after_seconds,
     }
+
+
+def _raise_for_private_delivery_retry_needed(result: PrivateRoundMessagingResult) -> None:
+    retry_count = int(result.get("retry_count") or 0)
+    if retry_count <= 0:
+        return
+    retry_after_seconds_value = result.get("retry_after_seconds")
+    retry_after_seconds = (
+        int(retry_after_seconds_value) if retry_after_seconds_value is not None else None
+    )
+    raise PrivateTournamentDeliveryRetryNeeded(
+        retry_count=retry_count,
+        retry_after_seconds=retry_after_seconds,
+    )
 
 
 def enqueue_private_tournament_round_messaging(*, tournament_id: str) -> None:
@@ -150,5 +183,12 @@ def enqueue_private_tournament_round_messaging(*, tournament_id: str) -> None:
 @celery_app.task(
     name="app.workers.tasks.tournaments_messaging.run_private_tournament_round_messaging"
 )
-def run_private_tournament_round_messaging(*, tournament_id: str) -> dict[str, int]:
-    return run_async_job(run_private_tournament_round_messaging_async(tournament_id=tournament_id))
+def run_private_tournament_round_messaging(
+    *,
+    tournament_id: str,
+) -> PrivateRoundMessagingResult:
+    result = run_async_job(
+        run_private_tournament_round_messaging_async(tournament_id=tournament_id)
+    )
+    _raise_for_private_delivery_retry_needed(result)
+    return result

@@ -53,4 +53,6 @@ def test_private_tournament_messaging_invalid_and_missing_context(monkeypatch) -
         "edited": 0,
         "failed": 0,
         "skipped": 0,
+        "retry_count": 0,
+        "retry_after_seconds": None,
     }

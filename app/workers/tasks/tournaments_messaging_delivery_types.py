@@ -16,6 +16,14 @@ class TournamentRoundDeliveryResult:
     skipped: int
     new_message_ids: dict[int, int]
     replaced_message_ids: dict[int, int]
+    retry_count: int = 0
+    retry_after_seconds: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TournamentRoundDeliveryFailureResult:
+    status: str
+    retry_after_seconds: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +54,7 @@ class TournamentRoundDeliveryOperations:
     delivery_operation: Callable[..., str]
     fallback_delivery_operation: Callable[..., str]
     content_version: Callable[..., str]
+    content_key: Callable[..., str]
     build_payload: Callable[..., tuple[str, object]]
 
 
@@ -79,6 +88,19 @@ class TournamentRoundDeliveryState:
     skipped: int = 0
     new_message_ids: dict[int, int] = field(default_factory=dict)
     replaced_message_ids: dict[int, int] = field(default_factory=dict)
+    retry_count: int = 0
+    retry_after_seconds: int | None = None
+
+    def record_retry(self, retry_after_seconds: int | None) -> None:
+        self.failed += 1
+        self.retry_count += 1
+        if retry_after_seconds is None:
+            return
+        retry_after = max(1, int(retry_after_seconds))
+        if self.retry_after_seconds is None:
+            self.retry_after_seconds = retry_after
+            return
+        self.retry_after_seconds = max(self.retry_after_seconds, retry_after)
 
     def to_result(self) -> TournamentRoundDeliveryResult:
         return TournamentRoundDeliveryResult(
@@ -88,11 +110,14 @@ class TournamentRoundDeliveryState:
             skipped=self.skipped,
             new_message_ids=self.new_message_ids,
             replaced_message_ids=self.replaced_message_ids,
+            retry_count=self.retry_count,
+            retry_after_seconds=self.retry_after_seconds,
         )
 
 
 __all__ = [
     "TournamentRoundDeliveryContext",
+    "TournamentRoundDeliveryFailureResult",
     "TournamentRoundDeliveryOperations",
     "TournamentRoundDeliveryRequest",
     "TournamentRoundDeliveryResult",

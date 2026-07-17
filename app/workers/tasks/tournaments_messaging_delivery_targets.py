@@ -38,16 +38,18 @@ def private_round_delivery_target(
     user_id: int,
     chat_id: int | None,
     delivery_operation: str,
+    content_key: str,
     pending_replay_safe: bool,
 ) -> PrivateTournamentDeliveryTarget:
     context = delivery_context.request.context
-    target_id = f"{user_id}:phase:{delivery_context.content_version}:{delivery_operation}"
+    target_id = f"{user_id}:{content_key}"
     safe_context: dict[str, object] = {
         "tournament_id": delivery_context.correlation_id,
         "user_id": user_id,
         "status": str(context.tournament.status),
         "current_round": int(context.tournament.current_round),
         "content_version": delivery_context.content_version,
+        "content_key": content_key,
         PENDING_REPLAY_SAFE_CONTEXT_KEY: pending_replay_safe,
     }
     attempt = TelegramDeliveryAttemptCreate(
@@ -79,6 +81,14 @@ def private_round_content_version(*, tournament: Any) -> str:
     return f"round:{max(1, int(tournament.current_round))}:status:{status}"
 
 
+def private_round_delivery_content_key(
+    *,
+    content_version: str,
+    delivery_operation: str,
+) -> str:
+    return f"phase:{content_version}:{delivery_operation}"
+
+
 def delivery_operation(existing_message_id: int | None) -> str:
     if existing_message_id is None:
         return "send"
@@ -95,6 +105,7 @@ __all__ = [
     "SKIP_CODE_NO_CHAT",
     "delivery_operation",
     "fallback_delivery_operation",
+    "private_round_delivery_content_key",
     "private_round_content_version",
     "private_round_delivery_target",
 ]

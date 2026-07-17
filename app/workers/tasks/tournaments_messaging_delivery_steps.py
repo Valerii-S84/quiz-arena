@@ -36,6 +36,9 @@ async def _prepare_delivery(
     preparation = await delivery_context.operations.prepare_delivery(attempt.target)
     if preparation.should_send:
         return True
+    if getattr(preparation, "status", None) == "RETRY":
+        state.record_retry(getattr(preparation, "retry_after_seconds", None))
+        return False
     state.skipped += 1
     return False
 
@@ -45,8 +48,23 @@ async def _record_delivery_exception(
     delivery_context: TournamentRoundDeliveryContext,
     target: object,
     exc: Exception,
-) -> str:
+) -> object:
     return await delivery_context.operations.record_delivery_failure(target, exc)
+
+
+def _record_delivery_failure_state(
+    *,
+    state: TournamentRoundDeliveryState,
+    failure: object,
+) -> None:
+    status = failure if isinstance(failure, str) else getattr(failure, "status", None)
+    if status == "FAILED":
+        state.failed += 1
+        return
+    if status == "RETRY":
+        state.record_retry(getattr(failure, "retry_after_seconds", None))
+        return
+    state.skipped += 1
 
 
 async def send_initial_round_message(
@@ -79,10 +97,7 @@ async def send_initial_round_message(
             target=attempt.target,
             exc=exc,
         )
-        if status == "FAILED":
-            state.failed += 1
-        else:
-            state.skipped += 1
+        _record_delivery_failure_state(state=state, failure=status)
         return
     state.sent += 1
     state.new_message_ids[attempt.user_id] = message_id
@@ -94,11 +109,17 @@ def _build_fallback_target(
 ):
     operations = delivery_context.operations
     existing_message_id = cast(int, attempt.existing_message_id)
+    delivery_operation = operations.fallback_delivery_operation(existing_message_id)
+    content_key = operations.content_key(
+        content_version=delivery_context.content_version,
+        delivery_operation=delivery_operation,
+    )
     return operations.build_target(
         delivery_context=delivery_context,
         user_id=attempt.user_id,
         chat_id=attempt.chat_id,
-        delivery_operation=operations.fallback_delivery_operation(existing_message_id),
+        delivery_operation=delivery_operation,
+        content_key=content_key,
         pending_replay_safe=False,
     )
 
@@ -155,10 +176,7 @@ async def _send_fallback_round_message(
             target=attempt.target,
             exc=edit_error,
         )
-        if fallback_status == "FAILED":
-            state.failed += 1
-        else:
-            state.skipped += 1
+        _record_delivery_failure_state(state=state, failure=fallback_status)
         return
     state.sent += 1
     state.replaced_message_ids[attempt.user_id] = message_id
