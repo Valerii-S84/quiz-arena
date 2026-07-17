@@ -111,6 +111,7 @@ async def test_lifecycle_completes_last_round(monkeypatch: pytest.MonkeyPatch) -
         "list_for_tournament_for_update",
         async_return([participant_row(tournament_id=tournament.id, user_id=11)]),
     )
+    monkeypatch.setattr(lifecycle, "lock_standings_phase_transition", async_return(None))
 
     result = await lifecycle.settle_round_and_advance(
         TournamentSession(),
@@ -139,6 +140,7 @@ async def test_lifecycle_advances_to_next_round(monkeypatch: pytest.MonkeyPatch)
         lifecycle.TournamentMatchesRepo, "list_by_tournament_for_update", async_return([])
     )
     monkeypatch.setattr(lifecycle, "create_round_matches", async_return(2))
+    monkeypatch.setattr(lifecycle, "lock_standings_phase_transition", async_return(None))
 
     result = await lifecycle.settle_round_and_advance(
         TournamentSession(),

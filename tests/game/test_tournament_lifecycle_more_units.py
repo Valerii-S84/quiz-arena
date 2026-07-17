@@ -86,12 +86,22 @@ async def test_settle_round_and_advance_returns_early_when_pending_left(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tournament = tournament_row(status="ROUND_1", current_round=1)
+    calls: list[str] = []
+
+    async def _lock(*_args, **_kwargs) -> None:
+        calls.append("lock")
+
+    async def _list_matches(*_args, **_kwargs):
+        calls.append("matches")
+        return [match_row(status="PENDING")]
+
     monkeypatch.setattr(
         lifecycle.TournamentMatchesRepo,
         "list_by_tournament_round_for_update",
-        async_return([match_row(status="PENDING")]),
+        _list_matches,
     )
     monkeypatch.setattr(lifecycle, "settle_pending_match_from_duel", async_return(False))
+    monkeypatch.setattr(lifecycle, "lock_standings_phase_transition", _lock)
 
     result = await lifecycle.settle_round_and_advance(
         TournamentSession(),
@@ -105,6 +115,7 @@ async def test_settle_round_and_advance_returns_early_when_pending_left(
         "round_started": 0,
         "tournament_completed": 0,
     }
+    assert calls == ["lock", "matches"]
 
 
 @pytest.mark.asyncio

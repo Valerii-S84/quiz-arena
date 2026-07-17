@@ -46,4 +46,11 @@ def test_private_tournament_messaging_invalid_and_missing_context(monkeypatch) -
         )
     )
 
-    assert result == {"processed": 0, "participants_total": 0, "sent": 0, "edited": 0, "failed": 0}
+    assert result == {
+        "processed": 0,
+        "participants_total": 0,
+        "sent": 0,
+        "edited": 0,
+        "failed": 0,
+        "skipped": 0,
+    }
