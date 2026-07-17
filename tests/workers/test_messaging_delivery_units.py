@@ -11,7 +11,10 @@ from tests.game.tournaments_unit_support import NOW_UTC, match_row, participant_
 
 
 @pytest.mark.asyncio
-async def test_deliver_round_messages_sends_edits_replaces_and_counts_missing_chat() -> None:
+async def test_deliver_round_messages_sends_edits_replaces_and_counts_missing_chat(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_tournament_delivery_persistence(monkeypatch)
     tournament = tournament_row(status="COMPLETED")
     context = TournamentRoundMessagingContext(
         parsed_tournament_id=tournament.id,
@@ -48,14 +51,18 @@ async def test_deliver_round_messages_sends_edits_replaces_and_counts_missing_ch
 
     assert result.sent == 2
     assert result.edited == 1
-    assert result.failed == 1
+    assert result.failed == 0
+    assert result.skipped == 1
     assert result.new_message_ids == {11: 901}
     assert result.replaced_message_ids == {33: 902}
     assert bot.closed
 
 
 @pytest.mark.asyncio
-async def test_deliver_round_messages_counts_not_modified_as_edited() -> None:
+async def test_deliver_round_messages_counts_not_modified_as_edited(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_tournament_delivery_persistence(monkeypatch)
     tournament = tournament_row(status="ROUND_1", current_round=1, round_deadline=NOW_UTC)
     context = TournamentRoundMessagingContext(
         parsed_tournament_id=tournament.id,
@@ -88,6 +95,7 @@ async def test_deliver_round_messages_counts_not_modified_as_edited() -> None:
     assert result.sent == 0
     assert result.edited == 1
     assert result.failed == 0
+    assert result.skipped == 0
 
 
 @pytest.mark.asyncio
@@ -135,6 +143,41 @@ async def test_deliver_daily_cup_messages_handles_send_edit_and_missing_chat(
     assert result["failed"] == 1
     assert result["new_message_ids"] == {11: 901}
     assert result["replaced_message_ids"] == {22: 902}
+
+
+def _patch_tournament_delivery_persistence(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _prepare_delivery(target):
+        return SimpleNamespace(should_send=target.chat_id is not None)
+
+    async def _record_delivery_failure(_target, _exc):
+        return "FAILED"
+
+    async def _record_delivery_skipped(*_args, **_kwargs):
+        return None
+
+    async def _persist_sent_message(_target, _fence, message, _happened_at, **_kwargs):
+        return int(message if isinstance(message, int) else message.message_id)
+
+    monkeypatch.setattr(
+        tournaments_messaging_delivery,
+        "prepare_private_tournament_delivery",
+        _prepare_delivery,
+    )
+    monkeypatch.setattr(
+        tournaments_messaging_delivery,
+        "record_private_tournament_delivery_failure",
+        _record_delivery_failure,
+    )
+    monkeypatch.setattr(
+        tournaments_messaging_delivery,
+        "record_private_tournament_delivery_skipped",
+        _record_delivery_skipped,
+    )
+    monkeypatch.setattr(
+        tournaments_messaging_delivery,
+        "persist_private_tournament_sent_message",
+        _persist_sent_message,
+    )
 
 
 class _Bot:
