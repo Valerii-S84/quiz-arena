@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import NotRequired, TypedDict
 from uuid import UUID
 
 import structlog
@@ -36,7 +37,16 @@ from app.workers.tasks.tournaments_messaging_text import (
 
 logger = structlog.get_logger("app.workers.tasks.tournaments_messaging")
 
-PrivateRoundMessagingResult = dict[str, int | None]
+
+class PrivateRoundMessagingResult(TypedDict):
+    processed: int
+    participants_total: int
+    sent: int
+    edited: int
+    failed: int
+    skipped: int
+    retry_count: NotRequired[int]
+    retry_after_seconds: NotRequired[int | None]
 
 
 class PrivateTournamentDeliveryRetryNeeded(RuntimeError):
