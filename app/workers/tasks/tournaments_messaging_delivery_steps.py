@@ -5,9 +5,7 @@ from typing import cast
 from app.workers.tasks.tournaments_message_delivery_persistence import (
     PrivateTournamentStandingsFence,
 )
-from app.workers.tasks.tournaments_messaging_delivery_targets import (
-    SKIP_CODE_EDIT_REPLACED_BY_SEND,
-)
+from app.workers.tasks.tournaments_messaging_delivery_targets import SKIP_CODE_EDIT_REPLACED_BY_SEND
 from app.workers.tasks.tournaments_messaging_delivery_types import (
     TournamentRoundDeliveryContext,
     TournamentRoundDeliveryState,
