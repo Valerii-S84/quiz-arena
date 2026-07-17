@@ -175,31 +175,18 @@ async def test_private_retryable_failure_marks_failed_without_defer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     failed_calls: list[Any] = []
-    deferred_calls: list[object] = []
 
     async def _mark_failed(_session: object, **kwargs: object) -> bool:
         failed_calls.append(kwargs["failure"])
         return True
 
-    async def _defer_retry_after(_session: object, **kwargs: object) -> bool:
-        deferred_calls.append(kwargs)
-        return True
+    async def _defer_retry_after(*_args: object, **_kwargs: object) -> bool:
+        raise AssertionError("retryable private delivery must not create orphan pending retry")
 
-    monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
-        "mark_failed",
-        _mark_failed,
-    )
-    monkeypatch.setattr(
-        tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo,
-        "defer_retry_after",
-        _defer_retry_after,
-    )
-    monkeypatch.setattr(
-        tournaments_message_delivery_persistence,
-        "SessionLocal",
-        _SessionLocal,
-    )
+    repo = tournaments_message_delivery_persistence.TelegramDeliveryAttemptsRepo
+    monkeypatch.setattr(repo, "mark_failed", _mark_failed)
+    monkeypatch.setattr(repo, "defer_retry_after", _defer_retry_after)
+    monkeypatch.setattr(tournaments_message_delivery_persistence, "SessionLocal", _SessionLocal)
 
     result = (
         await tournaments_message_delivery_persistence.record_private_tournament_delivery_failure(
@@ -216,7 +203,6 @@ async def test_private_retryable_failure_marks_failed_without_defer(
     assert result.retry_after_seconds == 7
     assert len(failed_calls) == 1
     assert failed_calls[0].failure_code == "TELEGRAM_RETRY_NEEDED"
-    assert deferred_calls == []
 
 
 @pytest.mark.parametrize("fallback", [False, True])

@@ -21,12 +21,6 @@ class TournamentRoundDeliveryResult:
 
 
 @dataclass(frozen=True, slots=True)
-class TournamentRoundDeliveryFailureResult:
-    status: str
-    retry_after_seconds: int | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class TournamentRoundDeliveryRequest:
     context: TournamentRoundMessagingContext
     build_bot_fn: Callable[[], Any]
@@ -97,10 +91,21 @@ class TournamentRoundDeliveryState:
         if retry_after_seconds is None:
             return
         retry_after = max(1, int(retry_after_seconds))
-        if self.retry_after_seconds is None:
-            self.retry_after_seconds = retry_after
+        self.retry_after_seconds = (
+            retry_after
+            if self.retry_after_seconds is None
+            else max(self.retry_after_seconds, retry_after)
+        )
+
+    def record_failure(self, failure: object) -> None:
+        status = failure if isinstance(failure, str) else getattr(failure, "status", None)
+        if status == "FAILED":
+            self.failed += 1
             return
-        self.retry_after_seconds = max(self.retry_after_seconds, retry_after)
+        if status == "RETRY":
+            self.record_retry(getattr(failure, "retry_after_seconds", None))
+            return
+        self.skipped += 1
 
     def to_result(self) -> TournamentRoundDeliveryResult:
         return TournamentRoundDeliveryResult(
@@ -117,7 +122,6 @@ class TournamentRoundDeliveryState:
 
 __all__ = [
     "TournamentRoundDeliveryContext",
-    "TournamentRoundDeliveryFailureResult",
     "TournamentRoundDeliveryOperations",
     "TournamentRoundDeliveryRequest",
     "TournamentRoundDeliveryResult",

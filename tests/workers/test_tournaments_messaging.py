@@ -52,6 +52,7 @@ async def test_private_delivery_continues_after_recipient_system_error(
 @pytest.mark.asyncio
 async def test_private_payload_failure_happens_before_pending_claim() -> None:
     call_order: list[str] = []
+    content_key_calls: list[dict[str, str]] = []
 
     def _payload(**_kwargs: Any) -> tuple[str, object]:
         call_order.append("payload")
@@ -61,6 +62,10 @@ async def test_private_payload_failure_happens_before_pending_claim() -> None:
         call_order.append("prepare")
         return SimpleNamespace(should_send=False)
 
+    def _content_key(**kwargs: str) -> str:
+        content_key_calls.append(kwargs)
+        return "phase:round:1:send"
+
     context = SimpleNamespace(
         telegram_targets={1: 101},
         participant_rows={1: SimpleNamespace(standings_message_id=None)},
@@ -68,7 +73,7 @@ async def test_private_payload_failure_happens_before_pending_claim() -> None:
     operations = SimpleNamespace(
         build_target=lambda **_kwargs: SimpleNamespace(idempotency_key="delivery"),
         delivery_operation=lambda _message_id: "send",
-        content_key=lambda **_kwargs: "phase:round:1:send",
+        content_key=_content_key,
         build_payload=_payload,
         prepare_delivery=_prepare,
     )
@@ -90,6 +95,7 @@ async def test_private_payload_failure_happens_before_pending_claim() -> None:
         )
 
     assert call_order == ["payload"]
+    assert content_key_calls == [{"content_version": "round:1", "delivery_operation": "send"}]
 
 
 def test_private_tournament_worker_share_url_uses_canonical_telegram_contract() -> None:

@@ -4,14 +4,9 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from aiogram.exceptions import TelegramRetryAfter
-from aiogram.methods import SendMessage
 
 from app.workers.tasks import daily_cup_messaging_delivery, tournaments_messaging_delivery
 from app.workers.tasks.tournaments_messaging_context import TournamentRoundMessagingContext
-from app.workers.tasks.tournaments_messaging_delivery_types import (
-    TournamentRoundDeliveryFailureResult,
-)
 from tests.game.tournaments_unit_support import NOW_UTC, match_row, participant_row, tournament_row
 
 
@@ -20,17 +15,6 @@ async def test_deliver_round_messages_sends_edits_replaces_and_counts_missing_ch
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_tournament_delivery_persistence(monkeypatch)
-    content_key_calls: list[dict[str, str]] = []
-
-    def _content_key(**kwargs: str) -> str:
-        content_key_calls.append(kwargs)
-        return f"phase:{kwargs['content_version']}:{kwargs['delivery_operation']}"
-
-    monkeypatch.setattr(
-        tournaments_messaging_delivery,
-        "private_round_delivery_content_key",
-        _content_key,
-    )
     tournament = tournament_row(status="COMPLETED")
     context = TournamentRoundMessagingContext(
         parsed_tournament_id=tournament.id,
@@ -50,20 +34,7 @@ async def test_deliver_round_messages_sends_edits_replaces_and_counts_missing_ch
     )
     bot = _Bot(edit_outcomes=[None, RuntimeError("replace")])
 
-    result = await tournaments_messaging_delivery.deliver_round_messages(
-        context=context,
-        build_bot_fn=lambda: bot,
-        resolve_match_context_fn=lambda **_kwargs: (None, None),
-        build_standings_lines_fn=lambda **_kwargs: ["standings"],
-        build_completed_text_fn=lambda **_kwargs: "completed",
-        build_round_text_fn=lambda **_kwargs: "round",
-        format_deadline_fn=lambda _deadline: "deadline",
-        build_keyboard_fn=lambda **_kwargs: "keyboard",
-        add_share_button_fn=lambda **_kwargs: "share-keyboard",
-        build_share_url_fn=lambda **_kwargs: "https://example.test",
-        is_message_not_modified_error_fn=lambda _exc: False,
-        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
-    )
+    result = await _deliver_private_round(context=context, bot=bot)
 
     assert result.sent == 2
     assert result.edited == 1
@@ -71,13 +42,6 @@ async def test_deliver_round_messages_sends_edits_replaces_and_counts_missing_ch
     assert result.skipped == 1
     assert result.new_message_ids == {11: 901}
     assert result.replaced_message_ids == {33: 902}
-    assert [item["delivery_operation"] for item in content_key_calls] == [
-        "send",
-        "edit:222",
-        "edit:333",
-        "fallback_send_after_edit:333",
-        "edit:444",
-    ]
     assert bot.closed
 
 
@@ -100,20 +64,7 @@ async def test_deliver_round_messages_counts_not_modified_as_edited(
     )
     bot = _Bot(edit_outcomes=[RuntimeError("not modified")])
 
-    result = await tournaments_messaging_delivery.deliver_round_messages(
-        context=context,
-        build_bot_fn=lambda: bot,
-        resolve_match_context_fn=lambda **_kwargs: (None, 22),
-        build_standings_lines_fn=lambda **_kwargs: ["standings"],
-        build_completed_text_fn=lambda **_kwargs: "completed",
-        build_round_text_fn=lambda **_kwargs: "round",
-        format_deadline_fn=lambda _deadline: "deadline",
-        build_keyboard_fn=lambda **_kwargs: "keyboard",
-        add_share_button_fn=lambda **_kwargs: "share-keyboard",
-        build_share_url_fn=lambda **_kwargs: "https://example.test",
-        is_message_not_modified_error_fn=lambda _exc: True,
-        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
-    )
+    result = await _deliver_private_round(context=context, bot=bot, not_modified=True)
 
     assert result.sent == 0
     assert result.edited == 1
@@ -127,7 +78,7 @@ async def test_deliver_round_messages_surfaces_initial_retryable_send(
 ) -> None:
     _patch_tournament_delivery_persistence(
         monkeypatch,
-        failure_result=TournamentRoundDeliveryFailureResult(
+        failure_result=SimpleNamespace(
             status="RETRY",
             retry_after_seconds=7,
         ),
@@ -146,29 +97,10 @@ async def test_deliver_round_messages_surfaces_initial_retryable_send(
     )
     bot = _Bot(
         edit_outcomes=[],
-        send_outcomes=[
-            TelegramRetryAfter(
-                method=SendMessage(chat_id=101, text="round"),
-                message="flood",
-                retry_after=7,
-            )
-        ],
+        send_outcomes=[RuntimeError("flood")],
     )
 
-    result = await tournaments_messaging_delivery.deliver_round_messages(
-        context=context,
-        build_bot_fn=lambda: bot,
-        resolve_match_context_fn=lambda **_kwargs: (None, None),
-        build_standings_lines_fn=lambda **_kwargs: ["standings"],
-        build_completed_text_fn=lambda **_kwargs: "completed",
-        build_round_text_fn=lambda **_kwargs: "round",
-        format_deadline_fn=lambda _deadline: "deadline",
-        build_keyboard_fn=lambda **_kwargs: "keyboard",
-        add_share_button_fn=lambda **_kwargs: "share-keyboard",
-        build_share_url_fn=lambda **_kwargs: "https://example.test",
-        is_message_not_modified_error_fn=lambda _exc: False,
-        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
-    )
+    result = await _deliver_private_round(context=context, bot=bot)
 
     assert result.sent == 0
     assert result.failed == 1
@@ -228,7 +160,7 @@ async def test_deliver_daily_cup_messages_handles_send_edit_and_missing_chat(
 def _patch_tournament_delivery_persistence(
     monkeypatch: pytest.MonkeyPatch,
     *,
-    failure_result: object = TournamentRoundDeliveryFailureResult(status="FAILED"),
+    failure_result: object = SimpleNamespace(status="FAILED"),
 ) -> None:
     async def _prepare_delivery(target):
         return SimpleNamespace(should_send=target.chat_id is not None)
@@ -261,6 +193,28 @@ def _patch_tournament_delivery_persistence(
         tournaments_messaging_delivery,
         "persist_private_tournament_sent_message",
         _persist_sent_message,
+    )
+
+
+async def _deliver_private_round(
+    *,
+    context: TournamentRoundMessagingContext,
+    bot: object,
+    not_modified: bool = False,
+):
+    return await tournaments_messaging_delivery.deliver_round_messages(
+        context=context,
+        build_bot_fn=lambda: bot,
+        resolve_match_context_fn=lambda **_kwargs: (None, 22 if not_modified else None),
+        build_standings_lines_fn=lambda **_kwargs: ["standings"],
+        build_completed_text_fn=lambda **_kwargs: "completed",
+        build_round_text_fn=lambda **_kwargs: "round",
+        format_deadline_fn=lambda _deadline: "deadline",
+        build_keyboard_fn=lambda **_kwargs: "keyboard",
+        add_share_button_fn=lambda **_kwargs: "share-keyboard",
+        build_share_url_fn=lambda **_kwargs: "https://example.test",
+        is_message_not_modified_error_fn=lambda _exc: not_modified,
+        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
     )
 
 

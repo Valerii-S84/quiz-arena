@@ -22,7 +22,6 @@ from app.workers.tasks.tournaments_messaging_delivery_targets import (
     private_round_delivery_target,
 )
 from app.workers.tasks.tournaments_messaging_delivery_types import (
-    TournamentRoundDeliveryFailureResult,
     TournamentRoundDeliveryOperations,
     TournamentRoundDeliveryRequest,
     TournamentRoundDeliveryResult,
@@ -33,9 +32,7 @@ async def _prepare_round_delivery(*args: Any, **kwargs: Any) -> Any:
     return await prepare_private_tournament_delivery(*args, **kwargs)
 
 
-async def _record_round_delivery_failure(
-    *args: Any, **kwargs: Any
-) -> TournamentRoundDeliveryFailureResult:
+async def _record_round_delivery_failure(*args: Any, **kwargs: Any) -> Any:
     return await record_private_tournament_delivery_failure(*args, **kwargs)
 
 

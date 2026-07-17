@@ -9,14 +9,14 @@ from app.db.repo.production_reliability_types import TelegramDeliveryFailure
 from app.db.repo.telegram_delivery_attempts_repo import TelegramDeliveryAttemptsRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.session import SessionLocal
-from app.services.telegram_delivery_outcomes import classify_telegram_delivery_exception
+from app.services.telegram_delivery_outcomes import (
+    TelegramDeliveryExceptionOutcome,
+    classify_telegram_delivery_exception,
+)
 from app.workers.tasks.tournaments_messaging_delivery_targets import (
     SKIP_CODE_EDIT_REPLACED_BY_SEND,
     SKIP_CODE_NO_CHAT,
     PrivateTournamentDeliveryTarget,
-)
-from app.workers.tasks.tournaments_messaging_delivery_types import (
-    TournamentRoundDeliveryFailureResult,
 )
 
 _PENDING_REPLAY_CLAIM_TTL_SECONDS = 300
@@ -96,7 +96,7 @@ async def prepare_private_tournament_delivery(
 async def record_private_tournament_delivery_failure(
     target: PrivateTournamentDeliveryTarget,
     exc: Exception,
-) -> TournamentRoundDeliveryFailureResult:
+) -> TelegramDeliveryExceptionOutcome:
     classified = classify_telegram_delivery_exception(exc)
     if classified is None:
         raise exc
@@ -113,7 +113,7 @@ async def record_private_tournament_delivery_failure(
             )
             if not failed:
                 raise RuntimeError("private tournament retry lease was lost")
-            return TournamentRoundDeliveryFailureResult(
+            return TelegramDeliveryExceptionOutcome(
                 status="RETRY",
                 retry_after_seconds=retry_after_seconds,
             )
@@ -126,7 +126,7 @@ async def record_private_tournament_delivery_failure(
         )
         if not failed:
             raise RuntimeError("private tournament failure lease was lost")
-        return TournamentRoundDeliveryFailureResult(status="FAILED")
+        return classified
 
 
 async def record_private_tournament_delivery_skipped(

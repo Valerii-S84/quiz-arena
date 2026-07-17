@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import cast
 
 from app.workers.tasks.tournaments_message_delivery_persistence import (
@@ -43,30 +44,6 @@ async def _prepare_delivery(
     return False
 
 
-async def _record_delivery_exception(
-    *,
-    delivery_context: TournamentRoundDeliveryContext,
-    target: object,
-    exc: Exception,
-) -> object:
-    return await delivery_context.operations.record_delivery_failure(target, exc)
-
-
-def _record_delivery_failure_state(
-    *,
-    state: TournamentRoundDeliveryState,
-    failure: object,
-) -> None:
-    status = failure if isinstance(failure, str) else getattr(failure, "status", None)
-    if status == "FAILED":
-        state.failed += 1
-        return
-    if status == "RETRY":
-        state.record_retry(getattr(failure, "retry_after_seconds", None))
-        return
-    state.skipped += 1
-
-
 async def send_initial_round_message(
     *,
     delivery_context: TournamentRoundDeliveryContext,
@@ -92,12 +69,8 @@ async def send_initial_round_message(
             delivery_context.happened_at,
         )
     except Exception as exc:
-        status = await _record_delivery_exception(
-            delivery_context=delivery_context,
-            target=attempt.target,
-            exc=exc,
-        )
-        _record_delivery_failure_state(state=state, failure=status)
+        failure = await delivery_context.operations.record_delivery_failure(attempt.target, exc)
+        state.record_failure(failure)
         return
     state.sent += 1
     state.new_message_ids[attempt.user_id] = message_id
@@ -133,14 +106,7 @@ async def _send_fallback_round_message(
 ) -> None:
     operations = delivery_context.operations
     fallback_target = _build_fallback_target(delivery_context, attempt)
-    fallback_attempt = TournamentRoundMessageAttempt(
-        user_id=attempt.user_id,
-        chat_id=attempt.chat_id,
-        existing_message_id=attempt.existing_message_id,
-        target=fallback_target,
-        text=attempt.text,
-        keyboard=attempt.keyboard,
-    )
+    fallback_attempt = replace(attempt, target=fallback_target)
     if not await _prepare_delivery(
         delivery_context=delivery_context,
         state=state,
@@ -166,17 +132,9 @@ async def _send_fallback_round_message(
             original_target=attempt.target,
         )
     except Exception as exc:
-        fallback_status = await _record_delivery_exception(
-            delivery_context=delivery_context,
-            target=fallback_target,
-            exc=exc,
-        )
-        await _record_delivery_exception(
-            delivery_context=delivery_context,
-            target=attempt.target,
-            exc=edit_error,
-        )
-        _record_delivery_failure_state(state=state, failure=fallback_status)
+        failure = await operations.record_delivery_failure(fallback_target, exc)
+        await operations.record_delivery_failure(attempt.target, edit_error)
+        state.record_failure(failure)
         return
     state.sent += 1
     state.replaced_message_ids[attempt.user_id] = message_id

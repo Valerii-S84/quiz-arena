@@ -40,13 +40,7 @@ PrivateRoundMessagingResult = dict[str, int | None]
 
 
 class PrivateTournamentDeliveryRetryNeeded(RuntimeError):
-    def __init__(self, *, retry_count: int, retry_after_seconds: int | None) -> None:
-        self.retry_count = retry_count
-        self.retry_after_seconds = retry_after_seconds
-        detail = f"private tournament delivery retry needed for {retry_count} recipient(s)"
-        if retry_after_seconds is not None:
-            detail = f"{detail}; retry_after_seconds={retry_after_seconds}"
-        super().__init__(detail)
+    pass
 
 
 def _is_celery_task(task_obj: object) -> bool:
@@ -82,8 +76,6 @@ def _empty_round_messaging_result() -> PrivateRoundMessagingResult:
         "edited": 0,
         "failed": 0,
         "skipped": 0,
-        "retry_count": 0,
-        "retry_after_seconds": None,
     }
 
 
@@ -140,29 +132,27 @@ async def run_private_tournament_round_messaging_async(
             logger=logger,
         )
 
-    return {
+    result: PrivateRoundMessagingResult = {
         "processed": 1,
         "participants_total": len(context.standings_user_ids),
         "sent": delivery_result.sent,
         "edited": delivery_result.edited,
         "failed": delivery_result.failed,
         "skipped": delivery_result.skipped,
-        "retry_count": delivery_result.retry_count,
-        "retry_after_seconds": delivery_result.retry_after_seconds,
     }
+    if delivery_result.retry_count > 0:
+        result["retry_count"] = delivery_result.retry_count
+        result["retry_after_seconds"] = delivery_result.retry_after_seconds
+    return result
 
 
 def _raise_for_private_delivery_retry_needed(result: PrivateRoundMessagingResult) -> None:
     retry_count = int(result.get("retry_count") or 0)
     if retry_count <= 0:
         return
-    retry_after_seconds_value = result.get("retry_after_seconds")
-    retry_after_seconds = (
-        int(retry_after_seconds_value) if retry_after_seconds_value is not None else None
-    )
     raise PrivateTournamentDeliveryRetryNeeded(
-        retry_count=retry_count,
-        retry_after_seconds=retry_after_seconds,
+        "private tournament delivery retry needed"
+        f"; retry_count={retry_count}; retry_after_seconds={result.get('retry_after_seconds')}"
     )
 
 

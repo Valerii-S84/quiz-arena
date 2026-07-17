@@ -92,8 +92,6 @@ async def test_run_private_tournament_round_messaging_async_reloads_inside_mutex
         "edited": 2,
         "failed": 0,
         "skipped": 0,
-        "retry_count": 0,
-        "retry_after_seconds": None,
     }
     assert session_local._call_count == 2
 
