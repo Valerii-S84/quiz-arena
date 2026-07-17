@@ -15,6 +15,7 @@ PENDING_REPLAY_SAFE_CONTEXT_KEY = "pending_replay_safe"
 class PrivateTournamentDeliveryTarget:
     attempt: TelegramDeliveryAttemptCreate
     chat_id: int | None
+    pending_replay_safe: bool
 
     @property
     def idempotency_key(self) -> str:
@@ -64,7 +65,11 @@ def private_round_delivery_target(
         telegram_user_id=chat_id,
         safe_context=safe_context,
     )
-    return PrivateTournamentDeliveryTarget(attempt=attempt, chat_id=chat_id)
+    return PrivateTournamentDeliveryTarget(
+        attempt=attempt,
+        chat_id=chat_id,
+        pending_replay_safe=pending_replay_safe,
+    )
 
 
 def private_round_content_version(*, tournament: Any) -> str:
