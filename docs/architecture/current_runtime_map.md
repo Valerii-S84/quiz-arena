@@ -2,31 +2,40 @@
 
 Operational architecture map for current production/runtime behavior.
 
+Last verified: 2026-07-18 against `docker-compose.prod.yml`,
+`deploy/Caddyfile`, `app/main.py`, and `app/bot/application.py`.
+
 ## 1) Runtime Topology
 
 ```text
-Internet / Telegram
+Browser / Telegram
         |
         v
-      Caddy (TLS, reverse proxy)
+ Caddy (TLS, reverse proxy)
         |
-        v
-   FastAPI (app.main)
+        +--> frontend:3000 (website/admin UI and quiz teaser routes)
         |
-        +--> Redis (Celery broker/result)
-        +--> PostgreSQL (domain + ops data)
-        |
-        v
- Celery worker(s) + Celery beat
+        +--> api:8000 (FastAPI API, health, and Telegram webhook)
+                  |
+                  +--> PostgreSQL (domain + ops data)
+                  +--> Redis (Celery broker/result and runtime state)
+                              |
+                              v
+                    Celery worker(s) + Celery beat
 ```
 
 Main deploy stack is defined in `docker-compose.prod.yml`:
 - `caddy`
+- `frontend` (prebuilt image supplied by `FRONTEND_IMAGE`)
 - `api`
 - `worker`
 - `beat`
 - `postgres`
 - `redis`
+
+Caddy also reaches the separately managed QuizBank API container through the
+external `api_quiz_bank` Docker network; that container is not defined by this
+repository's production compose file.
 
 ## 2) Inbound Telegram Flow (Webhook -> Queue -> Worker)
 
@@ -76,6 +85,7 @@ Delivery model:
 Dispatcher routers (`app.bot.application`):
 - `start`
 - `channel_bonus`
+- `gameplay_inline_share`
 - `gameplay`
 - `offers`
 - `payments`
@@ -106,7 +116,7 @@ These tasks read/write domain tables and can emit:
 - `analytics_events` (product/ops analytics events)
 - `analytics_daily` (aggregated KPIs)
 
-## 5) Internal Ops/API Surfaces
+## 5) HTTP Surfaces
 
 Mounted in `app.main`:
 - Health/readiness:
@@ -121,11 +131,24 @@ Mounted in `app.main`:
 - Ops UI:
   - `/ops/*`
   - static assets at `/ops/static`
+- Admin API:
+  - `/admin/auth/*`
+  - `/admin/overview`
+  - `/admin/users/*`, `/admin/economy/*`, `/admin/promo/*`
+  - `/admin/content/*`, `/admin/system`, `/admin/contact-requests/*`
+  - `/admin/website-analytics/overview`
+- Public API used by the frontend:
+  - `/api/contact`, `/api/stats`
+  - `/api/public/website-analytics/events`
+  - compatibility routes without the `/api` prefix remain mounted in FastAPI
 
-Internal access protection:
+Internal/ops access protection:
 - IP allowlist (`INTERNAL_API_ALLOWLIST`)
 - trusted proxy parsing (`INTERNAL_API_TRUSTED_PROXIES`)
 - token auth via `X-Internal-Token` / ops session cookie
+
+Admin APIs use the dedicated admin authentication/session flow under
+`app/api/routes/admin/`.
 
 ## 6) Core Data Surfaces (PostgreSQL)
 
@@ -134,9 +157,15 @@ High-impact runtime tables:
 - Operations/reliability events: `outbox_events`
 - Product analytics events: `analytics_events`, `analytics_daily`
 - Users/gameplay: `users`, `quiz_sessions`, `quiz_attempts`, `quiz_questions`
-- Economy/payments: `energy_state`, `ledger_entries`, `entitlements`, `purchases`
+- Economy/payments: `energy_state`, `ledger_entries`, `entitlements`, `purchases`,
+  `telegram_update_inbox`, `payment_events`, `payment_reconciliation_reviews`
 - Promo/referrals: `promo_*`, `referrals`
-- Competitive modes: `friend_challenges`, `tournaments`, `tournament_participants`, `tournament_matches`
+- Competitive modes: `friend_challenges`, `arena_duels`, `arena_attempts`,
+  `tournaments`, `tournament_participants`, `tournament_matches`,
+  `tournament_round_scores`
+- Admin/public site: `admins`, `admin_audit_log`, `contact_requests`,
+  `website_events`
+- Delivery reliability: `telegram_delivery_attempts`
 
 ## 7) Critical Runtime Config
 
@@ -152,6 +181,12 @@ Infra:
 - `REDIS_URL`
 - `CELERY_BROKER_URL`
 - `CELERY_RESULT_BACKEND`
+- `FRONTEND_IMAGE`
+- `FRONTEND_API_INTERNAL_URL`
+- `QUIZ_BANK_API_BASE_URL`
+- `QUIZ_BANK_EDGE_API_KEY`
+- `QUIZ_BANK_CONSUMER_ID`
+- `QUIZ_BANK_CONSUMER_API_KEY`
 
 Ops security:
 - `INTERNAL_API_TOKEN`

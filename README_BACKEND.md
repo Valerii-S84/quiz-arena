@@ -104,8 +104,9 @@ Active agent/source-of-truth rules:
 - `.agent/project/PROJECT_CONTEXT.md`
 - `.agent/project/CODE_STYLE.md`
 
-Root `AGENTS.md`, `CODE_STYLE.md`, `ENGINEERING_RULES.md`, and `REPO_STRUCTURE.md`
-remain compatibility docs only and are not the active source-of-truth for agent work.
+Root `AGENTS.md`, `CODE_STYLE.md`, `ENGINEERING_RULES.md`, `REPO_STRUCTURE.md`,
+and `IMPLEMENTATION_ARCHITECTURE.md` remain compatibility or historical docs
+only and are not the active source-of-truth for agent work or runtime topology.
 
 ## 6. Production references
 

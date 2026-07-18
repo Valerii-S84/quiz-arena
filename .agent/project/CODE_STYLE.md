@@ -23,6 +23,19 @@ fallback: якщо `primary_language` або `active_sections` не
 - Line length / docstring limits: `100` chars via Black/Ruff/isort; no separate repo-specific docstring quota is defined
 - Python-specific test rules: `pytest` with `asyncio_mode = auto`; default fast gate uses `pytest -q --ignore=tests/integration`, integration runs separately after migrations against `quiz_arena_test`
 
+## Architecture guards
+
+- `scripts/check_line_limits.sh` warns for every `app/**/*.py` file over `200`
+  lines. For changed files it rejects `app/**/*.py` over `250` lines, requires
+  `[APPROVED_SIZE_EXCEPTION]` above `220`, rejects `tests/**/*.py` above `400`,
+  and rejects `tools/**/*.py` above `300`.
+- Newly added files under `app/bot/handlers/` must not exceed `180` lines.
+- `scripts/check_architecture_debt.py` blocks new or worsened production
+  functions over `60` lines, more than `7` parameters, or nesting deeper than
+  `3`; unchanged legacy debt is reported as warnings.
+- `docs/architecture/technical_debt_baseline.md` is a dated snapshot, not a
+  live allowance list. Re-run the guards when reporting current debt.
+
 ## JavaScript / TypeScript
 
 - `Not used in this repo.`

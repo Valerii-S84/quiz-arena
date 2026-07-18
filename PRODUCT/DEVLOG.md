@@ -1,5 +1,9 @@
 # DEVLOG
 
+> HISTORICAL PRODUCT-SLICE LOG. This file does not claim to cover every current
+> repository change. Use Git history and the current documentation map in
+> `README.md` for the implemented state.
+
 ## Deutsch ist einfach! — Quiz Arena
 
 **Sprache:** Deutsch — STRICT
