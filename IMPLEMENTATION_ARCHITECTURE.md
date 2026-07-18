@@ -1,5 +1,12 @@
 # IMPLEMENTATION_ARCHITECTURE.md
 
+> HISTORICAL DESIGN DOCUMENT. This file preserves the original implementation
+> proposal and may contain superseded paths, alternatives, and limits. It is not
+> the current runtime source of truth. Use
+> `docs/architecture/current_runtime_map.md`,
+> `docs/database/schema_quick_map.md`, and `.agent/project/PROJECT_CONTEXT.md`
+> for the implemented repository state.
+
 > Scope: Production-Grade Architektur für **eine Sprache (Deutsch)**, ein Telegram-Quiz-Produkt mit Game Modes, Tournament Engine, Economy (Pakete via Telegram Stars), Anti-Cheat und sauberer Deployment-Topologie.
 
 ## 0. Invarianten (nicht verhandelbar)
@@ -373,8 +380,10 @@ Jeder Job:
 
 ---
 
-# Done Criteria (SLICE_06)
+# Done Criteria (SLICE_06, historical)
 
-* Dieses Dokument ist die einzige Quelle der Wahrheit für Implementation-Topologie.
+* Dieses Dokument war der Designvertrag für SLICE_06; die aktuelle
+  Implementation-Topologie wird in `docs/architecture/current_runtime_map.md`
+  gepflegt.
 * Keine Widersprüche zu: Vision, UX Flow, Game Modes, Tournament Engine, Economy, Data Schema, Engineering Rules.
 * Alle kritischen Risiken sind adressiert: Race Conditions, Idempotenz, Anti-Repeat, Double Rewards, Payment Safety.

@@ -1,5 +1,10 @@
 # AGENT CONSTITUTION
 
+> HISTORICAL PRODUCT-DESIGN GOVERNANCE. This file is not an active instruction
+> source for repository agents. Active agent policy starts at `.agent/AGENTS.md`,
+> and direct user instructions have the priority defined there. The content
+> below is preserved as product-design history only.
+
 ## Deutsch ist einfach! — Quiz Arena
 
 ---

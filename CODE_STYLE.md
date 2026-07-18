@@ -1,5 +1,11 @@
 # CODE_STYLE.md
 
+> Compatibility document. Active coding rules live in
+> `.agent/core/PRINCIPLES.md` and `.agent/project/CODE_STYLE.md`; executable CI
+> guards live in `scripts/check_*.sh` and `scripts/check_architecture_debt.py`.
+> When this historical document differs from those sources, the active rules and
+> executable guards take precedence.
+
 ## Grundprinzipien
 
 * **Klarheit > Cleverness.**

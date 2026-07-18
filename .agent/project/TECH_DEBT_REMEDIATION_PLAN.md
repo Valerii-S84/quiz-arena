@@ -12,11 +12,16 @@
 агент має працювати за цим планом, якщо користувач явно не задав інший
 порядок.
 
+Latest verified working-tree snapshot: `2026-07-18`. Live metrics must be
+recomputed from `scripts/check_architecture_debt.py` and
+`scripts/check_line_limits.sh`; dated counts in this document are historical
+evidence, not permanent allowlists.
+
 ## 1. Baseline and current snapshot
 
 Базова точка для цього плану: аудит репозиторію станом на `2026-04-15`.
-Поточне уточнення scope: аудит локального backend repo станом на
-`2026-05-12`.
+Попередній деталізований snapshot: аудит локального backend repo станом на
+`2026-05-12`. Остання повторна перевірка метрик: `2026-07-18`.
 
 Початкові проблеми з базового аудиту:
 
@@ -34,7 +39,7 @@
   і частини складних app-модулів.
 - `Low`: є drift між project docs і фактичним frontend/backend split.
 
-Поточний стан локального backend repo на `2026-05-12`:
+Зафіксований стан локального backend repo на `2026-05-12` (historical):
 
 - `frontend/` у робочому дереві відсутній.
 - Frontend source, frontend CI, and frontend image publishing live in the
@@ -59,6 +64,21 @@
   `app` modules was found in `pyproject.toml`.
 - Test-suite structural debt remains limited to
   `tests/game/test_sessions_start_arena.py` above `400` lines.
+
+Verified working-tree state on `2026-07-18`:
+
+- `frontend/` remains absent; frontend source and image publishing stay in the
+  standalone frontend repository.
+- `app/` has `29` Python files above `200` lines, `4` above `220`, `2` above
+  `250`, and `1` above `280`.
+- Production code has `84` functions/methods above `60` lines, `74` above `7`
+  parameters, and `13` above nesting depth `3`.
+- `3` test files exceed `400` lines.
+- Current app files above `220` lines are
+  `app/workers/tasks/payments_reliability_async.py` (`792`),
+  `app/services/telegram_delivery.py` (`259`),
+  `app/workers/tasks/daily_cup_turn_reminder_delivery.py` (`237`), and
+  `app/db/repo/outbox_events_repo.py` (`226`).
 
 ## 2. Definition of clean state
 
@@ -172,11 +192,13 @@ DoD фази:
 
 Перший пріоритет:
 
-- `app/bot/handlers/gameplay_flows/play_flow.py`
-- `app/game/sessions/service/sessions_submit_daily.py`
-- `app/game/sessions/service/daily_question_sets.py`
-- `app/workers/tasks/arena_duels.py`
-- long orchestration functions from the current architecture-debt guard output.
+- `app/workers/tasks/payments_reliability_async.py`
+- `app/services/telegram_delivery.py`
+- `app/workers/tasks/daily_cup_turn_reminder_delivery.py`
+- `app/db/repo/outbox_events_repo.py`
+- longest orchestration functions from the latest architecture-debt output,
+  including promo redeem, daily cup rendering, session submit/start, payment
+  reconciliation, tournament rounds, and daily metrics aggregation.
 
 Правило декомпозиції:
 
@@ -217,9 +239,12 @@ DoD фази:
 - `2026-05-12` cleanup slice split quiz energy consumption into a compatibility
   facade, consume orchestration and result/ledger/event helpers;
   `app/economy/energy/energy_consume.py` is now `132` lines.
-- Architecture debt after these slices: `10` app files above `220` lines, `98`
-  production functions/methods above `60` lines, `72` functions/methods above
-  `7` parameters and `15` functions above the nesting limit.
+- Historical architecture debt after the `2026-05-12` slices: `10` app files
+  above `220` lines, `98` production functions/methods above `60` lines, `72`
+  functions/methods above `7` parameters and `15` functions above the nesting
+  limit.
+- Latest verified metrics are the `2026-07-18` snapshot in section 1; do not use
+  the historical counts above as current values.
 
 ### Phase 3. External frontend remediation handoff
 
@@ -285,6 +310,12 @@ DoD фази:
 - test files більше не є сценарними монолітами;
 - назва тесту і його setup швидко читаються без deep scrolling;
 - coverage для refactored flows збережений або покращений.
+
+Поточний статус (`2026-07-18`):
+
+- `tests/workers/test_telegram_stars_reconciliation_task.py`: `1232` lines.
+- `tests/services/test_telegram_delivery.py`: `465` lines.
+- `tests/game/test_sessions_start_arena.py`: `403` lines.
 
 ## 5. PR slicing rules
 
