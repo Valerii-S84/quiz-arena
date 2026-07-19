@@ -1,193 +1,371 @@
-# GitHub -> Production Safe Deploy (Quiz Arena)
+# GitHub → Production Safe Deploy — Quiz Arena backend
 
-Цей документ для наступного агента, щоб деплой проходив стабільно і без повторення інцидентів із "бот завис / не відповідає".
+Цей runbook застосовується до поточного split-runtime: backend належить compose
+project `quiz-arena`, frontend — `quiz-arena-site`, shared edge — `infra-caddy`.
 
-## 0. Інваріанти (обов'язково)
-1. Деплой тільки з GitHub `main` (не з локального dirty-дерева).
-2. На сервері використовується тільки реальний env: `/opt/quiz-arena/.env`.
-3. Ніколи не запускати прод-команди з `.env.production.example` (там placeholder-и).
-4. Міграції застосовувати тільки після валідного backup.
-5. Після деплою обов'язково перевіряти health + webhook + Celery + Redis черги.
-6. Frontend для prod більше не будується з цього monorepo; `docker-compose.prod.yml` очікує готовий `FRONTEND_IMAGE`.
+## 0. Обов’язкові інваріанти
 
-## 1. GitHub flow (перед сервером)
-1. Створи гілку від `origin/main`.
-2. Внеси зміни.
-3. Прогін локального gate (тільки через venv):
+1. Deploy виконується тільки з commit, який уже merged у GitHub `main` і має
+   green required CI.
+2. API, worker і beat використовують один `BACKEND_IMAGE`, зібраний один раз з
+   exact deploy commit.
+3. Routine backend deploy не керує `frontend`, `caddy`, PostgreSQL, Redis,
+   Docker volumes, DNS, webhook URL або payment config.
+4. Production `.env` не відкривається і не друкується. Runbook перевіряє лише
+   existence/readability та передає path Docker Compose.
+5. Dirty production checkout не очищається через `reset`, `clean` або overwrite.
+   Новий код готується в окремому release checkout.
+6. Якщо live Alembic revision не збігається з candidate head, deploy
+   зупиняється до окремого migration/rollback approval.
+7. До recreate API compose має пройти durable network preflight для
+   `quiz-arena-edge` з alias `api`.
+8. Одночасно має працювати рівно один Celery beat.
+
+## 1. GitHub gate
+
+Локально або в CI:
+
 ```bash
-.venv/bin/ruff check app tests
-.venv/bin/black --check app tests
-.venv/bin/isort --check-only app tests
-.venv/bin/mypy app tests
-DATABASE_URL=postgresql+asyncpg://quiz:quiz@localhost:5432/quiz_arena_test TMPDIR=/tmp .venv/bin/pytest -q --ignore=tests/integration
+bash scripts/local_ci.sh
+git diff --check origin/main...HEAD
 ```
-   Або одним запуском: `bash scripts/local_ci.sh`
-   Цей helper відтворює повний GitHub CI локально, включно з підняттям
-   `postgres`/`redis` та integration job.
-4. Push гілки і PR у `main`.
-5. Дочекайся `CI / lint_unit` (і `integration`, якщо активний).
-6. Merge PR у `main`.
-7. Зафіксуй SHA merge-коміту:
+
+Перед сервером зафіксувати merged commit:
+
 ```bash
+DEPLOY_COMMIT="<full merged origin/main SHA>"
 git ls-remote --heads git@github.com:Valerii-S84/quiz-arena.git main
 ```
 
-## 2. Перевірка правильного прод-хоста
-1. Переконайся, що домен вказує на потрібний сервер:
-```bash
-dig +short deutchquizarena.de
-```
-2. Підключись SSH саме до цього IP.
-3. На сервері перевір шлях:
-```bash
-cd /opt/quiz-arena
-pwd
-```
+Stop condition: SHA GitHub `main` не дорівнює `DEPLOY_COMMIT`, required CI не
+green або PR/review threads не закриті.
 
-## 3. Safe sync коду на сервері
-Варіант A (рекомендовано, якщо дерево dirty): clean reclone.
+## 2. Production context
 
 ```bash
-ssh root@<SERVER_IP>
 set -euo pipefail
-TS=$(date +%Y%m%d_%H%M%S)
-cd /opt/quiz-arena
-cp .env /opt/quiz-arena.env.$TS
-cd /opt
-mv quiz-arena quiz-arena_dirty_$TS
-git clone --branch main --single-branch git@github.com:Valerii-S84/quiz-arena.git quiz-arena
-cp /opt/quiz-arena.env.$TS /opt/quiz-arena/.env
-cd /opt/quiz-arena
-git rev-parse --short HEAD
+
+DEPLOY_COMMIT="<full merged origin/main SHA>"
+TS="$(date -u +%Y%m%dT%H%M%SZ)"
+RELEASE_DIR="/opt/quiz-arena-releases/${DEPLOY_COMMIT}"
+COMPOSE_FILE="${RELEASE_DIR}/deploy/quiz-arena/docker-compose.prod.yml"
+QUIZ_ARENA_ENV_FILE="/opt/quiz-arena/.env"
+BACKEND_IMAGE="quiz-arena-backend:sha-${DEPLOY_COMMIT}"
+BACKUP_DIR="/var/backups/quiz-arena/predeploy-${DEPLOY_COMMIT}-${TS}"
+
+export DEPLOY_COMMIT RELEASE_DIR COMPOSE_FILE QUIZ_ARENA_ENV_FILE BACKEND_IMAGE BACKUP_DIR
 ```
 
-Варіант B (тільки якщо дерево чисте):
+Перевірити target без disclosure:
+
 ```bash
-cd /opt/quiz-arena
-git fetch origin
-git checkout main
-git reset --hard origin/main
+test "$(hostname)" = "ubuntu-8gb-nbg1-1"
+test -d /opt/quiz-arena
+test -r "${QUIZ_ARENA_ENV_FILE}"
+git -C /opt/quiz-arena rev-parse HEAD
+git -C /opt/quiz-arena status --short
 ```
 
-## 4. Backup перед міграціями
-Через `postgres` сервіс (не `api`, бо там може не бути `pg_dump`):
+`status --short` використовується тільки для класифікації path/status. Вміст
+protected runtime artifacts не відкривати. Нічого не видаляти й не
+перезаписувати.
+
+## 3. Clean release checkout
+
 ```bash
-cd /opt/quiz-arena
-source /opt/quiz-arena/.env
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env \
-  exec -T postgres sh -c 'pg_dump -U $POSTGRES_USER $POSTGRES_DB' \
-  > /opt/quiz-arena/backup_pre_deploy_$(date +%Y%m%d_%H%M%S).sql
-ls -lh /opt/quiz-arena/backup_pre_deploy_*.sql | tail -1
+test ! -e "${RELEASE_DIR}"
+mkdir -p /opt/quiz-arena-releases
+git clone --no-checkout git@github.com:Valerii-S84/quiz-arena.git "${RELEASE_DIR}"
+git -C "${RELEASE_DIR}" checkout --detach "${DEPLOY_COMMIT}"
+test "$(git -C "${RELEASE_DIR}" rev-parse HEAD)" = "${DEPLOY_COMMIT}"
+test -z "$(git -C "${RELEASE_DIR}" status --porcelain)"
 ```
 
-## 5. Build + deploy runtime
+Production dirty checkout залишається untouched і є окремим protected
+artifact source; deploy працює з release checkout.
+
+## 4. Compose, volumes і edge preflight
+
 ```bash
-cd /opt/quiz-arena
-bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/quiz-arena/docker-compose.prod.yml
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env pull frontend
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env build api worker beat
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d api frontend worker beat caddy
+docker network inspect quiz-arena-edge >/dev/null
+docker volume inspect quiz-arena_pg_data >/dev/null
+docker volume inspect quiz-arena_redis_data >/dev/null
+
+docker compose \
+  --project-directory "${RELEASE_DIR}" \
+  --env-file "${QUIZ_ARENA_ENV_FILE}" \
+  -f "${COMPOSE_FILE}" \
+  config --quiet
 ```
 
-Очікування перед цим кроком:
-- у `/opt/quiz-arena/.env` заданий `FRONTEND_IMAGE=<registry>/<owner>/quiz-arena-frontend:<tag>`;
-- production runtime env names are listed in `docs/runbooks/production_runtime_env.md`;
-- цей image уже зібраний і запушений зі standalone frontend repo;
-- browser-facing API base baked у frontend image має лишатися same-host `/api`.
+Перевірити, що candidate compose містить тільки backend ownership:
 
-## 6. Міграції
 ```bash
-cd /opt/quiz-arena
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env \
-  exec -T api sh -c "cd /app && alembic upgrade head"
+services="$(docker compose \
+  --project-directory "${RELEASE_DIR}" \
+  --env-file "${QUIZ_ARENA_ENV_FILE}" \
+  -f "${COMPOSE_FILE}" config --services)"
 
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env \
-  exec -T api sh -c "cd /app && alembic current"
+for required in postgres redis api worker beat; do
+  printf '%s\n' "${services}" | grep -qx "${required}"
+done
+printf '%s\n' "${services}" | grep -Eq '^(frontend|caddy)$' && exit 1 || true
 ```
 
-## 7. Обов'язкова post-deploy перевірка
-1. Контейнери:
+Stop condition: відсутня external network/volume, compose config invalid або
+backend compose містить `frontend`/`caddy`.
+
+## 5. Fresh PostgreSQL backup і rollback artifacts
+
 ```bash
-docker compose -f docker-compose.prod.yml ps
-bash scripts/check_compose_runtime_consistency.sh --expected-compose-file /opt/quiz-arena/docker-compose.prod.yml
+mkdir -p "${BACKUP_DIR}"
+chmod 700 "${BACKUP_DIR}"
+
+docker compose \
+  --project-directory "${RELEASE_DIR}" \
+  --env-file "${QUIZ_ARENA_ENV_FILE}" \
+  -f "${COMPOSE_FILE}" \
+  exec -T postgres sh -c 'pg_dump -Fc -U "$POSTGRES_USER" "$POSTGRES_DB"' \
+  > "${BACKUP_DIR}/quiz_arena_pg.dump"
+
+test -s "${BACKUP_DIR}/quiz_arena_pg.dump"
+docker compose \
+  --project-directory "${RELEASE_DIR}" \
+  --env-file "${QUIZ_ARENA_ENV_FILE}" \
+  -f "${COMPOSE_FILE}" \
+  exec -T postgres pg_restore --list \
+  < "${BACKUP_DIR}/quiz_arena_pg.dump" >/dev/null
+sha256sum "${BACKUP_DIR}/quiz_arena_pg.dump" \
+  > "${BACKUP_DIR}/quiz_arena_pg.dump.sha256"
 ```
-2. Public health endpoint:
+
+Зберегти exact previous runtime images без друку container env:
+
 ```bash
-curl -sS https://deutchquizarena.de/health
-```
-Очікування: `status=ok`.
+API_OLD_IMAGE="$(docker inspect --format '{{.Image}}' quiz-arena-api-1)"
+WORKER_OLD_IMAGE="$(docker inspect --format '{{.Image}}' quiz-arena-worker-1)"
+BEAT_OLD_IMAGE="$(docker inspect --format '{{.Image}}' quiz_arena_beat_prod)"
+export API_OLD_IMAGE WORKER_OLD_IMAGE BEAT_OLD_IMAGE
 
-3. Internal readiness endpoint:
+printf 'API_OLD_IMAGE=%s\nWORKER_OLD_IMAGE=%s\nBEAT_OLD_IMAGE=%s\n' \
+  "${API_OLD_IMAGE}" "${WORKER_OLD_IMAGE}" "${BEAT_OLD_IMAGE}" \
+  > "${BACKUP_DIR}/previous-image-ids.txt"
+
+docker image save \
+  -o "${BACKUP_DIR}/previous-runtime-images.tar" \
+  "${API_OLD_IMAGE}" "${WORKER_OLD_IMAGE}" "${BEAT_OLD_IMAGE}"
+sha256sum "${BACKUP_DIR}/previous-runtime-images.tar" \
+  > "${BACKUP_DIR}/previous-runtime-images.tar.sha256"
+docker image load -i "${BACKUP_DIR}/previous-runtime-images.tar" >/dev/null
+```
+
+Створити rollback override:
+
 ```bash
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env \
-  exec -T api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=2).read().decode())"
+printf 'services:\n  api:\n    image: %s\n  worker:\n    image: %s\n  beat:\n    image: %s\n' \
+  "${API_OLD_IMAGE}" "${WORKER_OLD_IMAGE}" "${BEAT_OLD_IMAGE}" \
+  > "${BACKUP_DIR}/rollback-images.yml"
 ```
-Очікування: `status=ready`, `database=ok`, `redis=ok`.
 
-4. Celery стан:
+## 6. Build once і migration compatibility
+
 ```bash
-docker compose -f docker-compose.prod.yml exec -T worker celery -A app.workers.celery_app inspect active
-docker compose -f docker-compose.prod.yml exec -T worker celery -A app.workers.celery_app inspect reserved
-```
-Очікування: без "залиплих" задач.
+docker build \
+  --label "org.opencontainers.image.revision=${DEPLOY_COMMIT}" \
+  --tag "${BACKEND_IMAGE}" \
+  "${RELEASE_DIR}"
 
-5. Redis черги:
+CANDIDATE_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "${BACKEND_IMAGE}")"
+test -n "${CANDIDATE_IMAGE_ID}"
+```
+
+Candidate head без DB write:
+
 ```bash
-docker compose -f docker-compose.prod.yml exec -T redis redis-cli LLEN q_normal
-docker compose -f docker-compose.prod.yml exec -T redis redis-cli LLEN q_critical
-docker compose -f docker-compose.prod.yml exec -T redis redis-cli LLEN q_low
-```
-Очікування: не ростуть безконтрольно.
+CANDIDATE_HEAD="$(docker run --rm "${BACKEND_IMAGE}" \
+  sh -c "alembic heads | awk '{print \$1}'")"
 
-5. Webhook:
+LIVE_CURRENT="$(docker run --rm \
+  --network quiz-arena_default \
+  --env-file "${QUIZ_ARENA_ENV_FILE}" \
+  "${BACKEND_IMAGE}" \
+  sh -c "alembic current | awk '{print \$1}'")"
+
+test -n "${CANDIDATE_HEAD}"
+test "${LIVE_CURRENT}" = "${CANDIDATE_HEAD}"
+```
+
+Якщо revisions не збігаються, не запускати `alembic upgrade`; deploy
+зупиняється до окремого migration plan.
+
+## 7. Controlled backend deploy
+
+Recreate тільки API і worker з одного image:
+
 ```bash
-source /opt/quiz-arena/.env
-curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo"
+docker compose \
+  --project-directory "${RELEASE_DIR}" \
+  --env-file "${QUIZ_ARENA_ENV_FILE}" \
+  -f "${COMPOSE_FILE}" \
+  up -d --no-deps --no-build api worker
 ```
-Очікування: URL = `https://deutchquizarena.de/webhook/telegram`, `pending_update_count=0`; якщо присутній `last_error_message`, тоді `last_error_date` має бути до поточного деплою (старі помилки допустимі).
 
-## 8. Duel-specific smoke (після інциденту обов'язково)
-1. Перевірити worker-логи по ретраях:
+Перевірити API edge і worker до beat:
+
 ```bash
-docker compose -f docker-compose.prod.yml logs worker --tail 200 | \
-  grep -E "telegram_update_retry_scheduled|telegram_update_failed_final|telegram_update_non_retryable_error|telegram_update_processed"
-```
-2. Переконатись, що немає циклічного спаму/ретраїв одного update.
-3. Провести ручний сценарій у Telegram:
-   - створення дуелі;
-   - прийняття опонентом;
-   - 1-2 відповіді;
-   - перевірка, що кнопки відповідають у обох гравців.
+docker network inspect quiz-arena-edge \
+  --format '{{json .Containers}}' | grep -q 'quiz-arena-api-1'
+docker exec infra_caddy_prod getent hosts api
 
-## 9. Швидка діагностика якщо бот "висить"
-1. Postgres lock/idle in transaction:
+for attempt in $(seq 1 30); do
+  docker inspect --format '{{.State.Health.Status}}' quiz-arena-api-1 \
+    | grep -qx healthy && break
+  test "${attempt}" != 30
+  sleep 2
+done
+
+docker exec -i quiz-arena-worker-1 python - <<'PY'
+from app.workers.celery_app import celery_app
+
+replies = celery_app.control.inspect(timeout=5).ping() or {}
+raise SystemExit(0 if replies else 1)
+PY
+```
+
+Замінити beat лише після green worker ping:
+
 ```bash
-source /opt/quiz-arena/.env
-docker compose -f docker-compose.prod.yml exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
-"SELECT pid,state,wait_event_type,wait_event,now()-xact_start AS xact_age,left(query,180) AS query \
- FROM pg_stat_activity WHERE datname=current_database() AND state='idle in transaction' ORDER BY xact_start;"
-```
-2. Якщо всі воркери зайняті одними задачами, а черга росте: дивитись `process_telegram_update` і останні stacktrace.
+docker compose \
+  --project-directory "${RELEASE_DIR}" \
+  --env-file "${QUIZ_ARENA_ENV_FILE}" \
+  -f "${COMPOSE_FILE}" \
+  up -d --no-deps --no-build beat
 
-## 10. Rollback (мінімальний)
-1. Визнач останню стабільну директорію (наприклад `quiz-arena_dirty_<TS>`).
-2. Атомарно поверни її:
+test "$(docker ps -q \
+  --filter label=com.docker.compose.project=quiz-arena \
+  --filter label=com.docker.compose.service=beat | wc -l)" -eq 1
+```
+
+Перевірити один image ID для трьох runtime components:
+
 ```bash
-cd /opt
-mv quiz-arena quiz-arena_bad_$(date +%Y%m%d_%H%M%S)
-mv quiz-arena_dirty_<TS> quiz-arena
-cd /opt/quiz-arena
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env pull --ignore-buildable frontend
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env build api worker beat
-docker compose -f docker-compose.prod.yml --env-file /opt/quiz-arena/.env up -d api frontend worker beat caddy
+for container in quiz-arena-api-1 quiz-arena-worker-1 quiz_arena_beat_prod; do
+  test "$(docker inspect --format '{{.Image}}' "${container}")" = "${CANDIDATE_IMAGE_ID}"
+  test "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "${container}")" = "unless-stopped"
+done
 ```
 
-`--ignore-buildable` keeps this rollback valid if the checked-out SHA predates the frontend image cutover and still defines `frontend` via `build:` instead of `image:`.
-3. Якщо проблема в БД-схемі/даних, відновити dump.
+Routine backend deploy не виконує Caddy reload.
 
-## 11. Антипатерни (заборонено)
-1. `--env-file .env.production.example` у прод-командах.
-2. Команди `exec db ...` коли сервіс реально називається `postgres`.
-3. Міграції без backup.
-4. Деплой "поверх" дуже dirty git-дерева без backup/reclone.
-5. Вважати "health ok" достатнім без перевірки webhook/черг/active задач.
+## 8. Post-deploy smoke
+
+```bash
+curl -fsS -o /dev/null https://deutchquizarena.de/health
+
+docker exec quiz_arena_postgres_prod \
+  sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null
+test "$(docker exec quiz_arena_redis_prod redis-cli ping)" = "PONG"
+
+docker exec -i quiz-arena-worker-1 python - <<'PY'
+from app.workers.celery_app import celery_app
+
+replies = celery_app.control.inspect(timeout=5).ping() or {}
+raise SystemExit(0 if replies else 1)
+PY
+
+test "$(docker ps -q \
+  --filter label=com.docker.compose.project=quiz-arena \
+  --filter label=com.docker.compose.service=beat | wc -l)" -eq 1
+
+for container in quiz-arena-api-1 quiz-arena-worker-1 quiz_arena_beat_prod; do
+  test "$(docker inspect --format '{{.State.Restarting}}' "${container}")" = "false"
+done
+```
+
+Перевірити Telegram provider-side status усередині API container. Скрипт
+використовує вже завантажений у process environment token, але не друкує token
+або provider payload. Два snapshots мають підтвердити очікуваний URL, успішну
+відповідь Telegram та відсутність зростання `pending_update_count`:
+
+```bash
+docker exec -i quiz-arena-api-1 python - <<'PY'
+import json
+import os
+import time
+import urllib.request
+
+EXPECTED_URL = "https://deutchquizarena.de/webhook/telegram"
+
+
+def snapshot():
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not token:
+        raise SystemExit("TELEGRAM_BOT_TOKEN is not available in API environment")
+    with urllib.request.urlopen(
+        f"https://api.telegram.org/bot{token}/getWebhookInfo",
+        timeout=12,
+    ) as response:
+        payload = json.load(response)
+    result = payload.get("result") or {}
+    return {
+        "ok": payload.get("ok") is True,
+        "url_matches": result.get("url") == EXPECTED_URL,
+        "pending_update_count": int(result.get("pending_update_count") or 0),
+        "last_error_present": "last_error_message" in result,
+    }
+
+
+before = snapshot()
+time.sleep(30)
+after = snapshot()
+sanitized = {"before": before, "after": after}
+print(json.dumps(sanitized, sort_keys=True))
+raise SystemExit(
+    0
+    if before["ok"]
+    and after["ok"]
+    and before["url_matches"]
+    and after["url_matches"]
+    and after["pending_update_count"] <= before["pending_update_count"]
+    else 1
+)
+PY
+```
+
+Окремий owner bot smoke: відправити `/start` production-боту й отримати штатну
+відповідь без платежу. Якщо provider check або owner bot smoke не пройдено,
+release не отримує статус `Done`.
+
+Не читати application logs, DB rows, Redis keys, provider payloads або secret
+values. У звіт записувати тільки sanitized результат наведеного check.
+
+## 9. Rollback
+
+Rollback trigger: health/ready failure, worker ping failure, Telegram provider
+check failure, не один beat, неправильний image ID або restart loop.
+
+```bash
+BACKEND_IMAGE=rollback-placeholder docker compose \
+  --project-directory "${RELEASE_DIR}" \
+  --env-file "${QUIZ_ARENA_ENV_FILE}" \
+  -f "${COMPOSE_FILE}" \
+  -f "${BACKUP_DIR}/rollback-images.yml" \
+  up -d --no-deps --no-build api worker beat
+
+docker network inspect quiz-arena-edge \
+  --format '{{json .Containers}}' | grep -q 'quiz-arena-api-1'
+docker exec infra_caddy_prod getent hosts api
+curl -fsS -o /dev/null https://deutchquizarena.de/health
+```
+
+Цей release не виконує schema migration, тому routine code rollback не
+відновлює DB dump. Будь-який DB restore є окремою owner-approved recovery
+операцією.
+
+## 10. Заборонено
+
+- `git reset`, `git clean`, force-push або overwrite production dirty files;
+- `docker compose down`, volume deletion або prune;
+- керування `frontend`, `infra-caddy`, PostgreSQL чи Redis у backend deploy;
+- читання/друк `.env`, tokens, private keys, production logs, DB rows або Redis keys;
+- migration, webhook, DNS або payment config changes у routine deploy.

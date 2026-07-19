@@ -21,7 +21,7 @@ services:
     networks:
       quiz_arena_site_edge:
         aliases:
-          - frontend
+          - site-frontend
       quiz_arena_edge:
 
 networks:

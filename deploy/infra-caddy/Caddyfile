@@ -20,7 +20,7 @@
 	}
 
 	handle /api/quiz-teaser/* {
-		reverse_proxy frontend:3000
+		reverse_proxy site-frontend:3000
 	}
 
 	handle_path /api/* {
@@ -28,7 +28,7 @@
 	}
 
 	handle {
-		reverse_proxy frontend:3000
+		reverse_proxy site-frontend:3000
 	}
 
 	tls {$CADDY_EMAIL}

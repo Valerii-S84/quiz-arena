@@ -62,8 +62,9 @@ Allowed planned service changes:
 - Stop/remove old `quiz_arena_caddy_prod` only at the Caddy cutover step.
 - Start new `infra_caddy_prod` only at the Caddy cutover step.
 - Start `quiz-arena-site` frontend only at the site split step.
-- Stop/remove old `quiz-arena-frontend-1` only after the new site frontend is
-  verified.
+- Keep old `quiz-arena-frontend-1` running as a rollback runtime through the
+  stability window. After the site frontend is verified, detach the old
+  frontend from edge networks instead of stopping or removing it.
 
 ## Operator Shell Setup
 
@@ -73,6 +74,8 @@ Run on the VPS only after approval:
 set -euo pipefail
 
 export RUNBOOK_COMMIT="69a7609c7352"
+export SITE_COMPOSE_COMMIT="2090868a644b97c4dad2b3eeba064410fc80f457"
+export BACKEND_COMPOSE_COMMIT="92f84581fd14f9aa8d5e99fe9eb0ee2d3f08c943"
 export BACKUP_ROOT="/var/backups/quiz-arena"
 export TS="$(date -u +%Y%m%dT%H%M%SZ)"
 export BACKUP_DIR="${BACKUP_ROOT}/infra_separation_${TS}"
@@ -387,7 +390,8 @@ docker network inspect quiz-arena-edge \
 
 docker network inspect quiz-arena-site-edge \
   --format '{{json .Containers}}' | grep -q 'quiz-arena-frontend-1' \
-  || docker network connect --alias frontend quiz-arena-site-edge quiz-arena-frontend-1
+  || docker network connect --alias frontend --alias site-frontend \
+    quiz-arena-site-edge quiz-arena-frontend-1
 
 docker network inspect api-quiz-bank-edge \
   --format '{{json .Containers}}' | grep -q 'api-quiz-bank-pilot' \
@@ -412,6 +416,8 @@ docker run --rm --network quiz-arena-edge alpine:3.20 \
   sh -lc 'getent hosts api'
 docker run --rm --network quiz-arena-site-edge alpine:3.20 \
   sh -lc 'getent hosts frontend'
+docker run --rm --network quiz-arena-site-edge alpine:3.20 \
+  sh -lc 'getent hosts site-frontend'
 docker run --rm --network api-quiz-bank-edge alpine:3.20 \
   sh -lc 'getent hosts api-quiz-bank'
 ```
@@ -449,6 +455,8 @@ tree:
 ```bash
 git -C /opt/quiz-arena fetch origin codex/infra-separation-plan
 git -C /opt/quiz-arena cat-file -e "${RUNBOOK_COMMIT}^{commit}"
+git -C /opt/quiz-arena cat-file -e "${SITE_COMPOSE_COMMIT}^{commit}"
+git -C /opt/quiz-arena cat-file -e "${BACKEND_COMPOSE_COMMIT}^{commit}"
 ```
 
 Create the infra directory and copy reviewed files from the pinned commit:
@@ -670,7 +678,7 @@ Create site directory and copy reviewed compose:
 install -d -m 755 /opt/quiz-arena-site
 
 git -C /opt/quiz-arena show \
-  "${RUNBOOK_COMMIT}:deploy/quiz-arena-site/docker-compose.prod.yml" \
+  "${SITE_COMPOSE_COMMIT}:deploy/quiz-arena-site/docker-compose.prod.yml" \
   > /opt/quiz-arena-site/docker-compose.prod.yml
 ```
 
@@ -740,6 +748,79 @@ docker compose --env-file .env.site -f docker-compose.prod.yml up -d frontend
 docker compose --env-file .env.site -f docker-compose.prod.yml ps
 ```
 
+Keep Caddy pinned to the old frontend while the new site frontend starts:
+
+```bash
+cd /opt/infra-caddy
+cp -a Caddyfile "${BACKUP_DIR}/files/infra-caddy.Caddyfile.pre_site_route_switch"
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/opt/infra-caddy/Caddyfile")
+text = path.read_text(encoding="utf-8")
+for old in ("site-frontend:3000", "frontend:3000"):
+    text = text.replace(old, "quiz-arena-frontend-1:3000")
+path.write_text(text, encoding="utf-8")
+PY
+docker compose --env-file .env.caddy -f docker-compose.yml exec -T caddy \
+  caddy reload --config /etc/caddy/Caddyfile
+```
+
+Readiness-gate the new frontend internally before any public route switch:
+
+```bash
+docker run --rm --network quiz-arena-edge alpine:3.20 \
+  sh -lc 'wget -q -O /tmp/site_frontend.html --timeout=5 http://quiz-arena-site-frontend-1:3000/ && test -s /tmp/site_frontend.html'
+docker run --rm --network quiz-arena-site-edge alpine:3.20 \
+  sh -lc 'wget -q -O /tmp/site_frontend.html --timeout=5 http://quiz-arena-site-frontend-1:3000/ && test -s /tmp/site_frontend.html'
+```
+
+Move the stable `site-frontend` alias to the new site container only after the
+internal readiness checks pass:
+
+```bash
+docker network disconnect quiz-arena-site-edge quiz-arena-frontend-1 || true
+docker network inspect quiz-arena-site-edge \
+  --format '{{json .Containers}}' | grep -q 'quiz-arena-site-frontend-1' \
+  || docker network connect --alias site-frontend quiz-arena-site-edge quiz-arena-site-frontend-1
+docker exec infra_caddy_prod getent hosts site-frontend
+docker run --rm --network quiz-arena-site-edge alpine:3.20 \
+  sh -lc 'wget -q -O /tmp/site_frontend.html --timeout=5 http://site-frontend:3000/ && test -s /tmp/site_frontend.html'
+```
+
+Switch Caddy to the stable site frontend upstream:
+
+```bash
+cd /opt/infra-caddy
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/opt/infra-caddy/Caddyfile")
+allowed = {
+    "frontend:3000",
+    "quiz-arena-frontend-1:3000",
+    "quiz-arena-site-frontend-1:3000",
+    "site-frontend:3000",
+}
+lines = []
+for line in path.read_text(encoding="utf-8").splitlines(keepends=True):
+    newline = "\n" if line.endswith("\n") else ""
+    raw = line[:-1] if newline else line
+    leading = raw[: len(raw) - len(raw.lstrip())]
+    parts = raw.split()
+    if len(parts) == 2 and parts[0] == "reverse_proxy" and parts[1] in allowed:
+        line = f"{leading}reverse_proxy site-frontend:3000{newline}"
+    lines.append(line)
+path.write_text("".join(lines), encoding="utf-8")
+PY
+docker run --rm \
+  --env-file /opt/infra-caddy/.env.caddy \
+  -v /opt/infra-caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
+  caddy:2.8 caddy validate --config /etc/caddy/Caddyfile
+docker compose --env-file .env.caddy -f docker-compose.yml exec -T caddy \
+  caddy reload --config /etc/caddy/Caddyfile
+```
+
 Verify new frontend container and edge route:
 
 ```bash
@@ -755,60 +836,97 @@ fi
 ```
 
 If the route is healthy and Caddy logs are clean, detach the old frontend from
-edge networks and stop only the old frontend service:
+edge networks. Keep the old frontend container available for rollback through
+the 24-48 hour stability window; do not stop or remove it during this phase:
 
 ```bash
-docker network disconnect quiz-arena-site-edge quiz-arena-frontend-1 || true
 docker network disconnect quiz-arena-edge quiz-arena-frontend-1 || true
-
-cd /opt/quiz-arena
-docker compose -f docker-compose.prod.yml --env-file .env stop frontend
-docker compose -f docker-compose.prod.yml --env-file .env rm -f frontend
+docker network disconnect quiz-arena-site-edge quiz-arena-frontend-1 || true
 ```
 
 Copy backend-only target compose into `/opt/quiz-arena` after old Caddy and old
-frontend are no longer active:
+frontend public routing are no longer active:
 
 ```bash
 cp -a /opt/quiz-arena/docker-compose.prod.yml \
   "${BACKUP_DIR}/files/quiz-arena.docker-compose.prod.yml.pre_backend_only_switch"
 
 git -C /opt/quiz-arena show \
-  "${RUNBOOK_COMMIT}:deploy/quiz-arena/docker-compose.prod.yml" \
+  "${BACKEND_COMPOSE_COMMIT}:deploy/quiz-arena/docker-compose.prod.yml" \
   > /opt/quiz-arena/docker-compose.prod.yml
 
 cd /opt/quiz-arena
-docker compose --env-file .env -f docker-compose.prod.yml config --quiet
+BACKEND_IMAGE="$(docker inspect --format '{{.Config.Image}}' quiz-arena-api-1)" \
+QUIZ_ARENA_ENV_FILE=".env" \
+  docker compose --env-file .env -f docker-compose.prod.yml config --quiet
 ```
 
 Rollback for Phase 8:
 
 ```bash
-cd /opt/quiz-arena-site
-docker compose --env-file .env.site -f docker-compose.prod.yml stop frontend || true
-docker compose --env-file .env.site -f docker-compose.prod.yml rm -f frontend || true
-
-cp -a "${BACKUP_DIR}/files/quiz-arena.docker-compose.prod.yml.before" \
-  /opt/quiz-arena/docker-compose.prod.yml
-
-cd /opt/quiz-arena
-docker compose -f docker-compose.prod.yml --env-file .env up -d frontend
-
-docker network inspect quiz-arena-site-edge \
-  --format '{{json .Containers}}' | grep -q 'quiz-arena-frontend-1' \
-  || docker network connect --alias frontend quiz-arena-site-edge quiz-arena-frontend-1
 docker network inspect quiz-arena-edge \
   --format '{{json .Containers}}' | grep -q 'quiz-arena-frontend-1' \
   || docker network connect quiz-arena-edge quiz-arena-frontend-1
 
+cd /opt/infra-caddy
+cp -a Caddyfile "${BACKUP_DIR}/files/infra-caddy.Caddyfile.pre_phase8_rollback"
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/opt/infra-caddy/Caddyfile")
+allowed = {
+    "frontend:3000",
+    "site-frontend:3000",
+    "quiz-arena-site-frontend-1:3000",
+    "quiz-arena-frontend-1:3000",
+}
+lines = []
+for line in path.read_text(encoding="utf-8").splitlines(keepends=True):
+    newline = "\n" if line.endswith("\n") else ""
+    raw = line[:-1] if newline else line
+    leading = raw[: len(raw) - len(raw.lstrip())]
+    parts = raw.split()
+    if len(parts) == 2 and parts[0] == "reverse_proxy" and parts[1] in allowed:
+        line = f"{leading}reverse_proxy quiz-arena-frontend-1:3000{newline}"
+    lines.append(line)
+path.write_text("".join(lines), encoding="utf-8")
+PY
+docker run --rm \
+  --env-file /opt/infra-caddy/.env.caddy \
+  -v /opt/infra-caddy/Caddyfile:/etc/caddy/Caddyfile:ro \
+  caddy:2.8 caddy validate --config /etc/caddy/Caddyfile
+docker compose --env-file .env.caddy -f docker-compose.yml exec -T caddy \
+  caddy reload --config /etc/caddy/Caddyfile
+
 curl -fsS https://deutchquizarena.de/ >/tmp/frontend_rollback.html
 test -s /tmp/frontend_rollback.html
 curl -fsS https://deutchquizarena.de/health
+curl -sS -o /tmp/quiz_teaser_rollback.out -w '%{http_code}\n' \
+  https://deutchquizarena.de/api/quiz-teaser/ \
+  | grep -Evq '^5[0-9][0-9]$'
+curl -sS -o /tmp/api_ready_rollback.out -w '%{http_code}\n' \
+  https://deutchquizarena.de/api/ready \
+  | grep -qx '404'
 ```
 
 Stop condition: rollback if frontend does not load, `/api/quiz-teaser/*` gives
-`502`, Caddy logs show `frontend` resolution errors, or API logs show new
+`502`, Caddy logs show `site-frontend` resolution errors, or API logs show new
 errors after the split.
+
+Post-Phase 8 expected production state:
+
+- Active frontend: `quiz-arena-site-frontend-1`.
+- Public Caddy frontend upstream: `site-frontend:3000`.
+- Old frontend rollback runtime: `quiz-arena-frontend-1` remains running but is
+  detached from `quiz-arena-edge` and `quiz-arena-site-edge`; it remains on
+  `quiz-arena_default` only.
+- If rollback to the old frontend is needed after edge detach, reconnect
+  `quiz-arena-frontend-1` to `quiz-arena-edge`, switch Caddy frontend upstreams
+  to `quiz-arena-frontend-1:3000`, reload Caddy, then verify frontend,
+  `/api/quiz-teaser/*`, `/health`, public `/api/ready`, Telegram webhook, and
+  Caddy logs.
+- Phase 9 env split is not part of Phase 8 and must not run without a separate
+  explicit GO.
 
 ## Phase 9: Split Quiz Arena Env File
 
@@ -820,6 +938,7 @@ Create `.env.quiz-arena` from the existing file without printing values:
 ```bash
 python3 - <<'PY'
 from pathlib import Path
+import subprocess
 
 source = Path("/opt/quiz-arena/.env")
 target = Path("/opt/quiz-arena/.env.quiz-arena")
@@ -917,8 +1036,22 @@ missing = [key for key in keys if key not in values]
 if missing:
     raise SystemExit(f"missing keys for .env.quiz-arena: {', '.join(missing)}")
 
+backend_image = subprocess.check_output(
+    [
+        "docker",
+        "inspect",
+        "--format",
+        "{{.Config.Image}}",
+        "quiz-arena-api-1",
+    ],
+    text=True,
+).strip()
+if not backend_image:
+    raise SystemExit("running API container has no image reference")
+
 target.write_text(
-    "".join(f"{key}={values[key]}\n" for key in keys),
+    "".join(f"{key}={values[key]}\n" for key in keys)
+    + f"BACKEND_IMAGE={backend_image}\n",
     encoding="utf-8",
 )
 target.chmod(0o600)
@@ -935,12 +1068,98 @@ docker compose --env-file .env.quiz-arena -f docker-compose.prod.yml config --qu
 Do not restart backend services in this phase unless a separate approved
 service-specific env reload is scheduled.
 
+If an approved service-specific env reload is scheduled, restart only the
+backend services that need the split env. The `api` service must remain
+reachable from Caddy through `api:8000` on `quiz-arena-edge`; verify or
+reconnect that edge alias before running public route checks.
+
+Restart and readiness-gate `api`:
+
+```bash
+cd /opt/quiz-arena
+docker compose --env-file .env.quiz-arena -f docker-compose.prod.yml up -d \
+  --no-deps --no-build api
+
+docker network inspect quiz-arena-edge \
+  --format '{{json .Containers}}' | grep -q 'quiz-arena-api-1' \
+  || docker network connect --alias api quiz-arena-edge quiz-arena-api-1
+
+docker exec infra_caddy_prod getent hosts api
+docker exec infra_caddy_prod caddy reload --config /etc/caddy/Caddyfile
+
+for attempt in $(seq 1 30); do
+  if docker run --rm --network quiz-arena-edge alpine:3.20 \
+    sh -lc 'wget -q -O /tmp/api_ready.out --timeout=3 http://api:8000/ready && test -s /tmp/api_ready.out'
+  then
+    break
+  fi
+  if [ "${attempt}" = "30" ]; then
+    echo "api did not become ready on quiz-arena-edge" >&2
+    exit 1
+  fi
+  sleep 2
+done
+
+curl -fsS https://deutchquizarena.de/health
+curl -sS -o /tmp/api_ready_after_phase9.out -w '%{http_code}\n' \
+  https://deutchquizarena.de/api/ready \
+  | grep -qx '404'
+```
+
+Restart worker only after `api` is healthy through Caddy. Do not call the
+final public `/health` check until Celery responds: `/health` includes a
+Celery worker ping and can return `503` while the worker is still booting.
+
+```bash
+cd /opt/quiz-arena
+docker compose --env-file .env.quiz-arena -f docker-compose.prod.yml up -d \
+  --no-deps --no-build worker
+
+for attempt in $(seq 1 30); do
+  if docker exec -i quiz-arena-worker-1 python - <<'PY'
+from app.workers.celery_app import celery_app
+
+replies = celery_app.control.inspect(timeout=5).ping() or {}
+raise SystemExit(0 if replies else 1)
+PY
+  then
+    break
+  fi
+  if [ "${attempt}" = "30" ]; then
+    echo "celery worker did not respond to ping" >&2
+    exit 1
+  fi
+  sleep 2
+done
+
+docker compose --env-file .env.quiz-arena -f docker-compose.prod.yml up -d \
+  --no-deps --no-build beat
+```
+
 Rollback for Phase 9:
 
 ```bash
 rm -f /opt/quiz-arena/.env.quiz-arena
 cp -a "${BACKUP_DIR}/env/quiz-arena.env.before" /opt/quiz-arena/.env
+cp -a "${BACKUP_DIR}/files/quiz-arena.docker-compose.prod.yml.before" \
+  /opt/quiz-arena/docker-compose.prod.yml
+
+cd /opt/quiz-arena
+docker compose -f docker-compose.prod.yml --env-file .env up -d \
+  --no-deps --no-build api worker beat
+
+docker network inspect quiz-arena-edge \
+  --format '{{json .Containers}}' | grep -q 'quiz-arena-api-1' \
+  || docker network connect --alias api quiz-arena-edge quiz-arena-api-1
+docker exec infra_caddy_prod getent hosts api
+docker exec infra_caddy_prod caddy reload --config /etc/caddy/Caddyfile
+
 curl -fsS https://deutchquizarena.de/health
+curl -fsS https://deutchquizarena.de/ >/tmp/frontend_phase9_rollback.html
+test -s /tmp/frontend_phase9_rollback.html
+curl -sS -o /tmp/api_valerchik_unauthorized_phase9_rollback.out \
+  -w '%{http_code}\n' https://api.valerchik.de/health \
+  | grep -qx '401'
 ```
 
 ## Phase 10: Final Verification Checklist
@@ -1078,9 +1297,9 @@ docker compose --env-file .env.caddy -f docker-compose.yml logs --since 30m cadd
   | tee "${BACKUP_DIR}/docker/infra_caddy.final.logs"
 
 cd /opt/quiz-arena
-docker compose --env-file .env -f docker-compose.prod.yml logs --since 30m api \
+docker compose --env-file .env.quiz-arena -f docker-compose.prod.yml logs --since 30m api \
   | tee "${BACKUP_DIR}/docker/quiz_arena_api.final.logs"
-docker compose --env-file .env -f docker-compose.prod.yml logs --since 30m worker \
+docker compose --env-file .env.quiz-arena -f docker-compose.prod.yml logs --since 30m worker \
   | tee "${BACKUP_DIR}/docker/quiz_arena_worker.final.logs"
 ```
 
@@ -1091,7 +1310,7 @@ is true:
 
 - Any backup command fails.
 - Any required backup file is missing or empty.
-- Caddy cannot resolve `api`, `frontend`, or `api-quiz-bank`.
+- Caddy cannot resolve `api`, `site-frontend`, or `api-quiz-bank`.
 - Caddy logs show repeated upstream resolution errors.
 - `https://deutchquizarena.de/health` is not `200`.
 - SSLIP health route is not `200`.
