@@ -388,7 +388,8 @@ docker network inspect quiz-arena-edge \
 
 docker network inspect quiz-arena-site-edge \
   --format '{{json .Containers}}' | grep -q 'quiz-arena-frontend-1' \
-  || docker network connect --alias site-frontend quiz-arena-site-edge quiz-arena-frontend-1
+  || docker network connect --alias frontend --alias site-frontend \
+    quiz-arena-site-edge quiz-arena-frontend-1
 
 docker network inspect api-quiz-bank-edge \
   --format '{{json .Containers}}' | grep -q 'api-quiz-bank-pilot' \
@@ -411,6 +412,8 @@ Verify upstream DNS from the future Caddy networks:
 ```bash
 docker run --rm --network quiz-arena-edge alpine:3.20 \
   sh -lc 'getent hosts api'
+docker run --rm --network quiz-arena-site-edge alpine:3.20 \
+  sh -lc 'getent hosts frontend'
 docker run --rm --network quiz-arena-site-edge alpine:3.20 \
   sh -lc 'getent hosts site-frontend'
 docker run --rm --network api-quiz-bank-edge alpine:3.20 \
