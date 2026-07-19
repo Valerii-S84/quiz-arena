@@ -282,14 +282,67 @@ for container in quiz-arena-api-1 quiz-arena-worker-1 quiz_arena_beat_prod; do
 done
 ```
 
-Не читати application logs, DB rows, Redis keys або provider payloads. Telegram
-provider-side status і owner bot smoke перевіряються owner-safe способом без
-token disclosure або реального списання коштів.
+Перевірити Telegram provider-side status усередині API container. Скрипт
+використовує вже завантажений у process environment token, але не друкує token
+або provider payload. Два snapshots мають підтвердити очікуваний URL, успішну
+відповідь Telegram та відсутність зростання `pending_update_count`:
+
+```bash
+docker exec -i quiz-arena-api-1 python - <<'PY'
+import json
+import os
+import time
+import urllib.request
+
+EXPECTED_URL = "https://deutchquizarena.de/webhook/telegram"
+
+
+def snapshot():
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not token:
+        raise SystemExit("TELEGRAM_BOT_TOKEN is not available in API environment")
+    with urllib.request.urlopen(
+        f"https://api.telegram.org/bot{token}/getWebhookInfo",
+        timeout=12,
+    ) as response:
+        payload = json.load(response)
+    result = payload.get("result") or {}
+    return {
+        "ok": payload.get("ok") is True,
+        "url_matches": result.get("url") == EXPECTED_URL,
+        "pending_update_count": int(result.get("pending_update_count") or 0),
+        "last_error_present": "last_error_message" in result,
+    }
+
+
+before = snapshot()
+time.sleep(30)
+after = snapshot()
+sanitized = {"before": before, "after": after}
+print(json.dumps(sanitized, sort_keys=True))
+raise SystemExit(
+    0
+    if before["ok"]
+    and after["ok"]
+    and before["url_matches"]
+    and after["url_matches"]
+    and after["pending_update_count"] <= before["pending_update_count"]
+    else 1
+)
+PY
+```
+
+Окремий owner bot smoke: відправити `/start` production-боту й отримати штатну
+відповідь без платежу. Якщо provider check або owner bot smoke не пройдено,
+release не отримує статус `Done`.
+
+Не читати application logs, DB rows, Redis keys, provider payloads або secret
+values. У звіт записувати тільки sanitized результат наведеного check.
 
 ## 9. Rollback
 
-Rollback trigger: health/ready failure, worker ping failure, не один beat,
-неправильний image ID або restart loop.
+Rollback trigger: health/ready failure, worker ping failure, Telegram provider
+check failure, не один beat, неправильний image ID або restart loop.
 
 ```bash
 BACKEND_IMAGE=rollback-placeholder docker compose \

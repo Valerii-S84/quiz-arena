@@ -74,6 +74,7 @@ Run on the VPS only after approval:
 set -euo pipefail
 
 export RUNBOOK_COMMIT="69a7609c7352"
+export SITE_COMPOSE_COMMIT="2090868a644b97c4dad2b3eeba064410fc80f457"
 export BACKUP_ROOT="/var/backups/quiz-arena"
 export TS="$(date -u +%Y%m%dT%H%M%SZ)"
 export BACKUP_DIR="${BACKUP_ROOT}/infra_separation_${TS}"
@@ -453,6 +454,7 @@ tree:
 ```bash
 git -C /opt/quiz-arena fetch origin codex/infra-separation-plan
 git -C /opt/quiz-arena cat-file -e "${RUNBOOK_COMMIT}^{commit}"
+git -C /opt/quiz-arena cat-file -e "${SITE_COMPOSE_COMMIT}^{commit}"
 ```
 
 Create the infra directory and copy reviewed files from the pinned commit:
@@ -674,7 +676,7 @@ Create site directory and copy reviewed compose:
 install -d -m 755 /opt/quiz-arena-site
 
 git -C /opt/quiz-arena show \
-  "${RUNBOOK_COMMIT}:deploy/quiz-arena-site/docker-compose.prod.yml" \
+  "${SITE_COMPOSE_COMMIT}:deploy/quiz-arena-site/docker-compose.prod.yml" \
   > /opt/quiz-arena-site/docker-compose.prod.yml
 ```
 
