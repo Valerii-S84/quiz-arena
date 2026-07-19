@@ -854,7 +854,9 @@ git -C /opt/quiz-arena show \
   > /opt/quiz-arena/docker-compose.prod.yml
 
 cd /opt/quiz-arena
-docker compose --env-file .env -f docker-compose.prod.yml config --quiet
+BACKEND_IMAGE="$(docker inspect --format '{{.Config.Image}}' quiz-arena-api-1)" \
+QUIZ_ARENA_ENV_FILE=".env" \
+  docker compose --env-file .env -f docker-compose.prod.yml config --quiet
 ```
 
 Rollback for Phase 8:
@@ -934,6 +936,7 @@ Create `.env.quiz-arena` from the existing file without printing values:
 ```bash
 python3 - <<'PY'
 from pathlib import Path
+import subprocess
 
 source = Path("/opt/quiz-arena/.env")
 target = Path("/opt/quiz-arena/.env.quiz-arena")
@@ -1031,8 +1034,22 @@ missing = [key for key in keys if key not in values]
 if missing:
     raise SystemExit(f"missing keys for .env.quiz-arena: {', '.join(missing)}")
 
+backend_image = subprocess.check_output(
+    [
+        "docker",
+        "inspect",
+        "--format",
+        "{{.Config.Image}}",
+        "quiz-arena-api-1",
+    ],
+    text=True,
+).strip()
+if not backend_image:
+    raise SystemExit("running API container has no image reference")
+
 target.write_text(
-    "".join(f"{key}={values[key]}\n" for key in keys),
+    "".join(f"{key}={values[key]}\n" for key in keys)
+    + f"BACKEND_IMAGE={backend_image}\n",
     encoding="utf-8",
 )
 target.chmod(0o600)
