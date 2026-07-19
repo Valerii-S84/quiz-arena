@@ -75,6 +75,7 @@ set -euo pipefail
 
 export RUNBOOK_COMMIT="69a7609c7352"
 export SITE_COMPOSE_COMMIT="2090868a644b97c4dad2b3eeba064410fc80f457"
+export BACKEND_COMPOSE_COMMIT="92f84581fd14f9aa8d5e99fe9eb0ee2d3f08c943"
 export BACKUP_ROOT="/var/backups/quiz-arena"
 export TS="$(date -u +%Y%m%dT%H%M%SZ)"
 export BACKUP_DIR="${BACKUP_ROOT}/infra_separation_${TS}"
@@ -455,6 +456,7 @@ tree:
 git -C /opt/quiz-arena fetch origin codex/infra-separation-plan
 git -C /opt/quiz-arena cat-file -e "${RUNBOOK_COMMIT}^{commit}"
 git -C /opt/quiz-arena cat-file -e "${SITE_COMPOSE_COMMIT}^{commit}"
+git -C /opt/quiz-arena cat-file -e "${BACKEND_COMPOSE_COMMIT}^{commit}"
 ```
 
 Create the infra directory and copy reviewed files from the pinned commit:
@@ -850,7 +852,7 @@ cp -a /opt/quiz-arena/docker-compose.prod.yml \
   "${BACKUP_DIR}/files/quiz-arena.docker-compose.prod.yml.pre_backend_only_switch"
 
 git -C /opt/quiz-arena show \
-  "${RUNBOOK_COMMIT}:deploy/quiz-arena/docker-compose.prod.yml" \
+  "${BACKEND_COMPOSE_COMMIT}:deploy/quiz-arena/docker-compose.prod.yml" \
   > /opt/quiz-arena/docker-compose.prod.yml
 
 cd /opt/quiz-arena
@@ -1295,9 +1297,9 @@ docker compose --env-file .env.caddy -f docker-compose.yml logs --since 30m cadd
   | tee "${BACKUP_DIR}/docker/infra_caddy.final.logs"
 
 cd /opt/quiz-arena
-docker compose --env-file .env -f docker-compose.prod.yml logs --since 30m api \
+docker compose --env-file .env.quiz-arena -f docker-compose.prod.yml logs --since 30m api \
   | tee "${BACKUP_DIR}/docker/quiz_arena_api.final.logs"
-docker compose --env-file .env -f docker-compose.prod.yml logs --since 30m worker \
+docker compose --env-file .env.quiz-arena -f docker-compose.prod.yml logs --since 30m worker \
   | tee "${BACKUP_DIR}/docker/quiz_arena_worker.final.logs"
 ```
 
