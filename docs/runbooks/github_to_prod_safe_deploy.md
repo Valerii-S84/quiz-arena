@@ -183,13 +183,13 @@ Candidate head без DB write:
 
 ```bash
 CANDIDATE_HEAD="$(docker run --rm "${BACKEND_IMAGE}" \
-  sh -c "alembic heads | awk '{print \\$1}'")"
+  sh -c "alembic heads | awk '{print \$1}'")"
 
 LIVE_CURRENT="$(docker run --rm \
   --network quiz-arena_default \
   --env-file "${QUIZ_ARENA_ENV_FILE}" \
   "${BACKEND_IMAGE}" \
-  sh -c "alembic current | awk '{print \\$1}'")"
+  sh -c "alembic current | awk '{print \$1}'")"
 
 test -n "${CANDIDATE_HEAD}"
 test "${LIVE_CURRENT}" = "${CANDIDATE_HEAD}"
@@ -260,7 +260,6 @@ Routine backend deploy не виконує Caddy reload.
 ## 8. Post-deploy smoke
 
 ```bash
-curl -fsS -o /dev/null https://deutschmit.de/health
 curl -fsS -o /dev/null https://deutchquizarena.de/health
 
 docker exec quiz_arena_postgres_prod \
@@ -303,7 +302,6 @@ BACKEND_IMAGE=rollback-placeholder docker compose \
 docker network inspect quiz-arena-edge \
   --format '{{json .Containers}}' | grep -q 'quiz-arena-api-1'
 docker exec infra_caddy_prod getent hosts api
-curl -fsS -o /dev/null https://deutschmit.de/health
 curl -fsS -o /dev/null https://deutchquizarena.de/health
 ```
 
