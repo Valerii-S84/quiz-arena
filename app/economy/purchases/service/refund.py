@@ -11,7 +11,11 @@ from app.db.repo.entitlements_repo import EntitlementsRepo
 from app.db.repo.ledger_repo import LedgerRepo
 from app.db.repo.purchases_repo import PurchasesRepo
 from app.db.repo.streak_repo import StreakRepo
-from app.economy.energy.constants import FREE_ENERGY_CAP, FREE_ENERGY_START
+from app.economy.energy.constants import (
+    ENERGY_REGEN_INTERVAL_SEC,
+    FREE_ENERGY_CAP,
+    FREE_ENERGY_START,
+)
 from app.economy.energy.time import berlin_local_date
 from app.economy.purchases.errors import (
     PurchaseNotFoundError,
@@ -20,6 +24,7 @@ from app.economy.purchases.errors import (
 )
 from app.economy.purchases.types import PurchaseRefundResult
 
+PROVIDER_REFUND_EVIDENCE_REQUIRED_STATUS = "FAILED_CREDIT_PENDING_REVIEW"
 REFUNDABLE_PURCHASE_STATUSES = {"CREDITED", "PAID_UNCREDITED"}
 
 
@@ -54,6 +59,7 @@ async def _debit_paid_energy_wallet(
             local_date_berlin=berlin_local_date(now_utc),
             free_energy_start=FREE_ENERGY_START,
             free_energy_cap=FREE_ENERGY_CAP,
+            regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
         )
 
     debit_amount = min(amount, state.paid_energy)
@@ -71,6 +77,7 @@ async def refund_purchase(
     *,
     purchase_id: UUID,
     now_utc: datetime,
+    provider_refund_confirmed: bool = False,
 ) -> PurchaseRefundResult:
     purchase = await PurchasesRepo.get_by_id_for_update(session, purchase_id)
     if purchase is None:
@@ -84,23 +91,15 @@ async def refund_purchase(
             idempotent_replay=True,
         )
 
-    if purchase.status not in REFUNDABLE_PURCHASE_STATUSES:
+    if purchase.status not in REFUNDABLE_PURCHASE_STATUSES and not (
+        provider_refund_confirmed and purchase.status == PROVIDER_REFUND_EVIDENCE_REQUIRED_STATUS
+    ):
         raise PurchaseRefundValidationError
 
     idempotent_replay = False
+    credit_entry = await _load_refund_credit_entry(session, purchase=purchase)
 
-    if purchase.status == "CREDITED":
-        try:
-            credit_entry = await LedgerRepo.get_purchase_credit_for_update(
-                session,
-                purchase_id=purchase.id,
-            )
-        except ValueError as exc:
-            raise PurchaseRefundInvariantError from exc
-
-        if credit_entry is None:
-            raise PurchaseRefundInvariantError
-
+    if credit_entry is not None:
         asset_breakdown = _extract_asset_breakdown(credit_entry.metadata_)
         existing_refund_entry = await LedgerRepo.get_by_idempotency_key(
             session,
@@ -160,3 +159,30 @@ async def refund_purchase(
         status=purchase.status,
         idempotent_replay=idempotent_replay,
     )
+
+
+async def _load_refund_credit_entry(
+    session: AsyncSession,
+    *,
+    purchase,
+) -> LedgerEntry | None:
+    if purchase.status not in {"CREDITED", "FAILED_CREDIT_PENDING_REVIEW"}:
+        return None
+
+    try:
+        credit_entry = await LedgerRepo.get_purchase_credit_for_update(
+            session,
+            purchase_id=purchase.id,
+        )
+    except ValueError as exc:
+        raise PurchaseRefundInvariantError from exc
+
+    if purchase.status == "CREDITED" and credit_entry is None:
+        raise PurchaseRefundInvariantError
+    if (
+        purchase.status == "FAILED_CREDIT_PENDING_REVIEW"
+        and getattr(purchase, "credited_at", None) is not None
+        and credit_entry is None
+    ):
+        raise PurchaseRefundInvariantError
+    return credit_entry

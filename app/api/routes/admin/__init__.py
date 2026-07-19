@@ -11,11 +11,13 @@ from .overview import router as overview_router
 from .promo import router as promo_router
 from .system import router as system_router
 from .users import router as users_router
+from .website_analytics import router as website_analytics_router
 
 router = APIRouter()
 router.include_router(auth_router)
 router.include_router(auth_session_router)
 router.include_router(overview_router)
+router.include_router(website_analytics_router)
 router.include_router(contact_requests_router)
 router.include_router(economy_router)
 router.include_router(users_router)

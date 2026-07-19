@@ -1,5 +1,9 @@
 # REPO_STRUCTURE.md
 
+> Compatibility overview. The current runtime layout is documented in
+> `docs/architecture/current_runtime_map.md`; active agent rules and project
+> boundaries live under `.agent/`. This file must not override either source.
+
 ## Ziel
 
 Diese Struktur verhindert Chaos, trennt UI von Domänenlogik und hält Module klein (&lt;250 Zeilen pro Datei).

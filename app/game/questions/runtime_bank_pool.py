@@ -1,25 +1,34 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from time import monotonic
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.game.questions.catalog import mode_requires_quick_mix_eligible
-from app.game.questions.runtime_bank_models import QUICK_MIX_MODE_CODE, QUICK_MIX_SCOPE_CODE
-
-
-@dataclass(slots=True)
-class _PoolCacheEntry:
-    loaded_at_mono: float
-    question_ids: tuple[str, ...]
-    updated_at_watermark: datetime
-
+from app.db.repo.quiz_questions_repo import QuizQuestionPoolCandidate
+from app.game.questions.runtime_bank_pool_entries import PoolCacheEntry as _PoolCacheEntry
+from app.game.questions.runtime_bank_pool_entries import QuestionCacheEntry as _QuestionCacheEntry
+from app.game.questions.runtime_bank_pool_entries import (
+    build_full_pool_entry as _build_full_pool_entry,
+)
+from app.game.questions.runtime_bank_pool_entries import (
+    build_incremental_pool_entry as _build_incremental_pool_entry,
+)
+from app.game.questions.runtime_bank_pool_loader import (  # noqa: F401
+    load_pool_candidates as _load_pool_candidates,
+)
+from app.game.questions.runtime_bank_pool_loader import (  # noqa: F401
+    load_pool_ids as _load_pool_ids,
+)
+from app.game.questions.runtime_bank_pool_membership import pool_cache_scope as _pool_cache_scope
+from app.game.questions.runtime_bank_pool_membership import (
+    question_from_pool_candidate as _question_from_pool_candidate,
+)
+from app.game.questions.types import QuizQuestion
 
 _QUESTION_POOL_CACHE: dict[tuple[str, tuple[str, ...] | None], _PoolCacheEntry] = {}
+_QUESTION_BY_ID_CACHE: dict[str, _QuestionCacheEntry] = {}
 _QUESTION_POOL_CACHE_LOCK = asyncio.Lock()
 
 
@@ -35,133 +44,24 @@ def _clamp_cache_ttl_seconds(value: int) -> int:
 
 def clear_question_pool_cache() -> None:
     _QUESTION_POOL_CACHE.clear()
+    _QUESTION_BY_ID_CACHE.clear()
 
 
-def _pool_cache_scope(mode_code: str) -> str:
-    return QUICK_MIX_SCOPE_CODE if mode_code == QUICK_MIX_MODE_CODE else mode_code
+def _get_question_by_id_cache(question_id: str) -> QuizQuestion | None:
+    cached = _QUESTION_BY_ID_CACHE.get(question_id)
+    if cached is None:
+        return None
+    ttl_seconds = _clamp_cache_ttl_seconds(get_settings().quiz_question_pool_cache_ttl_seconds)
+    if (monotonic() - cached.loaded_at_mono) > ttl_seconds:
+        _QUESTION_BY_ID_CACHE.pop(question_id, None)
+        return None
+    return cached.question
 
 
-def _pool_matches_mode(
-    mode_code: str,
-    *,
-    question_mode_code: str,
-    question_quick_mix_eligible: bool,
-) -> bool:
-    if mode_code == QUICK_MIX_MODE_CODE:
-        return question_quick_mix_eligible
-    return question_mode_code == mode_code
-
-
-def _pool_matches_level(
-    preferred_levels: tuple[str, ...] | None,
-    *,
-    question_level: str,
-) -> bool:
-    return preferred_levels is None or question_level in preferred_levels
-
-
-def _pool_includes_question(
-    mode_code: str,
-    preferred_levels: tuple[str, ...] | None,
-    *,
-    question_mode_code: str,
-    question_level: str,
-    question_status: str,
-    question_quick_mix_eligible: bool,
-) -> bool:
-    return (
-        question_status == "ACTIVE"
-        and _pool_matches_mode(
-            mode_code,
-            question_mode_code=question_mode_code,
-            question_quick_mix_eligible=question_quick_mix_eligible,
-        )
-        and _pool_matches_level(preferred_levels, question_level=question_level)
-    )
-
-
-async def _load_pool_ids(
-    session: AsyncSession,
-    *,
-    mode_code: str,
-    preferred_levels: tuple[str, ...] | None,
-) -> tuple[str, ...]:
-    repo = _repo()
-    if mode_requires_quick_mix_eligible(mode_code):
-        pool_ids = await repo.list_question_ids_all_active(
-            session,
-            exclude_question_ids=None,
-            preferred_levels=preferred_levels,
-            require_quick_mix_eligible=True,
-        )
-    else:
-        pool_ids = await repo.list_question_ids_for_mode(
-            session,
-            mode_code=mode_code,
-            exclude_question_ids=None,
-            preferred_levels=preferred_levels,
-        )
-    return tuple(pool_ids)
-
-
-async def _build_full_pool_entry(
-    session: AsyncSession,
-    *,
-    mode_code: str,
-    preferred_levels: tuple[str, ...] | None,
-) -> _PoolCacheEntry:
-    loaded_ids = await _load_pool_ids(
-        session,
-        mode_code=mode_code,
-        preferred_levels=preferred_levels,
-    )
-    return _PoolCacheEntry(
+def _store_question_by_id_cache(question: QuizQuestion) -> None:
+    _QUESTION_BY_ID_CACHE[question.question_id] = _QuestionCacheEntry(
         loaded_at_mono=monotonic(),
-        question_ids=loaded_ids,
-        updated_at_watermark=datetime.now(timezone.utc),
-    )
-
-
-async def _build_incremental_pool_entry(
-    session: AsyncSession,
-    *,
-    mode_code: str,
-    preferred_levels: tuple[str, ...] | None,
-    cached: _PoolCacheEntry,
-) -> _PoolCacheEntry:
-    changes = await _repo().list_question_pool_changes_since(
-        session,
-        since_updated_at=cached.updated_at_watermark,
-    )
-    if not changes:
-        return _PoolCacheEntry(
-            loaded_at_mono=monotonic(),
-            question_ids=cached.question_ids,
-            updated_at_watermark=cached.updated_at_watermark,
-        )
-
-    refreshed_ids = set(cached.question_ids)
-    max_updated_at = cached.updated_at_watermark
-    for change in changes:
-        include_question = _pool_includes_question(
-            mode_code,
-            preferred_levels,
-            question_mode_code=change.mode_code,
-            question_level=change.level,
-            question_status=change.status,
-            question_quick_mix_eligible=change.quick_mix_eligible,
-        )
-        if include_question:
-            refreshed_ids.add(change.question_id)
-        else:
-            refreshed_ids.discard(change.question_id)
-        if change.updated_at > max_updated_at:
-            max_updated_at = change.updated_at
-
-    return _PoolCacheEntry(
-        loaded_at_mono=monotonic(),
-        question_ids=tuple(sorted(refreshed_ids)),
-        updated_at_watermark=max_updated_at,
+        question=question,
     )
 
 
@@ -171,17 +71,63 @@ async def _get_pool_ids(
     mode_code: str,
     preferred_levels: tuple[str, ...] | None,
 ) -> tuple[str, ...]:
+    entry = await _get_pool_entry(
+        session,
+        mode_code=mode_code,
+        preferred_levels=preferred_levels,
+    )
+    return entry.question_ids
+
+
+async def _get_pool_candidates(
+    session: AsyncSession,
+    *,
+    mode_code: str,
+    preferred_levels: tuple[str, ...] | None,
+) -> tuple[QuizQuestionPoolCandidate, ...]:
+    entry = await _get_pool_entry(
+        session,
+        mode_code=mode_code,
+        preferred_levels=preferred_levels,
+    )
+    return tuple(entry.candidates_by_id[question_id] for question_id in entry.question_ids)
+
+
+async def _get_pool_question(
+    session: AsyncSession,
+    *,
+    mode_code: str,
+    preferred_levels: tuple[str, ...] | None,
+    question_id: str,
+) -> QuizQuestion | None:
+    entry = await _get_pool_entry(
+        session,
+        mode_code=mode_code,
+        preferred_levels=preferred_levels,
+    )
+    candidate = entry.candidates_by_id.get(question_id)
+    if candidate is None:
+        return None
+    return _question_from_pool_candidate(candidate)
+
+
+async def _get_pool_entry(
+    session: AsyncSession,
+    *,
+    mode_code: str,
+    preferred_levels: tuple[str, ...] | None,
+) -> _PoolCacheEntry:
     cache_key = (_pool_cache_scope(mode_code), preferred_levels)
     ttl_seconds = _clamp_cache_ttl_seconds(get_settings().quiz_question_pool_cache_ttl_seconds)
     now_mono = monotonic()
     cached = _QUESTION_POOL_CACHE.get(cache_key)
     if cached is not None and (now_mono - cached.loaded_at_mono) <= ttl_seconds:
-        return cached.question_ids
+        return cached
 
     async with _QUESTION_POOL_CACHE_LOCK:
         cached = _QUESTION_POOL_CACHE.get(cache_key)
         if cached is not None and (now_mono - cached.loaded_at_mono) <= ttl_seconds:
-            return cached.question_ids
+            return cached
 
         updated_entry = (
             await _build_incremental_pool_entry(
@@ -189,13 +135,16 @@ async def _get_pool_ids(
                 mode_code=mode_code,
                 preferred_levels=preferred_levels,
                 cached=cached,
+                question_cache=_QUESTION_BY_ID_CACHE,
+                loaded_at_mono=monotonic,
             )
             if cached is not None
             else await _build_full_pool_entry(
                 session,
                 mode_code=mode_code,
                 preferred_levels=preferred_levels,
+                loaded_at_mono=monotonic,
             )
         )
         _QUESTION_POOL_CACHE[cache_key] = updated_entry
-        return updated_entry.question_ids
+        return updated_entry

@@ -47,6 +47,26 @@ EVENT_ALERT_ROUTES = {
         severity="error",
         escalation_tier="ops_l1",
     ),
+    "payments_precheckout_stuck_detected": AlertRoute(
+        channels=("pagerduty", "slack", "generic"),
+        severity="critical",
+        escalation_tier="ops_l1",
+    ),
+    "payments_paid_uncredited_stuck_detected": AlertRoute(
+        channels=("pagerduty", "slack", "generic"),
+        severity="critical",
+        escalation_tier="ops_l1",
+    ),
+    "payments_credit_invariant_failed": AlertRoute(
+        channels=("pagerduty", "slack", "generic"),
+        severity="critical",
+        escalation_tier="ops_l1",
+    ),
+    "payments_webhook_allowed_updates_missing": AlertRoute(
+        channels=("pagerduty", "slack", "generic"),
+        severity="critical",
+        escalation_tier="ops_l1",
+    ),
     "offers_conversion_drop_detected": AlertRoute(
         channels=("slack", "generic"),
         severity="warning",

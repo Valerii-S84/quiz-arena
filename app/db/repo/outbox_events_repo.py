@@ -1,11 +1,45 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.outbox_events import OutboxEvent
+
+
+async def _lock_payload_dedupe_key(
+    session: AsyncSession,
+    *,
+    event_type: str,
+    payload_key: str,
+    payload_value: str,
+    status: str,
+) -> None:
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(:lock_key)"),
+        {
+            "lock_key": _payload_dedupe_lock_key(
+                event_type=event_type,
+                payload_key=payload_key,
+                payload_value=payload_value,
+                status=status,
+            )
+        },
+    )
+
+
+def _payload_dedupe_lock_key(
+    *,
+    event_type: str,
+    payload_key: str,
+    payload_value: str,
+    status: str,
+) -> int:
+    lock_material = "\x1f".join((event_type, status, payload_key, payload_value))
+    digest = hashlib.sha256(lock_material.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], byteorder="big", signed=True)
 
 
 class OutboxEventsRepo:
@@ -25,6 +59,91 @@ class OutboxEventsRepo:
         session.add(event)
         await session.flush()
         return event
+
+    @staticmethod
+    async def get_open_by_payload_key(
+        session: AsyncSession,
+        *,
+        event_type: str,
+        payload_key: str,
+        payload_value: str,
+        status: str = "OPEN",
+    ) -> OutboxEvent | None:
+        stmt = (
+            select(OutboxEvent)
+            .where(
+                OutboxEvent.event_type == event_type,
+                OutboxEvent.status == status,
+                OutboxEvent.payload[payload_key].astext == payload_value,
+            )
+            .order_by(OutboxEvent.created_at.desc(), OutboxEvent.id.desc())
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_open_by_payload_key_excluding_reason(
+        session: AsyncSession,
+        *,
+        event_type: str,
+        payload_key: str,
+        payload_value: str,
+        excluded_reason: str,
+        status: str = "OPEN",
+    ) -> OutboxEvent | None:
+        stmt = (
+            select(OutboxEvent)
+            .where(
+                OutboxEvent.event_type == event_type,
+                OutboxEvent.status == status,
+                OutboxEvent.payload[payload_key].astext == payload_value,
+                OutboxEvent.payload["reason"].astext != excluded_reason,
+            )
+            .order_by(OutboxEvent.created_at.desc(), OutboxEvent.id.desc())
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def create_once_by_payload_key(
+        session: AsyncSession,
+        *,
+        event_type: str,
+        payload: dict[str, object],
+        payload_key: str,
+        status: str = "OPEN",
+    ) -> tuple[OutboxEvent, bool]:
+        payload_value = payload.get(payload_key)
+        if not isinstance(payload_value, str) or not payload_value:
+            raise ValueError("payload key value must be a non-empty string")
+
+        # Temporary DB-backed serialization until a reviewed migration can add a true unique key.
+        await _lock_payload_dedupe_key(
+            session,
+            event_type=event_type,
+            payload_key=payload_key,
+            payload_value=payload_value,
+            status=status,
+        )
+        existing = await OutboxEventsRepo.get_open_by_payload_key(
+            session,
+            event_type=event_type,
+            payload_key=payload_key,
+            payload_value=payload_value,
+            status=status,
+        )
+        if existing is not None:
+            return existing, False
+
+        event = await OutboxEventsRepo.create(
+            session,
+            event_type=event_type,
+            payload=payload,
+            status=status,
+        )
+        return event, True
 
     @staticmethod
     async def list_events_since(
@@ -92,7 +211,10 @@ class OutboxEventsRepo:
         resolved_limit = max(1, int(limit))
         candidate_ids = (
             select(OutboxEvent.id)
-            .where(OutboxEvent.created_at < cutoff_utc)
+            .where(
+                OutboxEvent.created_at < cutoff_utc,
+                OutboxEvent.status != "OPEN",
+            )
             .order_by(OutboxEvent.created_at.asc(), OutboxEvent.id.asc())
             .limit(resolved_limit)
             .scalar_subquery()

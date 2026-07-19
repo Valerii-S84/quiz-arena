@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -50,37 +51,90 @@ def test_tournament_messaging_helpers_and_enqueue_fallback(monkeypatch: pytest.M
 
 
 @pytest.mark.asyncio
-async def test_run_private_tournament_round_messaging_async_persists_sent_ids(
+async def test_run_private_tournament_round_messaging_async_reloads_inside_mutex(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tournament_id = uuid4()
+    tournament = tournament_row(id=tournament_id, status="ROUND_1", current_round=1)
     context = SimpleNamespace(
         standings_user_ids=[11, 22],
         parsed_tournament_id=tournament_id,
+        tournament=tournament,
     )
-    persisted: list[dict[str, object]] = []
-
-    monkeypatch.setattr(tournaments_messaging, "SessionLocal", SessionLocalStub())
+    session_local = SessionLocalStub()
+    monkeypatch.setattr(
+        tournaments_messaging,
+        "SessionLocal",
+        session_local,
+    )
     monkeypatch.setattr(
         tournaments_messaging, "load_round_messaging_context", _async_return(context)
     )
     monkeypatch.setattr(
         tournaments_messaging,
         "deliver_round_messages",
-        _async_return(TournamentRoundDeliveryResult(1, 2, 0, {11: 101}, {22: 202})),
+        _async_return(TournamentRoundDeliveryResult(1, 2, 0, 0, {11: 101}, {22: 202})),
     )
-
-    async def _persist(**kwargs) -> None:
-        persisted.append(kwargs)
-
-    monkeypatch.setattr(tournaments_messaging, "persist_standings_message_ids", _persist)
+    monkeypatch.setattr(
+        tournaments_messaging,
+        "private_tournament_standings_mutex",
+        _unlocked_mutex,
+    )
 
     result = await tournaments_messaging.run_private_tournament_round_messaging_async(
         tournament_id=str(tournament_id),
     )
 
-    assert result == {"processed": 1, "participants_total": 2, "sent": 1, "edited": 2, "failed": 0}
-    assert persisted[0]["new_message_ids"] == {11: 101}
+    assert result == {
+        "processed": 1,
+        "participants_total": 2,
+        "sent": 1,
+        "edited": 2,
+        "failed": 0,
+        "skipped": 0,
+    }
+    assert session_local._call_count == 2
+
+
+def test_private_tournament_messaging_wrapper_schedules_retry_needed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    retry_calls: list[dict[str, object]] = []
+
+    class _RetryScheduled(RuntimeError):
+        pass
+
+    def _run(coro):
+        coro.close()
+        return {
+            "processed": 1,
+            "participants_total": 1,
+            "sent": 0,
+            "edited": 0,
+            "failed": 1,
+            "skipped": 0,
+            "retry_count": 1,
+            "retry_after_seconds": 7,
+        }
+
+    monkeypatch.setattr(tournaments_messaging, "run_async_job", _run)
+
+    def _retry(**kwargs: object) -> None:
+        retry_calls.append(kwargs)
+        raise _RetryScheduled
+
+    monkeypatch.setattr(
+        tournaments_messaging.run_private_tournament_round_messaging, "retry", _retry
+    )
+
+    with pytest.raises(_RetryScheduled):
+        tournaments_messaging.run_private_tournament_round_messaging(tournament_id=str(uuid4()))
+
+    assert retry_calls[0]["countdown"] == 7
+    assert isinstance(
+        retry_calls[0]["exc"],
+        tournaments_messaging.PrivateTournamentDeliveryRetryNeeded,
+    )
 
 
 @pytest.mark.asyncio
@@ -165,3 +219,8 @@ def _record_and_close(target: list[object]):
         coro.close()
 
     return _inner
+
+
+@asynccontextmanager
+async def _unlocked_mutex(_tournament_id):
+    yield

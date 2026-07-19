@@ -7,6 +7,7 @@ from app.economy.offers.types import OfferTemplate
 TRG_ENERGY_ZERO = "TRG_ENERGY_ZERO"
 TRG_ENERGY_LOW = "TRG_ENERGY_LOW"
 TRG_ENERGY10_SECOND_BUY = "TRG_ENERGY10_SECOND_BUY"
+TRG_DUEL_TICKET_SECOND_BUY = "TRG_DUEL_TICKET_SECOND_BUY"
 TRG_STREAK_GT7 = "TRG_STREAK_GT7"
 TRG_STREAK_RISK_22 = "TRG_STREAK_RISK_22"
 TRG_STREAK_MILESTONE_30 = "TRG_STREAK_MILESTONE_30"
@@ -19,6 +20,7 @@ TRIGGER_RESOLUTION_ORDER: tuple[str, ...] = (
     TRG_ENERGY_ZERO,
     TRG_STREAK_RISK_22,
     TRG_STARTER_EXPIRED,
+    TRG_DUEL_TICKET_SECOND_BUY,
     TRG_COMEBACK_3D,
     TRG_ENERGY10_SECOND_BUY,
     TRG_MONTH_EXPIRING,
@@ -36,6 +38,7 @@ OFFER_REPEAT_COOLDOWN = timedelta(hours=24)
 OFFER_MUTE_WINDOW = timedelta(hours=72)
 
 ENERGY10_SECOND_BUY_WINDOW = timedelta(days=7)
+DUEL_TICKET_SECOND_BUY_WINDOW = timedelta(days=7)
 COMEBACK_WINDOW_DAYS = 3
 STARTER_EXPIRED_WINDOW = timedelta(hours=48)
 MONTH_EXPIRING_WINDOW = timedelta(hours=72)
@@ -62,6 +65,14 @@ OFFER_TEMPLATES: dict[str, OfferTemplate] = {
         trigger_code=TRG_ENERGY10_SECOND_BUY,
         priority=80,
         text_key="msg.offer.mega.after_second_energy",
+        cta_product_codes=("PREMIUM_WEEK",),
+        blocking_modal=True,
+    ),
+    TRG_DUEL_TICKET_SECOND_BUY: OfferTemplate(
+        offer_code="OFFER_ARENA_PASS_AFTER_TICKETS",
+        trigger_code=TRG_DUEL_TICKET_SECOND_BUY,
+        priority=88,
+        text_key="msg.offer.arena_pass.after_tickets",
         cta_product_codes=("PREMIUM_WEEK",),
         blocking_modal=True,
     ),

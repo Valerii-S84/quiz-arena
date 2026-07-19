@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timezone
 
 import structlog
@@ -7,6 +8,9 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery, Message, PreCheckoutQuery
 
 from app.bot.handlers.payments_buy_flow import BuyHandlerServices, handle_buy_callback
+from app.bot.handlers.payments_duel_paywall import (
+    _duel_paywall_context_from_callback as _duel_paywall_context_from_callback,
+)
 from app.bot.handlers.payments_duel_paywall import _emit_duel_paywall_click
 from app.bot.handlers.payments_duel_paywall import (
     _is_duel_paywall_callback as _is_duel_paywall_callback,
@@ -20,6 +24,7 @@ from app.bot.handlers.payments_helpers import (
 from app.bot.handlers.payments_runtime import (
     apply_successful_payment,
     apply_zero_cost_purchase,
+    refund_payment_update,
     validate_precheckout,
 )
 from app.bot.keyboards.home import build_home_keyboard
@@ -31,6 +36,8 @@ from app.economy.purchases.errors import (
     ProductNotFoundError,
     PurchaseNotFoundError,
     PurchasePrecheckoutValidationError,
+    PurchaseRefundInvariantError,
+    PurchaseRefundValidationError,
 )
 from app.economy.purchases.service import PurchaseService
 from app.services.user_onboarding import UserOnboardingService
@@ -43,6 +50,14 @@ _extract_offer_impression_id_from_purchase_idempotency_key = (
 )
 _parse_buy_callback_data = parse_buy_callback_data
 _success_text_key = success_text_key
+
+
+def _invoice_payload_hash(invoice_payload: str) -> str:
+    return hashlib.sha256(invoice_payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _payment_identifier_hash(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
 
 
 @router.callback_query(F.data.startswith("buy:"))
@@ -92,6 +107,17 @@ async def handle_successful_payment(message: Message) -> None:
 
     payment = message.successful_payment
     now_utc = datetime.now(timezone.utc)
+    invoice_payload_hash = _invoice_payload_hash(payment.invoice_payload)
+    telegram_payment_charge_id_hash = _payment_identifier_hash(payment.telegram_payment_charge_id)
+
+    logger.info(
+        "payment_successful_update_received",
+        telegram_user_id=message.from_user.id,
+        telegram_payment_charge_id_hash=telegram_payment_charge_id_hash,
+        invoice_payload_hash=invoice_payload_hash,
+        currency=getattr(payment, "currency", None),
+        total_amount=getattr(payment, "total_amount", None),
+    )
 
     try:
         credit_result = await apply_successful_payment(
@@ -103,7 +129,14 @@ async def handle_successful_payment(message: Message) -> None:
         PurchaseNotFoundError,
         ProductNotFoundError,
         PurchasePrecheckoutValidationError,
-    ):
+    ) as exc:
+        logger.warning(
+            "payment_credit_failed",
+            telegram_user_id=message.from_user.id,
+            telegram_payment_charge_id_hash=telegram_payment_charge_id_hash,
+            invoice_payload_hash=invoice_payload_hash,
+            error_type=type(exc).__name__,
+        )
         await message.answer(
             TEXTS_DE["msg.purchase.error.failed"], reply_markup=build_home_keyboard()
         )
@@ -113,3 +146,46 @@ async def handle_successful_payment(message: Message) -> None:
         TEXTS_DE[success_text_key(credit_result.product_code)],
         reply_markup=build_home_keyboard(),
     )
+
+
+@router.message(F.refunded_payment)
+async def handle_refunded_payment(message: Message) -> None:
+    if message.from_user is None or message.refunded_payment is None:
+        await message.answer(TEXTS_DE["msg.system.error"])
+        return
+
+    refunded_payment = message.refunded_payment
+    now_utc = datetime.now(timezone.utc)
+    invoice_payload_hash = _invoice_payload_hash(refunded_payment.invoice_payload)
+    telegram_payment_charge_id_hash = _payment_identifier_hash(
+        refunded_payment.telegram_payment_charge_id
+    )
+
+    logger.info(
+        "payment_refunded_update_received",
+        telegram_user_id=message.from_user.id,
+        telegram_payment_charge_id_hash=telegram_payment_charge_id_hash,
+        invoice_payload_hash=invoice_payload_hash,
+        currency=getattr(refunded_payment, "currency", None),
+        total_amount=getattr(refunded_payment, "total_amount", None),
+    )
+
+    try:
+        await refund_payment_update(
+            telegram_user=message.from_user,
+            refunded_payment=refunded_payment,
+            now_utc=now_utc,
+        )
+    except (
+        PurchaseNotFoundError,
+        PurchaseRefundValidationError,
+        PurchaseRefundInvariantError,
+    ) as exc:
+        logger.warning(
+            "payment_refund_update_failed",
+            telegram_user_id=message.from_user.id,
+            telegram_payment_charge_id_hash=telegram_payment_charge_id_hash,
+            invoice_payload_hash=invoice_payload_hash,
+            error_type=type(exc).__name__,
+        )
+        raise

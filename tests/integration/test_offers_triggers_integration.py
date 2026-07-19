@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
@@ -9,11 +9,16 @@ from sqlalchemy import func, select
 
 from app.db.models.energy_state import EnergyState
 from app.db.models.offers_impressions import OfferImpression
+from app.db.models.purchases import Purchase
 from app.db.models.streak_state import StreakState
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
-from app.economy.energy.constants import BERLIN_TIMEZONE
-from app.economy.offers.constants import OFFER_NOT_SHOW_DISMISS_REASON, TRG_ENERGY_ZERO
+from app.economy.energy.constants import BERLIN_TIMEZONE, ENERGY_REGEN_INTERVAL_SEC
+from app.economy.offers.constants import (
+    OFFER_NOT_SHOW_DISMISS_REASON,
+    TRG_DUEL_TICKET_SECOND_BUY,
+    TRG_ENERGY_ZERO,
+)
 from app.economy.offers.service import OfferService
 from tests.integration.stable_ids import stable_telegram_user_id
 
@@ -49,7 +54,7 @@ async def _create_user_with_state(
                 free_energy=free_energy,
                 paid_energy=paid_energy,
                 free_cap=10,
-                regen_interval_sec=1800,
+                regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
                 last_regen_at=now_utc,
                 last_daily_topup_local_date=_berlin_date(now_utc),
                 version=0,
@@ -104,6 +109,37 @@ async def _insert_offer_impression(
         await session.flush()
 
 
+async def _insert_paid_duel_ticket_purchase(
+    *,
+    user_id: int,
+    paid_at: datetime,
+    seed: str,
+) -> None:
+    async with SessionLocal.begin() as session:
+        session.add(
+            Purchase(
+                id=uuid4(),
+                user_id=user_id,
+                product_code="FRIEND_CHALLENGE_5",
+                product_type="MICRO",
+                base_stars_amount=5,
+                discount_stars_amount=0,
+                stars_amount=5,
+                status="CREDITED",
+                idempotency_key=f"ticket:{seed}",
+                invoice_payload=f"ticket-invoice:{seed}",
+                telegram_payment_charge_id=f"ticket-charge:{seed}",
+                telegram_pre_checkout_query_id=None,
+                raw_successful_payment=None,
+                created_at=paid_at,
+                paid_at=paid_at,
+                credited_at=paid_at,
+                refunded_at=None,
+            )
+        )
+        await session.flush()
+
+
 @pytest.mark.asyncio
 async def test_offer_priority_prefers_energy_zero_over_other_trigger_event() -> None:
     now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
@@ -126,6 +162,42 @@ async def test_offer_priority_prefers_energy_zero_over_other_trigger_event() -> 
     assert selection is not None
     assert selection.trigger_code == TRG_ENERGY_ZERO
     assert selection.idempotent_replay is False
+
+
+@pytest.mark.asyncio
+async def test_offer_service_selects_arena_pass_after_second_duel_ticket_purchase() -> None:
+    now_utc = datetime(2026, 2, 18, 12, 0, tzinfo=UTC)
+    user_id = await _create_user_with_state(
+        seed="offer-second-ticket",
+        now_utc=now_utc,
+        free_energy=5,
+        paid_energy=0,
+        today_status="PLAYED",
+        last_activity_local_date=_berlin_date(now_utc),
+    )
+    await _insert_paid_duel_ticket_purchase(
+        user_id=user_id,
+        paid_at=now_utc - timedelta(days=1),
+        seed="one",
+    )
+    await _insert_paid_duel_ticket_purchase(
+        user_id=user_id,
+        paid_at=now_utc - timedelta(hours=2),
+        seed="two",
+    )
+
+    async with SessionLocal.begin() as session:
+        selection = await OfferService.evaluate_and_log_offer(
+            session,
+            user_id=user_id,
+            idempotency_key="offer-second-ticket-check",
+            now_utc=now_utc,
+        )
+
+    assert selection is not None
+    assert selection.trigger_code == TRG_DUEL_TICKET_SECOND_BUY
+    assert selection.offer_code == "OFFER_ARENA_PASS_AFTER_TICKETS"
+    assert selection.text_key == "msg.offer.arena_pass.after_tickets"
 
 
 @pytest.mark.asyncio

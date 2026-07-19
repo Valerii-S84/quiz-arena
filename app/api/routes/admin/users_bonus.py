@@ -11,7 +11,11 @@ from app.db.models.entitlements import Entitlement
 from app.db.models.streak_state import StreakState
 from app.db.models.user_events import UserEvent
 from app.db.models.users import User
-from app.economy.energy.constants import FREE_ENERGY_CAP, FREE_ENERGY_START
+from app.economy.energy.constants import (
+    ENERGY_REGEN_INTERVAL_SEC,
+    FREE_ENERGY_CAP,
+    FREE_ENERGY_START,
+)
 
 
 async def apply_bonus(
@@ -30,7 +34,7 @@ async def apply_bonus(
                 free_energy=FREE_ENERGY_START,
                 paid_energy=0,
                 free_cap=FREE_ENERGY_CAP,
-                regen_interval_sec=1800,
+                regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
                 last_regen_at=now_utc,
                 last_daily_topup_local_date=now_utc.date(),
                 version=0,

@@ -3,22 +3,49 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.purchases import Purchase
 
 from .purchases_repo_metrics import (
+    count_by_user,
+    count_credited_premium_without_entitlement,
+    count_credited_product,
+    count_credited_stars_without_purchase_credit,
+    count_paid_product_since,
     count_paid_purchases,
+    count_paid_purchases_for_user,
+    count_paid_uncredited_older_than,
+    count_precheckout_ok_older_than,
     sum_paid_stars_amount,
     sum_paid_stars_amount_by_product,
 )
+from .purchases_repo_reconciliation import list_stars_reconciliation_candidate_rows
+from .purchases_repo_writes import create, expire_stale_unpaid_invoices
 
 
 class PurchasesRepo:
     count_paid_purchases = staticmethod(count_paid_purchases)
     sum_paid_stars_amount = staticmethod(sum_paid_stars_amount)
     sum_paid_stars_amount_by_product = staticmethod(sum_paid_stars_amount_by_product)
+    count_by_user = staticmethod(count_by_user)
+    count_paid_purchases_for_user = staticmethod(count_paid_purchases_for_user)
+    count_paid_product_since = staticmethod(count_paid_product_since)
+    count_credited_product = staticmethod(count_credited_product)
+    count_paid_uncredited_older_than = staticmethod(count_paid_uncredited_older_than)
+    count_precheckout_ok_older_than = staticmethod(count_precheckout_ok_older_than)
+    count_credited_premium_without_entitlement = staticmethod(
+        count_credited_premium_without_entitlement
+    )
+    count_credited_stars_without_purchase_credit = staticmethod(
+        count_credited_stars_without_purchase_credit
+    )
+    list_stars_reconciliation_candidate_rows = staticmethod(
+        list_stars_reconciliation_candidate_rows
+    )
+    expire_stale_unpaid_invoices = staticmethod(expire_stale_unpaid_invoices)
+    create = staticmethod(create)
 
     @staticmethod
     async def get_by_id(session: AsyncSession, purchase_id: UUID) -> Purchase | None:
@@ -51,6 +78,19 @@ class PurchasesRepo:
         session: AsyncSession, invoice_payload: str
     ) -> Purchase | None:
         stmt = select(Purchase).where(Purchase.invoice_payload == invoice_payload).with_for_update()
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def get_by_telegram_payment_charge_id_for_update(
+        session: AsyncSession,
+        telegram_payment_charge_id: str,
+    ) -> Purchase | None:
+        stmt = (
+            select(Purchase)
+            .where(Purchase.telegram_payment_charge_id == telegram_payment_charge_id)
+            .with_for_update()
+        )
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -120,95 +160,3 @@ class PurchasesRepo:
         )
         result = await session.execute(stmt)
         return list(result.scalars().all())
-
-    @staticmethod
-    async def count_by_user(session: AsyncSession, *, user_id: int) -> int:
-        stmt = select(func.count(Purchase.id)).where(Purchase.user_id == user_id)
-        result = await session.execute(stmt)
-        return int(result.scalar_one() or 0)
-
-    @staticmethod
-    async def count_paid_purchases_for_user(session: AsyncSession, *, user_id: int) -> int:
-        stmt = select(func.count(Purchase.id)).where(
-            Purchase.user_id == user_id,
-            Purchase.paid_at.is_not(None),
-            Purchase.stars_amount > 0,
-        )
-        result = await session.execute(stmt)
-        return int(result.scalar_one() or 0)
-
-    @staticmethod
-    async def count_paid_product_since(
-        session: AsyncSession,
-        *,
-        user_id: int,
-        product_code: str,
-        since_utc: datetime,
-    ) -> int:
-        stmt = select(func.count(Purchase.id)).where(
-            Purchase.user_id == user_id,
-            Purchase.product_code == product_code,
-            Purchase.paid_at.is_not(None),
-            Purchase.paid_at >= since_utc,
-        )
-        result = await session.execute(stmt)
-        return int(result.scalar_one() or 0)
-
-    @staticmethod
-    async def count_credited_product(
-        session: AsyncSession,
-        *,
-        user_id: int,
-        product_code: str,
-    ) -> int:
-        stmt = select(func.count(Purchase.id)).where(
-            Purchase.user_id == user_id,
-            Purchase.product_code == product_code,
-            Purchase.status == "CREDITED",
-        )
-        result = await session.execute(stmt)
-        return int(result.scalar_one() or 0)
-
-    @staticmethod
-    async def count_paid_uncredited_older_than(
-        session: AsyncSession,
-        *,
-        older_than_utc: datetime,
-    ) -> int:
-        stmt = select(func.count(Purchase.id)).where(
-            Purchase.status == "PAID_UNCREDITED",
-            Purchase.paid_at.is_not(None),
-            Purchase.paid_at <= older_than_utc,
-        )
-        result = await session.execute(stmt)
-        return int(result.scalar_one() or 0)
-
-    @staticmethod
-    async def expire_stale_unpaid_invoices(
-        session: AsyncSession,
-        *,
-        older_than_utc: datetime,
-    ) -> int:
-        stmt = (
-            update(Purchase)
-            .where(
-                Purchase.status.in_(("CREATED", "INVOICE_SENT")),
-                Purchase.created_at <= older_than_utc,
-                Purchase.paid_at.is_(None),
-            )
-            .values(status="FAILED")
-        )
-        result = await session.execute(stmt)
-        return int(getattr(result, "rowcount", 0) or 0)
-
-    @staticmethod
-    async def create(
-        session: AsyncSession,
-        *,
-        purchase: Purchase,
-        created_at: datetime,
-    ) -> Purchase:
-        purchase.created_at = created_at
-        session.add(purchase)
-        await session.flush()
-        return purchase

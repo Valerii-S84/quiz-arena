@@ -42,6 +42,7 @@ def _message_update(
     telegram_user_id: int,
     message_id: int,
     text: str | None = None,
+    reply_to_text: str | None = None,
     successful_payment: dict[str, object] | None = None,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
@@ -59,6 +60,19 @@ def _message_update(
             message_payload["text"] = text
             if text.startswith("/promo "):
                 message_payload["entities"] = [{"offset": 0, "length": 6, "type": "bot_command"}]
+        if reply_to_text is not None:
+            message_payload["reply_to_message"] = {
+                "message_id": message_id - 1,
+                "date": int(datetime.now(UTC).timestamp()),
+                "chat": _private_chat_payload(telegram_user_id),
+                "from": {
+                    "id": 777_000_001,
+                    "is_bot": True,
+                    "first_name": "QuizArena",
+                    "username": "quiz_arena_smoke_bot",
+                },
+                "text": reply_to_text,
+            }
         if successful_payment is not None:
             message_payload["successful_payment"] = successful_payment
     return payload
@@ -70,6 +84,8 @@ def _callback_update(
     telegram_user_id: int,
     callback_query_id: str,
     data: str,
+    message_id: int | None = None,
+    message_text: str = "callback source",
 ) -> dict[str, object]:
     return {
         "update_id": update_id,
@@ -79,10 +95,10 @@ def _callback_update(
             "chat_instance": f"chat-instance-{telegram_user_id}",
             "data": data,
             "message": {
-                "message_id": 10_000 + update_id,
+                "message_id": message_id or 10_000 + update_id,
                 "date": int(datetime.now(UTC).timestamp()),
                 "chat": _private_chat_payload(telegram_user_id),
-                "text": "callback source",
+                "text": message_text,
             },
         },
     }

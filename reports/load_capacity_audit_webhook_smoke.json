@@ -1,0 +1,54 @@
+{
+  "started_at": "2026-06-18T18:22:34.415402+00:00",
+  "database_url_redacted": "postgresql+asyncpg://quiz:***@localhost:5432/quiz_arena_test",
+  "redis_url_redacted": "redis://localhost:6379/15",
+  "registered_scales": [
+    {
+      "users": 100,
+      "db_size_mb": 14.851,
+      "users_count_ms": 66.49,
+      "user_lookup_p95_ms": 39.831,
+      "global_best_ms": 38.51,
+      "public_stats_ms": 41.71,
+      "question_pool_warm_ms": 42.571,
+      "dispatcher_build_ms": 0.723,
+      "redis_keys": 0,
+      "rss_mb": 179.64
+    }
+  ],
+  "active_tests": [
+    {
+      "active_users": 10,
+      "flow": "webhook",
+      "latency": {
+        "count": 10,
+        "p50_ms": 5361.916,
+        "p95_ms": 5387.438,
+        "max_ms": 5404.27
+      },
+      "errors": 0,
+      "query_summary": {
+        "count": 945,
+        "total_ms": 13676.499,
+        "p95_ms": 76.124,
+        "max_ms": 258.19
+      },
+      "db_lock_waits_active": 0,
+      "deadlocks_delta": 0,
+      "outbound_calls": {
+        "SendMessage": 50,
+        "AnswerCallbackQuery": 20
+      },
+      "attempts_created": 10,
+      "duplicate_answer_groups": 0,
+      "processed_updates": {
+        "PROCESSED": 30
+      },
+      "rss_mb": 208.39
+    }
+  ],
+  "notes": [
+    "seeded_registered_users=100 seed_ms=70.924",
+    "Gate stopped after webhook smoke failure."
+  ]
+}

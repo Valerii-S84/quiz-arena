@@ -32,6 +32,13 @@ async def test_user_lookup_methods_use_expected_keys_and_filters() -> None:
     assert telegram_session.statement is not None
     assert "users.telegram_user_id = 700" in compile_statement(telegram_session.statement)
 
+    telegram_id_session = RecordingSession(_ScalarResult(7))
+    assert await UsersRepo.get_id_by_telegram_user_id(telegram_id_session, 700) == 7
+    assert telegram_id_session.statement is not None
+    telegram_id_sql = compile_statement(telegram_id_session.statement)
+    assert "SELECT users.id" in telegram_id_sql
+    assert "users.telegram_user_id = 700" in telegram_id_sql
+
     referral_session = RecordingSession(_ScalarResult(user))
     assert await UsersRepo.get_by_referral_code(referral_session, "REF7") is user
     assert referral_session.statement is not None
@@ -78,6 +85,21 @@ async def test_create_touch_and_global_streak_paths_use_session_contracts() -> N
     touch_sql = compile_statement(touch_session.statement)
     assert "UPDATE users SET last_seen_at=" in touch_sql
     assert "users.id = 123" in touch_sql
+
+    touch_by_telegram_session = RecordingSession(_ScalarResult(created))
+    assert (
+        await UsersRepo.touch_last_seen_by_telegram_user_id(
+            touch_by_telegram_session,
+            123,
+            seen_at,
+        )
+        is created
+    )
+    assert touch_by_telegram_session.statement is not None
+    touch_by_telegram_sql = compile_statement(touch_by_telegram_session.statement)
+    assert "UPDATE users SET last_seen_at=" in touch_by_telegram_sql
+    assert "users.telegram_user_id = 123" in touch_by_telegram_sql
+    assert "RETURNING users.id" in touch_by_telegram_sql
 
     streak_session = RecordingSession(_ScalarResult(11))
     assert await UsersRepo.get_global_best_streak(streak_session) == 11

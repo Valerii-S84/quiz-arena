@@ -9,6 +9,14 @@ from app.bot.promo_labels import get_promo_product_label
 from app.economy.purchases.catalog import PRODUCTS, get_product, is_product_available_for_sale
 
 
+def build_promo_input_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Abbrechen", callback_data="promo:cancel")],
+        ]
+    )
+
+
 def _resolve_target_product_codes(
     target_scope: str | None,
     *,

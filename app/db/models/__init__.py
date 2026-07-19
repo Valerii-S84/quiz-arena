@@ -15,7 +15,13 @@ from app.db.models.ledger_entries import LedgerEntry
 from app.db.models.mode_progress import ModeProgress
 from app.db.models.offers_impressions import OfferImpression
 from app.db.models.outbox_events import OutboxEvent
+from app.db.models.payment_inbox import (
+    PaymentEvent,
+    PaymentReconciliationReview,
+    TelegramUpdateInbox,
+)
 from app.db.models.processed_updates import ProcessedUpdate
+from app.db.models.production_reliability import TelegramDeliveryAttempt
 from app.db.models.promo_attempts import PromoAttempt
 from app.db.models.promo_audit_log import PromoAuditLog
 from app.db.models.promo_code_batches import PromoCodeBatch
@@ -34,6 +40,7 @@ from app.db.models.tournament_round_scores import TournamentRoundScore
 from app.db.models.tournaments import Tournament
 from app.db.models.user_events import UserEvent
 from app.db.models.users import User
+from app.db.models.website_events import WebsiteEvent
 
 __all__ = [
     "AdminAuditLog",
@@ -54,6 +61,8 @@ __all__ = [
     "ModeProgress",
     "OfferImpression",
     "OutboxEvent",
+    "PaymentEvent",
+    "PaymentReconciliationReview",
     "ProcessedUpdate",
     "PromoAttempt",
     "PromoAuditLog",
@@ -67,10 +76,13 @@ __all__ = [
     "ReconciliationRun",
     "Referral",
     "StreakState",
+    "TelegramUpdateInbox",
+    "TelegramDeliveryAttempt",
     "Tournament",
     "TournamentMatch",
     "TournamentParticipant",
     "TournamentRoundScore",
     "UserEvent",
     "User",
+    "WebsiteEvent",
 ]

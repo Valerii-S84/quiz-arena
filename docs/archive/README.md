@@ -9,7 +9,8 @@ Rules:
   - `README.md`
   - `README_BACKEND.md`
   - `docs/runbooks/`
-  - `AGENTS.md`
-  - `CODE_STYLE.md`
-  - `ENGINEERING_RULES.md`
-  - `REPO_STRUCTURE.md`
+  - `docs/architecture/current_runtime_map.md`
+  - `docs/database/schema_quick_map.md`
+  - `.agent/AGENTS.md`
+  - `.agent/core/`
+  - `.agent/project/`

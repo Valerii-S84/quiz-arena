@@ -190,6 +190,7 @@ async def test_submit_answer_records_non_daily_activity_and_advances_adaptive_mo
     assert result.current_streak == 7
     assert result.best_streak == 9
     assert result.next_preferred_level == "B1"
+    assert result.next_preferred_mix_step == 0
     assert result.selected_answer_text == "B"
     assert result.correct_answer_text == "B"
 

@@ -10,6 +10,7 @@ from app.db.models.entitlements import Entitlement
 from app.db.models.ledger_entries import LedgerEntry
 from app.db.repo.energy_repo import EnergyRepo
 from app.db.session import SessionLocal
+from app.economy.energy.constants import ENERGY_REGEN_INTERVAL_SEC
 from app.economy.energy.service import EnergyService
 from app.economy.energy.time import berlin_local_date
 from tests.integration.payments_idempotency_fixtures import UTC, _create_user
@@ -27,7 +28,7 @@ async def test_premium_bypass_does_not_change_free_or_paid_energy() -> None:
                 free_energy=4,
                 paid_energy=9,
                 free_cap=10,
-                regen_interval_sec=1800,
+                regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
                 last_regen_at=now_utc,
                 last_daily_topup_local_date=berlin_local_date(now_utc),
                 version=0,
@@ -87,7 +88,7 @@ async def test_non_premium_consume_decrements_paid_bucket_when_free_empty() -> N
                 free_energy=0,
                 paid_energy=3,
                 free_cap=10,
-                regen_interval_sec=1800,
+                regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
                 last_regen_at=now_utc,
                 last_daily_topup_local_date=berlin_local_date(now_utc),
                 version=0,

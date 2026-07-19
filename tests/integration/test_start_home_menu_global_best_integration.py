@@ -8,10 +8,12 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.bot.handlers import start
+from app.core.global_best_streak_cache import clear_global_best_streak_cache
 from app.db.models.energy_state import EnergyState
 from app.db.models.streak_state import StreakState
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
+from app.economy.energy.constants import ENERGY_REGEN_INTERVAL_SEC
 from tests.bot.helpers import DummyMessage
 from tests.integration.stable_ids import stable_telegram_user_id
 
@@ -52,7 +54,7 @@ async def _create_user_with_home_state(
                 free_energy=10,
                 paid_energy=0,
                 free_cap=10,
-                regen_interval_sec=1800,
+                regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
                 last_regen_at=now_utc,
                 last_daily_topup_local_date=_berlin_date(now_utc),
                 version=0,
@@ -81,6 +83,7 @@ async def _create_user_with_home_state(
 
 @pytest.mark.asyncio
 async def test_home_menu_shows_current_user_streak_and_global_best_streak(monkeypatch) -> None:
+    await clear_global_best_streak_cache()
     now_utc = datetime.now(timezone.utc)
     current_user_telegram_id = await _create_user_with_home_state(
         seed="home-current-user",

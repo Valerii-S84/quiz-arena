@@ -78,14 +78,16 @@ class _BotApiStub:
 
         if isinstance(method, SendMessage):
             chat_id = int(method.chat_id)
+            sent_message = self._build_message(chat_id=chat_id, text=method.text)
             self.sent_messages.append(
                 {
                     "chat_id": chat_id,
+                    "message_id": sent_message.message_id,
                     "text": method.text,
                     "reply_markup": method.reply_markup,
                 }
             )
-            return self._build_message(chat_id=chat_id, text=method.text)
+            return sent_message
 
         if isinstance(method, SendInvoice):
             total_amount = method.prices[0].amount if method.prices else 0

@@ -1,5 +1,9 @@
 # Documentation Audit (2026-03-02)
 
+> HISTORICAL SNAPSHOT. This audit records the repository classification on
+> 2026-03-02. It is not current documentation policy. Use the Documentation Map
+> and Documentation Hygiene sections in `README.md` for the current hierarchy.
+
 ## Scope
 
 Audit target:
@@ -14,7 +18,7 @@ Goal:
 - define archive/trash candidates,
 - list missing docs that should be added.
 
-## Current Source Of Truth (Keep)
+## Source Of Truth Recorded At Audit Time
 
 These files should stay canonical:
 

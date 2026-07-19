@@ -1,5 +1,9 @@
 # ENGINEERING_RULES.md
 
+> Compatibility document. Active engineering policy lives under `.agent/`, and
+> the actual merge gates are defined by `.github/workflows/ci.yml`, `Makefile`,
+> and `scripts/local_ci.sh`. This file is not an independent source of truth.
+
 ## Pre-commit Gate (Pflicht)
 
 Ein Merge ist nur erlaubt, wenn alle Checks grün sind.

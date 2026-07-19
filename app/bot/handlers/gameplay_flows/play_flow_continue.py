@@ -30,13 +30,14 @@ async def continue_regular_mode_after_answer_impl(
     callback: CallbackQuery,
     *,
     result: AnswerSessionResult,
+    user_id: int | None = None,
     now_utc: datetime,
     services: ContinueModeFlowServices,
 ) -> None:
     if callback.from_user is None or callback.message is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
-
+    del user_id
     outcome = await _resolve_continue_outcome(callback, result, now_utc, services)
     if outcome.handled:
         return
@@ -50,7 +51,6 @@ async def continue_regular_mode_after_answer_impl(
     if outcome.snapshot is None or outcome.next_result is None:
         await callback.answer(TEXTS_DE["msg.system.error"], show_alert=True)
         return
-
     await _send_next_question(callback, result, outcome.snapshot, outcome.next_result, services)
     await callback.answer()
 

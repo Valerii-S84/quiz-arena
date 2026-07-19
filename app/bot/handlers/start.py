@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from aiogram import F, Router
 from aiogram.filters import CommandStart
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from app.bot.handlers import start_flow
+from app.bot.handlers import start_flow, start_shop_flow
 from app.bot.handlers.start_helpers import (  # noqa: F401
     _notify_creator_about_join,
     _resolve_opponent_label,
@@ -31,15 +32,21 @@ router = Router(name="start")
 
 
 @router.message(CommandStart())
-async def handle_start(message: Message) -> None:
+async def handle_start(message: Message, state: FSMContext | None = None) -> None:
+    if state is not None:
+        await state.clear()
     await start_flow.handle_start_message(message)
 
 
 @router.callback_query(F.data == "shop:open")
-async def handle_shop_open(callback: CallbackQuery) -> None:
-    await start_flow.handle_shop_open(callback)
+async def handle_shop_open(callback: CallbackQuery, state: FSMContext | None = None) -> None:
+    if state is not None:
+        await state.clear()
+    await start_shop_flow.handle_shop_open(callback, state=state)
 
 
 @router.callback_query((F.data == "home:open") | (F.data == "menu:main"))
-async def handle_home_open(callback: CallbackQuery) -> None:
+async def handle_home_open(callback: CallbackQuery, state: FSMContext | None = None) -> None:
+    if state is not None:
+        await state.clear()
     await start_flow.handle_home_open(callback)

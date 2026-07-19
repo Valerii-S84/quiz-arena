@@ -16,7 +16,7 @@ def test_purchase_catalog_contains_core_micro_products() -> None:
         "FRIEND_CHALLENGE_5",
     }.issubset(PRODUCTS)
     assert PRODUCTS["FRIEND_CHALLENGE_5"].title == "Duell-Ticket"
-    assert PRODUCTS["FRIEND_CHALLENGE_5"].description == "Ein zusaetzliches Duell."
+    assert PRODUCTS["FRIEND_CHALLENGE_5"].description == "Ein zusätzliches Duell."
 
 
 def test_purchase_catalog_contains_core_premium_products() -> None:
@@ -27,6 +27,14 @@ def test_purchase_catalog_contains_core_premium_products() -> None:
         "PREMIUM_SEASON",
         "PREMIUM_YEAR",
     }.issubset(PRODUCTS)
+    assert PRODUCTS["PREMIUM_3_DAYS"].title == "Arena Pass 3 Tage"
+    assert PRODUCTS["PREMIUM_WEEK"].title == "Arena Pass 7 Tage"
+    assert PRODUCTS["PREMIUM_MONTH"].title == "Arena Pass 30 Tage"
+    assert PRODUCTS["PREMIUM_SEASON"].title == "Arena Pass Saison"
+    assert PRODUCTS["PREMIUM_YEAR"].title == "Arena Pass Jahr"
+    assert PRODUCTS["PREMIUM_WEEK"].description == (
+        "7 Tage ohne Duell-Limit. Mehr Revanchen. Mehr Arena-Chancen."
+    )
 
 
 def test_get_product_returns_none_for_unknown_code() -> None:
@@ -54,7 +62,7 @@ def test_all_catalog_products_are_available_for_sale() -> None:
 def test_premium_catalog_descriptions_explain_clear_benefits() -> None:
     assert PRODUCTS["PREMIUM_3_DAYS"].stars_amount == 0
     assert "Streak Freeze" in PRODUCTS["PREMIUM_3_DAYS"].description
-    assert "Streak Freeze" in PRODUCTS["PREMIUM_WEEK"].description
+    assert "Duell-Limit" in PRODUCTS["PREMIUM_WEEK"].description
     assert "ohne Pausen" in PRODUCTS["PREMIUM_MONTH"].description
     assert "spare Sterne" in PRODUCTS["PREMIUM_SEASON"].description
     assert "besten Sterne-Preis" in PRODUCTS["PREMIUM_YEAR"].description

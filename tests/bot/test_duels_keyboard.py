@@ -55,7 +55,7 @@ def test_duels_keyboards_do_not_offer_topic_level_or_format_selection() -> None:
         build_arena_revanche_confirm_keyboard(
             source_attempt_id="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
         ),
-        build_duel_paywall_keyboard(),
+        build_duel_paywall_keyboard(paywall_context="arena_limit"),
         build_friend_duel_keyboard(),
     ]
     labels = [button.text for keyboard in keyboards for button in _buttons(keyboard)]
@@ -113,16 +113,16 @@ def test_friend_duel_clean_entry_uses_single_default_create_callback() -> None:
 
 
 def test_duel_paywall_keyboard_sells_only_ticket_and_premium_week() -> None:
-    buttons = _buttons(build_duel_paywall_keyboard())
+    buttons = _buttons(build_duel_paywall_keyboard(paywall_context="arena_limit"))
 
     assert [button.text for button in buttons] == [
-        "🎟 Duell-Ticket – 5⭐",
-        "👑 Premium-Woche – 29⭐",
+        "🎟 Revanche-Ticket – 5⭐",
+        "💎 Arena Pass 7 Tage – 29⭐",
         "↩️ Später",
     ]
     assert [button.callback_data for button in buttons] == [
-        "buy:FRIEND_CHALLENGE_5:duel",
-        "buy:PREMIUM_WEEK:duel",
+        "buy:FRIEND_CHALLENGE_5:duel:arena_limit",
+        "buy:PREMIUM_WEEK:duel:arena_limit",
         "arena:list",
     ]
     assert "buy:PREMIUM_3_DAYS" not in [button.callback_data for button in buttons]
@@ -157,14 +157,14 @@ def test_arena_close_loss_keyboard_includes_revanche_paywall_and_arena() -> None
 
     assert [button.text for button in buttons] == [
         "🔁 Revanche",
-        "🎟 Duell-Ticket – 5⭐",
-        "👑 Premium-Woche – 29⭐",
+        "🎟 Revanche-Ticket – 5⭐",
+        "💎 Arena Pass 7 Tage – 29⭐",
         "🏟 Zur Arena",
     ]
     assert [button.callback_data for button in buttons] == [
         "arena:revanche:bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-        "buy:FRIEND_CHALLENGE_5:duel",
-        "buy:PREMIUM_WEEK:duel",
+        "buy:FRIEND_CHALLENGE_5:duel:close_loss",
+        "buy:PREMIUM_WEEK:duel:close_loss",
         "arena:list",
     ]
 

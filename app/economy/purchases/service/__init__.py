@@ -4,7 +4,11 @@ from app.db.repo.purchases_repo import PurchasesRepo
 
 from .builder import _as_init_result, _build_purchase
 from .constants import PREMIUM_PLAN_RANKS, PROMO_RESERVATION_TTL, STREAK_SAVER_PURCHASE_LOCK_WINDOW
-from .credit import apply_successful_payment, apply_zero_cost_purchase
+from .credit import (
+    apply_successful_payment,
+    credit_paid_purchase,
+    mark_successful_payment_paid_uncredited,
+)
 from .entitlements import _apply_premium_entitlement
 from .events import _emit_purchase_event
 from .init import init_purchase
@@ -21,6 +25,7 @@ from .validation import (
     _validate_reserved_discount_for_purchase,
     _validate_streak_saver_purchase_limit,
 )
+from .zero_cost import apply_zero_cost_purchase
 
 
 class PurchaseService:
@@ -40,10 +45,18 @@ class PurchaseService:
     )
     _apply_premium_entitlement = staticmethod(_apply_premium_entitlement)
     get_by_id = staticmethod(PurchasesRepo.get_by_id)
+    get_by_invoice_payload_for_update = staticmethod(
+        PurchasesRepo.get_by_invoice_payload_for_update
+    )
+    get_by_telegram_payment_charge_id_for_update = staticmethod(
+        PurchasesRepo.get_by_telegram_payment_charge_id_for_update
+    )
     init_purchase = staticmethod(init_purchase)
     mark_invoice_sent = staticmethod(mark_invoice_sent)
     validate_precheckout = staticmethod(validate_precheckout)
     apply_successful_payment = staticmethod(apply_successful_payment)
+    mark_successful_payment_paid_uncredited = staticmethod(mark_successful_payment_paid_uncredited)
+    credit_paid_purchase = staticmethod(credit_paid_purchase)
     apply_zero_cost_purchase = staticmethod(apply_zero_cost_purchase)
     refund_purchase = staticmethod(refund_purchase)
 

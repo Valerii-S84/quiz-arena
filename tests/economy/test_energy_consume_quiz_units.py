@@ -8,6 +8,7 @@ import pytest
 
 import app.economy.energy.energy_consume_quiz as energy_consume_quiz
 from app.db.models.ledger_entries import LedgerEntry
+from app.economy.energy.constants import ENERGY_REGEN_INTERVAL_SEC
 from app.economy.energy.types import EnergyBucketState
 from tests.type_helpers import AsyncSessionStub
 
@@ -33,7 +34,7 @@ def _energy_state(
         free_energy=free_energy,
         paid_energy=paid_energy,
         free_cap=10,
-        regen_interval_sec=1800,
+        regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
         last_regen_at=NOW_UTC,
         last_daily_topup_local_date=last_daily_topup_local_date or NOW_UTC.date(),
         version=0,
@@ -52,13 +53,8 @@ async def test_consume_quiz_debits_free_energy_and_emits_zero_event(
 
     monkeypatch.setattr(
         energy_consume_quiz,
-        "get_or_create_state_for_update",
-        _async_return(state),
-    )
-    monkeypatch.setattr(
-        energy_consume_quiz.EntitlementsRepo,
-        "has_active_premium",
-        _async_return(False),
+        "get_or_create_state_and_premium_status_for_update",
+        _state_and_premium(state, premium_active=False),
     )
     monkeypatch.setattr(
         energy_consume_quiz.LedgerRepo,
@@ -114,13 +110,8 @@ async def test_consume_quiz_does_not_daily_refill_before_debit(
 
     monkeypatch.setattr(
         energy_consume_quiz,
-        "get_or_create_state_for_update",
-        _async_return(state),
-    )
-    monkeypatch.setattr(
-        energy_consume_quiz.EntitlementsRepo,
-        "has_active_premium",
-        _async_return(False),
+        "get_or_create_state_and_premium_status_for_update",
+        _state_and_premium(state, premium_active=False),
     )
     monkeypatch.setattr(
         energy_consume_quiz.LedgerRepo,
@@ -156,13 +147,8 @@ async def test_consume_quiz_premium_bypass_does_not_write_ledger(
 
     monkeypatch.setattr(
         energy_consume_quiz,
-        "get_or_create_state_for_update",
-        _async_return(state),
-    )
-    monkeypatch.setattr(
-        energy_consume_quiz.EntitlementsRepo,
-        "has_active_premium",
-        _async_return(True),
+        "get_or_create_state_and_premium_status_for_update",
+        _state_and_premium(state, premium_active=True),
     )
     monkeypatch.setattr(
         energy_consume_quiz.LedgerRepo,
@@ -193,5 +179,12 @@ async def test_consume_quiz_premium_bypass_does_not_write_ledger(
 def _async_return(value):
     async def _inner(*_args, **_kwargs):
         return value
+
+    return _inner
+
+
+def _state_and_premium(state, *, premium_active: bool):
+    async def _inner(*_args, **_kwargs):
+        return state, premium_active
 
     return _inner

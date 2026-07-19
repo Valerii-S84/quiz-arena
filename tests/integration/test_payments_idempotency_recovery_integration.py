@@ -39,9 +39,9 @@ async def test_recovery_job_credits_stale_paid_uncredited_purchase() -> None:
                 invoice_payload="inv_recovery_success_1",
                 telegram_payment_charge_id="tg_charge_recovery_1",
                 raw_successful_payment={
-                    "invoice_payload": "inv_recovery_success_1",
                     "currency": "XTR",
                     "total_amount": 5,
+                    "raw_payload_stored": False,
                 },
                 created_at=now_utc - timedelta(minutes=15),
                 paid_at=now_utc - timedelta(minutes=10),

@@ -2,10 +2,16 @@
 
 Date: 2026-05-12
 
+Status: historical point-in-time baseline. Counts and "current" labels below
+refer only to 2026-05-12. For live enforcement use
+`scripts/check_architecture_debt.py` and `scripts/check_line_limits.sh`; the
+latest verified remediation snapshot is recorded in
+`.agent/project/TECH_DEBT_REMEDIATION_PLAN.md`.
+
 Scope: backend repository only. Frontend source, frontend CI, and frontend image
 publishing are owned by the standalone `quiz-arena-frontend` repository.
 
-## Current Counts
+## Snapshot Counts (2026-05-12)
 
 | Metric | Count |
 |---|---:|

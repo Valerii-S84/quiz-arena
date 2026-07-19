@@ -2,6 +2,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.keyboards import friend_challenge_share
 from app.bot.keyboards.duels_access import build_duel_monetization_rows
+from app.game.arena_duels.analytics import ArenaPaywallContext
 from app.game.duels import rollout as duel_rollout
 from app.game.duels.constants import (
     ARENA_LIST_CALLBACK,
@@ -132,10 +133,13 @@ def build_friend_challenge_finished_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def build_friend_challenge_limit_keyboard() -> InlineKeyboardMarkup:
+def build_friend_challenge_limit_keyboard(
+    *,
+    paywall_context: ArenaPaywallContext = "friend_create_limit",
+) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            *build_duel_monetization_rows(),
+            *build_duel_monetization_rows(paywall_context=paywall_context),
             [InlineKeyboardButton(text="↩️ Später", callback_data="home:open")],
         ]
     )

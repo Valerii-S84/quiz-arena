@@ -1,10 +1,24 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Sequence
+from typing import Protocol, Sequence, TypeVar
 
 from app.db.models.quiz_questions import QuizQuestion as QuizQuestionRecord
 from app.game.questions.runtime_bank_seed import stable_index
+
+
+class QuestionSelectionMetadata(Protocol):
+    @property
+    def question_id(self) -> str: ...
+
+    @property
+    def source_file(self) -> str: ...
+
+    @property
+    def category(self) -> str: ...
+
+
+_MetadataT = TypeVar("_MetadataT", bound=QuestionSelectionMetadata)
 
 
 def pick_from_pool(
@@ -44,10 +58,10 @@ def filter_active_records(
 
 def select_least_used_by_category(
     *,
-    candidate_records: Sequence[QuizQuestionRecord],
-    previous_records: Sequence[QuizQuestionRecord],
+    candidate_records: Sequence[_MetadataT],
+    previous_records: Sequence[QuestionSelectionMetadata],
     selection_seed: str,
-) -> QuizQuestionRecord | None:
+) -> _MetadataT | None:
     if not candidate_records:
         return None
 
@@ -66,10 +80,10 @@ def select_least_used_by_category(
 
 
 def _pick_record_by_seed(
-    records: Sequence[QuizQuestionRecord],
+    records: Sequence[_MetadataT],
     *,
     selection_seed: str,
-) -> QuizQuestionRecord | None:
+) -> _MetadataT | None:
     if not records:
         return None
     ordered = sorted(records, key=lambda record: record.question_id)
@@ -78,10 +92,10 @@ def _pick_record_by_seed(
 
 def select_diverse_record(
     *,
-    candidate_records: Sequence[QuizQuestionRecord],
-    previous_records: Sequence[QuizQuestionRecord],
+    candidate_records: Sequence[_MetadataT],
+    previous_records: Sequence[QuestionSelectionMetadata],
     selection_seed: str,
-) -> QuizQuestionRecord | None:
+) -> _MetadataT | None:
     if not candidate_records:
         return None
 

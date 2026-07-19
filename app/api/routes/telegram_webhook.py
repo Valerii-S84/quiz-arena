@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
+from app.services.payment_update_evidence import store_payment_update_evidence
 from app.services.telegram_updates import extract_update_id, is_valid_webhook_secret
 from app.workers.tasks.telegram_updates import process_telegram_update
 
@@ -84,6 +85,16 @@ async def telegram_webhook(request: Request) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content={"status": "ignored"},
+        )
+
+    evidence_stored = await store_payment_update_evidence(
+        update_payload=update_payload,
+        update_id=update_id,
+    )
+    if not evidence_stored:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "retry"},
         )
 
     enqueue_timeout_ms = max(

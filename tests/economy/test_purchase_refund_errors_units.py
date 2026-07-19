@@ -60,6 +60,40 @@ async def test_refund_purchase_rejects_non_refundable_status(
 
 
 @pytest.mark.asyncio
+async def test_refund_purchase_rejects_credit_pending_review_without_provider_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    purchase = refund_purchase_state(status="FAILED_CREDIT_PENDING_REVIEW")
+
+    async def _fake_get_by_id_for_update(_session, _purchase_id: UUID):
+        return purchase
+
+    async def _fail_get_purchase_credit_for_update(*_args, **_kwargs):
+        pytest.fail("generic review-pending refund must not inspect credit evidence")
+
+    monkeypatch.setattr(
+        purchase_refund.PurchasesRepo,
+        "get_by_id_for_update",
+        _fake_get_by_id_for_update,
+    )
+    monkeypatch.setattr(
+        purchase_refund.LedgerRepo,
+        "get_purchase_credit_for_update",
+        _fail_get_purchase_credit_for_update,
+    )
+
+    with pytest.raises(PurchaseRefundValidationError):
+        await purchase_refund.refund_purchase(
+            SessionStub(),
+            purchase_id=purchase.id,
+            now_utc=NOW,
+        )
+
+    assert purchase.status == "FAILED_CREDIT_PENDING_REVIEW"
+    assert purchase.refunded_at is None
+
+
+@pytest.mark.asyncio
 async def test_refund_purchase_rejects_missing_credit_entry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -93,18 +93,22 @@ Active agent rules and project context:
 
 Operational docs:
 - `docs/runbooks/`
-- `docs/architecture/`
-- `docs/database/`
-- `docs/analytics/`
+- `docs/architecture/current_runtime_map.md`
+- `docs/database/schema_quick_map.md`
+- `docs/analytics/events_catalog.md`
 - `docs/performance/`
 - `docs/metrics/`
 - `docs/operations/`
 
 Product/domain docs:
-- `PRODUCT/`
+- `PRODUCT/` (product intent and acceptance contracts; not runtime proof unless
+  a document explicitly marks an item as implemented)
 - `QuizBank/README.md`
 
-Reports and one-off artifacts:
+Historical snapshots, reports, and one-off artifacts:
+- `IMPLEMENTATION_ARCHITECTURE.md`
+- `docs/architecture/technical_debt_baseline.md`
+- `docs/documentation_audit_2026-03-02.md`
 - `reports/`
 - `docs/archive/`
 
@@ -113,5 +117,11 @@ Reports and one-off artifacts:
 - Canonical entrypoint is this file (`README.md`).
 - Active agent source-of-truth lives under `.agent/`; start with `.agent/AGENTS.md`, then follow `.agent/core/` and `.agent/project/`.
 - `README_BACKEND.md` is kept for compatibility and backend-focused bootstrap details.
-- Root `AGENTS.md`, `CODE_STYLE.md`, `ENGINEERING_RULES.md`, and `REPO_STRUCTURE.md` are legacy compatibility docs, not the active source-of-truth for current agent behavior.
+- Root `AGENTS.md`, `CODE_STYLE.md`, `ENGINEERING_RULES.md`, `REPO_STRUCTURE.md`,
+  and `IMPLEMENTATION_ARCHITECTURE.md` are compatibility or historical design
+  docs, not the active source-of-truth for current agent behavior or runtime topology.
+- Current runtime and schema claims must be verified against code, compose, and
+  migrations before updating `current_runtime_map.md` or `schema_quick_map.md`.
+- Dated audits and baselines are point-in-time evidence; their words such as
+  "current" apply only to the date recorded in the document.
 - Historical planning/handoff documents should be treated as archive material, not source-of-truth for current runtime behavior.

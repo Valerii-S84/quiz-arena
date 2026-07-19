@@ -2,11 +2,18 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.energy_state import EnergyState
+from app.db.models.entitlements import Entitlement
 from app.db.repo.energy_repo import EnergyRepo
-from app.economy.energy.constants import FREE_ENERGY_CAP, FREE_ENERGY_START
+from app.db.repo.entitlements_repo import EntitlementsRepo
+from app.economy.energy.constants import (
+    ENERGY_REGEN_INTERVAL_SEC,
+    FREE_ENERGY_CAP,
+    FREE_ENERGY_START,
+)
 from app.economy.energy.time import berlin_local_date
 from app.economy.energy.types import EnergySnapshot
 
@@ -51,7 +58,47 @@ async def get_or_create_state_for_update(
         local_date_berlin=berlin_local_date(now_utc),
         free_energy_start=FREE_ENERGY_START,
         free_energy_cap=FREE_ENERGY_CAP,
+        regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
     )
+
+
+async def get_or_create_state_and_premium_status_for_update(
+    session: AsyncSession,
+    user_id: int,
+    now_utc: datetime,
+) -> tuple[EnergyState, bool]:
+    stmt = (
+        select(EnergyState, Entitlement.id)
+        .outerjoin(
+            Entitlement,
+            and_(
+                Entitlement.user_id == EnergyState.user_id,
+                Entitlement.entitlement_type == "PREMIUM",
+                Entitlement.status == "ACTIVE",
+                Entitlement.starts_at <= now_utc,
+                or_(Entitlement.ends_at.is_(None), Entitlement.ends_at > now_utc),
+            ),
+        )
+        .where(EnergyState.user_id == user_id)
+        .with_for_update(of=EnergyState)
+    )
+    result = await session.execute(stmt)
+    row = result.one_or_none()
+    if row is not None:
+        state, entitlement_id = row
+        return state, entitlement_id is not None
+
+    state = await EnergyRepo.create_default_state(
+        session,
+        user_id=user_id,
+        now_utc=now_utc,
+        local_date_berlin=berlin_local_date(now_utc),
+        free_energy_start=FREE_ENERGY_START,
+        free_energy_cap=FREE_ENERGY_CAP,
+        regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
+    )
+    premium_active = await EntitlementsRepo.has_active_premium(session, user_id, now_utc)
+    return state, premium_active
 
 
 async def initialize_user_state(
@@ -64,4 +111,5 @@ async def initialize_user_state(
         local_date_berlin=berlin_local_date(now_utc),
         free_energy_start=FREE_ENERGY_START,
         free_energy_cap=FREE_ENERGY_CAP,
+        regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
     )

@@ -51,6 +51,7 @@ def _answer_result() -> AnswerSessionResult:
         mode_code="QUICK_MIX_A1A2",
         source="MENU",
         next_preferred_level="A2",
+        next_preferred_mix_step=1,
     )
 
 
@@ -81,6 +82,44 @@ async def test_continue_regular_mode_after_answer_sends_next_question() -> None:
 
     assert callback.message.answers[0].text == "next-question"
     assert callback.message.answers[0].kwargs["parse_mode"] == "HTML"
+    assert callback.answer_calls == [{"text": None, "show_alert": False}]
+
+
+@pytest.mark.asyncio
+async def test_continue_regular_mode_after_answer_uses_home_snapshot_for_continue() -> None:
+    captured: dict[str, object] = {}
+
+    async def _ensure_home_snapshot(session, *, telegram_user):
+        captured["snapshot"] = (session, telegram_user.id)
+        return _snapshot()
+
+    async def _start_session(*args, **kwargs):
+        del args
+        captured.update(kwargs)
+        return _start_result()
+
+    callback = _callback()
+
+    await play_flow.continue_regular_mode_after_answer(
+        callback,
+        result=_answer_result(),
+        now_utc=datetime(2026, 3, 13, 12, 0, tzinfo=UTC),
+        session_local=_SessionLocal("db-session"),
+        user_onboarding_service=SimpleNamespace(ensure_home_snapshot=_ensure_home_snapshot),
+        game_session_service=SimpleNamespace(start_session=_start_session),
+        offer_service=SimpleNamespace(),
+        offer_logging_error=RuntimeError,
+        channel_bonus_service=SimpleNamespace(),
+        build_question_text=lambda **kwargs: (
+            f"energy={kwargs['snapshot_free_energy']}+{kwargs['snapshot_paid_energy']}"
+        ),
+    )
+
+    assert captured["snapshot"] == ("db-session", 101)
+    assert captured["user_id"] == 101
+    assert captured["preferred_question_level"] == "A2"
+    assert "preferred_question_mix_step" not in captured
+    assert callback.message.answers[0].text == "energy=18+2"
     assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 

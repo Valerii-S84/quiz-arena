@@ -4,11 +4,13 @@ from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
+from aiogram.types import RefundedPayment
 
 from app.bot.handlers import payments
 from app.bot.texts.de import TEXTS_DE
 from app.economy.purchases.errors import (
     PurchaseInitValidationError,
+    PurchaseNotFoundError,
     PurchasePrecheckoutValidationError,
 )
 from app.economy.purchases.types import PurchaseCreditResult, PurchaseInitResult
@@ -33,6 +35,8 @@ class _SuccessfulPayment:
     def __init__(self) -> None:
         self.invoice_payload = "inv-1"
         self.telegram_payment_charge_id = "charge-1"
+        self.currency = "XTR"
+        self.total_amount = 29
 
     def model_dump(self, exclude_none: bool = True) -> dict[str, object]:
         assert exclude_none is True
@@ -42,6 +46,20 @@ class _SuccessfulPayment:
             "currency": "XTR",
             "total_amount": 29,
         }
+
+
+def _refunded_payment(
+    *,
+    invoice_payload: str = "inv-1",
+    currency: str = "XTR",
+    total_amount: int = 29,
+) -> RefundedPayment:
+    return RefundedPayment.model_construct(
+        currency=currency,
+        total_amount=total_amount,
+        invoice_payload=invoice_payload,
+        telegram_payment_charge_id="charge-1",
+    )
 
 
 class _PaymentMessage(DummyMessage):
@@ -54,6 +72,30 @@ class _PaymentMessage(DummyMessage):
         super().__init__()
         self.from_user = from_user
         self.successful_payment = successful_payment
+
+
+class _RefundedPaymentMessage(DummyMessage):
+    def __init__(
+        self,
+        *,
+        from_user: SimpleNamespace | None,
+        refunded_payment: RefundedPayment | None,
+    ) -> None:
+        super().__init__()
+        self.from_user = from_user
+        self.refunded_payment = refunded_payment
+
+
+class _Logger:
+    def __init__(self) -> None:
+        self.infos: list[tuple[str, dict[str, object]]] = []
+        self.warnings: list[tuple[str, dict[str, object]]] = []
+
+    def info(self, event: str, **payload: object) -> None:
+        self.infos.append((event, payload))
+
+    def warning(self, event: str, **payload: object) -> None:
+        self.warnings.append((event, payload))
 
 
 @pytest.mark.asyncio
@@ -192,11 +234,6 @@ async def test_handle_precheckout_passes_query_id_to_runtime(monkeypatch) -> Non
 
 @pytest.mark.asyncio
 async def test_handle_successful_payment_sends_success_text(monkeypatch) -> None:
-    monkeypatch.setattr(payments, "SessionLocal", DummySessionLocal())
-
-    async def _fake_home_snapshot(session, *, telegram_user):
-        return SimpleNamespace(user_id=77)
-
     async def _fake_apply_payment(*args, **kwargs):
         return PurchaseCreditResult(
             purchase_id=UUID("123e4567-e89b-12d3-a456-426614174000"),
@@ -205,12 +242,7 @@ async def test_handle_successful_payment_sends_success_text(monkeypatch) -> None
             idempotent_replay=False,
         )
 
-    async def _fake_get_by_id(*args, **kwargs):
-        return None
-
-    monkeypatch.setattr(payments.UserOnboardingService, "ensure_home_snapshot", _fake_home_snapshot)
-    monkeypatch.setattr(payments.PurchaseService, "apply_successful_payment", _fake_apply_payment)
-    monkeypatch.setattr(payments.PurchaseService, "get_by_id", _fake_get_by_id)
+    monkeypatch.setattr(payments, "apply_successful_payment", _fake_apply_payment)
 
     message = _PaymentMessage(
         from_user=SimpleNamespace(id=1), successful_payment=_SuccessfulPayment()
@@ -218,6 +250,41 @@ async def test_handle_successful_payment_sends_success_text(monkeypatch) -> None
     await payments.handle_successful_payment(message)  # type: ignore[arg-type]
 
     assert message.answers[0].text == TEXTS_DE["msg.purchase.success.premium"]
+
+
+@pytest.mark.asyncio
+async def test_handle_successful_payment_logs_received_update_without_raw_payload(
+    monkeypatch,
+) -> None:
+    logger = _Logger()
+    monkeypatch.setattr(payments, "logger", logger)
+
+    async def _fake_apply_payment(*args, **kwargs):
+        return PurchaseCreditResult(
+            purchase_id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+            product_code="PREMIUM_WEEK",
+            status="CREDITED",
+            idempotent_replay=False,
+        )
+
+    monkeypatch.setattr(payments, "apply_successful_payment", _fake_apply_payment)
+
+    payment = _SuccessfulPayment()
+    payment.invoice_payload = "invoice-raw-value"
+    message = _PaymentMessage(from_user=SimpleNamespace(id=1), successful_payment=payment)
+
+    await payments.handle_successful_payment(message)  # type: ignore[arg-type]
+
+    assert logger.infos[0][0] == "payment_successful_update_received"
+    assert logger.infos[0][1]["invoice_payload_hash"] != payment.invoice_payload
+    assert (
+        logger.infos[0][1]["telegram_payment_charge_id_hash"] != payment.telegram_payment_charge_id
+    )
+    assert "invoice_payload" not in logger.infos[0][1]
+    assert "telegram_payment_charge_id" not in logger.infos[0][1]
+    assert payment.invoice_payload not in str(logger.infos)
+    assert payment.telegram_payment_charge_id not in str(logger.infos)
+    assert "token" not in str(logger.infos).lower()
 
 
 @pytest.mark.asyncio
@@ -229,11 +296,99 @@ async def test_handle_successful_payment_sends_failure_text_for_validation_error
     async def _fake_apply_payment(*args, **kwargs):
         raise PurchasePrecheckoutValidationError()
 
+    logger = _Logger()
+    monkeypatch.setattr(payments, "logger", logger)
     monkeypatch.setattr(payments, "apply_successful_payment", _fake_apply_payment)
 
-    message = _PaymentMessage(
-        from_user=SimpleNamespace(id=1), successful_payment=_SuccessfulPayment()
-    )
+    payment = _SuccessfulPayment()
+    message = _PaymentMessage(from_user=SimpleNamespace(id=1), successful_payment=payment)
     await payments.handle_successful_payment(message)  # type: ignore[arg-type]
 
     assert message.answers[0].text == TEXTS_DE["msg.purchase.error.failed"]
+    assert logger.warnings[0][0] == "payment_credit_failed"
+    assert (
+        logger.warnings[0][1]["telegram_payment_charge_id_hash"]
+        != payment.telegram_payment_charge_id
+    )
+    assert "telegram_payment_charge_id" not in logger.warnings[0][1]
+    assert payment.telegram_payment_charge_id not in str(logger.warnings)
+
+
+@pytest.mark.asyncio
+async def test_handle_refunded_payment_applies_refund_update(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    async def _fake_refund_payment_update(*, telegram_user, refunded_payment, now_utc):
+        calls.append(
+            {
+                "telegram_user_id": telegram_user.id,
+                "refunded_payment": refunded_payment,
+                "now_utc": now_utc,
+            }
+        )
+
+    monkeypatch.setattr(payments, "refund_payment_update", _fake_refund_payment_update)
+
+    refund = _refunded_payment()
+    message = _RefundedPaymentMessage(from_user=SimpleNamespace(id=1), refunded_payment=refund)
+    await payments.handle_refunded_payment(message)  # type: ignore[arg-type]
+
+    assert calls[0]["telegram_user_id"] == 1
+    assert calls[0]["refunded_payment"] is refund
+    assert message.answers == []
+
+
+@pytest.mark.asyncio
+async def test_handle_refunded_payment_logs_received_update_without_raw_payload(
+    monkeypatch,
+) -> None:
+    logger = _Logger()
+    monkeypatch.setattr(payments, "logger", logger)
+
+    async def _fake_refund_payment_update(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(payments, "refund_payment_update", _fake_refund_payment_update)
+
+    refund = _refunded_payment(invoice_payload="invoice-raw-value")
+    message = _RefundedPaymentMessage(from_user=SimpleNamespace(id=1), refunded_payment=refund)
+
+    await payments.handle_refunded_payment(message)  # type: ignore[arg-type]
+
+    assert logger.infos[0][0] == "payment_refunded_update_received"
+    assert logger.infos[0][1]["invoice_payload_hash"] != refund.invoice_payload
+    assert (
+        logger.infos[0][1]["telegram_payment_charge_id_hash"] != refund.telegram_payment_charge_id
+    )
+    assert "invoice_payload" not in logger.infos[0][1]
+    assert "telegram_payment_charge_id" not in logger.infos[0][1]
+    assert refund.invoice_payload not in str(logger.infos)
+    assert refund.telegram_payment_charge_id not in str(logger.infos)
+    assert "token" not in str(logger.infos).lower()
+
+
+@pytest.mark.asyncio
+async def test_handle_refunded_payment_reraises_missing_purchase_for_worker_retry(
+    monkeypatch,
+) -> None:
+    async def _fake_refund_payment_update(*args, **kwargs):
+        raise PurchaseNotFoundError()
+
+    logger = _Logger()
+    monkeypatch.setattr(payments, "logger", logger)
+    monkeypatch.setattr(payments, "refund_payment_update", _fake_refund_payment_update)
+
+    refund = _refunded_payment()
+    message = _RefundedPaymentMessage(from_user=SimpleNamespace(id=1), refunded_payment=refund)
+
+    with pytest.raises(PurchaseNotFoundError):
+        await payments.handle_refunded_payment(message)  # type: ignore[arg-type]
+
+    assert message.answers == []
+    assert logger.warnings[0][0] == "payment_refund_update_failed"
+    assert (
+        logger.warnings[0][1]["telegram_payment_charge_id_hash"]
+        != refund.telegram_payment_charge_id
+    )
+    assert "telegram_payment_charge_id" not in logger.warnings[0][1]
+    assert refund.telegram_payment_charge_id not in str(logger.warnings)

@@ -9,6 +9,7 @@ from app.db.models.energy_state import EnergyState
 from app.db.models.entitlements import Entitlement
 from app.db.models.ledger_entries import LedgerEntry
 from app.db.session import SessionLocal
+from app.economy.energy.constants import ENERGY_REGEN_INTERVAL_SEC
 from app.economy.energy.service import EnergyService
 from tests.integration.payments_idempotency_fixtures import UTC, _create_user
 
@@ -25,7 +26,7 @@ async def test_premium_consume_does_not_mutate_wallet_or_create_ledger() -> None
                 free_energy=1,
                 paid_energy=3,
                 free_cap=10,
-                regen_interval_sec=1800,
+                regen_interval_sec=ENERGY_REGEN_INTERVAL_SEC,
                 last_regen_at=now_utc - timedelta(hours=6),
                 last_daily_topup_local_date=date(2026, 2, 17),
                 version=0,

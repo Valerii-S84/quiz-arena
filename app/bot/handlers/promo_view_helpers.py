@@ -28,7 +28,7 @@ def resolve_scope_label(target_scope: str | None, *, applicable_products: list[s
     if target_scope == "MICRO_ANY":
         return "Mikro-Pakete"
     if target_scope == "PREMIUM_ANY":
-        return "Premium-Plaene"
+        return "Arena Pass Pläne"
     product_label = get_promo_product_label(target_scope)
     if product_label is not None:
         return product_label

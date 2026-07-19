@@ -27,7 +27,9 @@ from app.db.models import (  # noqa: F401
     ReconciliationRun,
     Referral,
     StreakState,
+    TelegramDeliveryAttempt,
     User,
+    WebsiteEvent,
 )
 from app.db.models.base import Base
 
@@ -59,6 +61,8 @@ def test_all_m2_tables_registered() -> None:
         "daily_question_sets",
         "reconciliation_runs",
         "promo_code_batches",
+        "website_events",
+        "telegram_delivery_attempts",
     }
     assert expected_tables.issubset(set(Base.metadata.tables))
 
@@ -165,6 +169,57 @@ def test_critical_constraints_present() -> None:
     analytics_events_indexes = {index.name for index in analytics_events.indexes}
     assert "idx_analytics_events_created_at" in analytics_events_indexes
 
+    website_events = Base.metadata.tables["website_events"]
+    website_events_indexes = {index.name for index in website_events.indexes}
+    assert "idx_website_events_created_at" in website_events_indexes
+    assert "idx_website_events_local_date_type" in website_events_indexes
+    assert "idx_website_events_visitor_date" in website_events_indexes
+    assert "idx_website_events_path_date" in website_events_indexes
+
     quiz_questions = Base.metadata.tables["quiz_questions"]
     quiz_questions_indexes = {index.name for index in quiz_questions.indexes}
     assert "idx_quiz_questions_updated_at" in quiz_questions_indexes
+
+    telegram_delivery_attempts = Base.metadata.tables["telegram_delivery_attempts"]
+    telegram_delivery_check_names = {
+        constraint.name
+        for constraint in telegram_delivery_attempts.constraints
+        if isinstance(constraint, CheckConstraint)
+    }
+    assert "ck_telegram_delivery_attempts_status" in telegram_delivery_check_names
+    telegram_delivery_indexes = {index.name for index in telegram_delivery_attempts.indexes}
+    assert "idx_telegram_delivery_flow_correlation" in telegram_delivery_indexes
+    assert "idx_telegram_delivery_target" in telegram_delivery_indexes
+    assert "idx_telegram_delivery_blocked_candidate" in telegram_delivery_indexes
+    assert "idx_telegram_delivery_pending_claim" in telegram_delivery_indexes
+    blocked_candidate_index = next(
+        index
+        for index in telegram_delivery_attempts.indexes
+        if str(index.name) == "idx_telegram_delivery_blocked_candidate"
+    )
+    assert [str(column.name) for column in blocked_candidate_index.columns] == [
+        "status",
+        "is_blocked_candidate",
+        "failed_at",
+        "id",
+    ]
+    pending_claim_index = next(
+        index
+        for index in telegram_delivery_attempts.indexes
+        if str(index.name) == "idx_telegram_delivery_pending_claim"
+    )
+    assert [str(column.name) for column in pending_claim_index.columns] == [
+        "flow",
+        "created_at",
+        "id",
+        "attempt_count",
+        "updated_at",
+    ]
+    pending_claim_where = pending_claim_index.dialect_options["postgresql"]["where"]
+    assert str(pending_claim_where) == "status = 'PENDING'"
+    telegram_delivery_unique_constraints = {
+        constraint.name
+        for constraint in telegram_delivery_attempts.constraints
+        if isinstance(constraint, UniqueConstraint)
+    }
+    assert "uq_telegram_delivery_attempts_idempotency_key" in telegram_delivery_unique_constraints

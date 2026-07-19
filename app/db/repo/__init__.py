@@ -17,6 +17,9 @@ from app.db.repo.quiz_sessions_repo import QuizSessionsRepo
 from app.db.repo.reconciliation_runs_repo import ReconciliationRunsRepo
 from app.db.repo.referrals_repo import ReferralsRepo
 from app.db.repo.streak_repo import StreakRepo
+from app.db.repo.telegram_blocked_candidates_repo import TelegramBlockedCandidatesRepo
+from app.db.repo.telegram_delivery_attempts_repo import TelegramDeliveryAttemptsRepo
+from app.db.repo.telegram_delivery_retry_repo import TelegramDeliveryRetryRepo
 from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
@@ -42,6 +45,9 @@ __all__ = [
     "ReconciliationRunsRepo",
     "ReferralsRepo",
     "StreakRepo",
+    "TelegramBlockedCandidatesRepo",
+    "TelegramDeliveryAttemptsRepo",
+    "TelegramDeliveryRetryRepo",
     "TournamentMatchesRepo",
     "TournamentParticipantsRepo",
     "TournamentsRepo",

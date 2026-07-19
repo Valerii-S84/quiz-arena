@@ -13,6 +13,10 @@ class RuntimeSettingsMixin:
         default=300,
         alias="QUIZ_QUESTION_POOL_CACHE_TTL_SECONDS",
     )
+    global_best_streak_cache_ttl_seconds: int = Field(
+        default=300,
+        alias="GLOBAL_BEST_STREAK_CACHE_TTL_SECONDS",
+    )
     telegram_updates_alert_window_minutes: int = Field(
         default=15,
         alias="TELEGRAM_UPDATES_ALERT_WINDOW_MINUTES",
@@ -69,6 +73,14 @@ class RuntimeSettingsMixin:
     retention_cleanup_schedule_minute_berlin: int = Field(
         default=15,
         alias="RETENTION_CLEANUP_SCHEDULE_MINUTE_BERLIN",
+    )
+    website_analytics_visitor_salt: str = Field(
+        default="",
+        alias="WEBSITE_ANALYTICS_VISITOR_SALT",
+    )
+    website_analytics_rate_limit_per_minute: int = Field(
+        default=180,
+        alias="WEBSITE_ANALYTICS_RATE_LIMIT_PER_MINUTE",
     )
     internal_api_token: str = Field(alias="INTERNAL_API_TOKEN")
     internal_api_allowlist: str = Field(

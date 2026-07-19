@@ -29,7 +29,8 @@ async def start_mode_impl(
     now_utc = datetime.now(timezone.utc)
     async with services.session_local.begin() as session:
         snapshot = await services.user_onboarding_service.ensure_home_snapshot(
-            session, telegram_user=callback.from_user
+            session,
+            telegram_user=callback.from_user,
         )
         try:
             result = await services.game_session_service.start_session(

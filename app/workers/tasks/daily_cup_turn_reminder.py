@@ -148,6 +148,7 @@ async def run_daily_cup_turn_reminders_async(
         build_keyboard=build_daily_cup_lobby_keyboard,
         build_text=_build_turn_reminder_text,
         logger=logger,
+        session_local=SessionLocal,
     )
     sent_total = delivery_result.sent_total
     failed_total = delivery_result.failed_total

@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.db.repo.production_reliability_types import TelegramDeliveryAttemptCreate
 from app.workers.tasks import daily_cup_registration_push as push
 from tests.game.tournaments_unit_support import NOW_UTC
 from tests.workers.payments_reliability_async_support import SessionLocalStub
@@ -15,7 +16,19 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     bot = _Bot([])
+    attempts: list[TelegramDeliveryAttemptCreate] = []
+    delivery_kwargs: list[dict[str, object]] = []
+
+    async def _deliver_once(
+        _session_local, *, attempt: TelegramDeliveryAttemptCreate, send, **_kwargs
+    ):
+        attempts.append(attempt)
+        delivery_kwargs.append(_kwargs)
+        await send()
+        return SimpleNamespace(status="SENT", attempted=True)
+
     monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push, "deliver_telegram_once", _deliver_once)
     monkeypatch.setattr(
         push.AnalyticsRepo,
         "create_daily_cup_push_event_once",
@@ -25,52 +38,94 @@ async def test_send_daily_cup_registration_push_once_claims_and_sends(
     assert await push._send_daily_cup_registration_push_once(
         bot=bot,
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
-        user_id=11,
-        telegram_user_id=101,
-        text="text",
-        tournament_id_text="tid",
-        happened_at=NOW_UTC,
-        sent_event_type="sent",
+        item=_push_item(),
     )
     assert bot.sent == [101]
+    assert attempts[0].idempotency_key == "daily_cup:sent:tid:11"
+    assert delivery_kwargs[0]["allow_stale_pending_replay_send"] is True
+    assert delivery_kwargs[0]["retry_claim_ttl_seconds"] == 300
 
 
 @pytest.mark.asyncio
-async def test_send_daily_cup_registration_push_once_skips_unclaimed_or_failed_send(
+async def test_send_daily_cup_registration_push_once_repairs_sent_replay_without_counting_sent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    bot = _Bot([])
+    stored_events: list[str] = []
+
+    async def _sent_replay(*_args, **_kwargs):
+        return SimpleNamespace(status="SENT", attempted=False)
+
+    async def _store_event_once(_session, **kwargs) -> bool:
+        stored_events.append(str(kwargs["event_type"]))
+        return True
+
     monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push, "deliver_telegram_once", _sent_replay)
     monkeypatch.setattr(
         push.AnalyticsRepo,
         "create_daily_cup_push_event_once",
-        _async_return(False),
+        _store_event_once,
     )
+
+    assert not await push._send_daily_cup_registration_push_once(
+        bot=bot,
+        logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+        item=_push_item(),
+    )
+    assert bot.sent == []
+    assert stored_events == ["sent"]
+
+
+@pytest.mark.asyncio
+async def test_send_daily_cup_registration_push_once_skips_failed_delivery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _failed_delivery(*_args, **_kwargs):
+        return SimpleNamespace(status="FAILED")
+
+    monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push, "deliver_telegram_once", _failed_delivery)
     assert not await push._send_daily_cup_registration_push_once(
         bot=_Bot([]),
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
-        user_id=11,
-        telegram_user_id=101,
-        text="text",
-        tournament_id_text="tid",
-        happened_at=NOW_UTC,
-        sent_event_type="sent",
+        item=_push_item(),
     )
 
-    monkeypatch.setattr(
-        push.AnalyticsRepo,
-        "create_daily_cup_push_event_once",
-        _async_return(True),
-    )
+
+@pytest.mark.asyncio
+async def test_send_daily_cup_registration_push_once_handles_unclassified_send_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _deliver_once(_session_local, *, send, **_kwargs):
+        await send()
+        return SimpleNamespace(status="SENT", attempted=True)
+
+    monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push, "deliver_telegram_once", _deliver_once)
     assert not await push._send_daily_cup_registration_push_once(
         bot=_Bot([RuntimeError("send failed")]),
         logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
-        user_id=11,
-        telegram_user_id=101,
-        text="text",
-        tournament_id_text="tid",
-        happened_at=NOW_UTC,
-        sent_event_type="sent",
+        item=_push_item(),
     )
+
+
+@pytest.mark.asyncio
+async def test_send_daily_cup_registration_push_once_propagates_delivery_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _delivery_failure(*_args, **_kwargs):
+        raise RuntimeError("db unavailable")
+
+    monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(push, "deliver_telegram_once", _delivery_failure)
+
+    with pytest.raises(RuntimeError, match="db unavailable"):
+        await push._send_daily_cup_registration_push_once(
+            bot=_Bot([]),
+            logger=SimpleNamespace(warning=lambda *_args, **_kwargs: None),
+            item=_push_item(),
+        )
 
 
 @pytest.mark.asyncio
@@ -92,7 +147,7 @@ async def test_send_daily_cup_registration_push_async_counts_targets(
         return []
 
     async def _send_once(**kwargs) -> bool:
-        return kwargs["user_id"] == 22
+        return kwargs["item"].user_id == 22
 
     monkeypatch.setattr(push, "SessionLocal", SessionLocalStub())
     monkeypatch.setattr(push, "ensure_daily_cup_registration_tournament", _async_return(tournament))
@@ -158,3 +213,14 @@ def _async_return(value: object):
         return value
 
     return _inner
+
+
+def _push_item() -> push._RegistrationPushItem:
+    return push._RegistrationPushItem(
+        user_id=11,
+        telegram_user_id=101,
+        text="text",
+        tournament_id_text="tid",
+        happened_at=NOW_UTC,
+        sent_event_type="sent",
+    )

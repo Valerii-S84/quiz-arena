@@ -21,7 +21,11 @@ async def reserve_post_game_prompt(
     if user.referral_prompt_shown_at is not None:
         return False
 
-    completed_sessions = await QuizSessionsRepo.count_completed_for_user(session, user_id=user_id)
+    completed_sessions = await QuizSessionsRepo.count_completed_for_user(
+        session,
+        user_id=user_id,
+        cap=3,
+    )
     if completed_sessions not in {1, 2}:
         return False
 

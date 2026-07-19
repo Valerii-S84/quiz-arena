@@ -183,6 +183,14 @@ async def test_handle_friend_challenge_rematch_shows_limit_keyboard_on_payment_r
     )
 
     assert callback.message.answers[0].text == TEXTS_DE["msg.friend.challenge.limit.reached"]
+    callbacks = [
+        button.callback_data
+        for row in callback.message.answers[0].kwargs["reply_markup"].inline_keyboard
+        for button in row
+        if button.callback_data
+    ]
+    assert "buy:FRIEND_CHALLENGE_5:duel:friend_rematch_limit" in callbacks
+    assert "buy:PREMIUM_WEEK:duel:friend_rematch_limit" in callbacks
     assert callback.answer_calls == [{"text": None, "show_alert": False}]
 
 

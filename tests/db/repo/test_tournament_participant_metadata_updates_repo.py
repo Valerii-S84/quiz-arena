@@ -33,6 +33,21 @@ async def test_participant_metadata_updates_reuse_scoped_update_helper() -> None
     )
     assert "standings_message_id=777" in compile_statement(message_session.statement)
 
+    fenced_message_session = RecordingSession(_ScalarResult(10))
+    await Repo.compare_and_set_standings_message_id(
+        fenced_message_session,
+        tournament_id=tournament_id,
+        user_id=10,
+        expected_message_id=777,
+        message_id=888,
+        expected_status="ROUND_2",
+        expected_round=2,
+    )
+    fenced_message_sql = compile_statement(fenced_message_session.statement)
+    assert "tournament_participants.standings_message_id = 777" in fenced_message_sql
+    assert "tournaments.status = 'ROUND_2'" in fenced_message_sql
+    assert "tournaments.current_round = 2" in fenced_message_sql
+
     proof_session = RecordingSession(_ScalarResult(10))
     await Repo.set_proof_card_file_id_if_missing(
         proof_session,

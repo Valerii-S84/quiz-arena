@@ -1,5 +1,10 @@
 # DATA SCHEMA
 
+> HISTORICAL CONCEPTUAL PRODUCT SCHEMA. This document describes product intent,
+> not the live PostgreSQL schema. Current implemented tables are mapped in
+> `docs/database/schema_quick_map.md` and defined by `app/db/models/` plus
+> `alembic/versions/`.
+
 ## Deutsch ist einfach! — Quiz Arena
 
 **Sprache:** Deutsch (Dokumentation) — STRICT

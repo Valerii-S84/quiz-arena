@@ -118,6 +118,32 @@ async def test_send_ops_alert_routes_critical_event_to_pagerduty_and_slack(
 
 
 @pytest.mark.asyncio
+async def test_send_ops_alert_routes_payment_invariant_alerts_as_critical(
+    monkeypatch,
+) -> None:
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        alerts,
+        "get_settings",
+        lambda: _settings(
+            ops_alert_slack_webhook_url="https://slack.example.local/hook",
+            ops_alert_pagerduty_routing_key="pd_key",
+        ),
+    )
+    _patch_http_client(monkeypatch, calls)
+
+    sent = await alerts.send_ops_alert(
+        event="payments_precheckout_stuck_detected",
+        payload={"precheckout_stuck": 1},
+    )
+
+    assert sent is True
+    assert calls[0]["json"]["payload"]["severity"] == "critical"
+    assert calls[0]["json"]["payload"]["group"] == "ops_l1"
+    assert "CRITICAL" in calls[1]["json"]["text"]
+
+
+@pytest.mark.asyncio
 async def test_send_ops_alert_applies_policy_override(monkeypatch) -> None:
     calls: list[dict[str, Any]] = []
     monkeypatch.setattr(

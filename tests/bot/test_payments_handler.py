@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 
+from app.bot.handlers import payments_duel_paywall
 from app.bot.handlers.payments import (
     _build_purchase_idempotency_key,
+    _duel_paywall_context_from_callback,
     _extract_offer_impression_id_from_purchase_idempotency_key,
     _is_duel_paywall_callback,
     _parse_buy_callback_data,
 )
+from app.game.arena_duels.analytics import ARENA_EVENT_PREMIUM_WEEK_CLICKED
 
 
 def test_parse_buy_callback_without_optional_payload() -> None:
@@ -22,7 +27,7 @@ def test_parse_buy_callback_without_optional_payload() -> None:
 
 def test_parse_buy_callback_with_duel_context_payload() -> None:
     product_code, promo_redemption_id, offer_impression_id = _parse_buy_callback_data(
-        "buy:PREMIUM_WEEK:duel"
+        "buy:PREMIUM_WEEK:duel:close_loss"
     )
 
     assert product_code == "PREMIUM_WEEK"
@@ -56,13 +61,65 @@ def test_parse_buy_callback_raises_for_invalid_payload() -> None:
 
 
 def test_duel_paywall_callback_context_is_explicit() -> None:
+    assert _is_duel_paywall_callback(
+        "buy:PREMIUM_WEEK:duel:close_loss",
+        product_code="PREMIUM_WEEK",
+    )
     assert _is_duel_paywall_callback("buy:PREMIUM_WEEK:duel", product_code="PREMIUM_WEEK")
     assert not _is_duel_paywall_callback("buy:PREMIUM_WEEK", product_code="PREMIUM_WEEK")
     assert not _is_duel_paywall_callback(
         "buy:PREMIUM_WEEK:offer:42",
         product_code="PREMIUM_WEEK",
     )
+    assert not _is_duel_paywall_callback(
+        "buy:PREMIUM_WEEK:duel:unknown_context",
+        product_code="PREMIUM_WEEK",
+    )
     assert not _is_duel_paywall_callback("buy:ENERGY_10:duel", product_code="ENERGY_10")
+
+
+def test_duel_paywall_context_is_extracted_from_callback() -> None:
+    assert (
+        _duel_paywall_context_from_callback(
+            "buy:PREMIUM_WEEK:duel:daily_cup_prep",
+            product_code="PREMIUM_WEEK",
+        )
+        == "daily_cup_prep"
+    )
+    assert (
+        _duel_paywall_context_from_callback(
+            "buy:PREMIUM_WEEK:duel",
+            product_code="PREMIUM_WEEK",
+        )
+        is None
+    )
+
+
+@pytest.mark.asyncio
+async def test_emit_duel_paywall_click_payload_includes_context(monkeypatch) -> None:
+    emitted: list[dict[str, object]] = []
+
+    async def _fake_emit(_session, **kwargs):
+        emitted.append(kwargs)
+
+    monkeypatch.setattr(payments_duel_paywall, "emit_arena_analytics_event", _fake_emit)
+
+    await payments_duel_paywall._emit_duel_paywall_click(
+        object(),
+        user_id=5,
+        product_code="PREMIUM_WEEK",
+        happened_at=datetime(2026, 7, 6, 12, 0, tzinfo=UTC),
+        paywall_context="beaten_result",
+    )
+
+    payload = emitted[0]["payload"]
+    assert emitted[0]["event_type"] == ARENA_EVENT_PREMIUM_WEEK_CLICKED
+    assert payload == {
+        "user_id": 5,
+        "action": "buy",
+        "access_type": "PREMIUM_WEEK",
+        "paywall_context": "beaten_result",
+    }
 
 
 def test_build_purchase_idempotency_key_embeds_offer_impression_id() -> None:

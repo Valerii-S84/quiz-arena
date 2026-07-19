@@ -7,7 +7,10 @@ from typing import Any
 
 from aiogram.types import CallbackQuery
 
-from app.bot.handlers.payments_duel_paywall import _is_duel_paywall_callback
+from app.bot.handlers.payments_duel_paywall import (
+    _duel_paywall_context_from_callback,
+    _is_duel_paywall_callback,
+)
 
 
 class BuyProductUnavailableError(Exception):
@@ -84,6 +87,10 @@ async def init_buy_purchase(*, request: BuyPurchaseRequest, services: BuyPurchas
                 user_id=snapshot.user_id,
                 product_code=request.product_code,
                 happened_at=request.now_utc,
+                paywall_context=_duel_paywall_context_from_callback(
+                    request.callback.data or "",
+                    product_code=request.product_code,
+                ),
             )
         return await services.purchase_service.init_purchase(
             session,
