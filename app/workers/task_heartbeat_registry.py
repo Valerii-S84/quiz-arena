@@ -49,6 +49,18 @@ CRITICAL_TASK_HEARTBEATS: tuple[CriticalTaskHeartbeat, ...] = (
         stale_after_seconds=7200,
         severity="P2",
     ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.arena_duels.expire_arena_duels",
+        schedule_key="arena-duel-expiry-every-5-minutes",
+        stale_after_seconds=600,
+        severity="P2",
+    ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.tournaments.run_private_tournament_rounds",
+        schedule_key="private-tournaments-round-lifecycle",
+        stale_after_seconds=600,
+        severity="P1",
+    ),
 )
 
 
