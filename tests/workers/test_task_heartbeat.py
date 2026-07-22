@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
 
 from app.workers import task_heartbeat
+from app.workers.tasks import (
+    analytics_daily,
+    arena_duels_schedule,
+    payments_reliability_schedule,
+    tournaments_schedule,
+)
 from tests.type_helpers import AsyncBeginContext
 
 
@@ -109,12 +116,61 @@ async def test_heartbeat_write_failure_does_not_fail_task(
     ]
 
 
-def test_critical_task_heartbeat_registry_is_unique_and_periodic() -> None:
+def test_critical_task_heartbeat_registry_is_unique_and_valid() -> None:
     rows = task_heartbeat.get_critical_task_heartbeats()
     identities = {(row.task_name, row.schedule_key) for row in rows}
 
     assert rows
     assert len(identities) == len(rows)
-    assert all(row.stale_after_seconds > 0 for row in rows)
+    assert all(row.stale_after_seconds is None or row.stale_after_seconds > 0 for row in rows)
     assert {row.severity for row in rows} <= {"P1", "P2"}
     assert not any("premium_expiry" in row.task_name for row in rows)
+
+
+def test_critical_task_heartbeat_registry_entry_accepts_on_demand_staleness() -> None:
+    row = task_heartbeat.CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.example.run_on_demand",
+        schedule_key="example-on-demand",
+        stale_after_seconds=None,
+    )
+
+    assert row.stale_after_seconds is None
+
+
+def test_critical_task_heartbeat_registry_entry_accepts_numeric_staleness() -> None:
+    row = task_heartbeat.CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.example.run_periodic",
+        schedule_key="example-every-5-minutes",
+        stale_after_seconds=600,
+    )
+
+    assert row.stale_after_seconds == 600
+
+
+def test_payment_reconciliation_has_no_unreachable_registry_duplicate() -> None:
+    rows = [
+        row
+        for row in task_heartbeat.get_critical_task_heartbeats()
+        if row.task_name == "app.workers.tasks.payments_reliability.run_payments_reconciliation"
+    ]
+
+    assert [(row.schedule_key, row.stale_after_seconds) for row in rows] == [
+        ("payments-reconciliation-every-15-minutes", 1800)
+    ]
+
+
+def test_periodic_heartbeat_registry_entries_match_current_schedule() -> None:
+    app = SimpleNamespace(conf=SimpleNamespace(beat_schedule={}))
+    payments_reliability_schedule.configure_payments_reliability_schedule(app)
+    arena_duels_schedule.configure_arena_duels_schedule(app)
+    tournaments_schedule.configure_private_tournaments_schedule(app)
+
+    analytics_schedule = analytics_daily.celery_app.conf.beat_schedule or {}
+    analytics_key = "analytics-daily-aggregation-hourly"
+    app.conf.beat_schedule[analytics_key] = analytics_schedule[analytics_key]
+
+    for row in task_heartbeat.get_critical_task_heartbeats():
+        if row.stale_after_seconds is None:
+            continue
+        schedule_entry = app.conf.beat_schedule[row.schedule_key]
+        assert schedule_entry["task"] == row.task_name

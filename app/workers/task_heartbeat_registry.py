@@ -7,7 +7,7 @@ from dataclasses import dataclass
 class CriticalTaskHeartbeat:
     task_name: str
     schedule_key: str
-    stale_after_seconds: int
+    stale_after_seconds: int | None
     severity: str = "P1"
 
 
@@ -37,11 +37,6 @@ CRITICAL_TASK_HEARTBEATS: tuple[CriticalTaskHeartbeat, ...] = (
         task_name="app.workers.tasks.payments_reliability.run_telegram_stars_reconciliation",
         schedule_key="telegram-stars-reconciliation-every-5-minutes",
         stale_after_seconds=600,
-    ),
-    CriticalTaskHeartbeat(
-        task_name="app.workers.tasks.payments_reliability.run_payments_reconciliation",
-        schedule_key="payments-reconciliation-daily-0330-berlin",
-        stale_after_seconds=172800,
     ),
     CriticalTaskHeartbeat(
         task_name="app.workers.tasks.analytics_daily.run_analytics_daily_aggregation",
