@@ -1,4 +1,20 @@
+import pytest
+
+from app.workers.asyncio_runner import run_async_job
 from app.workers.tasks import payments_reliability
+
+
+@pytest.fixture(autouse=True)
+def _run_tasks_without_heartbeat_persistence(monkeypatch) -> None:
+    def _run_tracked_async_job(*, task_name, schedule_key, awaitable):
+        del task_name, schedule_key
+        return run_async_job(awaitable)
+
+    monkeypatch.setattr(
+        payments_reliability,
+        "run_tracked_async_job",
+        _run_tracked_async_job,
+    )
 
 
 def test_recover_paid_uncredited_task_wrapper(monkeypatch) -> None:
