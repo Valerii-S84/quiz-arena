@@ -22,6 +22,12 @@ from app.workers.tasks import analytics_daily, payments_reliability
         ),
         (
             payments_reliability,
+            payments_reliability.run_payment_invariant_alerts,
+            "app.workers.tasks.payments_reliability.run_payment_invariant_alerts",
+            "payment-invariant-alerts-every-minute",
+        ),
+        (
+            payments_reliability,
             payments_reliability.expire_stale_unpaid_invoices,
             "app.workers.tasks.payments_reliability.expire_stale_unpaid_invoices",
             "expire-stale-unpaid-invoices-every-5-minutes",

@@ -7,15 +7,25 @@ from dataclasses import dataclass
 class CriticalTaskHeartbeat:
     task_name: str
     schedule_key: str
-    stale_after_seconds: int
+    stale_after_seconds: int | None
     severity: str = "P1"
 
 
 CRITICAL_TASK_HEARTBEATS: tuple[CriticalTaskHeartbeat, ...] = (
     CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.telegram_updates_observability.run_telegram_updates_reliability_alerts",
+        schedule_key="telegram-updates-reliability-alerts-every-5-minutes",
+        stale_after_seconds=600,
+    ),
+    CriticalTaskHeartbeat(
         task_name="app.workers.tasks.payments_reliability.recover_paid_uncredited",
         schedule_key="recover-paid-uncredited-every-5-minutes",
         stale_after_seconds=600,
+    ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.payments_reliability.run_payment_invariant_alerts",
+        schedule_key="payment-invariant-alerts-every-minute",
+        stale_after_seconds=120,
     ),
     CriticalTaskHeartbeat(
         task_name="app.workers.tasks.payments_reliability.expire_stale_unpaid_invoices",
@@ -39,11 +49,6 @@ CRITICAL_TASK_HEARTBEATS: tuple[CriticalTaskHeartbeat, ...] = (
         stale_after_seconds=600,
     ),
     CriticalTaskHeartbeat(
-        task_name="app.workers.tasks.payments_reliability.run_payments_reconciliation",
-        schedule_key="payments-reconciliation-daily-0330-berlin",
-        stale_after_seconds=172800,
-    ),
-    CriticalTaskHeartbeat(
         task_name="app.workers.tasks.analytics_daily.run_analytics_daily_aggregation",
         schedule_key="analytics-daily-aggregation-hourly",
         stale_after_seconds=7200,
@@ -60,6 +65,17 @@ CRITICAL_TASK_HEARTBEATS: tuple[CriticalTaskHeartbeat, ...] = (
         schedule_key="private-tournaments-round-lifecycle",
         stale_after_seconds=600,
         severity="P1",
+    ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.tournaments_messaging.run_private_tournament_round_messaging",
+        schedule_key="private-tournament-round-messaging-on-demand",
+        stale_after_seconds=None,
+    ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.offers_observability.run_offers_funnel_alerts",
+        schedule_key="offers-funnel-alerts-every-15-minutes",
+        stale_after_seconds=1800,
+        severity="P2",
     ),
 )
 

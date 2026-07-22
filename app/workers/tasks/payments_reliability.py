@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.task_heartbeat import run_tracked_async_job
 from app.workers.tasks.payments_reliability_async import (
@@ -63,11 +62,13 @@ def run_payment_invariant_alerts(
     precheckout_stale_minutes: int = 3,
     paid_uncredited_stale_seconds: int = 60,
 ) -> dict[str, int]:
-    return run_async_job(
-        run_payment_invariant_alerts_async(
+    return run_tracked_async_job(
+        task_name="app.workers.tasks.payments_reliability.run_payment_invariant_alerts",
+        schedule_key="payment-invariant-alerts-every-minute",
+        awaitable=run_payment_invariant_alerts_async(
             precheckout_stale_minutes=precheckout_stale_minutes,
             paid_uncredited_stale_seconds=paid_uncredited_stale_seconds,
-        )
+        ),
     )
 
 
