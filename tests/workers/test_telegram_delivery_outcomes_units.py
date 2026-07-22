@@ -3,6 +3,7 @@ from __future__ import annotations
 from aiogram.exceptions import (
     TelegramBadRequest,
     TelegramForbiddenError,
+    TelegramNetworkError,
     TelegramNotFound,
     TelegramRetryAfter,
 )
@@ -27,7 +28,7 @@ def test_classify_telegram_forbidden_as_blocked_candidate() -> None:
     assert outcome.failure.is_blocked_candidate is True
 
 
-def test_classify_telegram_bad_request_as_non_blocked_failure() -> None:
+def test_classify_missing_chat_bad_request_as_blocked_candidate() -> None:
     outcome = classify_telegram_delivery_exception(
         TelegramBadRequest(
             method=SendMessage(chat_id=101, text="x"),
@@ -40,6 +41,20 @@ def test_classify_telegram_bad_request_as_non_blocked_failure() -> None:
     assert outcome.failure is not None
     assert outcome.failure.failure_code == "TELEGRAM_BAD_REQUEST"
     assert outcome.failure.telegram_error_code == 400
+    assert outcome.failure.is_blocked_candidate is True
+    assert outcome.failure.failure_reason == "TelegramBadRequest"
+
+
+def test_classify_other_bad_request_as_non_blocked_failure() -> None:
+    outcome = classify_telegram_delivery_exception(
+        TelegramBadRequest(
+            method=SendMessage(chat_id=101, text="x"),
+            message="message is not modified",
+        )
+    )
+
+    assert outcome is not None
+    assert outcome.failure is not None
     assert outcome.failure.is_blocked_candidate is False
 
 
@@ -76,3 +91,20 @@ def test_classify_telegram_retry_after_as_retryable_outcome() -> None:
 
 def test_unclassified_exception_is_left_to_caller_retry_semantics() -> None:
     assert classify_telegram_delivery_exception(RuntimeError("network maybe sent")) is None
+
+
+def test_classify_network_error_as_transient_non_blocked_failure() -> None:
+    outcome = classify_telegram_delivery_exception(
+        TelegramNetworkError(
+            method=SendMessage(chat_id=101, text="x"),
+            message="connection reset with sensitive details",
+        )
+    )
+
+    assert outcome is not None
+    assert outcome.status == "FAILED"
+    assert outcome.failure is not None
+    assert outcome.failure.failure_code == "TELEGRAM_TRANSIENT_SEND_ERROR"
+    assert outcome.failure.failure_reason == "TelegramNetworkError"
+    assert outcome.failure.telegram_error_code is None
+    assert outcome.failure.is_blocked_candidate is False

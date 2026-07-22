@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.repo.production_reliability_types import TelegramDeliveryAttemptCreate
 from app.db.repo.telegram_delivery_attempts_repo import TelegramDeliveryAttemptsRepo
 from app.db.repo.telegram_delivery_retry_repo import TelegramDeliveryRetryRepo
+from app.services.telegram_blocked_candidate_policy import blocked_candidate_skip
 from app.services.telegram_delivery_lease import (
     TelegramDeliveryCallOptions,
     TelegramDeliveryLease,
@@ -98,6 +99,13 @@ async def _prepare_delivery_attempt(
 
     if current_status in TELEGRAM_DELIVERY_TERMINAL_STATUSES:
         return terminal_replay_outcome(row=row, status=current_status, created=created)
+    effective_skip = skip
+    if effective_skip is None:
+        effective_skip = await blocked_candidate_skip(
+            session,
+            attempt=attempt,
+            attempts_repo=attempts_repo,
+        )
     if replayed and current_status == "PENDING":
         lease_attempt_count = await claim_pending_replay(
             session=session,
@@ -109,17 +117,17 @@ async def _prepare_delivery_attempt(
         if lease_attempt_count is None:
             return pending_replay_outcome(created=created)
 
-    if skip is not None:
+    if effective_skip is not None:
         prepared = TelegramDeliveryLease(created, replayed, lease_attempt_count)
         updated = await attempts_repo.mark_skipped(
             session,
             idempotency_key=attempt.idempotency_key,
-            failure_code=skip.failure_code,
-            failure_reason=skip.failure_reason,
+            failure_code=effective_skip.failure_code,
+            failure_reason=effective_skip.failure_reason,
             **lease_update_kwargs(prepared, attempts_repo),
         )
         require_lease_update(updated=updated, status="skipped", attempts_repo=attempts_repo)
-        return skipped_outcome(created=created, replayed=replayed, skip=skip)
+        return skipped_outcome(created=created, replayed=replayed, skip=effective_skip)
 
     return TelegramDeliveryLease(created, replayed, lease_attempt_count)
 

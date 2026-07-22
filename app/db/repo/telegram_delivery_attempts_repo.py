@@ -9,10 +9,11 @@ from app.db.repo.production_reliability_types import (
     TelegramDeliveryAttemptCreate,
     TelegramDeliveryFailure,
 )
+from app.db.repo.telegram_blocked_candidates_repo import TelegramBlockedCandidatesRepo
 from app.db.repo.telegram_delivery_retry_repo import TelegramDeliveryRetryRepo
 
 
-class TelegramDeliveryAttemptsRepo(TelegramDeliveryRetryRepo):
+class TelegramDeliveryAttemptsRepo(TelegramBlockedCandidatesRepo, TelegramDeliveryRetryRepo):
     @staticmethod
     async def create_once(
         session: AsyncSession,
