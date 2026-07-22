@@ -9,7 +9,9 @@ from app.workers import task_heartbeat
 from app.workers.tasks import (
     analytics_daily,
     arena_duels_schedule,
+    offers_observability,
     payments_reliability_schedule,
+    telegram_updates_observability,
     tournaments_schedule,
 )
 from tests.type_helpers import AsyncBeginContext
@@ -159,15 +161,71 @@ def test_payment_reconciliation_has_no_unreachable_registry_duplicate() -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    ("task_name", "schedule_key", "stale_after_seconds", "severity"),
+    (
+        (
+            "app.workers.tasks.telegram_updates_observability."
+            "run_telegram_updates_reliability_alerts",
+            "telegram-updates-reliability-alerts-every-5-minutes",
+            600,
+            "P1",
+        ),
+        (
+            "app.workers.tasks.payments_reliability.run_payment_invariant_alerts",
+            "payment-invariant-alerts-every-minute",
+            120,
+            "P1",
+        ),
+        (
+            "app.workers.tasks.tournaments_messaging." "run_private_tournament_round_messaging",
+            "private-tournament-round-messaging-on-demand",
+            None,
+            "P1",
+        ),
+        (
+            "app.workers.tasks.offers_observability.run_offers_funnel_alerts",
+            "offers-funnel-alerts-every-15-minutes",
+            1800,
+            "P2",
+        ),
+    ),
+)
+def test_remaining_observability_registry_entries(
+    task_name: str,
+    schedule_key: str,
+    stale_after_seconds: int | None,
+    severity: str,
+) -> None:
+    rows = task_heartbeat.get_critical_task_heartbeats()
+
+    assert (
+        task_heartbeat.CriticalTaskHeartbeat(
+            task_name=task_name,
+            schedule_key=schedule_key,
+            stale_after_seconds=stale_after_seconds,
+            severity=severity,
+        )
+        in rows
+    )
+
+
 def test_periodic_heartbeat_registry_entries_match_current_schedule() -> None:
     app = SimpleNamespace(conf=SimpleNamespace(beat_schedule={}))
     payments_reliability_schedule.configure_payments_reliability_schedule(app)
     arena_duels_schedule.configure_arena_duels_schedule(app)
     tournaments_schedule.configure_private_tournaments_schedule(app)
 
-    analytics_schedule = analytics_daily.celery_app.conf.beat_schedule or {}
-    analytics_key = "analytics-daily-aggregation-hourly"
-    app.conf.beat_schedule[analytics_key] = analytics_schedule[analytics_key]
+    for task_module, schedule_key in (
+        (analytics_daily, "analytics-daily-aggregation-hourly"),
+        (offers_observability, "offers-funnel-alerts-every-15-minutes"),
+        (
+            telegram_updates_observability,
+            "telegram-updates-reliability-alerts-every-5-minutes",
+        ),
+    ):
+        module_schedule = task_module.celery_app.conf.beat_schedule or {}
+        app.conf.beat_schedule[schedule_key] = module_schedule[schedule_key]
 
     for row in task_heartbeat.get_critical_task_heartbeats():
         if row.stale_after_seconds is None:
