@@ -6,8 +6,10 @@ from typing import Literal, cast
 from aiogram.exceptions import (
     TelegramBadRequest,
     TelegramForbiddenError,
+    TelegramNetworkError,
     TelegramNotFound,
     TelegramRetryAfter,
+    TelegramServerError,
 )
 
 from app.db.repo.production_reliability_types import TelegramDeliveryFailure
@@ -67,7 +69,7 @@ def classify_telegram_delivery_exception(
                 failure_code="TELEGRAM_BAD_REQUEST",
                 failure_reason=_failure_reason(exc),
                 telegram_error_code=400,
-                is_blocked_candidate=False,
+                is_blocked_candidate=_looks_like_missing_chat(exc),
             ),
         )
     if isinstance(exc, TelegramNotFound):
@@ -77,6 +79,16 @@ def classify_telegram_delivery_exception(
                 failure_code="TELEGRAM_NOT_FOUND",
                 failure_reason=_failure_reason(exc),
                 telegram_error_code=404,
+                is_blocked_candidate=False,
+            ),
+        )
+    if isinstance(exc, (TelegramNetworkError, TelegramServerError, TimeoutError, ConnectionError)):
+        return TelegramDeliveryExceptionOutcome(
+            status="FAILED",
+            failure=TelegramDeliveryFailure(
+                failure_code="TELEGRAM_TRANSIENT_SEND_ERROR",
+                failure_reason=_failure_reason(exc),
+                telegram_error_code=None,
                 is_blocked_candidate=False,
             ),
         )
@@ -127,7 +139,12 @@ def skipped_outcome(
 
 
 def _failure_reason(exc: Exception) -> str:
-    return str(exc)[:500]
+    return type(exc).__name__
+
+
+def _looks_like_missing_chat(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "chat not found" in text or "bot was blocked" in text
 
 
 __all__ = [
