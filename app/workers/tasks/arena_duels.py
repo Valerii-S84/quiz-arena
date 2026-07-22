@@ -11,6 +11,7 @@ from app.db.session import SessionLocal
 from app.game.arena_duels.types import ArenaBeatenNotification
 from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
+from app.workers.task_heartbeat import run_tracked_async_job
 from app.workers.tasks.arena_duels_notification_content import (
     build_arena_beaten_notification_keyboard,
 )
@@ -80,7 +81,12 @@ def send_arena_beaten_notification_task(
 
 @celery_app.task(name="app.workers.tasks.arena_duels.expire_arena_duels")
 def expire_arena_duels_task() -> dict[str, int]:
-    return run_async_job(expire_arena_duels())
+    task_name = "app.workers.tasks.arena_duels.expire_arena_duels"
+    return run_tracked_async_job(
+        task_name=task_name,
+        schedule_key="arena-duel-expiry-every-5-minutes",
+        awaitable=expire_arena_duels(),
+    )
 
 
 configure_arena_duels_schedule(celery_app)
