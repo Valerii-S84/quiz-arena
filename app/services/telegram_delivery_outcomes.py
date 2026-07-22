@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 from aiogram.exceptions import (
     TelegramBadRequest,
@@ -83,6 +83,49 @@ def classify_telegram_delivery_exception(
     return None
 
 
+def terminal_replay_outcome(
+    *,
+    row: object,
+    status: str,
+    created: bool,
+) -> TelegramDeliveryOutcome:
+    return TelegramDeliveryOutcome(
+        status=cast(TelegramDeliveryOutcomeStatus, status),
+        created=created,
+        attempted=False,
+        replayed=not created,
+        failure_code=getattr(row, "failure_code", None),
+        failure_reason=getattr(row, "failure_reason", None),
+        telegram_error_code=getattr(row, "telegram_error_code", None),
+    )
+
+
+def pending_replay_outcome(*, created: bool) -> TelegramDeliveryOutcome:
+    return TelegramDeliveryOutcome(
+        status="RETRY",
+        created=created,
+        attempted=False,
+        replayed=not created,
+        failure_code="PENDING_REPLAY",
+    )
+
+
+def skipped_outcome(
+    *,
+    created: bool,
+    replayed: bool,
+    skip: TelegramDeliverySkip,
+) -> TelegramDeliveryOutcome:
+    return TelegramDeliveryOutcome(
+        status="SKIPPED",
+        created=created,
+        attempted=False,
+        replayed=replayed,
+        failure_code=skip.failure_code,
+        failure_reason=skip.failure_reason,
+    )
+
+
 def _failure_reason(exc: Exception) -> str:
     return str(exc)[:500]
 
@@ -94,4 +137,7 @@ __all__ = [
     "TelegramDeliveryOutcomeStatus",
     "TelegramDeliverySkip",
     "classify_telegram_delivery_exception",
+    "pending_replay_outcome",
+    "skipped_outcome",
+    "terminal_replay_outcome",
 ]

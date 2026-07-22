@@ -78,7 +78,7 @@ async def test_delivery_attempt_status_updates_are_scoped_by_idempotency_key() -
     assert "UPDATE telegram_delivery_attempts SET" in sent_sql
     assert "status='SENT'" in sent_sql
     assert "telegram_delivery_attempts.idempotency_key = 'delivery:daily:1'" in sent_sql
-    assert "telegram_delivery_attempts.status != 'SENT'" in sent_sql
+    assert "telegram_delivery_attempts.status = 'PENDING'" in sent_sql
 
     replay_sent_session = RecordingSession(ScalarResult(None), ScalarResult(1))
     assert (
@@ -90,7 +90,7 @@ async def test_delivery_attempt_status_updates_are_scoped_by_idempotency_key() -
     )
     replay_update_sql = compile_statement(replay_sent_session.statements[0])
     replay_select_sql = compile_statement(replay_sent_session.statements[1])
-    assert "telegram_delivery_attempts.status != 'SENT'" in replay_update_sql
+    assert "telegram_delivery_attempts.status = 'PENDING'" in replay_update_sql
     assert "telegram_delivery_attempts.status = 'SENT'" in replay_select_sql
 
     failed_session = RecordingSession(ScalarResult(1))
@@ -112,7 +112,7 @@ async def test_delivery_attempt_status_updates_are_scoped_by_idempotency_key() -
     assert "skipped_at=NULL" in failed_sql
     assert "failure_code='TELEGRAM_FORBIDDEN'" in failed_sql
     assert "is_blocked_candidate=true" in failed_sql
-    assert "telegram_delivery_attempts.status != 'SENT'" in failed_sql
+    assert "telegram_delivery_attempts.status = 'PENDING'" in failed_sql
 
     skipped_session = RecordingSession(ScalarResult(1))
     assert (
@@ -129,7 +129,7 @@ async def test_delivery_attempt_status_updates_are_scoped_by_idempotency_key() -
     assert "failed_at=NULL" in skipped_sql
     assert "telegram_error_code=NULL" in skipped_sql
     assert "is_blocked_candidate=false" in skipped_sql
-    assert "telegram_delivery_attempts.status != 'SENT'" in skipped_sql
+    assert "telegram_delivery_attempts.status = 'PENDING'" in skipped_sql
 
     deferred_session = RecordingSession(ScalarResult(1))
     assert (
@@ -153,7 +153,7 @@ async def test_delivery_attempt_status_updates_are_scoped_by_idempotency_key() -
             idempotency_key="delivery:daily:1",
             claim_ttl_seconds=300,
         )
-        is True
+        == 1
     )
     stale_claim_sql = compile_statement(stale_claim_session.statement)
     assert "attempt_count=(telegram_delivery_attempts.attempt_count + 1)" in stale_claim_sql
@@ -161,6 +161,72 @@ async def test_delivery_attempt_status_updates_are_scoped_by_idempotency_key() -
     assert "telegram_delivery_attempts.idempotency_key = 'delivery:daily:1'" in stale_claim_sql
     assert "telegram_delivery_attempts.status = 'PENDING'" in stale_claim_sql
     assert "make_interval" in stale_claim_sql
+
+
+async def test_delivery_terminal_updates_require_matching_pending_lease() -> None:
+    sent_session = RecordingSession(ScalarResult(1))
+    assert await TelegramDeliveryAttemptsRepo.mark_sent(
+        sent_session,
+        idempotency_key="delivery:lease:1",
+        expected_attempt_count=7,
+    )
+    sent_sql = compile_statement(sent_session.statement)
+    assert "telegram_delivery_attempts.status = 'PENDING'" in sent_sql
+    assert "telegram_delivery_attempts.attempt_count = 7" in sent_sql
+
+    failed_session = RecordingSession(ScalarResult(1))
+    assert await TelegramDeliveryAttemptsRepo.mark_failed(
+        failed_session,
+        idempotency_key="delivery:lease:1",
+        failure=TelegramDeliveryFailure(failure_code="TELEGRAM_FORBIDDEN"),
+        expected_attempt_count=7,
+    )
+    failed_sql = compile_statement(failed_session.statement)
+    assert "telegram_delivery_attempts.status = 'PENDING'" in failed_sql
+    assert "telegram_delivery_attempts.attempt_count = 7" in failed_sql
+
+    skipped_session = RecordingSession(ScalarResult(1))
+    assert await TelegramDeliveryAttemptsRepo.mark_skipped(
+        skipped_session,
+        idempotency_key="delivery:lease:1",
+        failure_code="BLOCKED_GATE",
+        expected_attempt_count=7,
+    )
+    skipped_sql = compile_statement(skipped_session.statement)
+    assert "telegram_delivery_attempts.status = 'PENDING'" in skipped_sql
+    assert "telegram_delivery_attempts.attempt_count = 7" in skipped_sql
+
+
+async def test_retry_defer_and_dispatch_use_lease_cas() -> None:
+    deferred_session = RecordingSession(ScalarResult(1))
+    assert await TelegramDeliveryAttemptsRepo.defer_retry_after(
+        deferred_session,
+        idempotency_key="delivery:lease:1",
+        retry_after_seconds=7,
+        claim_ttl_seconds=60,
+        expected_attempt_count=3,
+        retry_failure_code="TELEGRAM_RETRY_NEEDED",
+        retry_failure_reason="telegram retry needed after 7s",
+    )
+    deferred_sql = compile_statement(deferred_session.statement)
+    assert "telegram_delivery_attempts.status = 'PENDING'" in deferred_sql
+    assert "telegram_delivery_attempts.attempt_count = 3" in deferred_sql
+    assert "failure_code='TELEGRAM_RETRY_NEEDED'" in deferred_sql
+
+    dispatch_session = RecordingSession(ScalarResult(4))
+    assert (
+        await TelegramDeliveryAttemptsRepo.claim_pending_replay_dispatch(
+            dispatch_session,
+            idempotency_key="delivery:lease:1",
+            expected_attempt_count=3,
+        )
+        == 4
+    )
+    dispatch_sql = compile_statement(dispatch_session.statement)
+    assert "telegram_delivery_attempts.status = 'PENDING'" in dispatch_sql
+    assert "telegram_delivery_attempts.attempt_count = 3" in dispatch_sql
+    assert "attempt_count=(telegram_delivery_attempts.attempt_count + 1)" in dispatch_sql
+    assert "failure_code=NULL" in dispatch_sql
 
 
 async def test_blocked_candidates_query_filters_candidates_since_timestamp() -> None:
@@ -202,3 +268,5 @@ async def test_retry_claim_uses_pending_rows_with_skip_locked() -> None:
     assert "telegram_delivery_attempts.attempt_count = 0" in sql
     assert ">= 60" in sql
     assert "FOR UPDATE SKIP LOCKED" in sql
+    assert "pending_replay_safe" in sql
+    assert "TELEGRAM_RETRY_NEEDED" in sql
