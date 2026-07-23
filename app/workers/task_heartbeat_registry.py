@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from app.core.config import get_settings
+
 
 @dataclass(frozen=True, slots=True)
 class CriticalTaskHeartbeat:
@@ -79,6 +81,23 @@ CRITICAL_TASK_HEARTBEATS: tuple[CriticalTaskHeartbeat, ...] = (
     ),
 )
 
+_PREMIUM_EXPIRY_HEARTBEAT = CriticalTaskHeartbeat(
+    task_name="app.workers.tasks.premium_expiry.expire_premium_entitlements",
+    schedule_key="premium-expiry-lifecycle-hourly",
+    stale_after_seconds=7200,
+    severity="P2",
+)
 
-def get_critical_task_heartbeats() -> tuple[CriticalTaskHeartbeat, ...]:
+
+def get_critical_task_heartbeats(
+    *,
+    premium_expiry_schedule_enabled: bool | None = None,
+) -> tuple[CriticalTaskHeartbeat, ...]:
+    expiry_enabled = (
+        get_settings().premium_expiry_schedule_enabled
+        if premium_expiry_schedule_enabled is None
+        else premium_expiry_schedule_enabled
+    )
+    if expiry_enabled:
+        return (*CRITICAL_TASK_HEARTBEATS, _PREMIUM_EXPIRY_HEARTBEAT)
     return CRITICAL_TASK_HEARTBEATS

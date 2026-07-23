@@ -74,6 +74,10 @@ class RuntimeSettingsMixin:
         default=15,
         alias="RETENTION_CLEANUP_SCHEDULE_MINUTE_BERLIN",
     )
+    premium_expiry_schedule_enabled: bool = Field(
+        default=False,
+        alias="PREMIUM_EXPIRY_SCHEDULE_ENABLED",
+    )
     website_analytics_visitor_salt: str = Field(
         default="",
         alias="WEBSITE_ANALYTICS_VISITOR_SALT",
