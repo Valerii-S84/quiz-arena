@@ -204,10 +204,20 @@ def test_daily_arena_messaging_enqueue_paths_and_wrapper(monkeypatch: pytest.Mon
         }
     ]
 
+    tracked: dict[str, object] = {}
+
+    def _run_tracked_async_job(*, task_name, schedule_key, awaitable):
+        tracked.update(task_name=task_name, schedule_key=schedule_key)
+        return {"wrapped": close_coroutine_with_name(awaitable)}
+
     monkeypatch.setattr(
         daily_cup_messaging,
-        "run_async_job",
-        lambda coroutine: {"wrapped": close_coroutine_with_name(coroutine)},
+        "run_tracked_async_job",
+        _run_tracked_async_job,
     )
     wrapped = daily_cup_messaging.run_daily_cup_round_messaging(tournament_id="arena-id-wrapper")
     assert wrapped == {"wrapped": "run_daily_cup_round_messaging_async_with_followups"}
+    assert tracked == {
+        "task_name": "app.workers.tasks.daily_cup.run_daily_cup_round_messaging",
+        "schedule_key": "daily-cup-round-messaging-on-demand",
+    }

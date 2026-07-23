@@ -51,6 +51,56 @@ CRITICAL_TASK_HEARTBEATS: tuple[CriticalTaskHeartbeat, ...] = (
         stale_after_seconds=600,
     ),
     CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.daily_cup.send_invite",
+        schedule_key="daily-cup-send-invite-on-demand",
+        stale_after_seconds=None,
+    ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.daily_cup.send_invite_registration",
+        schedule_key="daily-cup-send-invite-registration",
+        stale_after_seconds=172800,
+    ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.daily_cup.open_registration",
+        schedule_key="daily-cup-open-registration",
+        stale_after_seconds=None,
+    ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.daily_cup.send_last_call_reminder",
+        schedule_key="daily-cup-last-call-reminder",
+        stale_after_seconds=172800,
+    ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.daily_cup.send_prestart_reminder",
+        schedule_key="daily-cup-prestart-reminder",
+        stale_after_seconds=172800,
+    ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.daily_cup.send_turn_reminders",
+        schedule_key="daily-cup-turn-reminders",
+        stale_after_seconds=1200,
+    ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.daily_cup.close_registration_and_start",
+        schedule_key="daily-cup-close-registration",
+        stale_after_seconds=172800,
+    ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.daily_cup.publish_final_results",
+        schedule_key="daily-cup-publish-final-results",
+        stale_after_seconds=172800,
+    ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.daily_cup.advance_rounds",
+        schedule_key="daily-cup-round-advance",
+        stale_after_seconds=120,
+    ),
+    CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.daily_cup.run_daily_cup_round_messaging",
+        schedule_key="daily-cup-round-messaging-on-demand",
+        stale_after_seconds=None,
+    ),
+    CriticalTaskHeartbeat(
         task_name="app.workers.tasks.analytics_daily.run_analytics_daily_aggregation",
         schedule_key="analytics-daily-aggregation-hourly",
         stale_after_seconds=7200,
