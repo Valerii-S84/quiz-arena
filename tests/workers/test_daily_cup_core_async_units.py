@@ -118,6 +118,56 @@ async def test_close_daily_cup_registration_cancels_when_too_few_participants(
 
 
 @pytest.mark.asyncio
+async def test_close_daily_cup_registration_retries_committed_cancel_delivery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tournament = tournament_row(type="DAILY_ARENA", status="CANCELED")
+    participants = [participant_row(tournament_id=tournament.id, user_id=11)]
+    emitted_events: list[dict[str, object]] = []
+    canceled_targets: list[int] = []
+    cancel_tournament_ids: list[str] = []
+
+    async def _emit(*, events: list[dict[str, object]], **_kwargs) -> None:
+        emitted_events.extend(events)
+
+    async def _send(*, telegram_targets: list[int], tournament_id: str, **_kwargs) -> None:
+        canceled_targets.extend(telegram_targets)
+        cancel_tournament_ids.append(tournament_id)
+
+    monkeypatch.setattr(daily_cup_async, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: NOW_UTC)
+    monkeypatch.setattr(
+        daily_cup_async,
+        "ensure_daily_cup_registration_tournament",
+        _async_return(tournament),
+    )
+    monkeypatch.setattr(
+        daily_cup_async.TournamentParticipantsRepo,
+        "list_for_tournament_for_update",
+        _async_return(participants),
+    )
+    monkeypatch.setattr(
+        daily_cup_async.UsersRepo,
+        "list_by_ids",
+        _async_return([SimpleNamespace(telegram_user_id=101)]),
+    )
+    monkeypatch.setattr(daily_cup_async, "emit_daily_cup_events", _emit)
+    monkeypatch.setattr(daily_cup_async, "send_daily_cup_canceled_messages", _send)
+
+    result = await daily_cup_async.close_daily_cup_registration_and_start_async()
+
+    assert result == {
+        "processed": 1,
+        "canceled": 1,
+        "started": 0,
+        "participants_total": 1,
+    }
+    assert canceled_targets == [101]
+    assert cancel_tournament_ids == [str(tournament.id)]
+    assert emitted_events == []
+
+
+@pytest.mark.asyncio
 async def test_publish_daily_cup_final_results_processes_completed_tournament(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

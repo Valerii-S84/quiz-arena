@@ -9,6 +9,7 @@ from app.workers import task_heartbeat
 from app.workers.tasks import (
     analytics_daily,
     arena_duels_schedule,
+    daily_cup_schedule,
     offers_observability,
     payments_reliability_schedule,
     telegram_updates_observability,
@@ -216,10 +217,83 @@ def test_remaining_observability_registry_entries(
     )
 
 
+def test_daily_cup_heartbeat_registry_entries_match_source_identities() -> None:
+    expected = {
+        (
+            "app.workers.tasks.daily_cup.send_invite",
+            "daily-cup-send-invite-on-demand",
+            None,
+            "P1",
+        ),
+        (
+            "app.workers.tasks.daily_cup.send_invite_registration",
+            "daily-cup-send-invite-registration",
+            172800,
+            "P1",
+        ),
+        (
+            "app.workers.tasks.daily_cup.open_registration",
+            "daily-cup-open-registration",
+            None,
+            "P1",
+        ),
+        (
+            "app.workers.tasks.daily_cup.send_last_call_reminder",
+            "daily-cup-last-call-reminder",
+            172800,
+            "P1",
+        ),
+        (
+            "app.workers.tasks.daily_cup.send_prestart_reminder",
+            "daily-cup-prestart-reminder",
+            172800,
+            "P1",
+        ),
+        (
+            "app.workers.tasks.daily_cup.send_turn_reminders",
+            "daily-cup-turn-reminders",
+            1200,
+            "P1",
+        ),
+        (
+            "app.workers.tasks.daily_cup.close_registration_and_start",
+            "daily-cup-close-registration",
+            172800,
+            "P1",
+        ),
+        (
+            "app.workers.tasks.daily_cup.publish_final_results",
+            "daily-cup-publish-final-results",
+            172800,
+            "P1",
+        ),
+        (
+            "app.workers.tasks.daily_cup.advance_rounds",
+            "daily-cup-round-advance",
+            120,
+            "P1",
+        ),
+        (
+            "app.workers.tasks.daily_cup.run_daily_cup_round_messaging",
+            "daily-cup-round-messaging-on-demand",
+            None,
+            "P1",
+        ),
+    }
+    actual = {
+        (row.task_name, row.schedule_key, row.stale_after_seconds, row.severity)
+        for row in task_heartbeat.get_critical_task_heartbeats()
+        if row.task_name.startswith("app.workers.tasks.daily_cup.")
+    }
+
+    assert actual == expected
+
+
 def test_periodic_heartbeat_registry_entries_match_current_schedule() -> None:
     app = SimpleNamespace(conf=SimpleNamespace(beat_schedule={}))
     payments_reliability_schedule.configure_payments_reliability_schedule(app)
     arena_duels_schedule.configure_arena_duels_schedule(app)
+    daily_cup_schedule.configure_daily_cup_schedule(app)
     tournaments_schedule.configure_private_tournaments_schedule(app)
 
     for task_module, schedule_key in (
