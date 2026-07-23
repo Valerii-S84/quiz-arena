@@ -184,6 +184,12 @@ def test_payment_reconciliation_has_no_unreachable_registry_duplicate() -> None:
             "P1",
         ),
         (
+            "app.workers.tasks.arena_duels.send_arena_beaten_notification_task",
+            "arena-beaten-notification-on-demand",
+            None,
+            "P1",
+        ),
+        (
             "app.workers.tasks.offers_observability.run_offers_funnel_alerts",
             "offers-funnel-alerts-every-15-minutes",
             1800,
