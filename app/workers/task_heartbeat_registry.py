@@ -74,6 +74,11 @@ CRITICAL_TASK_HEARTBEATS: tuple[CriticalTaskHeartbeat, ...] = (
         stale_after_seconds=None,
     ),
     CriticalTaskHeartbeat(
+        task_name="app.workers.tasks.arena_duels.send_arena_beaten_notification_task",
+        schedule_key="arena-beaten-notification-on-demand",
+        stale_after_seconds=None,
+    ),
+    CriticalTaskHeartbeat(
         task_name="app.workers.tasks.offers_observability.run_offers_funnel_alerts",
         schedule_key="offers-funnel-alerts-every-15-minutes",
         stale_after_seconds=1800,

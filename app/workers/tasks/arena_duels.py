@@ -9,7 +9,6 @@ from app.db.repo.arena_duels_repo import ArenaDuelsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.game.arena_duels.types import ArenaBeatenNotification
-from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
 from app.workers.task_heartbeat import run_tracked_async_job
 from app.workers.tasks.arena_duels_notification_content import (
@@ -71,11 +70,14 @@ def send_arena_beaten_notification_task(
     notification_payload: dict[str, object],
     happened_at_iso: str,
 ) -> dict[str, int]:
-    return run_async_job(
-        send_arena_beaten_notification(
+    task_name = "app.workers.tasks.arena_duels.send_arena_beaten_notification_task"
+    return run_tracked_async_job(
+        task_name=task_name,
+        schedule_key="arena-beaten-notification-on-demand",
+        awaitable=send_arena_beaten_notification(
             notification=notification_from_payload(notification_payload),
             happened_at=datetime.fromisoformat(happened_at_iso),
-        )
+        ),
     )
 
 

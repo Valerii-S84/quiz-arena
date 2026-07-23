@@ -37,6 +37,7 @@ TRUNCATE_TABLES = (
     "purchases",
     "processed_updates",
     "outbox_events",
+    "telegram_delivery_attempts",
     "analytics_events",
     "analytics_daily",
     "reconciliation_runs",
