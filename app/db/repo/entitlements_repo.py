@@ -10,9 +10,10 @@ from app.db.models.entitlements import Entitlement
 from app.db.repo.entitlements_cache import PremiumStatus as _PremiumStatus
 from app.db.repo.entitlements_cache import entitlement_request_cache  # noqa: F401
 from app.db.repo.entitlements_cache import get_cached_premium_status, store_cached_premium_status
+from app.db.repo.premium_entitlements_expiry_repo import PremiumEntitlementsExpiryRepo
 
 
-class EntitlementsRepo:
+class EntitlementsRepo(PremiumEntitlementsExpiryRepo):
     @staticmethod
     async def _get_active_premium_entitlement(
         session: AsyncSession,
