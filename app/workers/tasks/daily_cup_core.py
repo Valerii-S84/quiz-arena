@@ -23,12 +23,19 @@ from app.game.tournaments.constants import (
 )
 from app.game.tournaments.internal import generate_invite_code
 from app.services.telegram_delivery import deliver_telegram_once
+from app.services.telegram_delivery_outcomes import TelegramDeliveryOutcome
 from app.workers.tasks.daily_cup_config import TOURNAMENT_MAX_PARTICIPANTS
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_core")
+_CANCEL_RETRY_SECONDS, _CANCEL_DELIVERY_PENDING_REPLAY_TTL_SECONDS = 60, 300
 
-_CANCEL_DELIVERY_PENDING_REPLAY_TTL_SECONDS = 300
+
+class DailyCupCancelDeliveryRetryNeeded(RuntimeError):
+    def __init__(self, *, tournament_id: str, retry_after_seconds: int) -> None:
+        self.tournament_id = tournament_id
+        self.retry_after_seconds = max(1, int(retry_after_seconds))
+        super().__init__("Daily Cup cancel delivery retry needed")
 
 
 def now_utc() -> datetime:
@@ -119,17 +126,40 @@ async def send_daily_cup_canceled_messages(
     resolved_session_local = session_local if session_local is not None else SessionLocal
     resolved_deliver_once = deliver_once if deliver_once is not None else deliver_telegram_once
     bot = resolved_bot_factory()
+    retry_after_seconds: int | None = None
+    retry_cause: Exception | None = None
     try:
         for chat_id in telegram_targets:
-            await _deliver_daily_cup_canceled_message(
-                bot=bot,
-                chat_id=chat_id,
-                tournament_id=tournament_id,
-                session_local=resolved_session_local,
-                deliver_once=resolved_deliver_once,
-            )
+            try:
+                outcome = await _deliver_daily_cup_canceled_message(
+                    bot=bot,
+                    chat_id=chat_id,
+                    tournament_id=tournament_id,
+                    session_local=resolved_session_local,
+                    deliver_once=resolved_deliver_once,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "daily_cup_cancel_delivery_failed",
+                    tournament_id=tournament_id,
+                    error_type=type(exc).__name__,
+                )
+                retry_cause = retry_cause or exc
+                retry_after_seconds = max(retry_after_seconds or 0, _CANCEL_RETRY_SECONDS)
+                continue
+            if outcome.status == "RETRY":
+                outcome_delay = outcome.retry_after_seconds or _CANCEL_RETRY_SECONDS
+                retry_after_seconds = max(retry_after_seconds or 0, int(outcome_delay))
     finally:
         await bot.session.close()
+    if retry_after_seconds is not None:
+        retry_needed = DailyCupCancelDeliveryRetryNeeded(
+            tournament_id=tournament_id,
+            retry_after_seconds=retry_after_seconds,
+        )
+        if retry_cause is not None:
+            raise retry_needed from retry_cause
+        raise retry_needed
 
 
 async def _deliver_daily_cup_canceled_message(
@@ -139,25 +169,17 @@ async def _deliver_daily_cup_canceled_message(
     tournament_id: str,
     session_local: Any,
     deliver_once: Any,
-) -> None:
+) -> TelegramDeliveryOutcome:
     async def _send() -> None:
         await bot.send_message(chat_id=chat_id, text=TEXTS_DE["msg.daily_cup.canceled"])
 
-    try:
-        await deliver_once(
-            session_local,
-            attempt=_daily_cup_cancel_attempt(tournament_id=tournament_id, chat_id=chat_id),
-            send=_send,
-            allow_stale_pending_replay_send=True,
-            retry_claim_ttl_seconds=_CANCEL_DELIVERY_PENDING_REPLAY_TTL_SECONDS,
-        )
-    except Exception as exc:
-        logger.warning(
-            "daily_cup_cancel_delivery_failed",
-            tournament_id=tournament_id,
-            error_type=type(exc).__name__,
-        )
-        return
+    return await deliver_once(
+        session_local,
+        attempt=_daily_cup_cancel_attempt(tournament_id=tournament_id, chat_id=chat_id),
+        send=_send,
+        allow_stale_pending_replay_send=True,
+        retry_claim_ttl_seconds=_CANCEL_DELIVERY_PENDING_REPLAY_TTL_SECONDS,
+    )
 
 
 def _daily_cup_cancel_attempt(*, tournament_id: str, chat_id: int) -> TelegramDeliveryAttemptCreate:
@@ -169,6 +191,7 @@ def _daily_cup_cancel_attempt(*, tournament_id: str, chat_id: int) -> TelegramDe
         target_type="daily_cup_cancel",
         target_id=tournament_id,
         telegram_user_id=chat_id,
+        safe_context={"pending_replay_safe": True},
     )
 
 

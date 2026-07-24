@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 import pytest
@@ -74,7 +75,7 @@ def test_daily_cup_task_wrappers_record_heartbeats(
     expected_result = {"processed": 1}
     tracked: dict[str, object] = {}
 
-    async def _fake_async() -> dict[str, int]:
+    async def _fake_async(**_kwargs: object) -> dict[str, int]:
         return expected_result
 
     def _run_tracked_async_job(
@@ -94,3 +95,41 @@ def test_daily_cup_task_wrappers_record_heartbeats(
 
     assert result == expected_result
     assert tracked == {"task_name": task_name, "schedule_key": schedule_key}
+
+
+class _RetryRaised(Exception):
+    pass
+
+
+def test_close_registration_and_start_retries_exact_canceled_tournament(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tournament_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    retry_kwargs: dict[str, object] = {}
+
+    async def _close_async(*, tournament_id: str | None = None) -> dict[str, int]:
+        assert tournament_id is None
+        raise daily_cup.DailyCupCancelDeliveryRetryNeeded(
+            tournament_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            retry_after_seconds=47,
+        )
+
+    def _run_tracked_async_job(*, awaitable: Any, **_kwargs: object) -> dict[str, int]:
+        return asyncio.run(awaitable)
+
+    def _retry(**kwargs: object) -> None:
+        retry_kwargs.update(kwargs)
+        raise _RetryRaised
+
+    task = daily_cup.close_registration_and_start._get_current_object()
+    monkeypatch.setattr(daily_cup, "close_daily_cup_registration_and_start_async", _close_async)
+    monkeypatch.setattr(daily_cup, "run_tracked_async_job", _run_tracked_async_job)
+    monkeypatch.setattr(task, "retry", _retry)
+
+    with pytest.raises(_RetryRaised):
+        daily_cup.close_registration_and_start()
+
+    assert task.max_retries == 5
+    assert retry_kwargs["countdown"] == 47
+    assert retry_kwargs["kwargs"] == {"tournament_id": tournament_id}
+    assert isinstance(retry_kwargs["exc"], daily_cup.DailyCupCancelDeliveryRetryNeeded)

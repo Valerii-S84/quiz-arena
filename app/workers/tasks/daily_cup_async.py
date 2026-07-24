@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.application import build_bot
+from app.db.models.tournaments import Tournament
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
-from app.game.tournaments.constants import TOURNAMENT_TYPE_DAILY_ARENA
+from app.game.tournaments.constants import TOURNAMENT_STATUS_CANCELED, TOURNAMENT_TYPE_DAILY_ARENA
 from app.workers.tasks.daily_cup_config import DAILY_CUP_MIN_PARTICIPANTS
 from app.workers.tasks.daily_cup_core import (
     emit_daily_cup_events,
@@ -102,12 +106,44 @@ async def _build_close_transition(
     )
 
 
-async def close_daily_cup_registration_and_start_async() -> dict[str, int]:
+async def _load_close_tournament(
+    *,
+    session: AsyncSession,
+    now_utc_value,
+    tournament_id: str | None,
+) -> Tournament | None:
+    if tournament_id is None:
+        return await ensure_daily_cup_registration_tournament(
+            session=session,
+            now_utc_value=now_utc_value,
+        )
+    try:
+        parsed_tournament_id = UUID(tournament_id)
+    except ValueError as exc:
+        raise ValueError("invalid Daily Cup tournament id") from exc
+    tournament = await TournamentsRepo.get_by_id_for_update(session, parsed_tournament_id)
+    if (
+        tournament is None
+        or tournament.type != TOURNAMENT_TYPE_DAILY_ARENA
+        or tournament.status != TOURNAMENT_STATUS_CANCELED
+    ):
+        return None
+    return tournament
+
+
+async def close_daily_cup_registration_and_start_async(
+    *,
+    tournament_id: str | None = None,
+) -> dict[str, int]:
     now_utc_value = _now_utc()
     async with SessionLocal.begin() as session:
-        tournament = await ensure_daily_cup_registration_tournament(
-            session=session, now_utc_value=now_utc_value
+        tournament = await _load_close_tournament(
+            session=session,
+            now_utc_value=now_utc_value,
+            tournament_id=tournament_id,
         )
+        if tournament is None:
+            return {"processed": 0, "canceled": 0, "started": 0, "participants_total": 0}
         transition = await _build_close_transition(
             session=session,
             tournament=tournament,
