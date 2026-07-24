@@ -49,7 +49,7 @@ async def test_daily_cup_core_emits_events_and_persists_message_ids(
 
 
 @pytest.mark.asyncio
-async def test_send_daily_cup_canceled_messages_ignores_send_errors() -> None:
+async def test_send_daily_cup_canceled_messages_continues_then_requests_retry() -> None:
     bot = _Bot([RuntimeError("blocked"), None])
     delivery_kwargs: list[dict[str, object]] = []
 
@@ -58,18 +58,51 @@ async def test_send_daily_cup_canceled_messages_ignores_send_errors() -> None:
         await send()
         return SimpleNamespace(status="SENT")
 
-    await daily_cup_core.send_daily_cup_canceled_messages(
-        telegram_targets=[101, 102],
-        tournament_id="tid",
-        bot_factory=lambda: bot,
-        session_local=SimpleNamespace(),
-        deliver_once=_deliver_once,
-    )
+    with pytest.raises(daily_cup_core.DailyCupCancelDeliveryRetryNeeded) as exc_info:
+        await daily_cup_core.send_daily_cup_canceled_messages(
+            telegram_targets=[101, 102],
+            tournament_id="tid",
+            bot_factory=lambda: bot,
+            session_local=SimpleNamespace(),
+            deliver_once=_deliver_once,
+        )
 
     assert bot.sent == [102]
     assert bot.closed
+    assert exc_info.value.tournament_id == "tid"
+    assert exc_info.value.retry_after_seconds == 60
     assert [kwargs["allow_stale_pending_replay_send"] for kwargs in delivery_kwargs] == [True, True]
     assert [kwargs["retry_claim_ttl_seconds"] for kwargs in delivery_kwargs] == [300, 300]
+
+
+@pytest.mark.asyncio
+async def test_send_daily_cup_canceled_messages_uses_retry_outcome_delay() -> None:
+    bot = _Bot([None, None])
+    outcomes = iter(
+        [
+            SimpleNamespace(status="RETRY", retry_after_seconds=47),
+            SimpleNamespace(status="SENT", retry_after_seconds=None),
+        ]
+    )
+    delivery_calls = 0
+
+    async def _deliver_once(_session_local, **_kwargs):
+        nonlocal delivery_calls
+        delivery_calls += 1
+        return next(outcomes)
+
+    with pytest.raises(daily_cup_core.DailyCupCancelDeliveryRetryNeeded) as exc_info:
+        await daily_cup_core.send_daily_cup_canceled_messages(
+            telegram_targets=[101, 102],
+            tournament_id="tid",
+            bot_factory=lambda: bot,
+            session_local=SimpleNamespace(),
+            deliver_once=_deliver_once,
+        )
+
+    assert delivery_calls == 2
+    assert bot.closed
+    assert exc_info.value.retry_after_seconds == 47
 
 
 @pytest.mark.asyncio
@@ -165,6 +198,55 @@ async def test_close_daily_cup_registration_retries_committed_cancel_delivery(
     assert canceled_targets == [101]
     assert cancel_tournament_ids == [str(tournament.id)]
     assert emitted_events == []
+
+
+@pytest.mark.asyncio
+async def test_close_daily_cup_registration_retry_loads_exact_canceled_tournament(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tournament = tournament_row(type="DAILY_ARENA", status="CANCELED")
+    participants = [participant_row(tournament_id=tournament.id, user_id=11)]
+    loaded_tournament_ids: list[object] = []
+    cancel_tournament_ids: list[str] = []
+
+    async def _load(_session, tournament_id):
+        loaded_tournament_ids.append(tournament_id)
+        return tournament
+
+    async def _send(*, tournament_id: str, **_kwargs) -> None:
+        cancel_tournament_ids.append(tournament_id)
+
+    async def _unexpected_current_tournament(**_kwargs):
+        raise AssertionError("retry must not select the current Daily Cup window")
+
+    monkeypatch.setattr(daily_cup_async, "SessionLocal", SessionLocalStub())
+    monkeypatch.setattr(daily_cup_async, "_now_utc", lambda: NOW_UTC)
+    monkeypatch.setattr(
+        daily_cup_async,
+        "ensure_daily_cup_registration_tournament",
+        _unexpected_current_tournament,
+    )
+    monkeypatch.setattr(daily_cup_async.TournamentsRepo, "get_by_id_for_update", _load)
+    monkeypatch.setattr(
+        daily_cup_async.TournamentParticipantsRepo,
+        "list_for_tournament_for_update",
+        _async_return(participants),
+    )
+    monkeypatch.setattr(
+        daily_cup_async.UsersRepo,
+        "list_by_ids",
+        _async_return([SimpleNamespace(telegram_user_id=101)]),
+    )
+    monkeypatch.setattr(daily_cup_async, "emit_daily_cup_events", _async_return(None))
+    monkeypatch.setattr(daily_cup_async, "send_daily_cup_canceled_messages", _send)
+
+    result = await daily_cup_async.close_daily_cup_registration_and_start_async(
+        tournament_id=str(tournament.id),
+    )
+
+    assert result["canceled"] == 1
+    assert loaded_tournament_ids == [tournament.id]
+    assert cancel_tournament_ids == [str(tournament.id)]
 
 
 @pytest.mark.asyncio

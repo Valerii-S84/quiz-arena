@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from celery import Task
+
 from app.workers.celery_app import celery_app
 from app.workers.task_heartbeat import run_tracked_async_job
 from app.workers.tasks.daily_cup_async import (
@@ -20,6 +22,7 @@ from app.workers.tasks.daily_cup_async import (
 from app.workers.tasks.daily_cup_async import (
     send_daily_cup_last_call_reminder_async as _send_daily_cup_last_call_reminder_async,
 )
+from app.workers.tasks.daily_cup_core import DailyCupCancelDeliveryRetryNeeded
 from app.workers.tasks.daily_cup_messaging import run_daily_cup_round_messaging
 from app.workers.tasks.daily_cup_nonfinishers_summary import run_daily_cup_nonfinishers_summary
 from app.workers.tasks.daily_cup_prestart_reminder import (
@@ -146,14 +149,31 @@ def send_turn_reminders() -> dict[str, int]:
     )
 
 
-@celery_app.task(name="app.workers.tasks.daily_cup.close_registration_and_start")
-def close_registration_and_start() -> dict[str, int]:
+@celery_app.task(
+    name="app.workers.tasks.daily_cup.close_registration_and_start",
+    bind=True,
+    max_retries=5,
+)
+def close_registration_and_start(
+    self: Task,
+    *,
+    tournament_id: str | None = None,
+) -> dict[str, int]:
     task_name = "app.workers.tasks.daily_cup.close_registration_and_start"
-    return run_tracked_async_job(
-        task_name=task_name,
-        schedule_key="daily-cup-close-registration",
-        awaitable=close_daily_cup_registration_and_start_async(),
-    )
+    try:
+        return run_tracked_async_job(
+            task_name=task_name,
+            schedule_key="daily-cup-close-registration",
+            awaitable=close_daily_cup_registration_and_start_async(
+                tournament_id=tournament_id,
+            ),
+        )
+    except DailyCupCancelDeliveryRetryNeeded as exc:
+        raise self.retry(
+            exc=exc,
+            countdown=exc.retry_after_seconds,
+            kwargs={"tournament_id": exc.tournament_id},
+        )
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.advance_rounds")
