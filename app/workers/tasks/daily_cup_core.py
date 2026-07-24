@@ -28,8 +28,7 @@ from app.workers.tasks.daily_cup_config import TOURNAMENT_MAX_PARTICIPANTS
 from app.workers.tasks.daily_cup_time import get_daily_cup_window
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_core")
-_CANCEL_RETRY_SECONDS = 60
-_CANCEL_DELIVERY_PENDING_REPLAY_TTL_SECONDS = 300
+_CANCEL_RETRY_SECONDS, _CANCEL_DELIVERY_PENDING_REPLAY_TTL_SECONDS = 60, 300
 
 
 class DailyCupCancelDeliveryRetryNeeded(RuntimeError):
@@ -192,6 +191,7 @@ def _daily_cup_cancel_attempt(*, tournament_id: str, chat_id: int) -> TelegramDe
         target_type="daily_cup_cancel",
         target_id=tournament_id,
         telegram_user_id=chat_id,
+        safe_context={"pending_replay_safe": True},
     )
 
 

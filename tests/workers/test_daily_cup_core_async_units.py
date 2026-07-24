@@ -73,6 +73,10 @@ async def test_send_daily_cup_canceled_messages_continues_then_requests_retry() 
     assert exc_info.value.retry_after_seconds == 60
     assert [kwargs["allow_stale_pending_replay_send"] for kwargs in delivery_kwargs] == [True, True]
     assert [kwargs["retry_claim_ttl_seconds"] for kwargs in delivery_kwargs] == [300, 300]
+    assert all(
+        getattr(kwargs["attempt"], "safe_context") == {"pending_replay_safe": True}
+        for kwargs in delivery_kwargs
+    )
 
 
 @pytest.mark.asyncio
