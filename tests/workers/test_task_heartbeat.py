@@ -12,6 +12,7 @@ from app.workers.tasks import (
     daily_cup_schedule,
     offers_observability,
     payments_reliability_schedule,
+    production_invariant_alerts,
     telegram_updates_observability,
     tournaments_schedule,
 )
@@ -302,6 +303,10 @@ def test_periodic_heartbeat_registry_entries_match_current_schedule() -> None:
         (
             telegram_updates_observability,
             "telegram-updates-reliability-alerts-every-5-minutes",
+        ),
+        (
+            production_invariant_alerts,
+            "production-critical-invariant-alerts-every-5-minutes",
         ),
     ):
         module_schedule = task_module.celery_app.conf.beat_schedule or {}
