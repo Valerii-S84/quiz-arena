@@ -26,6 +26,8 @@ async def load_tournament_expected_targets(
             FROM tournament_participants p
             JOIN tournaments t ON t.id = p.tournament_id
             WHERE p.tournament_id = :tournament_id
+              AND t.type = 'PRIVATE'
+              AND t.status NOT IN ('REGISTRATION', 'CANCELED')
             ORDER BY p.user_id
             """
         ),
@@ -41,6 +43,7 @@ async def load_tournament_expected_targets(
                 current_round=int(row[3] or 0),
                 flow=flow,
             ),
+            is_matchable=row[1] is None,
         )
         for row in result.all()
     ]

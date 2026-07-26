@@ -23,8 +23,6 @@ def phase_repair_match_id(target_id: str) -> str:
     else:
         if normalized.endswith(":send"):
             normalized = normalized[: -len(":send")]
-    if ":c:" in normalized:
-        normalized = normalized.split(":c:", 1)[0]
     return normalized
 
 

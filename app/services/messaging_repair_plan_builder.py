@@ -29,10 +29,12 @@ def build_messaging_repair_plan(
     existing_attempts: list[ExistingDeliveryOutcome],
 ) -> MessagingRepairPlan:
     groups = _classify_existing_attempts(existing_attempts)
+    indeterminate_targets = [target for target in expected_targets if not target.is_matchable]
     missing_targets = [
         target
         for target in expected_targets
-        if _repair_match_key(target_type=target.target_type, target_id=target.target_id)
+        if target.is_matchable
+        and _repair_match_key(target_type=target.target_type, target_id=target.target_id)
         not in groups.accounted_by_target
     ]
     return MessagingRepairPlan(
@@ -41,6 +43,7 @@ def build_messaging_repair_plan(
         expected_targets=expected_targets,
         existing_attempts=existing_attempts,
         missing_targets=missing_targets,
+        indeterminate_targets=indeterminate_targets,
         pending_targets=groups.pending_targets,
         stale_pending_targets=groups.stale_pending_targets,
         failed_targets=groups.failed_targets,
