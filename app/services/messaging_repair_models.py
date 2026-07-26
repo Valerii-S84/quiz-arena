@@ -7,6 +7,7 @@ from dataclasses import dataclass
 class RepairTarget:
     target_type: str
     target_id: str
+    is_matchable: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +28,7 @@ class MessagingRepairPlan:
     expected_targets: list[RepairTarget]
     existing_attempts: list[ExistingDeliveryOutcome]
     missing_targets: list[RepairTarget]
+    indeterminate_targets: list[RepairTarget]
     pending_targets: list[ExistingDeliveryOutcome]
     stale_pending_targets: list[ExistingDeliveryOutcome]
     failed_targets: list[ExistingDeliveryOutcome]

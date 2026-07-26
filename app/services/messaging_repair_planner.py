@@ -13,9 +13,7 @@ from app.services.messaging_repair_queries import (
     load_tournament_expected_targets,
 )
 
-SUPPORTED_REPAIR_FLOWS = frozenset(
-    {"daily_cup_round_messaging", "private_tournament_round_messaging"}
-)
+SUPPORTED_REPAIR_FLOWS = frozenset({"private_tournament_round_messaging"})
 
 
 async def plan_tournament_messaging_repair(
