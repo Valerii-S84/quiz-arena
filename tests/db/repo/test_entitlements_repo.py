@@ -66,6 +66,19 @@ async def test_active_premium_queries_return_bool_scope_and_lock() -> None:
     )
     assert "FOR UPDATE" in compile_statement(lock_session.statement)
 
+    active_status_lock_session = RecordingSession(_ScalarResult(entitlement))
+    assert (
+        await EntitlementsRepo.get_premium_with_active_status_for_update(
+            active_status_lock_session, 7
+        )
+        is entitlement
+    )
+    active_status_sql = compile_statement(active_status_lock_session.statement)
+    assert "entitlements.status = 'ACTIVE'" in active_status_sql
+    assert "entitlements.ends_at IS NULL" not in active_status_sql
+    assert "entitlements.ends_at >" not in active_status_sql
+    assert "FOR UPDATE" in active_status_sql
+
 
 async def test_entitlement_request_cache_reuses_premium_status_for_same_flow() -> None:
     now_utc = datetime(2026, 3, 14, 12, 0, tzinfo=UTC)

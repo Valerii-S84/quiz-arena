@@ -32,11 +32,21 @@ async def _apply_premium_entitlement(
     if existing_entitlement is not None:
         return
 
-    active_entitlement = await EntitlementsRepo.get_active_premium_for_update(
-        session, user_id, now_utc
+    active_entitlement = await EntitlementsRepo.get_premium_with_active_status_for_update(
+        session, user_id
     )
     starts_at = now_utc
     ends_at = now_utc + timedelta(days=product.premium_days)
+
+    if (
+        active_entitlement is not None
+        and active_entitlement.ends_at is not None
+        and active_entitlement.ends_at <= now_utc
+    ):
+        active_entitlement.status = "EXPIRED"
+        active_entitlement.updated_at = now_utc
+        await session.flush()
+        active_entitlement = None
 
     if active_entitlement is not None:
         active_rank = _premium_plan_rank(active_entitlement.scope)

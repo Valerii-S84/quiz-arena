@@ -36,7 +36,7 @@ def _repair_credited_payment_evidence(
     raw_successful_payment: dict[str, object],
 ) -> None:
     existing_charge_id = purchase.telegram_payment_charge_id
-    if existing_charge_id is not None:
+    if existing_charge_id is not None and existing_charge_id.strip():
         if existing_charge_id != telegram_payment_charge_id:
             raise PurchasePrecheckoutValidationError
         return
