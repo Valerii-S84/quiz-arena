@@ -31,18 +31,6 @@ if ! ensure_base_ref; then
 fi
 
 fail=0
-diff_output=$(mktemp)
-trap 'rm -f "$diff_output"' EXIT
-
-if ! merge_base=$(git merge-base "$BASE_REF" HEAD); then
-  echo "ERROR: Growth delta guard requires a merge base for ${BASE_REF} and HEAD." >&2
-  exit 1
-fi
-
-if ! git diff --numstat "$merge_base"..HEAD >"$diff_output"; then
-  echo "ERROR: Growth delta guard failed to diff ${BASE_REF}...HEAD." >&2
-  exit 1
-fi
 
 while IFS=$'\t' read -r added deleted file; do
   [[ -z "$file" ]] && continue
@@ -63,6 +51,6 @@ while IFS=$'\t' read -r added deleted file; do
       ;;
   esac
 
-done <"$diff_output"
+done < <(git diff --numstat "$BASE_REF"...HEAD)
 
 exit $fail

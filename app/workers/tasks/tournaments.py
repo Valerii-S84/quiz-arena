@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
-from app.workers.task_heartbeat import run_tracked_async_job
 from app.workers.tasks.tournaments_async import (
     run_private_tournament_rounds_async as _run_private_tournament_rounds_async,
 )
@@ -18,14 +18,11 @@ def run_private_tournament_rounds(
     batch_size: int = DEADLINE_BATCH_SIZE,
     round_duration_hours: int = ROUND_DURATION_HOURS,
 ) -> dict[str, int]:
-    task_name = "app.workers.tasks.tournaments.run_private_tournament_rounds"
-    return run_tracked_async_job(
-        task_name=task_name,
-        schedule_key="private-tournaments-round-lifecycle",
-        awaitable=run_private_tournament_rounds_async(
+    return run_async_job(
+        run_private_tournament_rounds_async(
             batch_size=batch_size,
             round_duration_hours=round_duration_hours,
-        ),
+        )
     )
 
 

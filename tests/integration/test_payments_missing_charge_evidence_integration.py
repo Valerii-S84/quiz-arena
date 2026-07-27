@@ -221,3 +221,55 @@ async def test_valid_telegram_payment_charge_id_credits_once_and_duplicate_is_re
 
     assert await _purchase_credit_count(init.purchase_id) == 1
     assert await _premium_entitlement_count(user_id=user_id, purchase_id=init.purchase_id) == 1
+
+
+@pytest.mark.asyncio
+async def test_credited_replay_repairs_missing_charge_without_duplicate_credit() -> None:
+    now_utc = datetime(2026, 7, 10, 13, 0, tzinfo=UTC)
+    user_id = await _create_user("credited-replay-missing-charge")
+    init = await _create_prechecked_premium_purchase(
+        user_id=user_id,
+        idempotency_prefix="credited-replay-missing-charge",
+        now_utc=now_utc,
+    )
+    raw_successful_payment = _raw_successful_payment(
+        init.invoice_payload,
+        init.final_stars_amount,
+    )
+
+    async with SessionLocal.begin() as session:
+        await PurchaseService.apply_successful_payment(
+            session,
+            user_id=user_id,
+            invoice_payload=init.invoice_payload,
+            telegram_payment_charge_id="tg_charge_repair_source",
+            raw_successful_payment=raw_successful_payment,
+            now_utc=now_utc,
+        )
+
+    async with SessionLocal.begin() as session:
+        purchase = await PurchasesRepo.get_by_id_for_update(session, init.purchase_id)
+        assert purchase is not None
+        purchase.telegram_payment_charge_id = None
+
+    async with SessionLocal.begin() as session:
+        replay = await PurchaseService.apply_successful_payment(
+            session,
+            user_id=user_id,
+            invoice_payload=init.invoice_payload,
+            telegram_payment_charge_id="tg_charge_repaired",
+            raw_successful_payment=raw_successful_payment,
+            now_utc=now_utc,
+        )
+
+    assert replay.status == "CREDITED"
+    assert replay.idempotent_replay is True
+
+    async with SessionLocal.begin() as session:
+        purchase = await PurchasesRepo.get_by_id(session, init.purchase_id)
+        assert purchase is not None
+        assert purchase.telegram_payment_charge_id == "tg_charge_repaired"
+        assert purchase.status == "CREDITED"
+
+    assert await _purchase_credit_count(init.purchase_id) == 1
+    assert await _premium_entitlement_count(user_id=user_id, purchase_id=init.purchase_id) == 1

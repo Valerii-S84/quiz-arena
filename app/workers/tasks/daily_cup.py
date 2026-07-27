@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from celery import Task
-
+from app.workers.asyncio_runner import run_async_job
 from app.workers.celery_app import celery_app
-from app.workers.task_heartbeat import run_tracked_async_job
 from app.workers.tasks.daily_cup_async import (
     close_daily_cup_registration_and_start_async as _close_daily_cup_registration_and_start_async,
 )
@@ -22,7 +20,6 @@ from app.workers.tasks.daily_cup_async import (
 from app.workers.tasks.daily_cup_async import (
     send_daily_cup_last_call_reminder_async as _send_daily_cup_last_call_reminder_async,
 )
-from app.workers.tasks.daily_cup_core import DailyCupCancelDeliveryRetryNeeded
 from app.workers.tasks.daily_cup_messaging import run_daily_cup_round_messaging
 from app.workers.tasks.daily_cup_nonfinishers_summary import run_daily_cup_nonfinishers_summary
 from app.workers.tasks.daily_cup_prestart_reminder import (
@@ -81,109 +78,47 @@ __all__ = [
     retry_kwargs={"max_retries": 5},
 )
 def send_invite() -> dict[str, int]:
-    task_name = "app.workers.tasks.daily_cup.send_invite"
-    return run_tracked_async_job(
-        task_name=task_name,
-        schedule_key="daily-cup-send-invite-on-demand",
-        awaitable=send_daily_cup_invite_async(),
-    )
+    return run_async_job(send_daily_cup_invite_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.send_invite_registration")
 def send_invite_registration() -> dict[str, int]:
-    task_name = "app.workers.tasks.daily_cup.send_invite_registration"
-    return run_tracked_async_job(
-        task_name=task_name,
-        schedule_key="daily-cup-send-invite-registration",
-        awaitable=send_daily_cup_invite_registration_async(),
-    )
+    return run_async_job(send_daily_cup_invite_registration_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.open_registration")
 def open_registration() -> dict[str, int]:
-    task_name = "app.workers.tasks.daily_cup.open_registration"
-    return run_tracked_async_job(
-        task_name=task_name,
-        schedule_key="daily-cup-open-registration",
-        awaitable=open_daily_cup_registration_async(),
-    )
+    return run_async_job(open_daily_cup_registration_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.send_last_call_reminder")
 def send_last_call_reminder() -> dict[str, int]:
-    task_name = "app.workers.tasks.daily_cup.send_last_call_reminder"
-    return run_tracked_async_job(
-        task_name=task_name,
-        schedule_key="daily-cup-last-call-reminder",
-        awaitable=send_daily_cup_last_call_reminder_async(),
-    )
+    return run_async_job(send_daily_cup_last_call_reminder_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.send_prestart_reminder")
 def send_prestart_reminder() -> dict[str, int]:
-    task_name = "app.workers.tasks.daily_cup.send_prestart_reminder"
-    return run_tracked_async_job(
-        task_name=task_name,
-        schedule_key="daily-cup-prestart-reminder",
-        awaitable=send_daily_cup_prestart_reminder_async(),
-    )
+    return run_async_job(send_daily_cup_prestart_reminder_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.publish_final_results")
 def publish_final_results() -> dict[str, int]:
-    task_name = "app.workers.tasks.daily_cup.publish_final_results"
-    return run_tracked_async_job(
-        task_name=task_name,
-        schedule_key="daily-cup-publish-final-results",
-        awaitable=publish_daily_cup_final_results_async(),
-    )
+    return run_async_job(publish_daily_cup_final_results_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.send_turn_reminders")
 def send_turn_reminders() -> dict[str, int]:
-    task_name = "app.workers.tasks.daily_cup.send_turn_reminders"
-    return run_tracked_async_job(
-        task_name=task_name,
-        schedule_key="daily-cup-turn-reminders",
-        awaitable=run_daily_cup_turn_reminders_async(),
-    )
+    return run_async_job(run_daily_cup_turn_reminders_async())
 
 
-@celery_app.task(
-    name="app.workers.tasks.daily_cup.close_registration_and_start",
-    bind=True,
-    max_retries=5,
-)
-def close_registration_and_start(
-    self: Task,
-    *,
-    tournament_id: str | None = None,
-) -> dict[str, int]:
-    task_name = "app.workers.tasks.daily_cup.close_registration_and_start"
-    try:
-        return run_tracked_async_job(
-            task_name=task_name,
-            schedule_key="daily-cup-close-registration",
-            awaitable=close_daily_cup_registration_and_start_async(
-                tournament_id=tournament_id,
-            ),
-        )
-    except DailyCupCancelDeliveryRetryNeeded as exc:
-        raise self.retry(
-            exc=exc,
-            countdown=exc.retry_after_seconds,
-            kwargs={"tournament_id": exc.tournament_id},
-        )
+@celery_app.task(name="app.workers.tasks.daily_cup.close_registration_and_start")
+def close_registration_and_start() -> dict[str, int]:
+    return run_async_job(close_daily_cup_registration_and_start_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.advance_rounds")
 def advance_rounds() -> dict[str, int]:
-    task_name = "app.workers.tasks.daily_cup.advance_rounds"
-    return run_tracked_async_job(
-        task_name=task_name,
-        schedule_key="daily-cup-round-advance",
-        awaitable=advance_daily_cup_rounds_async(),
-    )
+    return run_async_job(advance_daily_cup_rounds_async())
 
 
 configure_daily_cup_schedule(celery_app)

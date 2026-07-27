@@ -24,7 +24,6 @@ from app.db.repo.tournament_matches_repo import TournamentMatchesRepo
 from app.db.repo.tournament_participants_repo import TournamentParticipantsRepo
 from app.db.repo.tournaments_repo import TournamentsRepo
 from app.db.repo.users_repo import UsersRepo
-from app.db.repo.worker_task_heartbeats_repo import WorkerTaskHeartbeatsRepo
 
 __all__ = [
     "EnergyRepo",
@@ -53,5 +52,4 @@ __all__ = [
     "TournamentParticipantsRepo",
     "TournamentsRepo",
     "UsersRepo",
-    "WorkerTaskHeartbeatsRepo",
 ]

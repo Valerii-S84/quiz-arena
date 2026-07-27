@@ -99,15 +99,13 @@ async def test_run_private_tournament_round_messaging_async_reloads_inside_mutex
 def test_private_tournament_messaging_wrapper_schedules_retry_needed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    captured: dict[str, str] = {}
     retry_calls: list[dict[str, object]] = []
 
     class _RetryScheduled(RuntimeError):
         pass
 
-    def _run(*, task_name, schedule_key, awaitable):
-        captured.update(task_name=task_name, schedule_key=schedule_key)
-        awaitable.close()
+    def _run(coro):
+        coro.close()
         return {
             "processed": 1,
             "participants_total": 1,
@@ -119,7 +117,7 @@ def test_private_tournament_messaging_wrapper_schedules_retry_needed(
             "retry_after_seconds": 7,
         }
 
-    monkeypatch.setattr(tournaments_messaging, "run_tracked_async_job", _run)
+    monkeypatch.setattr(tournaments_messaging, "run_async_job", _run)
 
     def _retry(**kwargs: object) -> None:
         retry_calls.append(kwargs)
@@ -137,12 +135,6 @@ def test_private_tournament_messaging_wrapper_schedules_retry_needed(
         retry_calls[0]["exc"],
         tournaments_messaging.PrivateTournamentDeliveryRetryNeeded,
     )
-    assert captured == {
-        "task_name": (
-            "app.workers.tasks.tournaments_messaging." "run_private_tournament_round_messaging"
-        ),
-        "schedule_key": "private-tournament-round-messaging-on-demand",
-    }
 
 
 @pytest.mark.asyncio
