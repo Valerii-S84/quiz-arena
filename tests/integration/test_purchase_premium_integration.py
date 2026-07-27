@@ -173,6 +173,104 @@ async def test_premium_upgrade_extends_from_existing_end_and_revokes_old_entitle
 
 
 @pytest.mark.asyncio
+async def test_premium_purchase_expires_stale_active_entitlement_before_creating_new() -> None:
+    now_utc = datetime.now(UTC)
+    user_id = await _create_user("premium-expired-active")
+    expired_end = now_utc - timedelta(days=1)
+
+    async with SessionLocal.begin() as session:
+        stale_entitlement = Entitlement(
+            user_id=user_id,
+            entitlement_type="PREMIUM",
+            scope="PREMIUM_YEAR",
+            status="ACTIVE",
+            starts_at=now_utc - timedelta(days=366),
+            ends_at=expired_end,
+            source_purchase_id=None,
+            idempotency_key=f"entitlement-stale-active-{uuid4().hex}",
+            metadata_={},
+            created_at=now_utc - timedelta(days=366),
+            updated_at=expired_end,
+        )
+        session.add(stale_entitlement)
+        await session.flush()
+        stale_entitlement_id = stale_entitlement.id
+
+    async with SessionLocal.begin() as session:
+        init = await PurchaseService.init_purchase(
+            session,
+            user_id=user_id,
+            product_code="PREMIUM_WEEK",
+            idempotency_key="premium-after-expired-active-1",
+            now_utc=now_utc,
+        )
+        await PurchaseService.mark_invoice_sent(session, purchase_id=init.purchase_id)
+        await PurchaseService.validate_precheckout(
+            session,
+            user_id=user_id,
+            invoice_payload=init.invoice_payload,
+            total_amount=init.final_stars_amount,
+            now_utc=now_utc,
+        )
+        first = await PurchaseService.apply_successful_payment(
+            session,
+            user_id=user_id,
+            invoice_payload=init.invoice_payload,
+            telegram_payment_charge_id="tg_charge_after_expired_active_1",
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
+            now_utc=now_utc,
+        )
+        replay = await PurchaseService.apply_successful_payment(
+            session,
+            user_id=user_id,
+            invoice_payload=init.invoice_payload,
+            telegram_payment_charge_id="tg_charge_after_expired_active_1",
+            raw_successful_payment={
+                "invoice_payload": init.invoice_payload,
+                "currency": "XTR",
+                "total_amount": init.final_stars_amount,
+            },
+            now_utc=now_utc,
+        )
+
+    assert first.status == "CREDITED"
+    assert first.idempotent_replay is False
+    assert replay.status == "CREDITED"
+    assert replay.idempotent_replay is True
+
+    async with SessionLocal.begin() as session:
+        purchase = await PurchasesRepo.get_by_id(session, init.purchase_id)
+        assert purchase is not None
+        assert purchase.status == "CREDITED"
+
+        entitlements = list(
+            (
+                await session.scalars(
+                    select(Entitlement).where(
+                        Entitlement.user_id == user_id,
+                        Entitlement.entitlement_type == "PREMIUM",
+                    )
+                )
+            ).all()
+        )
+        assert len(entitlements) == 2
+
+        stale = next(item for item in entitlements if item.id == stale_entitlement_id)
+        assert stale.status == "EXPIRED"
+        assert stale.updated_at == now_utc
+
+        active = next(item for item in entitlements if item.source_purchase_id == init.purchase_id)
+        assert active.status == "ACTIVE"
+        assert active.scope == "PREMIUM_WEEK"
+        assert active.starts_at == now_utc
+        assert active.ends_at == now_utc + timedelta(days=7)
+
+
+@pytest.mark.asyncio
 async def test_premium_downgrade_is_blocked_during_active_higher_tier() -> None:
     now_utc = datetime.now(UTC)
     user_id = await _create_user("premium-downgrade")

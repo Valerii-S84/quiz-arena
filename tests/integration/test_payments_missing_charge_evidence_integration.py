@@ -223,13 +223,23 @@ async def test_valid_telegram_payment_charge_id_credits_once_and_duplicate_is_re
     assert await _premium_entitlement_count(user_id=user_id, purchase_id=init.purchase_id) == 1
 
 
+@pytest.mark.parametrize(
+    ("stored_charge_id", "case_name"),
+    [
+        (None, "missing"),
+        ("", "blank"),
+    ],
+)
 @pytest.mark.asyncio
-async def test_credited_replay_repairs_missing_charge_without_duplicate_credit() -> None:
+async def test_credited_replay_repairs_missing_or_blank_charge_without_duplicate_credit(
+    stored_charge_id: str | None,
+    case_name: str,
+) -> None:
     now_utc = datetime(2026, 7, 10, 13, 0, tzinfo=UTC)
-    user_id = await _create_user("credited-replay-missing-charge")
+    user_id = await _create_user(f"credited-replay-{case_name}-charge")
     init = await _create_prechecked_premium_purchase(
         user_id=user_id,
-        idempotency_prefix="credited-replay-missing-charge",
+        idempotency_prefix=f"credited-replay-{case_name}-charge",
         now_utc=now_utc,
     )
     raw_successful_payment = _raw_successful_payment(
@@ -250,7 +260,7 @@ async def test_credited_replay_repairs_missing_charge_without_duplicate_credit()
     async with SessionLocal.begin() as session:
         purchase = await PurchasesRepo.get_by_id_for_update(session, init.purchase_id)
         assert purchase is not None
-        purchase.telegram_payment_charge_id = None
+        purchase.telegram_payment_charge_id = stored_charge_id
 
     async with SessionLocal.begin() as session:
         replay = await PurchaseService.apply_successful_payment(

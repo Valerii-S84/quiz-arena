@@ -91,6 +91,23 @@ class EntitlementsRepo:
         )
 
     @staticmethod
+    async def get_premium_with_active_status_for_update(
+        session: AsyncSession,
+        user_id: int,
+    ) -> Entitlement | None:
+        stmt = (
+            select(Entitlement)
+            .where(
+                Entitlement.user_id == user_id,
+                Entitlement.entitlement_type == "PREMIUM",
+                Entitlement.status == "ACTIVE",
+            )
+            .with_for_update()
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
     async def create(session: AsyncSession, *, entitlement: Entitlement) -> Entitlement:
         session.add(entitlement)
         await session.flush()
