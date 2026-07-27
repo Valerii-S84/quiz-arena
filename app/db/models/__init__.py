@@ -21,7 +21,11 @@ from app.db.models.payment_inbox import (
     TelegramUpdateInbox,
 )
 from app.db.models.processed_updates import ProcessedUpdate
-from app.db.models.production_reliability import TelegramDeliveryAttempt, WorkerTaskHeartbeat
+from app.db.models.production_reliability import (
+    ProductionInvariantAlert,
+    TelegramDeliveryAttempt,
+    WorkerTaskHeartbeat,
+)
 from app.db.models.promo_attempts import PromoAttempt
 from app.db.models.promo_audit_log import PromoAuditLog
 from app.db.models.promo_code_batches import PromoCodeBatch
@@ -64,6 +68,7 @@ __all__ = [
     "PaymentEvent",
     "PaymentReconciliationReview",
     "ProcessedUpdate",
+    "ProductionInvariantAlert",
     "PromoAttempt",
     "PromoAuditLog",
     "PromoCode",

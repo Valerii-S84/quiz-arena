@@ -18,6 +18,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.models.base import Base
+from app.db.models.production_invariant_alert import ProductionInvariantAlert
 
 
 class TelegramDeliveryAttempt(Base):
@@ -128,3 +129,10 @@ class WorkerTaskHeartbeat(Base):
         nullable=False,
         server_default=text("now()"),
     )
+
+
+__all__ = [
+    "ProductionInvariantAlert",
+    "TelegramDeliveryAttempt",
+    "WorkerTaskHeartbeat",
+]

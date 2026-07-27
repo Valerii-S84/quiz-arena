@@ -1,3 +1,7 @@
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +21,27 @@ from app.api.routes.public_website_analytics import router as public_website_ana
 from app.api.routes.telegram_webhook import router as telegram_webhook_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.workers.tasks.production_invariant_alerts import run_production_invariant_monitor
+
+_PRODUCTION_ENVIRONMENTS = frozenset({"prod", "production"})
+
+
+@asynccontextmanager
+async def app_lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    monitor_task: asyncio.Task[None] | None = None
+    app_env = str(get_settings().app_env).strip().lower()
+    if app_env in _PRODUCTION_ENVIRONMENTS:
+        monitor_task = asyncio.create_task(
+            run_production_invariant_monitor(),
+            name="production-invariant-monitor",
+        )
+    try:
+        yield
+    finally:
+        if monitor_task is not None:
+            monitor_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await monitor_task
 
 
 def create_app() -> FastAPI:
@@ -27,6 +52,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Quiz Arena Bot API",
         version="0.1.0",
+        lifespan=app_lifespan,
         docs_url="/docs" if docs_enabled else None,
         redoc_url="/redoc" if docs_enabled else None,
         openapi_url="/openapi.json" if docs_enabled else None,
