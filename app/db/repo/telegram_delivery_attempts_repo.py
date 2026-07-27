@@ -9,11 +9,9 @@ from app.db.repo.production_reliability_types import (
     TelegramDeliveryAttemptCreate,
     TelegramDeliveryFailure,
 )
-from app.db.repo.telegram_blocked_candidates_repo import TelegramBlockedCandidatesRepo
-from app.db.repo.telegram_delivery_retry_repo import TelegramDeliveryRetryRepo
 
 
-class TelegramDeliveryAttemptsRepo(TelegramBlockedCandidatesRepo, TelegramDeliveryRetryRepo):
+class TelegramDeliveryAttemptsRepo:
     @staticmethod
     async def create_once(
         session: AsyncSession,
@@ -68,17 +66,13 @@ class TelegramDeliveryAttemptsRepo(TelegramBlockedCandidatesRepo, TelegramDelive
         session: AsyncSession,
         *,
         idempotency_key: str,
-        expected_attempt_count: int | None = None,
     ) -> bool:
-        conditions = [
-            TelegramDeliveryAttempt.idempotency_key == idempotency_key,
-            TelegramDeliveryAttempt.status == "PENDING",
-        ]
-        if expected_attempt_count is not None:
-            conditions.append(TelegramDeliveryAttempt.attempt_count == expected_attempt_count)
         stmt = (
             update(TelegramDeliveryAttempt)
-            .where(*conditions)
+            .where(
+                TelegramDeliveryAttempt.idempotency_key == idempotency_key,
+                TelegramDeliveryAttempt.status != "SENT",
+            )
             .values(
                 status="SENT",
                 sent_at=func.now(),
@@ -95,8 +89,6 @@ class TelegramDeliveryAttemptsRepo(TelegramBlockedCandidatesRepo, TelegramDelive
         result = await session.execute(stmt)
         if result.scalar_one_or_none() is not None:
             return True
-        if expected_attempt_count is not None:
-            return False
 
         replay_stmt = select(TelegramDeliveryAttempt.id).where(
             TelegramDeliveryAttempt.idempotency_key == idempotency_key,
@@ -111,17 +103,13 @@ class TelegramDeliveryAttemptsRepo(TelegramBlockedCandidatesRepo, TelegramDelive
         *,
         idempotency_key: str,
         failure: TelegramDeliveryFailure,
-        expected_attempt_count: int | None = None,
     ) -> bool:
-        conditions = [
-            TelegramDeliveryAttempt.idempotency_key == idempotency_key,
-            TelegramDeliveryAttempt.status == "PENDING",
-        ]
-        if expected_attempt_count is not None:
-            conditions.append(TelegramDeliveryAttempt.attempt_count == expected_attempt_count)
         stmt = (
             update(TelegramDeliveryAttempt)
-            .where(*conditions)
+            .where(
+                TelegramDeliveryAttempt.idempotency_key == idempotency_key,
+                TelegramDeliveryAttempt.status != "SENT",
+            )
             .values(
                 status="FAILED",
                 failed_at=func.now(),
@@ -144,17 +132,13 @@ class TelegramDeliveryAttemptsRepo(TelegramBlockedCandidatesRepo, TelegramDelive
         idempotency_key: str,
         failure_code: str,
         failure_reason: str | None = None,
-        expected_attempt_count: int | None = None,
     ) -> bool:
-        conditions = [
-            TelegramDeliveryAttempt.idempotency_key == idempotency_key,
-            TelegramDeliveryAttempt.status == "PENDING",
-        ]
-        if expected_attempt_count is not None:
-            conditions.append(TelegramDeliveryAttempt.attempt_count == expected_attempt_count)
         stmt = (
             update(TelegramDeliveryAttempt)
-            .where(*conditions)
+            .where(
+                TelegramDeliveryAttempt.idempotency_key == idempotency_key,
+                TelegramDeliveryAttempt.status != "SENT",
+            )
             .values(
                 status="SKIPPED",
                 skipped_at=func.now(),
@@ -163,6 +147,57 @@ class TelegramDeliveryAttemptsRepo(TelegramBlockedCandidatesRepo, TelegramDelive
                 failure_reason=failure_reason,
                 telegram_error_code=None,
                 is_blocked_candidate=False,
+                updated_at=func.now(),
+            )
+            .returning(TelegramDeliveryAttempt.id)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def defer_retry_after(
+        session: AsyncSession,
+        *,
+        idempotency_key: str,
+        retry_after_seconds: int,
+        claim_ttl_seconds: int = 300,
+    ) -> bool:
+        retry_after = max(1, int(retry_after_seconds))
+        claim_ttl = max(1, int(claim_ttl_seconds))
+        retry_offset = claim_ttl - retry_after
+        stmt = (
+            update(TelegramDeliveryAttempt)
+            .where(
+                TelegramDeliveryAttempt.idempotency_key == idempotency_key,
+                TelegramDeliveryAttempt.status == "PENDING",
+            )
+            .values(
+                attempt_count=TelegramDeliveryAttempt.attempt_count + 1,
+                updated_at=func.now() - func.make_interval(0, 0, 0, 0, 0, 0, retry_offset),
+            )
+            .returning(TelegramDeliveryAttempt.id)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def claim_stale_pending_replay(
+        session: AsyncSession,
+        *,
+        idempotency_key: str,
+        claim_ttl_seconds: int = 300,
+    ) -> bool:
+        claim_ttl = max(1, int(claim_ttl_seconds))
+        stmt = (
+            update(TelegramDeliveryAttempt)
+            .where(
+                TelegramDeliveryAttempt.idempotency_key == idempotency_key,
+                TelegramDeliveryAttempt.status == "PENDING",
+                TelegramDeliveryAttempt.updated_at
+                <= func.now() - func.make_interval(0, 0, 0, 0, 0, 0, claim_ttl),
+            )
+            .values(
+                attempt_count=TelegramDeliveryAttempt.attempt_count + 1,
                 updated_at=func.now(),
             )
             .returning(TelegramDeliveryAttempt.id)

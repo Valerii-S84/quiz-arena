@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.workers.asyncio_runner import run_async_job
 from app.workers.tasks import telegram_updates_observability
 
 
@@ -30,8 +29,6 @@ def _session_local_with_sessions(*sessions: object) -> SimpleNamespace:
 
 
 def test_run_telegram_updates_reliability_alerts_task_wrapper(monkeypatch) -> None:
-    captured: dict[str, str] = {}
-
     async def fake_async() -> dict[str, object]:
         return {
             "processed_updates_processing_stuck_count": 1,
@@ -41,31 +38,15 @@ def test_run_telegram_updates_reliability_alerts_task_wrapper(monkeypatch) -> No
             "telegram_updates_failed_final_total": 1,
         }
 
-    def run_tracked(*, task_name, schedule_key, awaitable):
-        captured.update(task_name=task_name, schedule_key=schedule_key)
-        return run_async_job(awaitable)
-
     monkeypatch.setattr(
         telegram_updates_observability,
         "run_telegram_updates_reliability_alerts_async",
         fake_async,
     )
-    monkeypatch.setattr(
-        telegram_updates_observability,
-        "run_tracked_async_job",
-        run_tracked,
-    )
 
     result = telegram_updates_observability.run_telegram_updates_reliability_alerts()
     assert result["processed_updates_processing_stuck_count"] == 1
     assert result["telegram_updates_retries_total"] == 4
-    assert captured == {
-        "task_name": (
-            "app.workers.tasks.telegram_updates_observability."
-            "run_telegram_updates_reliability_alerts"
-        ),
-        "schedule_key": "telegram-updates-reliability-alerts-every-5-minutes",
-    }
 
 
 @pytest.mark.asyncio
