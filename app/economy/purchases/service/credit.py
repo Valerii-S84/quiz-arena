@@ -28,6 +28,32 @@ RECOVERABLE_PAYMENT_STATUSES = frozenset(
 )
 
 
+def _repair_credited_payment_evidence(
+    *,
+    purchase,
+    invoice_payload: str,
+    telegram_payment_charge_id: str,
+    raw_successful_payment: dict[str, object],
+) -> None:
+    existing_charge_id = purchase.telegram_payment_charge_id
+    if existing_charge_id is not None:
+        if existing_charge_id != telegram_payment_charge_id:
+            raise PurchasePrecheckoutValidationError
+        return
+
+    validation_error = successful_payment_validation_error(
+        purchase=purchase,
+        invoice_payload=invoice_payload,
+        telegram_payment_charge_id=telegram_payment_charge_id,
+        raw_successful_payment=raw_successful_payment,
+    )
+    if validation_error is not None:
+        raise PurchasePrecheckoutValidationError
+
+    purchase.telegram_payment_charge_id = telegram_payment_charge_id
+    purchase.raw_successful_payment = sanitize_successful_payment_payload(raw_successful_payment)
+
+
 async def _mark_successful_payment(
     session: AsyncSession,
     *,
@@ -79,6 +105,12 @@ async def mark_successful_payment_paid_uncredited(
         raise PurchaseNotFoundError
 
     if purchase.status == "CREDITED":
+        _repair_credited_payment_evidence(
+            purchase=purchase,
+            invoice_payload=invoice_payload,
+            telegram_payment_charge_id=telegram_payment_charge_id,
+            raw_successful_payment=raw_successful_payment,
+        )
         return credited_replay_result(purchase=purchase, user_id=user_id)
 
     if purchase.status not in RECOVERABLE_PAYMENT_STATUSES:
