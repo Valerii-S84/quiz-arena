@@ -51,9 +51,8 @@ async def test_apply_premium_entitlement_creates_new_entitlement_without_active_
         del purchase_id, entitlement_type
         return None
 
-    async def _fake_get_active_premium_for_update(_session, user_id: int, now_utc):
+    async def _fake_get_premium_with_active_status_for_update(_session, user_id: int):
         assert user_id == 7
-        assert now_utc == NOW
         return None
 
     async def _fake_create(_session, *, entitlement: Entitlement):
@@ -67,8 +66,8 @@ async def test_apply_premium_entitlement_creates_new_entitlement_without_active_
     )
     monkeypatch.setattr(
         purchase_entitlements.EntitlementsRepo,
-        "get_active_premium_for_update",
-        _fake_get_active_premium_for_update,
+        "get_premium_with_active_status_for_update",
+        _fake_get_premium_with_active_status_for_update,
     )
     monkeypatch.setattr(purchase_entitlements.EntitlementsRepo, "create", _fake_create)
 
@@ -97,7 +96,7 @@ async def test_apply_premium_entitlement_rejects_non_upgrade_active_plan(
     async def _fake_get_by_source_purchase_id_for_update(*_args, **_kwargs):
         return None
 
-    async def _fake_get_active_premium_for_update(_session, _user_id: int, _now_utc):
+    async def _fake_get_premium_with_active_status_for_update(_session, _user_id: int):
         return active_entitlement
 
     monkeypatch.setattr(
@@ -107,8 +106,8 @@ async def test_apply_premium_entitlement_rejects_non_upgrade_active_plan(
     )
     monkeypatch.setattr(
         purchase_entitlements.EntitlementsRepo,
-        "get_active_premium_for_update",
-        _fake_get_active_premium_for_update,
+        "get_premium_with_active_status_for_update",
+        _fake_get_premium_with_active_status_for_update,
     )
 
     with pytest.raises(PurchasePrecheckoutValidationError):
@@ -136,7 +135,7 @@ async def test_apply_premium_entitlement_revokes_active_plan_and_extends_upgrade
     async def _fake_get_by_source_purchase_id_for_update(*_args, **_kwargs):
         return None
 
-    async def _fake_get_active_premium_for_update(_session, _user_id: int, _now_utc):
+    async def _fake_get_premium_with_active_status_for_update(_session, _user_id: int):
         return active_entitlement
 
     async def _fake_create(_session, *, entitlement: Entitlement):
@@ -150,8 +149,8 @@ async def test_apply_premium_entitlement_revokes_active_plan_and_extends_upgrade
     )
     monkeypatch.setattr(
         purchase_entitlements.EntitlementsRepo,
-        "get_active_premium_for_update",
-        _fake_get_active_premium_for_update,
+        "get_premium_with_active_status_for_update",
+        _fake_get_premium_with_active_status_for_update,
     )
     monkeypatch.setattr(purchase_entitlements.EntitlementsRepo, "create", _fake_create)
 
@@ -191,7 +190,7 @@ async def test_apply_premium_entitlement_returns_existing_source_purchase(
     )
     monkeypatch.setattr(
         purchase_entitlements.EntitlementsRepo,
-        "get_active_premium_for_update",
+        "get_premium_with_active_status_for_update",
         _fail_get_active,
     )
     monkeypatch.setattr(purchase_entitlements.EntitlementsRepo, "create", _fail_create)
