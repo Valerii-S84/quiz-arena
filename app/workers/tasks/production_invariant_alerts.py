@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 
 import structlog
@@ -13,6 +14,7 @@ logger = structlog.get_logger(__name__)
 
 TASK_NAME = "app.workers.tasks.production_invariant_alerts.run_production_invariant_alerts"
 SCHEDULE_KEY = "production-critical-invariant-alerts-every-5-minutes"
+MONITOR_INTERVAL_SECONDS = 300.0
 
 
 async def run_production_invariant_alerts_async() -> dict[str, int]:
@@ -38,6 +40,18 @@ async def run_production_invariant_alerts_async() -> dict[str, int]:
     return summary
 
 
+async def run_production_invariant_monitor() -> None:
+    while True:
+        try:
+            await run_production_invariant_alerts_async()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # Keep the process-lifetime monitor alive after an isolated failed cycle.
+            logger.exception("production_invariant_monitor_cycle_failed")
+        await asyncio.sleep(MONITOR_INTERVAL_SECONDS)
+
+
 @celery_app.task(name=TASK_NAME)
 def run_production_invariant_alerts() -> dict[str, int]:
     return run_tracked_async_job(
@@ -47,21 +61,11 @@ def run_production_invariant_alerts() -> dict[str, int]:
     )
 
 
-celery_app.conf.beat_schedule = celery_app.conf.beat_schedule or {}
-celery_app.conf.beat_schedule.update(
-    {
-        SCHEDULE_KEY: {
-            "task": TASK_NAME,
-            "schedule": 300.0,
-            "options": {"queue": "q_normal"},
-        },
-    }
-)
-
-
 __all__ = [
+    "MONITOR_INTERVAL_SECONDS",
     "SCHEDULE_KEY",
     "TASK_NAME",
     "run_production_invariant_alerts",
     "run_production_invariant_alerts_async",
+    "run_production_invariant_monitor",
 ]

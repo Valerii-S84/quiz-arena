@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 
 import pytest
@@ -62,16 +63,33 @@ def test_task_wrapper_uses_heartbeat_tracking(monkeypatch: pytest.MonkeyPatch) -
     assert captured["schedule_key"] == production_invariant_alerts.SCHEDULE_KEY
 
 
-def test_task_schedule_registered() -> None:
-    schedule = production_invariant_alerts.celery_app.conf.beat_schedule[
-        production_invariant_alerts.SCHEDULE_KEY
-    ]
-
-    assert schedule == {
-        "task": production_invariant_alerts.TASK_NAME,
-        "schedule": 300.0,
-        "options": {"queue": "q_normal"},
+def test_task_is_not_scheduled_on_monitored_worker() -> None:
+    schedule = production_invariant_alerts.celery_app.conf.beat_schedule or {}
+    assert production_invariant_alerts.TASK_NAME not in {
+        entry["task"] for entry in schedule.values()
     }
+
+
+async def test_monitor_runs_evaluator_before_waiting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    async def _run() -> dict[str, int]:
+        nonlocal calls
+        calls += 1
+        return {"checks_total": 1}
+
+    async def _cancel_on_sleep(_seconds: float) -> None:
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(production_invariant_alerts, "run_production_invariant_alerts_async", _run)
+    monkeypatch.setattr(production_invariant_alerts.asyncio, "sleep", _cancel_on_sleep)
+
+    with pytest.raises(asyncio.CancelledError):
+        await production_invariant_alerts.run_production_invariant_monitor()
+
+    assert calls == 1
 
 
 def _result(*, name: str, status: str, severity: str, count: int) -> InvariantResult:

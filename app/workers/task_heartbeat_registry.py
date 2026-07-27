@@ -51,11 +51,6 @@ CRITICAL_TASK_HEARTBEATS: tuple[CriticalTaskHeartbeat, ...] = (
         stale_after_seconds=600,
     ),
     CriticalTaskHeartbeat(
-        task_name="app.workers.tasks.production_invariant_alerts.run_production_invariant_alerts",
-        schedule_key="production-critical-invariant-alerts-every-5-minutes",
-        stale_after_seconds=600,
-    ),
-    CriticalTaskHeartbeat(
         task_name="app.workers.tasks.daily_cup.send_invite",
         schedule_key="daily-cup-send-invite-on-demand",
         stale_after_seconds=None,
