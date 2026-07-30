@@ -4,6 +4,7 @@
 **Decision type:** Target architecture and incremental migration strategy  
 **Repository baseline:** `main` at `e4c1e6721f60c746cb3c3666fb03264859af71cc`  
 **Research date:** 2026-07-30  
+**Amended:** 2026-07-30 — Slice 2–4 sequencing aligned with the implementation plan; outgoing-detail retention made a pre-producer gate
 **Scope:** Quiz Arena backend: FastAPI, aiogram, Celery, PostgreSQL, Redis, Telegram integrations, admin and analytics  
 
 ---
@@ -543,7 +544,46 @@ Raw secrets and sensitive headers are not stored.
 
 Observability must not merely alert on stale incoming work. A scheduled repair task re-enqueues eligible `RECEIVED`, `RETRY` and expired `PROCESSING` rows.
 
-The repair operation itself is idempotent. Multiple enqueues are acceptable because the claim protocol serializes processing.
+The scanner performs only a bounded read-only selection and enqueues stable
+`update_id` values after the transaction closes; it never changes status,
+claim token or lease. The worker is the sole claimant/reclaimer. The repair
+operation itself is idempotent. Multiple enqueues are acceptable because the
+worker claim protocol serializes processing.
+
+### 10.5 Payment-event replay authority and protected evidence
+
+`ProcessedUpdate` owns transport lease/status only. `PaymentEvent` owns the
+payment command correlation, monotonic business outcome and replay lifecycle;
+transport age or status never establishes that a payment was applied.
+
+Retryable `SUCCESSFUL_PAYMENT` and `REFUNDED_PAYMENT` evidence uses an
+event-specific, authenticated-encryption envelope with explicit schema version,
+dedicated key version, ciphertext hash, expiry and redaction timestamp. The
+allowlist contains only fields consumed by the payment command, including the
+raw `telegram_payment_charge_id` where required. Existing hashes remain for
+lookup/log-safe correlation. A whole Telegram `Update`, `order_info`, tokens,
+unneeded provider fields and plaintext identifiers are forbidden in JSON,
+logs, errors and admin responses.
+
+The activation sequence is mandatory:
+
+1. additive envelope schema, key validation and disabled crypto adapter;
+2. static payment-event handlers, worker-owned claim/CAS repair, terminal
+   retention task, schedules and visibility;
+3. only then encryption-at-write and the first `RETRY` producer.
+
+The repair scanner performs a bounded read-only selection of due
+`payment_event_id` values and enqueues after commit. It does not claim or
+decrypt. The worker alone claims a due event in a short transaction, decrypts
+outside SQL, invokes the actual command and compare-and-set completes with its
+token/version. Duplicate enqueues are harmless. Wrong-key, tampered or expired
+evidence moves to `REVIEW` rather than retrying forever.
+
+Terminal `APPLIED`, `FAILED` and `REVIEW` ciphertext is redacted by a bounded,
+scheduled retention operation after the approved horizon. `PROCESSING` and
+`RETRY` evidence is not silently purged. Once a live writer has been activated,
+repair and retention continue until all nonterminal/unredacted rows and the
+approved backup/replica horizon are clear.
 
 ---
 
@@ -624,8 +664,10 @@ effect_type
 aggregate_type
 aggregate_id
 recipient_key
+recipient_digest
 payload_version
 payload
+payload_digest
 idempotency_key
 status
 attempt_count
@@ -641,11 +683,18 @@ manual_replay_count
 last_replayed_at
 last_replayed_by
 last_replay_reason
+terminal_at
+detail_expires_at
+detail_redacted_at
 created_at
 updated_at
 ```
 
 A unique constraint protects `idempotency_key` within the chosen namespace.
+Stored idempotency keys are opaque or HMAC-derived and do not embed a raw
+recipient or other unnecessary identifier. Recipient, payload, provider and
+error-detail fields are nullable after approved redaction; their bounded
+digests and aggregate-safe audit metadata remain.
 
 ### 11.4 States
 
@@ -740,7 +789,29 @@ It clears terminal error fields as appropriate, sets `next_retry_at`, increments
 
 If the operator intentionally wants a new, separate message for the same aggregate, that is a new business effect with a new effect identity and idempotency key. It is not called replay and may reference the prior row through `supersedes_outgoing_id` or equivalent audit metadata.
 
-### 11.9 Operator visibility ships with the dispatcher
+### 11.9 Detail retention and redaction
+
+Replayable delivery detail has a bounded lifecycle:
+
+- `detail_expires_at` is persisted when the row is created; the default approved
+  maximum is 30 days and applies to live storage, replicas and backups according
+  to the security/privacy decision;
+- expired `PENDING` or `RETRY`, and expired-detail `CLAIMED` after its lease,
+  are compare-and-set to `FAILED(DETAIL_RETENTION_EXPIRED)` before redaction;
+- an active claim is never redacted underneath its owner; after lease expiry,
+  an expired-detail stale claim is terminalized before redaction;
+- a bounded `FOR UPDATE SKIP LOCKED` retention task clears recipient, payload,
+  provider identifiers and detailed errors, then records `detail_redacted_at`;
+- status, effect/type/version, opaque digests, aggregate-safe correlation,
+  timestamps, counters and replay/suppress audit remain;
+- replay, suppress and detailed inspection reject expired or redacted rows;
+- no nonterminal row is silently deleted.
+
+The retention task, schedule, alerts and backup/replica policy are deployed and
+verified before the first production producer. A producer without a working
+purger is incomplete.
+
+### 11.10 Operator visibility ships with the dispatcher
 
 The first production release of the dispatcher must include:
 
@@ -931,16 +1002,33 @@ The following findings are not architecture backlog. They are a separate immedia
 
 1. Existing TOTP secret must not be returned to a password-only pending principal.
 2. Refresh tokens require rotation, unique session/token identity and replay detection.
-3. Logout must attempt revocation of access and refresh independently and report/handle partial failure correctly.
-4. Refresh must revalidate current admin identity, role and enabled state rather than treating stale claims as authoritative.
+3. Logout atomically and idempotently revokes the access identity and current
+   refresh family/session in one state-store operation. If auth state is
+   unavailable, logout fails closed and retains both cookies so the same
+   credentials can retry.
+4. Every token issuance and authorization path — including initial
+   password-only login, partial/2FA completion and refresh — resolves current
+   admin email, role and enabled authority before creating a refresh family,
+   signing tokens or writing cookies. JWT claims and request-provided values
+   are never authority;
+   configuration is authoritative only if `PF-01` explicitly selects it, and
+   every path still consumes the shared resolver DTO rather than reading
+   configuration directly.
 
 Required tests include:
 
 - pending principal cannot read an enrolled TOTP secret;
 - predecessor refresh cannot be replayed after rotation;
 - concurrent refresh behavior is deterministic;
-- logout revokes both token identities even if one revocation operation fails;
-- role/email/disabled-state changes invalidate or update refresh behavior.
+- successful logout makes a copied access token and every token in the refresh
+  family unusable;
+- state-store failure sends no cookie deletion, and retry after recovery revokes
+  both identities;
+- logout versus refresh has one serialized outcome;
+- with `ADMIN_2FA_REQUIRED=false`, missing, disabled or mismatched authority is
+  denied with zero refresh-family, token or cookie issuance;
+- role/email/disabled-state changes invalidate every issuance and authorization
+  path.
 
 This work is shipped and verified independently before the first architecture pilot.
 
@@ -1265,6 +1353,15 @@ Temporary duplication is controlled, not merely documented.
 
 ## 21. Migration plan and stop gates
 
+**Sequencing amendment — 2026-07-30.** The accepted execution order for
+Slices 2–4 is now: noncritical Daily push correctness/boundary → durable
+dispatcher with Daily push as the low-risk end-to-end producer → all Referrals.
+The earlier text placed referral qualification before the dispatcher while the
+implementation brief fixed Daily push first. This amendment resolves that
+conflict and supersedes the former Slice-2 pre-dispatch correctness scope. It
+does not change the global module, transaction, idempotency, delivery or
+stop-gate rules.
+
 ### 21.1 Execution model for a solo-maintained product
 
 This roadmap is a sequence of independent value units, not a commitment to complete every slice continuously.
@@ -1366,13 +1463,30 @@ Exit criterion: no `SessionLocal`, ORM model or policy logic in the Celery task;
 
 **Pause gate:** if the pilot does not reduce implementation/test complexity, stop and revise the architecture before migrating another behavior.
 
-### Slice 2 — referral qualification (`R2`)
+### Slice 2 — noncritical Daily push correctness and boundary (`R2`)
 
-**Goal:** prove a richer single-module use case with locking/idempotency but without introducing the full Telegram dispatcher.
+**Goal:** correct the current success-marker race and prove a small application/
+presentation boundary before introducing the durable dispatcher.
 
-The business qualification and reward state transition are separated from notification. Notification may initially remain on the legacy path if it cannot yet meet durable delivery requirements.
+Deliverables:
 
-Exit criterion: business mutation is application-owned and idempotent; failed notification cannot change reward correctness.
+- a token-owned Redis task-run lease serializes concurrent Daily push scans;
+- eligibility is checked before send and a success marker is written only after
+  provider success;
+- the run lease remains held across the complete recipient loop; an ordinary
+  recipient failure creates no marker but does not release the lease early;
+- Redis/acquire/renewal loss or a post-send marker-write failure aborts further
+  sends; token-safe release happens after an ordinary completed invocation,
+  while marker-write failure leaves the token to expire and alerts;
+- provider-success-before-marker remains an explicit observable duplicate
+  window until Slice 3;
+- recipient/payload preparation is application-owned while Telegram rendering
+  and send remain adapter/entrypoint concerns;
+- no SQL transaction remains open during Telegram I/O.
+
+Exit criterion: two concurrent task invocations cannot send the same run in
+parallel, failed sends remain eligible, and the extracted boundary is ready for
+durable routing.
 
 ### Slice 3 — durable outgoing delivery foundation (`R3` infrastructure)
 
@@ -1388,25 +1502,37 @@ Deliverables:
 - scheduled repair/reclaim;
 - admin/ops visibility and alerts;
 - same-row manual replay with audit;
+- bounded detail-retention/redaction task and schedule, live before any producer;
 - provider crash-window tests;
-- one low-risk recoverable message migrated end to end.
+- Daily push migrated as the one low-risk recoverable message end to end.
 
-Exit criterion: there is a real production consumer, stale recovery and operator visibility. No orphan repository primitives remain without a caller.
+Exit criterion: there is a real production consumer, stale recovery, operator
+visibility and enforced detail retention. No orphan repository primitive
+remains without a caller, and no producer stores replayable detail without a
+working purger.
 
-**Major pause gate:** after Slice 3, reassess whether current product usage and incident history justify continuing into Arena, friend challenges and tournaments. The system may remain at this state indefinitely.
+**Major pause gate:** after Slice 3, reassess whether current product usage and
+incident history justify continuing through Referrals into Arena, friend
+challenges and tournaments. The system may remain at this state indefinitely.
 
-### Slice 4 — referral reward notification (`R2`)
+### Slice 4 — Referrals qualification, reward and notification (`R2`/`R3`)
 
-**Goal:** close the current “notified before delivery” failure mode.
+**Goal:** move the complete referral behavior after the dispatcher is proven,
+while closing the current “notified before delivery” failure mode.
 
 Deliverables:
 
+- qualification is an application-owned, locking/idempotent use case;
+- qualification is separated from reward choice/grant and notification;
+- reward choice/grant is application-owned and preserves current invariants;
 - reward state and outgoing notification recorded atomically where required;
 - delivery after commit;
 - retry and same-row manual replay;
 - no `notified_at` terminal marker before successful or explicitly terminal delivery state.
 
-Exit criterion: a provider failure does not permanently hide a granted reward notification.
+Exit criterion: business mutation is application-owned and idempotent; failed
+notification cannot change reward correctness or permanently hide a granted
+reward notification.
 
 ### Slice 5 — Arena completion (`R3`)
 

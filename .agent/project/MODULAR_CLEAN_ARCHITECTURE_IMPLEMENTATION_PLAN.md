@@ -111,14 +111,21 @@ audit. Жодний finding не став неактуальним через po
 
 ## 2. Implementation roadmap
 
+Порядок нижче є виконуваним тлумаченням ADR §21 з amendment від
+2026-07-30: після Slice 1 спочатку виправляється й виділяється Daily push,
+потім вводиться durable dispatcher, і лише після цього мігруються всі
+Referrals. Amendment supersede-ить попередні sequencing і Slice-2
+pre-dispatch correctness scope, але не змінює глобальні module, transaction,
+idempotency чи delivery rules ADR.
+
 Порядок release/slice фіксований:
 
 1. Release 0 — admin security.
 2. Release 1 — correctness, analytics truth, Redis state й architecture tooling.
 3. Slice 1 — promo reservation expiry.
-4. Slice 2 — некритичний Telegram delivery flow.
-5. Slice 3 — durable dispatcher, retry, repair і visibility.
-6. Referrals.
+4. Slice 2 — Daily push correctness and boundary.
+5. Slice 3 — durable dispatcher, retry, repair, visibility і retention.
+6. Slice 4 — Referrals.
 7. Arena.
 8. Friend challenges.
 9. Daily Cup і private tournaments.
@@ -188,44 +195,62 @@ audit. Жодний finding не став неактуальним через po
 
 - **Мета / risk / залежності:** закрити `AR-004`; `R3`; залежить від `R0-02`
   і preflight `PF-01`.
-- **Файли та зміни:** змінити
+- **Файли та зміни:** додати вузький
+  `app/services/admin/auth_authority.py::{CurrentAdminAuthority,resolve_current_admin_authority}`;
+  змінити
+  `app/api/routes/admin/auth.py::login_admin`,
   `app/api/routes/admin/auth_session.py::refresh_session`,
   `admin/deps.py::get_pending_admin`,
+  `admin/auth_responses.py::{issue_login_success_response,issue_verified_session_response}`,
   `admin/auth_helpers.py::configured_admin_role`,
   `app/db/repo/admins_repo.py::{get_by_email,get_or_create}` і, після
   preflight, `app/core/config_admin.py` або `app/db/models/admins.py`;
-  stale JWT claims ніколи не оновлюють role в БД, issuance звіряє current
-  email/role/enabled authority.
+  stale JWT claims ніколи не оновлюють role в БД. Після password verification,
+  але до partial або full session issuance, кожний path резолвить current
+  email/role/enabled authority. Зокрема,
+  `ADMIN_2FA_REQUIRED=false` видає claims лише з resolver DTO, а не з
+  password/config payload. Missing, disabled або mismatch identity
+  відхиляється до створення refresh family, token чи cookie.
 - **Транзакція / БД / зовнішні ефекти:** auth application service є owner;
   коротка current-identity read transaction лише за authoritative values;
+  вона закривається до Redis, token signing і response/cookie construction;
   зовнішнього I/O всередині неї немає.
-- **Тести:** email/role change invalidates access і refresh; disabled/missing
-  identity denied; stale claim не переписує DB; invalid configured role denied.
+- **Тести:** обидва режими `ADMIN_2FA_REQUIRED=true|false`; email/role change
+  invalidates login, pending authorization, access і refresh;
+  disabled/missing identity denied; stale claim не переписує DB; invalid
+  configured role denied; authority outage повертає `503`. Negative-path
+  tests доводять zero calls до refresh-family/token/cookie issuers.
 - **Rollout / rollback / legacy:** coordinated config/schema rollout згідно
   `PF-01`; safe default — deny при відсутності або mismatch, без auto-create з
   claims; rollback не відновлює claim-as-authority.
 - **DoD / розблоковує:** кожний token issuance/authorization доводить current
   identity; розблоковує security release verification.
 
-#### R0-04 — Independent logout revocation
+#### R0-04 — Atomic logout revocation
 
 - **Мета / risk / залежності:** закрити `AR-003`; `R3`; залежить від `R0-02`.
 - **Файли та зміни:** змінити
-  `app/api/routes/admin/auth_session.py::logout` і використання
-  `auth_tokens.py::revoke_access_token` та
-  `auth_refresh_sessions.py::revoke_family`: чинна access-token revocation
-  identity/hash і current refresh family/session revoke-яться незалежно,
-  cookies очищаються завжди, partial failure повертає `503` і bounded security
-  event.
-- **Транзакція / БД / зовнішні ефекти:** SQL немає; coordinator виконує дві
-  незалежні Redis operations і збирає результат без short-circuit.
-- **Тести:** access revoke fails/family revoke succeeds, family fails/access
-  succeeds, обидва fail, обидва success, successor refresh unusable after
-  logout і cookie clearing у кожному випадку.
-- **Rollout / rollback / legacy:** direct release; legacy sequential block
-  видалити в тому самому PR після tests; rollback лише до іншої незалежної
-  реалізації.
-- **DoD / розблоковує:** failure першої revocation не пропускає другу;
+  `app/api/routes/admin/auth_session.py::logout`,
+  `auth_tokens.py` і `auth_responses.py`; у
+  `app/services/admin/auth_refresh_sessions.py` додати
+  `revoke_logout_session`. Одна idempotent Redis Lua/CAS operation,
+  serialized із refresh rotation, атомарно revoke-ить надану access
+  identity/hash/JTI і current refresh family/session. Cookies очищаються лише
+  після успішної revocation; Redis failure повертає `503`, bounded
+  security-event і зберігає обидві cookies, щоб клієнт міг retry-нути logout.
+- **Транзакція / БД / зовнішні ефекти:** SQL немає; одна атомарна Redis
+  operation є owner. Response construction не може частково опублікувати
+  success до її завершення.
+- **Тести:** one/both cookies present, обидва absent idempotent success,
+  malformed one side не заважає revoke-нути valid identity з іншої,
+  Redis failure retains cookies, retry after recovery clears cookies,
+  logout-versus-refresh race має один serialized outcome, successor refresh
+  і кожний token current refresh family та copied access token unusable after
+  success, token contents не потрапляють у logs.
+- **Rollout / rollback / legacy:** direct release; legacy sequential
+  operations видалити в тому самому PR після tests; rollback не повертає
+  partial cookie-clearing behavior.
+- **DoD / розблоковує:** revocation є atomic і retryable з наявними credentials;
   `AR-001`–`AR-004` закриті й Release 0 окремо verified у production;
   розблоковує Release 1.
 
@@ -351,31 +376,57 @@ audit. Жодний finding не став неактуальним через po
   `R2`; залежить від `PF-03` і `R1-05`.
 - **Файли та зміни:** створити
   `docs/architecture/analytics_metric_contracts.md`; додати immutable
-  `user_activity_days(user_id, local_date_berlin)` з unique key і Alembic
-  revision; у двох `UsersRepo.touch_last_seen*` paths атомарно upsert-ити цей
-  activity-day у тій самій caller transaction. Змінити
+  `user_activity_hours(user_id, hour_start_utc, local_date_berlin,
+  local_hour_berlin)` з unique `(user_id, hour_start_utc)` і Alembic revision;
+  у двох `UsersRepo.touch_last_seen*` paths атомарно upsert-ити цей
+  activity-hour у тій самій caller transaction. UTC hour розрізняє дві
+  fall-back години, а current 24-bucket API агрегує їх як distinct
+  `(user_id, local_hour_berlin)`, доки `PF-03` не затвердить versioned іншу
+  semantics. Змінити
   `app/services/analytics_daily.py::build_daily_snapshot`,
   `app/db/repo/analytics_daily_mutations.py::upsert_daily`,
-  `AnalyticsRepo` та `analytics_daily`: додати `contract_version`,
+  `AnalyticsRepo`, `analytics_daily` та
+  `app/workers/tasks/analytics_daily.py::run_analytics_daily_aggregation_async`:
+  додати `contract_version`,
   `activity_as_of_utc` і validity marker. Кожний завершений Berlin-day snapshot
-  зберігає окремі distinct-user counts: DAU за
-  `[day_end-1d, day_end)`, WAU за `[day_end-7d, day_end)`, MAU за
-  `[day_end-30d, day_end)`; ці поля не є additive. Upsert інших daily metrics
-  не має права переписувати вже valid historical activity fields.
+  для local date `D` зберігає окремі distinct-user counts: DAU за inclusive
+  dates `[D,D]`, WAU за `[D-6,D]`, MAU за `[D-29,D]`; ці поля не є additive.
+  Якщо query потребує UTC bounds, Berlin midnight `start_date` і Berlin
+  midnight `D+1` конвертуються в UTC окремо; fixed `timedelta` від UTC
+  `day_end` заборонений. `activity_as_of_utc` дорівнює Berlin midnight `D+1`,
+  converted to UTC. Upsert інших daily metrics не має права переписувати вже
+  valid historical activity fields. Fact є version-neutral observation;
+  metric/query `contract_version` живе в snapshot і reader DTO. Додати
+  `app/workers/tasks/analytics_activity_retention.py` з bounded batch purge
+  strictly before earliest queryable local date, explicit schedule/metrics і
+  supporting index. Approved `PF-03` horizon не може бути меншим за **121
+  Berlin calendar days** (120 completed days для previous-90d MAU endpoint +
+  current partial day). Scheduled aggregation обробляє лише
+  `local_date < berlin_today`; current Berlin day (`offset=0`) не може отримати
+  valid activity snapshot. Якщо legacy/current partial row існує, він
+  `activity_source_valid=false` до recompute після наступної Berlin midnight.
 - **Транзакція / БД / зовнішні ефекти:** user-touch caller лишається owner і
-  пише `last_seen_at` + activity-day атомарно; analytics aggregation use case є
+  пише `last_seen_at` + activity-hour атомарно; analytics aggregation use case є
   owner короткої read/write transaction; без network I/O. Старі snapshots,
   побудовані лише з mutable `User.last_seen_at`, не backfill-яться і не
   позначаються valid.
 - **Тести:** framework-free window/definition tests; real PostgreSQL concurrent
-  same-user/day upsert, distinct DAU/WAU/MAU windows, DST, day-end boundary,
-  late calculation, freshness і “never sum daily rows”; prove old
-  `last_seen_at` history is invalid rather than silently reusable.
+  same-user/hour upsert, distinct DAU/WAU/MAU calendar windows, boundaries at
+  both Berlin midnights, spring-forward `2026-03-29` (23h), fall-back
+  `2026-10-25` (25h і repeated 02:00), no fixed-duration arithmetic, late
+  calculation, freshness і “never sum daily rows”; prove old `last_seen_at`
+  history is invalid rather than silently reusable. Retention tests покривають
+  exact local-date boundary, bounded/idempotent batches, current partial day,
+  minimum 121-day preservation і schedule/metric wiring. Worker tests доводять,
+  що partial today ніколи не valid/reader-selectable, включно зі
+  spring-forward/fall-back days, а після midnight completed day recompute-иться
+  з правильним `activity_as_of_utc`.
 - **Rollout / rollback / legacy:** additive source/writer deploy, reader ще не
   перемикається. `canonical_valid_from_date` фіксується в registry; historical
   activity backfill дозволений лише з independently proven complete immutable
   source. Safe default — prospective warm-up, old rows
-  `activity_source_valid=false`.
+  `activity_source_valid=false`; retention task і approved horizon live до
+  reader cutover.
 - **DoD / розблоковує:** формула, `calculated_at/activity_as_of_utc` і source
   validity відтворювані; є безперервні canonical rows для gate `R1-07`.
 
@@ -384,9 +435,20 @@ audit. Жодний finding не став неактуальним через po
 - **Мета / risk / залежності:** завершити `AR-030`; `R2`; `R1-05` і `R1-06`.
 - **Файли та зміни:** змінити
   `admin/overview_activity_metrics.py::count_distinct_users`,
-  `overview_payload_kpis.py` і додати
+  `overview_payload_kpis.py`,
+  `admin/overview_series.py::{fetch_users_series,fetch_hourly_activity_series}`
+  і `overview_payload_sections.py::load_dashboard_sections`; змінити
+  `app/api/routes/admin/overview.py::OverviewResponse` та payload assembly,
+  додавши explicit `ActivityOverviewMetadata(contract_version,
+  activity_as_of_utc, source_valid_from_date)`. Додати
   `AnalyticsRepo.get_activity_snapshot_at_or_before(as_of_utc)` для canonical
-  `analytics_daily`; вимкнути beat registration у
+  `analytics_daily` та canonical hour-fact queries. `users_series.new_users`
+  лишається registration metric з `User.created_at`; active-users series і
+  24-bucket hourly series читають `user_activity_hours`. Усі три consumers
+  отримують один resolved `as_of_utc` cutoff і один reader DTO
+  `contract_version`; fact rows version-neutral. Один reader flag
+  атомарно перемикає KPI, daily active series і hourly series; mixed
+  canonical-KPI/legacy-series state заборонений. Вимкнути beat registration у
   `workers/tasks/admin_daily_metrics.py`, не видаляючи ще `daily_metrics`.
 - **Транзакція / БД / зовнішні ефекти:** read query contract owner; deprecated
   writer перестає mutating; schema additive/unchanged.
@@ -394,8 +456,11 @@ audit. Жодний finding не став неактуальним через po
   `as_of_utc`, ніколи не sum-ить daily DAU/WAU/MAU rows; current/previous KPI
   беруть відповідні snapshot endpoints і повертають explicit
   `activity_as_of_utc`; admin/internal values, bounded reconciliation,
-  invalid/missing/stale snapshot і schedule absence. Окремий gate-test доводить
-  valid current/previous endpoints для всіх `7d/30d/90d` dashboard periods.
+  invalid/missing/stale snapshot/facts і schedule absence. Окремий gate-test
+  доводить, що KPI + both series використовують той самий
+  `contract_version/activity_as_of_utc`, а current/previous endpoints valid
+  для всіх `7d/30d/90d` periods; hourly output завжди має 24 buckets і
+  documented repeated-hour semantics.
 - **Rollout / rollback / legacy:** explicit reader flag у registry; internal
   admin → full cutover лише після source-valid horizon. Без approved immutable
   backfill safe default — prospective warm-up **120 completed Berlin days**
@@ -457,7 +522,9 @@ audit. Жодний finding не став неактуальним через po
   Release 1 join до pilot; `R2`; completion/evidence всіх `R1-01`–`R1-09`,
   включно з `R1-07` full cutover ≥7 stable days.
 - **Файли та зміни:** видалити legacy reader branch, analytics reader flag,
-  obsolete reconciliation-only route tests і registry entry; не видаляти
+  `build_activity_days_subquery`, `build_activity_hours_subquery`, усіх
+  callers старого live union, obsolete reconciliation-only route tests і
+  registry entry; не видаляти
   `daily_metrics` table/model — це окремий `C-07`.
 - **Транзакція / БД / зовнішні ефекти:** canonical analytics query є єдиним
   reader; deprecated writer лишається disabled; schema/network effects немає.
@@ -494,7 +561,7 @@ audit. Жодний finding не став неактуальним через po
   rows/counts еквівалентні; pause gate — якщо complexity не зменшилася,
   roadmap зупинити; успіх розблоковує Slice 2.
 
-### Slice 2 — noncritical Telegram flow
+### Slice 2 — Daily push correctness and boundary
 
 #### S2-01 — Daily push success-marker correctness
 
@@ -502,15 +569,32 @@ audit. Жодний finding не став неактуальним через po
   architecture move; `R2`; `S1-01`.
 - **Файли та зміни:** змінити
   `app/workers/tasks/daily_challenge_async.py::run_daily_push_notifications_async`
-  та `DailyPushLogsRepo.create_once`: eligibility перевіряти до send, а
-  success-marker створювати лише після успішного `bot.send_message`;
-  stable key `daily_push:{local_date}:{kind}:{user_id}`.
-- **Транзакція / БД / зовнішні ефекти:** short read transaction → Telegram
-  send без transaction → short success-record transaction; provider-success
-  crash може дати duplicate, але не suppress-ить unsent message.
-- **Тести:** characterization recipient/kind behavior; send failure leaves
-  eligible; success marks once; provider-success/before-marker crash documented;
-  no SQL transaction open during send.
+  та `DailyPushLogsRepo.create_once`; додати вузький
+  `app/services/daily_push_claim.py::DailyPushRunLease`. Перед scan task
+  atomically бере Redis `SET NX` lease
+  `daily_push:run:{local_date}:{kind}` з random token, bounded TTL/heartbeat і
+  compare-token renew/delete. Eligibility перевіряється під чинним lease до
+  send, success-marker `daily_push:{local_date}:{kind}:{user_id}` створюється
+  лише після успішного `bot.send_message`.
+- **Транзакція / БД / зовнішні ефекти:** acquire lease → short read transaction
+  → Telegram send без transaction → short success-record transaction →
+  token-safe release після завершення всього invocation. Ordinary
+  per-recipient send failure не створює marker, але task продовжує наступних
+  recipients під тим самим run lease; early release заборонений.
+  Redis/acquire/renewal loss abort-ить усі подальші sends і fail-closed для
+  цього run. Telegram timeout менший за lease TTL.
+  Provider-success/before-marker crash все ще може дати duplicate; якщо marker
+  write падає після provider success, task abort-ить подальші sends, не
+  release-ить lease достроково, alert-ить і дає TTL завершитися.
+- **Тести:** characterization recipient/kind behavior; два concurrent task
+  instances з barrier роблять рівно один send; held/lost lease не виконує
+  додаткових sends; після failure одного recipient перший task продовжує під
+  lease, а другий не може стартувати; ordinary failure не створює marker і
+  lease release-иться лише після завершення invocation; stale owner не
+  renew/delete-ить successor; renewal/marker-write failure abort-ить further
+  sends, marker-write failure утримує lease до TTL;
+  provider-success/before-marker crash documented; no SQL transaction open
+  during send.
 - **Rollout / rollback / legacy:** direct correctness release без flag; rollback
   до pre-send marker заборонений, лише forward fix.
 - **DoD / розблоковує:** failed send не стає durably ineligible; розблоковує
@@ -522,14 +606,16 @@ audit. Жодний finding не став неактуальним через po
   generic dispatcher; `R2`; `S2-01`.
 - **Файли та зміни:** створити
   `app/modules/gameplay/daily_push/application/prepare_daily_push.py`,
-  SQL adapter і immutable recipient/payload DTO; Telegram presenter лишити в
-  adapter/entrypoint; зробити `daily_challenge.py`/`daily_challenge_async.py`
-  thin; application не імпортує bot texts/keyboards/Celery.
+  SQL adapter, task-run lease port і immutable recipient/payload DTO; Redis
+  lease adapter і Telegram presenter лишити в adapter/entrypoint; зробити
+  `daily_challenge.py`/`daily_challenge_async.py` thin; application не імпортує
+  bot texts/keyboards/Celery/Redis.
 - **Транзакція / БД / зовнішні ефекти:** application use case owns target/read
   і result-record UoWs; presenter sends між ними після commit; no broker/network
   in transaction.
 - **Тести:** application selection/DTO tests, SQL adapter integration,
-  presenter contract, real Celery entrypoint test, import contract.
+  lease port/presenter contracts, real concurrent Celery entrypoint test,
+  import contract.
 - **Rollout / rollback / legacy:** direct equivalent replacement без parallel
   write path; rollback git revert; legacy split code видалити після green
   equivalence, `daily_push_logs` поки лишити.
@@ -553,8 +639,10 @@ audit. Жодний finding не став неактуальним через po
   `telegram_delivery_attempts`.
 - **Транзакція / БД / зовнішні ефекти:** producers ще disabled; table містить
   closed `dispatch_kind=TELEGRAM|INTERNAL_HANDLER`,
-  effect/aggregate/recipient, payload type/version, validated bounded payload,
-  unique `idempotency_key`, states
+  effect/aggregate, nullable recipient/payload/provider/error detail,
+  recipient/payload digests, payload type/version, validated bounded payload,
+  opaque/HMAC-derived unique `idempotency_key` (не raw recipient-bearing key),
+  `detail_expires_at`, `detail_redacted_at`, `terminal_at`, states
   `PENDING/CLAIMED/RETRY/SENT/FAILED/SKIPPED`, attempts, claim token/lease,
   retry, provider id, bounded error і replay audit fields.
   `OutgoingEffectWriterPort.put_once` використовує caller-owned SQLAlchemy
@@ -563,10 +651,12 @@ audit. Жодний finding не став неактуальним через po
   Bootstrap factory має `for_session(session) -> OutgoingEffectWriterPort` і
   inject-иться в source UoW factory; лише bootstrap imports concrete messaging
   adapter.
-- **Тести:** migration/metadata/constraints; partial indexes для due
+- **Тести:** migration/metadata/constraints і nullable-after-redaction fields;
+  partial indexes для due
   `PENDING/RETRY` і expired `CLAIMED`; unique idempotency race на PostgreSQL;
-  payload privacy/version validation; source rollback прибирає outgoing row;
-  writer не володіє transaction. Architecture contract дозволяє лише
+  opaque-key, digest і payload privacy/version validation; source rollback
+  прибирає outgoing row; writer не володіє transaction. Architecture contract
+  дозволяє лише
   `source.application|workflow → messaging.public`, але забороняє source
   imports messaging adapters/domain/ORM/repository.
 - **Rollout / rollback / legacy:** additive deploy, жодний producer/consumer не
@@ -586,10 +676,14 @@ audit. Жодний finding не став неактуальним через po
 - **Транзакція / БД / зовнішні ефекти:** кожний claim/outcome — окрема коротка
   application-owned transaction; claim використовує
   `FOR UPDATE SKIP LOCKED`, random token, lease й attempt++; outcome CAS —
-  `id/status/token`; зовнішнього I/O немає.
+  `id/status/token`; claim predicate відхиляє expired/redacted detail.
+  Expired `PENDING/RETRY` і expired-detail stale `CLAIMED` після lease CAS-яться
+  у `FAILED(DETAIL_RETENTION_EXPIRED)` до redaction; будь-який active
+  `CLAIMED` не чіпається до lease expiry. Зовнішнього I/O немає.
 - **Тести:** два workers не claim-ять один row; stale reclaim; старий token не
   завершує новий claim; retry due ordering, max attempts/age, idempotency race,
-  rollback після exception — real PostgreSQL.
+  exact detail-expiry boundary, active-claim protection, expired nonterminal
+  terminalization і rollback після exception — real PostgreSQL.
 - **Rollout / rollback / legacy:** disabled code path; additive rollback;
   rows не видаляти.
 - **DoD / розблоковує:** усі legal/illegal transitions явні й CAS-protected;
@@ -648,7 +742,9 @@ audit. Жодний finding не став неактуальним через po
 - **Файли та зміни:** додати application commands `ReplayOutgoingDelivery` і
   `SuppressOutgoingDelivery`; audited CAS
   `FAILED|SKIPPED → RETRY` на тому самому row; payload та
-  `idempotency_key` immutable; suppress дозволяє лише
+  `idempotency_key` immutable для producers/operators, доки detail існує;
+  лише retention redactor може null-ити detail і поставити
+  `detail_redacted_at`, зберігши opaque digests/audit. Suppress дозволяє лише
   `PENDING|RETRY|FAILED → SKIPPED` з reason, але відхиляє active `CLAIMED`;
   clone endpoint відсутній.
 - **Транзакція / БД / зовнішні ефекти:** command owns one short CAS
@@ -681,12 +777,45 @@ audit. Жодний finding не став неактуальним через po
   of truth, Redis `LLEN q_delivery` лише transport backlog; rollback UI не
   вимикає consumer для pending rows.
 - **DoD / розблоковує:** on-call бачить і ремонтує stuck/failed work;
-  `D3-03/04/05/06` мають бути одним production release gate; розблоковує pilot.
+  `D3-03/04/05/06` мають бути одним production release gate; розблоковує
+  retention implementation, але не producer.
 
-#### D3-07 — Durable Daily push cutover
+#### D3-07 — Outgoing delivery detail retention
+
+- **Мета / risk / залежності:** enforce-ити approved privacy lifecycle до
+  першого producer; `R3`; `D3-01`, `D3-02`, `D3-05`, `D3-06`, `PF-06`.
+- **Файли та зміни:** створити
+  `app/modules/messaging/application/outgoing_delivery_retention.py`,
+  bounded SQL adapter і
+  `app/workers/tasks/outgoing_delivery_retention.py::{redact_outgoing_delivery_details_async,redact_outgoing_delivery_details}`;
+  додати explicit Beat schedule. Task `FOR UPDATE SKIP LOCKED` batches
+  terminal/expired rows, CAS-ить expired `PENDING/RETRY` та stale `CLAIMED` у
+  `FAILED(DETAIL_RETENTION_EXPIRED)`, потім очищає recipient, payload,
+  provider id і error detail та ставить `detail_redacted_at`. Лишаються лише
+  effect/status/type/version/digests, aggregate-safe correlation, timestamps,
+  counters і replay/suppress audit.
+- **Транзакція / БД / зовнішні ефекти:** один bounded DB batch без network I/O.
+  Active `CLAIMED` не змінюється до lease expiry; nonterminal row не видаляється
+  silently. Replay/suppress/detail read відхиляють expired/redacted row.
+- **Тести:** exact 30-day boundary, terminal redaction, expired nonterminal
+  terminalization, active claim protection і stale-claim CAS, concurrent/
+  idempotent batches, retry/replay rejection після redaction, admin redacted
+  view, retained row не містить recipient/payload/provider/error detail,
+  schedule та producer-gate integration.
+- **Rollout / rollback / legacy:** dry-run counts → task/schedule enabled і
+  observed → лише тоді first producer. Redaction forward-only; rollback
+  зупиняє нові producers, але не відновлює erased detail. Після будь-якої
+  producer activation retention schedule/alerts лишаються live до zero
+  unredacted rows і завершення approved backup/replica horizon. Backup/replica
+  lifecycle має відповідати `PF-06`.
+- **DoD / розблоковує:** purger і alerts live до появи production detail;
+  жодний expired replayable payload не зберігається безстроково; розблоковує
+  `D3-08`.
+
+#### D3-08 — Durable Daily push cutover
 
 - **Мета / risk / залежності:** перший recoverable end-to-end flow; `R2`;
-  `D3-01`–`D3-06`, `S2-02`, preflights `PF-04`–`PF-07`.
+  `D3-01`–`D3-07`, `S2-02`, preflights `PF-04`–`PF-07`.
 - **Файли та зміни:** daily push application transaction викликає injected
   `OutgoingEffectWriterPort.put_once` зі stable key замість direct send;
   presenter type versioned; додати explicit routing flag і registry entry;
@@ -703,11 +832,12 @@ audit. Жодний finding не став неактуальним через po
   cohort → full; rollback flag stops only new producers, dispatcher продовжує
   drain every existing nonterminal row.
 - **DoD / розблоковує:** real consumer, stale repair, operator visibility і
-  recoverable pilot працюють; розблоковує `D3-08` після 7-day observation.
+  enforced retention та recoverable pilot працюють; розблоковує `D3-09` після
+  7-day observation.
 
-#### D3-08 — Pilot legacy-path cleanup
+#### D3-09 — Pilot legacy-path cleanup
 
-- **Мета / risk / залежності:** закрити першу dual path; `R2`; `D3-07`, ≥7
+- **Мета / risk / залежності:** закрити першу dual path; `R2`; `D3-08`, ≥7
   stable full-cutover days, zero unexpected fallback.
 - **Файли та зміни:** видалити direct Daily push sender routing, flag/config,
   obsolete tests і registry entry; `daily_push_logs` лишити read-only до
@@ -722,12 +852,12 @@ audit. Жодний finding не став неактуальним через po
 - **DoD / розблоковує:** Slice 3 має zero unmanaged legacy path; major pause
   gate — roadmap може завершитися тут; інакше розблоковує Referrals.
 
-### Referrals
+### Slice 4 — Referrals
 
 #### REF-01 — Referral qualification application use case
 
 - **Мета / risk / залежності:** перенести qualification ownership без delivery
-  change; `R2`; `D3-08`.
+  change; `R2`; `D3-09`.
 - **Файли та зміни:** створити
   `app/modules/economy/referrals/application/qualify_referrals.py` і
   module UoW adapter; перенести orchestration з
@@ -1361,10 +1491,47 @@ audit. Жодний finding не став неактуальним через po
   policy delta; old decision не resurrect-ити неявно.
 - **DoD / розблоковує:** policy slot closed; розблоковує `P-04`.
 
-#### P-04 — Authoritative payment evidence lifecycle
+#### P-04 — Protected payment replay envelope
 
-- **Мета / risk / залежності:** закрити payment half `AR-024`; `R3`; `P-03`,
+- **Мета / risk / залежності:** зробити retryable payment evidence фактично
+  replayable без plaintext provider identifiers; `R3`; `P-03`, `PF-06`,
   transport-compatible with later `C-01`.
+- **Файли та зміни:** у
+  `app/db/models/payment_inbox.py::PaymentEvent` і наступній Alembic revision
+  додати `replay_ciphertext`, `replay_schema_version`, `replay_key_version`,
+  `replay_ciphertext_hash`, `replay_expires_at`, `replay_redacted_at`;
+  existing charge-id hashes лишити тільки для lookup/log-safe correlation.
+  Створити
+  `app/services/payment_evidence_encryption.py::{encrypt_payment_replay_envelope,decrypt_payment_replay_envelope}`
+  та dedicated `PAYMENT_EVIDENCE_ENCRYPTION_KEY` validation у
+  `app/core/config_runtime.py`. Versioned allowlist містить лише input, який
+  реально споживає command: для `SUCCESSFUL_PAYMENT` — Telegram user id,
+  invoice payload, currency, total amount та raw
+  `telegram_payment_charge_id`;
+  для `REFUNDED_PAYMENT` — відповідні consumed поля й raw Telegram charge ID.
+  Whole `Update`, `order_info`, token чи зайві PII не зберігаються. Live
+  `store_payment_update_evidence` у цьому milestone не змінювати; створити лише
+  disabled adapter і contract fixtures. Plaintext не входить у
+  JSON/log/error/admin response.
+- **Транзакція / БД / зовнішні ефекти:** schema, config validation і crypto
+  adapter only; жодний live caller не шифрує й не пише envelope у цьому
+  milestone. Немає `RETRY` producer, repair/retention worker або runtime
+  cutover.
+- **Тести:** ciphertext/storage/logs/errors не містять raw charge IDs;
+  version/key rotation, wrong key і tamper detection; exact allowlists для paid
+  та refund; fresh-session decrypt відновлює exact command input, включно з
+  charge-ID equality; expiry metadata і config outage fail-closed.
+- **Rollout / rollback / legacy:** additive columns + key validation і
+  disabled crypto adapter; no live writer/reader/producer. Key
+  backup/rotation/incident access затверджені у `PF-06`; downgrade або
+  plaintext compatibility path відсутні.
+- **DoD / розблоковує:** adapter contract доводить, що versioned ciphertext
+  достатньо для actual paid/refund command replay і не розкриває raw Telegram
+  charge identity; розблоковує `P-05`.
+
+#### P-05 — Authoritative payment evidence lifecycle and repair
+
+- **Мета / risk / залежності:** закрити payment half `AR-024`; `R3`; `P-04`.
 - **Файли та зміни:** у
   `app/db/models/payment_inbox.py::{TelegramUpdateInbox,PaymentEvent}` і
   `app/db/repo/payment_inbox_repo.py::PaymentEventsRepo` зробити `PaymentEvent`
@@ -1372,47 +1539,63 @@ audit. Жодний finding не став неактуальним через po
   intake/provenance. Додати `PROCESSING` до
   `RECEIVED → PROCESSING → APPLIED/RETRY/FAILED/REVIEW`, `state_version`,
   `processing_token`, `attempt_count`, `next_retry_at`, timestamps і bounded
-  reason в Alembic revision. Змінити
-  `app/services/payment_update_evidence.py::store_payment_update_evidence`,
+  reason. Змінити
+  `app/services/payment_update_evidence.py::store_payment_update_evidence` для
+  encryption-at-write та
   `app/bot/handlers/payments.py::{handle_precheckout,handle_successful_payment,handle_refunded_payment}`
   та відповідні functions у `payments_runtime.py`: aiogram `Update.update_id`
-  резолвиться в `payment_event_id`, і обидва IDs входять у command DTO.
-  Додати
+  резолвиться в `payment_event_id`, і обидва IDs входять у command DTO. Додати
   `app/workers/tasks/payment_event_repair.py::{repair_payment_events_async,repair_payment_events}`
   і
   `::{replay_payment_event_async,replay_payment_event,PAYMENT_EVENT_REPAIR_HANDLERS}`,
-  та explicit schedule у `payments_reliability_schedule.py`. До першого
-  `RETRY` producer merge static handlers для retryable
-  `SUCCESSFUL_PAYMENT/REFUNDED_PAYMENT` вже існують; `PRE_CHECKOUT` не є
+  створити
+  `app/workers/tasks/payment_event_retention.py::{redact_terminal_payment_event_envelopes_async,redact_terminal_payment_event_envelopes}`
+  і додати repair + retention schedules у `payments_reliability_schedule.py`.
+  До першого
+  `RETRY` producer static handlers для retryable
+  `SUCCESSFUL_PAYMENT/REFUNDED_PAYMENT` already deployed; `PRE_CHECKOUT` не є
   retryable.
 - **Транзакція / БД / зовнішні ефекти:** `ProcessedUpdate` лишається тільки
-  transport lease/status і не визначає payment success. Payment application UoW
-  locks purchase + `PaymentEvent`, CAS-ить token/version і атомарно commit-ить
-  purchase mutation та business outcome; late `FAILED/RETRY` не може overwrite
-  `APPLIED`. Provider/broker виконується поза SQL. `RETRY` дозволений лише з
-  `attempt_count/next_retry_at` і bounded replay input: scanner claim-ить row,
-  commit-ить lease, після commit enqueue-ить stable `payment_event_id`; missed
-  enqueue підбирає наступний scan. Expired pre-checkout не replay-иться, а йде
-  в `REVIEW`.
+  transport lease/status і не визначає payment success. Scanner під single-run
+  guard робить bounded read-only selection due `payment_event_id`, commit-ить,
+  потім enqueue-ить; він не claim-ить і не decrypt-ить. Worker є єдиним
+  claimant: short transaction CAS-ить due row у `PROCESSING` і отримує token,
+  decrypt-ить envelope поза SQL, викликає actual command, а outcome CAS-ить за
+  token/version. Payment application UoW locks purchase + `PaymentEvent` і
+  атомарно commit-ить purchase mutation та business outcome; late
+  `FAILED/RETRY` не overwrite-ить `APPLIED`. Duplicate enqueue safe; missed
+  enqueue лишає row eligible. Wrong-key/tamper/expired envelope CAS-иться у
+  `REVIEW`, а не retry-иться безкінечно. Окремий bounded retention batch без
+  external I/O redaction-ить ciphertext лише для
+  `APPLIED|FAILED|REVIEW` після approved horizon; `PROCESSING|RETRY` не
+  purge-яться.
 - **Тести:** entrypoint correlation `update_id → inbox → payment_event_id →
-  purchase`; duplicate webhook/evidence, two-session outcome race, late
-  failure/retry versus `APPLIED`, crash before/after joint commit, retry claim,
-  missed enqueue і repair replay; real aiogram path, real PostgreSQL migration
-  and CAS tests.
+  purchase`; real persisted evidence → fresh-session decrypt → actual
+  paid/refund command; duplicate webhook/evidence/queued tasks, two-session
+  claim/outcome race, crash before paid checkpoint і після joint commit, stale
+  token, missed enqueue, wrong-key/tamper/expired → `REVIEW`, terminal
+  redaction exact boundary, nonterminal preservation, idempotent/concurrent
+  retention batches і schedule wiring; real aiogram path і PostgreSQL
+  migration/CAS tests.
 - **Rollout / rollback / legacy:** відкрити staged slot
-  `PAYMENT_APPLICATION_MIGRATION_STAGE=LEGACY → EVIDENCE_NEW`; additive columns,
-  consumer/repair + schedule deploy before RETRY producer, then reader and
-  cohort; no destructive status rewrite. Existing
-  `TelegramUpdateInbox.status` не використовується як outcome і видаляється лише
-  після separate inventory/cleanup.
+  `PAYMENT_APPLICATION_MIGRATION_STAGE=LEGACY → EVIDENCE_NEW`; static handlers,
+  repair consumer/schedule і retention task/schedule deploy-яться та
+  verify-яться **до** activation encryption-at-write і першого `RETRY`
+  producer; потім writer, reader і cohort перемикаються одним release gate.
+  Rollback зупиняє new writer/producer, але repair і retention лишаються live
+  до zero nonterminal/unredacted rows та approved backup horizon. No
+  destructive status rewrite. Existing
+  `TelegramUpdateInbox.status` не використовується як outcome і видаляється
+  лише після separate inventory/cleanup.
 - **DoD / розблоковує:** кожна payment command має exact correlated
-  `PaymentEvent`; terminal outcome монотонний, retry має active repair, і
-  evidence не лишається вічно `RECEIVED/PROCESSING`; розблоковує `P-05`.
+  `PaymentEvent`; terminal outcome монотонний, retry має active worker-owned
+  repair, і evidence не лишається вічно `RECEIVED/PROCESSING`; розблоковує
+  `P-06`.
 
-#### P-05 — Pre-checkout validation command
+#### P-06 — Pre-checkout validation command
 
 - **Мета / risk / залежності:** винести одну pre-checkout policy boundary;
-  `R3`; `P-04`.
+  `R3`; `P-05`.
 - **Файли та зміни:** створити
   `app/modules/economy/payments/application/validate_precheckout.py` і public
   DTO/error contract; зробити відповідну branch
@@ -1425,12 +1608,12 @@ audit. Жодний finding не став неактуальним через po
   `EVIDENCE_NEW → PRECHECKOUT_NEW`; pure decision shadow, internal test purchase
   then cohort; zero invariant mismatch.
 - **DoD / розблоковує:** handler не володіє validation/SQL policy;
-  розблоковує `P-06`.
+  розблоковує `P-07`.
 
-#### P-06 — Mark-paid and `PAID_UNCREDITED` checkpoint command
+#### P-07 — Mark-paid and `PAID_UNCREDITED` checkpoint command
 
 - **Мета / risk / залежності:** зберегти durable paid checkpoint окремим
-  application behavior; `R3`; `P-05`.
+  application behavior; `R3`; `P-06`.
 - **Файли та зміни:** створити
   `app/modules/economy/payments/application/mark_purchase_paid.py`; adapt paid
   update branch in `payments_runtime.py` і evidence outcome mapping.
@@ -1443,12 +1626,12 @@ audit. Жодний finding не став неактуальним через po
   `PRECHECKOUT_NEW → MARK_PAID_NEW`; internal/cohort, old recovery remains
   available, no dual state mutation.
 - **DoD / розблоковує:** paid money завжди має recoverable checkpoint;
-  розблоковує `P-07`.
+  розблоковує `P-08`.
 
-#### P-07 — Idempotent entitlement and ledger credit command
+#### P-08 — Idempotent entitlement and ledger credit command
 
 - **Мета / risk / залежності:** атомарно credit-нути один paid purchase; `R3`;
-  `P-06`, `R1-02`.
+  `P-07`, `R1-02`.
 - **Файли та зміни:** створити
   `app/modules/economy/payments/application/credit_paid_purchase.py` і SQL UoW;
   adapt current credit branch/repositories without changing ledger keys.
@@ -1461,12 +1644,12 @@ audit. Жодний finding не став неактуальним через po
   `MARK_PAID_NEW → CREDIT_NEW`; pure result shadow/internal purchases/cohort;
   zero money/reward mismatch.
 - **DoD / розблоковує:** credit mutation є single command і не дублюється;
-  розблоковує `P-08`.
+  розблоковує `P-09`.
 
-#### P-08 — `PAID_UNCREDITED` recovery command and thin worker
+#### P-09 — `PAID_UNCREDITED` recovery command and thin worker
 
 - **Мета / risk / залежності:** відновлювати checkpoint через той самий credit
-  command; `R3`; `P-07`.
+  command; `R3`; `P-08`.
 - **Файли та зміни:** створити
   `app/modules/economy/payments/application/recover_paid_purchase.py::{RecoverPaidPurchase,RecoverPaidPurchaseCommand}`;
   зробити
@@ -1483,12 +1666,12 @@ audit. Жодний finding не став неактуальним через po
 - **Rollout / rollback / legacy:** stage `CREDIT_NEW → ALL_NEW`; internal backlog
   dry run, cohort/full; old recovery route retained only for R3 observation.
 - **DoD / розблоковує:** handler/worker не owns SQL policy і durable checkpoint
-  fully recoverable; розблоковує `P-09`.
+  fully recoverable; розблоковує `P-10`.
 
-#### P-09 — Telegram Stars provider-fetch adapter
+#### P-10 — Telegram Stars provider-fetch adapter
 
 - **Мета / risk / залежності:** ізолювати provider pagination/I/O з hotspot;
-  `R3`; `P-08`, preflight `PF-05`.
+  `R3`; `P-09`, preflight `PF-05`.
 - **Файли та зміни:** створити
   `app/modules/economy/payments/adapters/telegram_stars/provider_history.py`;
   extract fetch/pagination from
@@ -1500,12 +1683,12 @@ audit. Жодний finding не став неактуальним через po
 - **Rollout / rollback / legacy:** disabled composition only; no routing flag or
   write slot; old reconciler still active.
 - **DoD / розблоковує:** provider I/O owner isolated and bounded;
-  розблоковує `P-10`.
+  розблоковує `P-11`.
 
-#### P-10 — Pure reconciliation classification and revalidation plan
+#### P-11 — Pure reconciliation classification and revalidation plan
 
 - **Мета / risk / залежності:** isolate exact/ambiguous/refund policy decision;
-  `R3`; `P-09`, `PF-08`.
+  `R3`; `P-10`, `PF-08`.
 - **Файли та зміни:** створити
   `app/modules/economy/payments/application/classify_reconciliation.py::{classify_reconciliation,ReconciliationPlan,ReconciliationDecision}`;
   extract pure rules from `services/payment_reconciliation.py` і current worker;
@@ -1517,12 +1700,12 @@ audit. Жодний finding не став неактуальним через po
 - **Rollout / rollback / legacy:** shadow only, no writer/slot; policy delta
   blocks until `PF-08` approval.
 - **DoD / розблоковує:** reconciliation decision reproducible without I/O;
-  розблоковує `P-11`.
+  розблоковує `P-12`.
 
-#### P-11 — Reconciliation review persistence and output port
+#### P-12 — Reconciliation review persistence and output port
 
 - **Мета / risk / залежності:** persist ambiguous outcomes independently from
-  alerts; `R3`; `P-10`.
+  alerts; `R3`; `P-11`.
 - **Файли та зміни:** adapt `PaymentReconciliationReview` model/repo, next
   Alembic revision and application output port; store bounded evidence digest,
   reason, state and correlation, not provider secret/raw payload.
@@ -1531,14 +1714,14 @@ audit. Жодний finding не став неактуальним через po
 - **Тести:** idempotent review upsert, same-key conflict, retry/resolution state,
   migration/privacy/admin query, alert failure does not lose review.
 - **Rollout / rollback / legacy:** additive reader-first deploy, disabled writer;
-  no write slot until `P-12`.
+  no write slot until `P-13`.
 - **DoD / розблоковує:** ambiguous payment has durable operator-visible state;
-  розблоковує `P-12`.
+  розблоковує `P-13`.
 
-#### P-12 — Exact-match reconciliation auto-recovery handler
+#### P-13 — Exact-match reconciliation auto-recovery handler
 
 - **Мета / risk / залежності:** apply only proven exact plans through new
-  commands; `R3`; `P-08`, `P-11`, preflights `PF-07/PF-08`.
+  commands; `R3`; `P-09`, `P-12`, preflights `PF-07/PF-08`.
 - **Файли та зміни:** створити
   `app/modules/economy/payments/application/reconcile_exact_payment.py::{ReconcileExactPayment,ReconcileExactPaymentCommand}`;
   додати transaction-participant symbols
@@ -1560,12 +1743,12 @@ audit. Жодний finding не став неактуальним через po
   `telegram_stars_reconciliation_dry_run` is a kill switch, not a legacy/new
   slot; auto recovery off until evidence approved.
 - **DoD / розблоковує:** no auto recovery without exact revalidation and durable
-  review fallback; розблоковує `P-13`.
+  review fallback; розблоковує `P-14`.
 
-#### P-13 — Payment application-stage legacy cleanup
+#### P-14 — Payment application-stage legacy cleanup
 
 - **Мета / risk / залежності:** звільнити application slot before refund work;
-  `R3`; `P-08` ≥14 stable days + billing cycle, `P-12` uses new commands.
+  `R3`; `P-09` ≥14 stable days + billing cycle, `P-13` uses new commands.
 - **Файли та зміни:** видалити legacy evidence outcome mapping,
   precheckout/mark-paid/credit/recovery branches, application staged setting,
   obsolete mocks/tests і registry entry; keep `PAID_UNCREDITED` and
@@ -1577,12 +1760,12 @@ audit. Жодний finding не став неактуальним через po
 - **Rollout / rollback / legacy:** forward fix after observation; evidence/schema
   retained.
 - **DoD / розблоковує:** application slot closed, reconciliation is sole active
-  payment slot; розблоковує `P-14`.
+  payment slot; розблоковує `P-15`.
 
-#### P-14 — Refund and available-benefit clawback command
+#### P-15 — Refund and available-benefit clawback command
 
 - **Мета / risk / залежності:** isolate чинний refund invariant і не приписувати
-  `AR-027` непідтверджену product semantics; `R3`; `P-13`.
+  `AR-027` непідтверджену product semantics; `R3`; `P-14`.
 - **Файли та зміни:** створити
   `app/modules/economy/payments/application/refund_purchase.py::{RefundPurchase,RefundPurchaseCommand,RefundOutcome}`
   з полями `financial_reversal_amount`, `recovered_asset_amount`,
@@ -1605,12 +1788,12 @@ audit. Жодний finding не став неактуальним через po
   milestone, model/repo/migration і product/finance approval; вона не входить у
   цей план.
 - **DoD / розблоковує:** financial reversal і recovered/unrecovered gameplay
-  asset виміряні окремо без нового debt state; розблоковує `P-15`.
+  asset виміряні окремо без нового debt state; розблоковує `P-16`.
 
-#### P-15 — Manual-review resolve, replay and suppress commands
+#### P-16 — Manual-review resolve, replay and suppress commands
 
 - **Мета / risk / залежності:** make operator decisions explicit and auditable;
-  `R3`; `P-12`, `P-14`.
+  `R3`; `P-13`, `P-15`.
 - **Файли та зміни:** створити
   `app/modules/economy/payments/application/review_actions.py::{ResolvePaymentReview,ReplayPaymentReview,SuppressPaymentReview}`
   і command DTOs з `review_id`, expected version та bounded reason; створити
@@ -1629,12 +1812,12 @@ audit. Жодний finding не став неактуальним через po
 - **Rollout / rollback / legacy:** uses existing reconciliation/refund slots; no
   third slot/flag; commands enabled after admin acceptance.
 - **DoD / розблоковує:** review recovery safe without ad-hoc SQL;
-  розблоковує `P-16`.
+  розблоковує `P-17`.
 
-#### P-16 — Payment audit and post-commit alert adapters
+#### P-17 — Payment audit and post-commit alert adapters
 
 - **Мета / risk / залежності:** remove audit/alert I/O from payment transactions;
-  `R3`; `P-14`, `P-15`.
+  `R3`; `P-15`, `P-16`.
 - **Файли та зміни:** створити
   `app/modules/economy/payments/application/ports.py::{PaymentAuditPort,PaymentAlertPort}`,
   `app/modules/economy/payments/adapters/audit_ledger.py::AuditLedgerPaymentAdapter`
@@ -1650,13 +1833,13 @@ audit. Жодний finding не став неактуальним через po
 - **Rollout / rollback / legacy:** direct adapter switch inside two existing
   staged routes; no new slot; rollback preserves persisted audit/review state.
 - **DoD / розблоковує:** alert failure cannot corrupt payment outcome;
-  розблоковує `P-17`.
+  розблоковує `P-18`.
 
-#### P-17 — Payment final cutover and hotspot cleanup
+#### P-18 — Payment final cutover and hotspot cleanup
 
 - **Мета / risk / залежності:** завершити Payments vertical slice; `R3`;
-  `P-12/P-14` full cutover ≥14 stable days + complete
-  billing/refund/reconciliation cycle, `P-15/P-16`.
+  `P-13/P-15` full cutover ≥14 stable days + complete
+  billing/refund/reconciliation cycle, `P-16/P-17`.
 - **Файли та зміни:** remove remaining reconciliation/refund legacy branches in
   `payments_reliability_async.py`, staged settings, obsolete mocks/tests і both
   registry entries; не видаляти `PAID_UNCREDITED`, live evidence/reviews.
@@ -1674,24 +1857,29 @@ audit. Жодний finding не став неактуальним через po
 #### C-01 — Incoming update lease schema and claim protocol
 
 - **Мета / risk / залежності:** дати `AR-022` і generic half `AR-024` durable
-  protocol без runtime switch; `R3`; `P-17`, payload/retention preflight
+  protocol без runtime switch; `R3`; `P-18`, payload/retention preflight
   `PF-06`.
 - **Файли та зміни:** розширити
   `app/db/models/processed_updates.py::ProcessedUpdate`,
   `app/db/repo/processed_updates_repo_slots.py::ProcessedUpdatesRepoSlotsMixin`
   і metrics repo; додати Alembic revision зі states
   `RECEIVED/PROCESSING/PROCESSED/RETRY/FAILED`, `attempt_count`,
+  `state_version`,
   `processing_token`, `claimed_at`, `lease_until`, `heartbeat_at`,
   `next_retry_at`, bounded error fields та approved encrypted replay envelope
   (`payload_ciphertext`, hash/schema/key version, `replay_expires_at`).
 - **Транзакція / БД / зовнішні ефекти:** repo exposes only short
-  create/claim/heartbeat/outcome CAS operations. Token + nonexpired lease є
-  authority; handler, broker і crypto I/O не виконуються всередині transaction.
+  create, read-only eligible selection, worker claim/reclaim, heartbeat і
+  outcome CAS operations. Лише worker може перевести
+  `RECEIVED|due RETRY|expired PROCESSING → PROCESSING` і отримати token;
+  token + nonexpired lease є authority. Scanner не мутує state/token. Handler,
+  broker і crypto I/O не виконуються всередині transaction.
   `PaymentEvent` не дублюється: це business outcome, `ProcessedUpdate` —
   transport.
 - **Тести:** migration upgrade/clean DB, two independent PostgreSQL sessions
-  claim one row, stale-token terminal CAS rejected, heartbeat extends matching
-  lease only, retry ordering/indexes, envelope expiry/privacy.
+  claim one row, scanner selection не змінює state/token, stale-token terminal
+  CAS rejected, heartbeat extends matching lease only, retry due
+  ordering/indexes, duplicate task claim serialization, envelope expiry/privacy.
 - **Rollout / rollback / legacy:** additive schema deployed disabled; жодний
   webhook/worker producer ще не пише new lifecycle. No destructive downgrade;
   old columns/readers remain.
@@ -1701,7 +1889,7 @@ audit. Жодний finding не став неактуальним через po
 #### C-02 — Incoming update runtime repair and cohort cutover
 
 - **Мета / risk / залежності:** увімкнути repairable incoming lifecycle окремо
-  від його schema й cleanup; `R3`; `C-01`, `P-17`, `PF-05/PF-06`.
+  від його schema й cleanup; `R3`; `C-01`, `P-18`, `PF-05/PF-06`.
 - **Файли та зміни:** змінити
   `app/api/routes/telegram_webhook.py::telegram_webhook`,
   `app/workers/tasks/telegram_updates_processing.py::{process_update_async,_feed_update_with_trace}`,
@@ -1712,16 +1900,23 @@ audit. Жодний finding не став неактуальним через po
   `app/core/config_migrations.py`; додати
   `repair_stale_incoming_updates_async` + Celery task/schedule.
 - **Транзакція / БД / зовнішні ефекти:** webhook encrypt-ить bounded payload,
-  commit-ить `RECEIVED`, потім enqueue-ить; worker коротко claim-ить
-  `PROCESSING`, heartbeat-ить і CAS-ить outcome, а aiogram handler працює без
-  open SQL claim transaction. Scanner claim-ить expired/`RETRY`, commit-ить,
-  decrypt-ить і enqueue-ить stable `update_id` after commit; missed enqueue
-  лишається eligible. Payment outcome mapping посилається на `PaymentEvent`, не
-  копіюється у transport state.
+  commit-ить `RECEIVED`, потім enqueue-ить stable `update_id`.
+  Immediate і repair enqueue можуть дублюватися. Worker короткою transaction
+  єдиний claim-ить/reclaim-ить eligible row, отримує processing token,
+  decrypt-ить і запускає aiogram handler поза open SQL claim transaction,
+  heartbeat-ить та CAS-ить outcome за token/version. Scanner під single-run
+  guard робить лише bounded read-only selection
+  `RECEIVED|due RETRY|expired PROCESSING`, commit-ить, потім enqueue-ить
+  stable `update_id`; він не claim-ить, не heartbeat-ить і не decrypt-ить.
+  Duplicate task не може обійти worker state/lease/token CAS; enqueue failure
+  не змінює row, тому наступний scan бачить його знову. Payment outcome mapping
+  посилається на `PaymentEvent`, не копіюється у transport state.
 - **Тести:** real webhook → broker → worker path; worker loss before/after
-  claim, missed initial/repair enqueue, long handler heartbeat, stale reclaim,
-  old-token completion, duplicate delivery and payment correlation; two
-  independent PostgreSQL sessions + barrier.
+  claim, scanner → queue → worker exact path, scanner не мутує status/token,
+  expired `PROCESSING` → queued worker reclaim, due `RETRY`, missed
+  initial/repair enqueue, long handler heartbeat, old-token
+  completion, two queued tasks with barrier → one claim, duplicate delivery
+  and payment correlation; two independent PostgreSQL sessions + barrier.
 - **Rollout / rollback / legacy:** registry slot і monotonic
   `PAYMENT_COHORT → COHORT → ALL_NEW`; one route per update, no dual handler.
   Rollback stops routing new updates to new claims, але scanner/consumer
@@ -1750,7 +1945,7 @@ audit. Жодний finding не став неактуальним через po
 
 #### C-04 — Conflict-safe first-row energy and streak state
 
-- **Мета / risk / залежності:** close tentative `AR-040`; `R3`; `P-17`.
+- **Мета / risk / залежності:** close tentative `AR-040`; `R3`; `P-18`.
 - **Файли та зміни:** змінити
   `app/economy/energy/energy_models.py::get_or_create_state_for_update`,
   `app/db/repo/energy_repo.py::EnergyRepo.create_default_state`,
@@ -1775,7 +1970,7 @@ audit. Жодний finding не став неактуальним через po
 #### C-05 — Explicit composition roots and resource lifecycle
 
 - **Мета / risk / залежності:** address proven structure of `AR-032` without
-  claiming an unproven leak; `R2`; `P-17`, migrated adapters stable.
+  claiming an unproven leak; `R2`; `P-18`, migrated adapters stable.
 - **Файли та зміни:** create narrow API composition root in
   `app/bootstrap/api.py`; add FastAPI lifespan disposal around `app/main.py`,
   DB engine, Redis clients and API-owned dispatcher resources; bot/Celery
@@ -1881,9 +2076,9 @@ R0-02 ─┼─> R0-03/R0-04 ─> Release 0 verified
                                   │
                                   └─> S2-01/S2-02 Daily push boundary
                                            │
-                                           └─> D3-01..D3-06 dispatcher
+                                           └─> D3-01..D3-07 dispatcher/retention
                                                     │
-                                                    └─> D3-07/D3-08 pilot
+                                                    └─> D3-08/D3-09 pilot
                                                              │
                                                              └─> Referrals
                                                                   └─> Arena
@@ -1897,7 +2092,8 @@ R0-02 ─┼─> R0-03/R0-04 ─> Release 0 verified
 
 ```text
 schema → claim/lease/CAS → provider adapter → q_delivery/repair
-       → same-row replay → admin/metrics/alerts → pilot cutover → cleanup
+       → same-row replay → admin/metrics/alerts → retention → pilot cutover
+       → cleanup
 ```
 
 ### 4.2 Що можна робити паралельно
@@ -1910,8 +2106,8 @@ schema → claim/lease/CAS → provider adapter → q_delivery/repair
   `R1-10`.
 - Characterization tests наступного stage можна підготувати під час observation
   попереднього, але не створювати третій dual path і не перемикати runtime.
-- У D3 schema/protocol PR reviews можуть перекриватися, але `q_delivery` не
-  активується до replay, visibility й alerts.
+- У D3 schema/protocol PR reviews можуть перекриватися, але first producer не
+  активується до replay, visibility, alerts і live retention task.
 - Pure payment/tournament decision tests можна ділити на окремі гілки, але
   fixed roadmap і один active behavioral migration зберігаються.
 
@@ -1922,8 +2118,9 @@ schema → claim/lease/CAS → provider adapter → q_delivery/repair
   допустимий terminal state.
 - Після `S1-01`: pilot pattern оцінений; якщо він не спростив код/tests,
   architecture roadmap зупиняється й ADR переглядається.
-- Після `D3-08`: durable delivery infrastructure корисна сама по собі; major
-  value/risk reassessment перед Arena/Friend/Tournaments.
+- Після `D3-09`: durable delivery infrastructure корисна сама по собі; major
+  value/risk reassessment перед продовженням через Referrals до
+  Arena/Friend/Tournaments.
 - Після cleanup кожного Ref/Arena/Friend/Tournament/Payment stage.
 
 Перед pause активний registry entry або закривається, або має чинні owner,
@@ -1936,12 +2133,12 @@ schema → claim/lease/CAS → provider adapter → q_delivery/repair
 |---|---|---|
 | Canonical analytics reader | `R1-07` | documented definition, freshness, bounded comparison, rollback flag |
 | Redis cooldown | `R1-09` | shared TTL/outage tests |
-| First durable delivery | `D3-07` | `D3-01`–`D3-06` deployed together, visibility live |
+| First durable delivery | `D3-08` | `D3-01`–`D3-07` deployed, visibility and retention live |
 | Referral mutations/notification | `REF-02/03` | zero pure-decision mismatch, dispatcher SLO |
 | Arena | `A-03`–`A-08` | replay fixed, shadow evidence, staged slots, PostgreSQL concurrency |
 | Friend | `F-02`–`F-05` | serialized caps, one workflow, staged delivery |
 | Tournaments | `T-01`–`T-09` | per-item recovery, reward-before-proof, complete business cycle |
-| Payments | `P-04`–`P-16` | staged app/reconciliation/refund, dry-run/shadow, review path |
+| Payments | `P-04`–`P-18` | protected replay evidence, staged app/reconciliation/refund, dry-run/shadow, review path |
 
 ### 4.5 Write-slot proof
 
@@ -1952,15 +2149,15 @@ boolean aliases.
 | Phase | Slot 1 | Slot 2 | Gate before next phase |
 |---|---|---|---|
 | Release 1 | none; analytics route read-only | none | `R1-10` removes read flag |
-| Durable pilot | `D3-07` Daily delivery | none | `D3-08` closes |
+| Durable pilot | `D3-08` Daily delivery | none | `D3-09` closes |
 | Referrals | `REF-02` reward mutation | `REF-03` delivery | `REF-04` closes both |
 | Arena | `A-03..A-05` access stage | `A-06..A-08` delivery stage | `A-09` closes both |
 | Friend | `F-02` access stage | `F-03..F-05` delivery stage | `F-06` closes both |
 | Tournament before `T-07` | `T-01` lifecycle | `T-02..T-06` delivery | `T-07` closes delivery |
 | Tournament after `T-07` | `T-01` lifecycle | `T-08/T-09` finalization | `T-10` closes both |
-| Payments before `P-12` | `P-04..P-08` application | none | adapters/shadow use no slot |
-| Payments at `P-12` | application | reconciliation | `P-13` closes application |
-| Payments after `P-13` | `P-14` refund | reconciliation | `P-17` closes both |
+| Payments before `P-13` | `P-05..P-09` application | none | `P-04` envelope and adapters/shadow use no slot |
+| Payments at `P-13` | application | reconciliation | `P-14` closes application |
+| Payments after `P-14` | `P-15` refund | reconciliation | `P-18` closes both |
 | Further cleanup | `C-02` incoming runtime route at most | none | `C-03` closes slot; `C-09` final join |
 
 `telegram_stars_reconciliation_dry_run`, emergency kill switches і pure shadow
@@ -2176,6 +2373,24 @@ transport backlog. Initial targets:
   вони не переводяться bulk у terminal state.
 - Старі attempt rows без payload не clone-яться автоматично.
 
+### 6.7 Detail retention and redaction
+
+- Replayable recipient/payload/provider/error detail живе не довше 30 days від
+  approved origin/terminal rule у `PF-06`; `detail_expires_at` записується при
+  створенні row, а не обчислюється ad hoc scanner-ом.
+- Due `PENDING/RETRY` або stale `CLAIMED`, чий detail expired, спочатку
+  CAS-иться в `FAILED(DETAIL_RETENTION_EXPIRED)`. Active `CLAIMED` не
+  redaction-иться до lease expiry; nonterminal work не delete-иться silently.
+- Retention task bounded batches використовує `FOR UPDATE SKIP LOCKED`, не
+  робить external I/O і після terminal classification очищає recipient,
+  payload, provider id та error detail. Лишаються opaque digests,
+  effect/status/type/version, aggregate-safe audit, timestamps і counters.
+- Replay, suppress і admin detail access fail-ять explicit
+  `DETAIL_REDACTED|DETAIL_RETENTION_EXPIRED`; redacted row не можна clone-ити
+  або реконструювати з logs.
+- Dry-run inventory, live scheduled task, alerts і backup/replica policy
+  verified до `D3-08`; first producer без purger заборонений.
+
 ---
 
 ## 7. Testing, rollout and cleanup contract
@@ -2262,12 +2477,12 @@ repository snapshot.
 |---|---|---|---|
 | `PF-01` | Хто є production authority для admin enabled/disabled, email і role: config чи DB? Звірити operator policy, deployed env і admin inventory. | `R0-03` production DoD | Deny missing/mismatch; ніколи не auto-create/update з JWT claim. |
 | `PF-02` | Чи є duplicate `IN_PROGRESS` DailyRun на `(user_id, berlin_date)`? Read-only production SQL, визначити deterministic survivor/repair. | `R1-03` migration | Не створювати index і не delete-ити data до approved repair. |
-| `PF-03` | Product/operator definition DAU/WAU/MAU, timezone/freshness, supported `7d/30d/90d` comparisons і чи існує complete immutable source для historical backfill. Затвердити metric catalog та source-completeness proof із dashboard/data owner. | `R1-06/07` cutover | Не backfill-ити з mutable `User.last_seen_at`. Додати `user_activity_days`, позначити old rows invalid і, якщо немає independently proven source, чекати prospective 120-day horizon before all-period reader cutover. |
-| `PF-04` | Daily push SLA/effect class: ephemeral чи recoverable? Product/incident review. | `D3-07` effect contract | Recoverable `R2`; до dispatcher лише log-after-success, без гарантії retry. |
-| `PF-05` | Live counts/age/errors у `telegram_delivery_attempts`, queue depths, worker/beat topology, applied migration head і p95 latency. Read-only DB/Redis/deployment inspection. | `D3-04/07`, `C-02`, `C-06`, `C-08` cutovers | Existing shared worker, no fifth process; no legacy row migration/deletion; no cutover без measured capacity. |
-| `PF-06` | Дозволений outgoing content та мінімальний replayable incoming Telegram payload, encryption/key rotation і retention. Security/privacy review exact fields, recipient identifiers і incident access. | `D3-01`, `C-01/C-02` | Outgoing: template/type/version + bounded scalar args, no rendered text/secrets, 30-day detail. Incoming: encrypted versioned envelope, hash, no raw logs, purge terminal ciphertext after 7 days; C runtime cutover blocked until approved replay schema/key. |
+| `PF-03` | Product/operator definition DAU/WAU/MAU, timezone/freshness, supported `7d/30d/90d` comparisons, hourly grain/repeated fall-back hour semantics, fact retention/API compatibility і чи існує complete immutable source для historical backfill. Затвердити metric catalog та source-completeness proof із dashboard/data owner. | `R1-06/07` cutover | Не backfill-ити з mutable `User.last_seen_at`. Додати version-neutral hour-grain immutable fact; current 24-bucket API collapse-ить repeated local hour per distinct user. Retention не менше 121 Berlin calendar days, bounded purger live до cutover. Позначити old rows invalid і, якщо немає independently proven source, чекати prospective 120 completed-day horizon before atomic KPI+series cutover. |
+| `PF-04` | Daily push SLA/effect class: ephemeral чи recoverable? Product/incident review. | `D3-08` effect contract | Recoverable `R2`; до dispatcher лише leased log-after-success, без гарантії retry. |
+| `PF-05` | Live counts/age/errors у `telegram_delivery_attempts`, queue depths, worker/beat topology, applied migration head і p95 latency. Read-only DB/Redis/deployment inspection. | `D3-04/08`, `C-02`, `C-06`, `C-08` cutovers | Existing shared worker, no fifth process; no legacy row migration/deletion; no cutover без measured capacity. |
+| `PF-06` | Дозволені outgoing, incoming і payment replay fields; encryption keys/rotation, live DB + backup/replica retention, recipient/provider identifiers та incident access. Security/privacy review exact allowlists і redaction horizons. | `D3-01/D3-07/D3-08`, `P-04/P-05`, `C-01/C-02` | Outgoing: template/type/version + bounded scalar args, opaque digests, no rendered text/secrets, 30-day detail enforced before producer. PaymentEvent replay: dedicated encrypted versioned minimal paid/refund command envelope; raw `telegram_payment_charge_id` існує лише в ciphertext, а current canonical `Purchase.telegram_payment_charge_id` policy не змінюється цим milestone. No live evidence writer/RETRY before handler, key, repair і retention gate. Incoming: encrypted versioned envelope, hash, no raw logs, purge terminal ciphertext after 7 days; runtime cutovers blocked until approved schemas/keys. |
 | `PF-07` | Для кожного behavioral R3 slice: minimum shadow sample, “full business cycle” і owner approval. Записати в registry before rollout. | Кожний R3 runtime cutover, крім перелічених у §7.4 direct forward-only fixes | Cutover blocked; mismatch threshold zero for money/reward/quota/invariants. Forward-only fixes застосовують R3 tests, але не чекають synthetic shadow sample/cycle. |
-| `PF-08` | Product semantics: різниця `new_users_only`/`first_purchase_only`, чи REFUNDED рахується paid history, Telegram Stars auto-recovery authority і будь-яка майбутня debt/collection policy. Product + finance/ops review. | `P-02`, `P-10/P-12` та лише policy-changing amendment після safe-default `P-14` | `P-14` не блокується: preserve current full financial reversal, claw back only available asset, report unrecovered amount, no debt state. Reconciliation stays dry-run; policy change потребує окремого milestone/flag. |
+| `PF-08` | Product semantics: різниця `new_users_only`/`first_purchase_only`, чи REFUNDED рахується paid history, Telegram Stars auto-recovery authority і будь-яка майбутня debt/collection policy. Product + finance/ops review. | `P-02`, `P-11/P-13` та лише policy-changing amendment після safe-default `P-15` | `P-15` не блокується: preserve current full financial reversal, claw back only available asset, report unrecovered amount, no debt state. Reconciliation stays dry-run; policy change потребує окремого milestone/flag. |
 | `PF-09` | Чи Daily Quiz reward може бути explicit `pending` замість immediate? Product UX/terms review. | Deferred `CompleteDailyQuizWithReward` design | Preserve current atomic completion+reward workflow. |
 | `PF-10` | Actual branch protection/CI required checks і authorization для protected runtime/CI files. Перевірити GitHub/deployment control plane before PR. | Merge/cutover milestones that touch protected files | Separate reviewed approval; do not bypass checks or edit production topology silently. |
 | `PF-11` | Чи Friend/Arena push quota рахує business attempt, accepted outgoing row чи successful provider delivery? Звірити product policy, incident history і operator expectation. | `A-08`, `F-03` quota cutovers | Provider failure не ставить terminal delivered marker і не permanently consume-ить delivery quota; attempt accounting, якщо потрібне, зберігати окремо. |
@@ -2276,10 +2491,10 @@ repository snapshot.
 
 ## 9. Milestone inventory
 
-- Загалом: **80** PR-sized milestones.
+- Загалом: **82** PR-sized milestones.
 - `R1`: **3**.
 - `R2`: **21**.
-- `R3`: **56**.
+- `R3`: **58**.
 - Blocking preflight records: **11**, але вони блокують лише вказані
   milestones/cutovers; `PF-01` є першим early blocker.
 
