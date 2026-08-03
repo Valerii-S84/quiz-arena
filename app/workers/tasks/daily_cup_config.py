@@ -28,6 +28,7 @@ def _parse_hhmm(value: str, *, default_hour: int, default_minute: int) -> tuple[
 
 DAILY_CUP_TIMEZONE = settings.daily_cup_timezone.strip() or "Europe/Berlin"
 DAILY_CUP_TOURNAMENT_TYPE = TOURNAMENT_TYPE_DAILY_ARENA
+DAILY_CUP_ENABLED = settings.daily_cup_enabled
 DAILY_CUP_INVITE_TIME = settings.daily_cup_invite_time
 DAILY_CUP_LAST_CALL_REMINDER_TIME = settings.daily_cup_last_call_reminder_time
 DAILY_CUP_PRESTART_REMINDER_TIME = settings.daily_cup_prestart_reminder_time
@@ -89,6 +90,7 @@ __all__ = [
     "DAILY_CUP_ACTIVE_LOOKBACK_DAYS",
     "DAILY_CUP_CLOSE_HOUR",
     "DAILY_CUP_CLOSE_MINUTE",
+    "DAILY_CUP_ENABLED",
     "DAILY_CUP_INVITE_HOUR",
     "DAILY_CUP_INVITE_MINUTE",
     "DAILY_CUP_LAST_CALL_REMINDER_HOUR",

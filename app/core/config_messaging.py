@@ -71,6 +71,7 @@ class MessagingSettingsMixin:
     tournament_max_participants: int = Field(default=8, alias="TOURNAMENT_MAX_PARTICIPANTS")
     tournament_min_participants: int = Field(default=2, alias="TOURNAMENT_MIN_PARTICIPANTS")
     tournament_rounds: int = Field(default=3, alias="TOURNAMENT_ROUNDS")
+    daily_cup_enabled: bool = Field(default=True, alias="DAILY_CUP_ENABLED")
     daily_cup_invite_time: str = Field(default="16:00", alias="DAILY_CUP_INVITE_TIME")
     daily_cup_last_call_reminder_time: str = Field(
         default="16:30",

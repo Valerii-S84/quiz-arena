@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.bot.texts.de import TEXTS_DE
+from app.core.config import Settings
 from app.game.tournaments.daily_cup_slots import ROUND_SLOTS, get_round_deadline, get_round_start
 from app.workers.tasks import daily_cup_async, daily_cup_schedule
 
@@ -22,6 +23,7 @@ RUNTIME_DAILY_CUP_OS_GETENV_RE = re.compile(r'os\.getenv\("(DAILY_CUP_[A-Z_]+)"'
 def test_configure_daily_cup_schedule_uses_single_1600_registration_push(
     monkeypatch,
 ) -> None:
+    monkeypatch.setattr(daily_cup_schedule, "DAILY_CUP_ENABLED", True)
     monkeypatch.setattr(daily_cup_schedule, "DAILY_CUP_OPEN_HOUR", 16)
     monkeypatch.setattr(daily_cup_schedule, "DAILY_CUP_OPEN_MINUTE", 0)
     monkeypatch.setattr(daily_cup_schedule, "DAILY_CUP_LAST_CALL_REMINDER_HOUR", 16)
@@ -53,6 +55,38 @@ def test_configure_daily_cup_schedule_uses_single_1600_registration_push(
     assert schedule["daily-cup-close-registration"]["schedule"].minute == {0}
 
 
+def test_daily_cup_enabled_defaults_to_true() -> None:
+    assert Settings.model_fields["daily_cup_enabled"].default is True
+
+
+def test_configure_daily_cup_schedule_registers_no_entries_when_disabled(monkeypatch) -> None:
+    monkeypatch.setattr(daily_cup_schedule, "DAILY_CUP_ENABLED", False)
+    celery_app = SimpleNamespace(conf=SimpleNamespace(beat_schedule={}))
+
+    daily_cup_schedule.configure_daily_cup_schedule(celery_app)
+
+    assert not any(name.startswith("daily-cup-") for name in celery_app.conf.beat_schedule)
+
+
+def test_configure_daily_cup_schedule_removes_only_daily_cup_entries_when_disabled(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(daily_cup_schedule, "DAILY_CUP_ENABLED", False)
+    unrelated_entry = {"task": "tests.unrelated"}
+    celery_app = SimpleNamespace(
+        conf=SimpleNamespace(
+            beat_schedule={
+                "daily-cup-existing-entry": {"task": "tests.daily_cup"},
+                "unrelated-entry": unrelated_entry,
+            }
+        )
+    )
+
+    daily_cup_schedule.configure_daily_cup_schedule(celery_app)
+
+    assert celery_app.conf.beat_schedule == {"unrelated-entry": unrelated_entry}
+
+
 def test_daily_cup_env_examples_match_runtime_daily_cup_keys_and_defaults() -> None:
     config_messaging_text = (ROOT / "app/core/config_messaging.py").read_text(encoding="utf-8")
     daily_cup_config_text = (ROOT / "app/workers/tasks/daily_cup_config.py").read_text(
@@ -63,6 +97,7 @@ def test_daily_cup_env_examples_match_runtime_daily_cup_keys_and_defaults() -> N
         *RUNTIME_DAILY_CUP_OS_GETENV_RE.findall(daily_cup_config_text),
     }
     expected_daily_cup_lines = {
+        "DAILY_CUP_ENABLED=true",
         "DAILY_CUP_INVITE_TIME=16:00",
         "DAILY_CUP_LAST_CALL_REMINDER_TIME=16:30",
         "DAILY_CUP_PRESTART_REMINDER_TIME=16:50",
