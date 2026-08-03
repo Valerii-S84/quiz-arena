@@ -9,8 +9,7 @@ from app.game.tournaments import daily_cup_user_status
 from app.game.tournaments.constants import DAILY_CUP_TOURNAMENT_TYPES, TOURNAMENT_TYPE_DAILY_ARENA
 from app.game.tournaments.daily_cup_user_status import DailyCupUserStatus
 from app.workers.celery_app import celery_app
-from app.workers.tasks import daily_cup_core
-from app.workers.tasks.daily_cup_schedule import configure_daily_cup_schedule
+from app.workers.tasks import daily_cup_core, daily_cup_schedule
 from tests.game.daily_arena_golden_support import (
     async_return,
     patch_status_window,
@@ -184,11 +183,12 @@ async def test_daily_arena_status_registration_variants(
     assert snapshot.status is expected_status
 
 
-def test_daily_arena_schedule_snapshot_contains_only_arena_entries() -> None:
+def test_daily_arena_schedule_snapshot_contains_only_arena_entries(monkeypatch) -> None:
     # GOLDEN: оновлено після видалення Elimination (крок 1 рефакторингу)
     # daily-elimination-final-deadline свідомо видалений з beat schedule
+    monkeypatch.setattr(daily_cup_schedule, "DAILY_CUP_ENABLED", True)
     celery_app_stub = SimpleNamespace(conf=SimpleNamespace(beat_schedule={}))
-    configure_daily_cup_schedule(celery_app_stub)
+    daily_cup_schedule.configure_daily_cup_schedule(celery_app_stub)
     schedule = celery_app_stub.conf.beat_schedule
     assert "daily-cup-send-invite-registration" in schedule
     assert "daily-cup-last-call-reminder" in schedule
