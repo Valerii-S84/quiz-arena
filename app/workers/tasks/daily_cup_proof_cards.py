@@ -155,7 +155,7 @@ def enqueue_daily_cup_proof_cards(
     delay_seconds: int = 2,
     lock_retry_attempt: int = 0,
 ) -> bool:
-    if not is_daily_cup_enabled():
+    if user_id is None and not is_daily_cup_enabled():
         return False
     return enqueue_daily_cup_proof_cards_job(
         tournament_id=tournament_id,
@@ -178,7 +178,7 @@ def run_daily_cup_proof_cards(
     initial_delay_seconds: int = 2,
     lock_retry_attempt: int = 0,
 ) -> dict[str, int]:
-    if not is_daily_cup_enabled():
+    if user_id is None and not is_daily_cup_enabled():
         return disabled_daily_cup_task_result()
     return run_async_job(
         run_daily_cup_proof_cards_async(

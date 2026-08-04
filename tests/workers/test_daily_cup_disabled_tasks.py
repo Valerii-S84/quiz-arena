@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from typing import Any
 
@@ -94,17 +95,60 @@ def test_disabled_followup_enqueuers_do_not_enqueue(monkeypatch: pytest.MonkeyPa
     )
     monkeypatch.setattr(daily_cup_nonfinishers_summary, "_is_celery_task", _unexpected_call)
 
-    assert (
-        daily_cup_messaging.enqueue_daily_cup_round_messaging(tournament_id="daily-cup-disabled")
-        is None
-    )
+    daily_cup_messaging.enqueue_daily_cup_round_messaging(tournament_id="daily-cup-disabled")
     assert (
         daily_cup_proof_cards.enqueue_daily_cup_proof_cards(tournament_id="daily-cup-disabled")
         is False
     )
-    assert (
-        daily_cup_nonfinishers_summary.enqueue_daily_cup_nonfinishers_summary(
-            tournament_id="daily-cup-disabled"
-        )
-        is None
+    daily_cup_nonfinishers_summary.enqueue_daily_cup_nonfinishers_summary(
+        tournament_id="daily-cup-disabled"
     )
+
+
+def test_disabled_user_requested_proof_card_still_enqueues(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+
+    def _record_enqueue(**kwargs: object) -> bool:
+        calls.append(kwargs)
+        return True
+
+    monkeypatch.setattr(daily_cup_config, "DAILY_CUP_ENABLED", False)
+    monkeypatch.setattr(
+        daily_cup_proof_cards,
+        "enqueue_daily_cup_proof_cards_job",
+        _record_enqueue,
+    )
+
+    assert daily_cup_proof_cards.enqueue_daily_cup_proof_cards(
+        tournament_id="daily-cup-disabled",
+        user_id=42,
+        delay_seconds=0,
+    )
+    assert len(calls) == 1
+    assert calls[0]["tournament_id"] == "daily-cup-disabled"
+    assert calls[0]["user_id"] == 42
+
+
+def test_disabled_queued_user_requested_proof_card_still_executes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+
+    async def _fake_async(**kwargs: object) -> dict[str, int]:
+        calls.append(kwargs)
+        return {"processed": 1, "sent": 1}
+
+    monkeypatch.setattr(daily_cup_config, "DAILY_CUP_ENABLED", False)
+    monkeypatch.setattr(daily_cup_proof_cards, "run_daily_cup_proof_cards_async", _fake_async)
+    monkeypatch.setattr(daily_cup_proof_cards, "run_async_job", asyncio.run)
+
+    assert daily_cup_proof_cards.run_daily_cup_proof_cards(
+        tournament_id="daily-cup-disabled",
+        user_id=42,
+        initial_delay_seconds=0,
+    ) == {"processed": 1, "sent": 1}
+    assert len(calls) == 1
+    assert calls[0]["tournament_id"] == "daily-cup-disabled"
+    assert calls[0]["user_id"] == 42
