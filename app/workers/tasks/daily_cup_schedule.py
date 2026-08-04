@@ -5,6 +5,7 @@ from celery.schedules import crontab
 from app.workers.tasks.daily_cup_config import (
     DAILY_CUP_CLOSE_HOUR,
     DAILY_CUP_CLOSE_MINUTE,
+    DAILY_CUP_ENABLED,
     DAILY_CUP_LAST_CALL_REMINDER_HOUR,
     DAILY_CUP_LAST_CALL_REMINDER_MINUTE,
     DAILY_CUP_OPEN_HOUR,
@@ -16,6 +17,12 @@ from app.workers.tasks.daily_cup_config import (
 
 def configure_daily_cup_schedule(celery_app) -> None:
     celery_app.conf.beat_schedule = celery_app.conf.beat_schedule or {}
+    if not DAILY_CUP_ENABLED:
+        for entry_name in tuple(celery_app.conf.beat_schedule):
+            if entry_name.startswith("daily-cup-"):
+                del celery_app.conf.beat_schedule[entry_name]
+        return
+
     schedule_entries = {
         "daily-cup-send-invite-registration": {
             "task": "app.workers.tasks.daily_cup.send_invite_registration",
