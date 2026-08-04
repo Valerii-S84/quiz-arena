@@ -19,7 +19,12 @@ from app.workers.tasks.daily_cup_core import persist_daily_cup_standings_message
 from app.workers.tasks.daily_cup_messaging_context import load_daily_cup_round_messaging_context
 from app.workers.tasks.daily_cup_messaging_delivery import deliver_daily_cup_messages
 from app.workers.tasks.daily_cup_messaging_followups import handle_daily_cup_completion_followups
-from app.workers.tasks.daily_cup_task_helpers import is_celery_task, is_today_daily_cup_tournament
+from app.workers.tasks.daily_cup_task_helpers import (
+    disabled_daily_cup_task_result,
+    is_celery_task,
+    is_daily_cup_enabled,
+    is_today_daily_cup_tournament,
+)
 from app.workers.tasks.tournaments_messaging_text import (
     ROUND_STATUSES,
     format_points,
@@ -115,6 +120,8 @@ def enqueue_daily_cup_round_messaging(
     tournament_id: str,
     enqueue_completion_followups: bool = False,
 ) -> None:
+    if not is_daily_cup_enabled():
+        return
     try:
         if is_celery_task(run_daily_cup_round_messaging):
             run_daily_cup_round_messaging.delay(
@@ -142,6 +149,8 @@ def run_daily_cup_round_messaging(
     tournament_id: str,
     enqueue_completion_followups: bool = False,
 ) -> dict[str, int]:
+    if not is_daily_cup_enabled():
+        return disabled_daily_cup_task_result()
     return run_async_job(
         run_daily_cup_round_messaging_async_with_followups(
             tournament_id=tournament_id, enqueue_completion_followups=enqueue_completion_followups

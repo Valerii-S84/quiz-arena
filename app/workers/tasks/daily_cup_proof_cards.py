@@ -24,7 +24,12 @@ from app.workers.tasks.daily_cup_proof_cards_context import load_daily_cup_proof
 from app.workers.tasks.daily_cup_proof_cards_delivery import deliver_daily_cup_proof_cards
 from app.workers.tasks.daily_cup_proof_cards_enqueue import enqueue_daily_cup_proof_cards_job
 from app.workers.tasks.daily_cup_proof_cards_text import format_points, format_user_label
-from app.workers.tasks.daily_cup_task_helpers import is_celery_task, is_today_daily_cup_tournament
+from app.workers.tasks.daily_cup_task_helpers import (
+    disabled_daily_cup_task_result,
+    is_celery_task,
+    is_daily_cup_enabled,
+    is_today_daily_cup_tournament,
+)
 from app.workers.tasks.daily_cup_winner_rewards import (
     DAILY_CUP_REWARD_MIN_PARTICIPANTS,
     grant_daily_cup_winner_rewards,
@@ -150,6 +155,8 @@ def enqueue_daily_cup_proof_cards(
     delay_seconds: int = 2,
     lock_retry_attempt: int = 0,
 ) -> bool:
+    if not is_daily_cup_enabled():
+        return False
     return enqueue_daily_cup_proof_cards_job(
         tournament_id=tournament_id,
         user_id=user_id,
@@ -171,6 +178,8 @@ def run_daily_cup_proof_cards(
     initial_delay_seconds: int = 2,
     lock_retry_attempt: int = 0,
 ) -> dict[str, int]:
+    if not is_daily_cup_enabled():
+        return disabled_daily_cup_task_result()
     return run_async_job(
         run_daily_cup_proof_cards_async(
             tournament_id=tournament_id,

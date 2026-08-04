@@ -30,6 +30,10 @@ from app.workers.tasks.daily_cup_rounds import (
     advance_daily_cup_rounds_async as _advance_daily_cup_rounds_async,
 )
 from app.workers.tasks.daily_cup_schedule import configure_daily_cup_schedule
+from app.workers.tasks.daily_cup_task_helpers import (
+    disabled_daily_cup_task_result,
+    is_daily_cup_enabled,
+)
 from app.workers.tasks.daily_cup_turn_reminder import (
     run_daily_cup_turn_reminders_async as _run_daily_cup_turn_reminders_async,
 )
@@ -78,46 +82,64 @@ __all__ = [
     retry_kwargs={"max_retries": 5},
 )
 def send_invite() -> dict[str, int]:
+    if not is_daily_cup_enabled():
+        return disabled_daily_cup_task_result()
     return run_async_job(send_daily_cup_invite_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.send_invite_registration")
 def send_invite_registration() -> dict[str, int]:
+    if not is_daily_cup_enabled():
+        return disabled_daily_cup_task_result()
     return run_async_job(send_daily_cup_invite_registration_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.open_registration")
 def open_registration() -> dict[str, int]:
+    if not is_daily_cup_enabled():
+        return disabled_daily_cup_task_result()
     return run_async_job(open_daily_cup_registration_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.send_last_call_reminder")
 def send_last_call_reminder() -> dict[str, int]:
+    if not is_daily_cup_enabled():
+        return disabled_daily_cup_task_result()
     return run_async_job(send_daily_cup_last_call_reminder_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.send_prestart_reminder")
 def send_prestart_reminder() -> dict[str, int]:
+    if not is_daily_cup_enabled():
+        return disabled_daily_cup_task_result()
     return run_async_job(send_daily_cup_prestart_reminder_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.publish_final_results")
 def publish_final_results() -> dict[str, int]:
+    if not is_daily_cup_enabled():
+        return disabled_daily_cup_task_result()
     return run_async_job(publish_daily_cup_final_results_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.send_turn_reminders")
 def send_turn_reminders() -> dict[str, int]:
+    if not is_daily_cup_enabled():
+        return disabled_daily_cup_task_result()
     return run_async_job(run_daily_cup_turn_reminders_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.close_registration_and_start")
 def close_registration_and_start() -> dict[str, int]:
+    if not is_daily_cup_enabled():
+        return disabled_daily_cup_task_result()
     return run_async_job(close_daily_cup_registration_and_start_async())
 
 
 @celery_app.task(name="app.workers.tasks.daily_cup.advance_rounds")
 def advance_rounds() -> dict[str, int]:
+    if not is_daily_cup_enabled():
+        return disabled_daily_cup_task_result()
     return run_async_job(advance_daily_cup_rounds_async())
 
 

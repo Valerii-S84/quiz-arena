@@ -44,6 +44,7 @@ def _resolve_test_database_url() -> str:
 
 def bootstrap_pytest_env() -> None:
     global _BOOTSTRAPPED
+    os.environ["DAILY_CUP_ENABLED"] = "true"
     if _BOOTSTRAPPED:
         return
 

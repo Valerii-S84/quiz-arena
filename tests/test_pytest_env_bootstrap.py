@@ -7,6 +7,15 @@ import pytest
 import pytest_env_bootstrap
 
 
+def test_bootstrap_pytest_env_normalizes_daily_cup_flag(monkeypatch) -> None:
+    monkeypatch.setenv("DAILY_CUP_ENABLED", "false")
+    monkeypatch.setattr(pytest_env_bootstrap, "_BOOTSTRAPPED", False)
+
+    pytest_env_bootstrap.bootstrap_pytest_env()
+
+    assert os.environ["DAILY_CUP_ENABLED"] == "true"
+
+
 def test_bootstrap_pytest_env_preserves_existing_database_url(
     monkeypatch,
 ) -> None:

@@ -23,6 +23,10 @@ from app.workers.tasks.daily_cup_nonfinishers_summary_context import (
 from app.workers.tasks.daily_cup_nonfinishers_summary_delivery import (
     deliver_daily_cup_nonfinishers_summary,
 )
+from app.workers.tasks.daily_cup_task_helpers import (
+    disabled_daily_cup_task_result,
+    is_daily_cup_enabled,
+)
 
 logger = structlog.get_logger("app.workers.tasks.daily_cup_nonfinishers_summary")
 
@@ -104,6 +108,8 @@ async def run_daily_cup_nonfinishers_summary_async(*, tournament_id: str) -> dic
 
 
 def enqueue_daily_cup_nonfinishers_summary(*, tournament_id: str, delay_seconds: int = 0) -> None:
+    if not is_daily_cup_enabled():
+        return
     try:
         if _is_celery_task(run_daily_cup_nonfinishers_summary):
             run_daily_cup_nonfinishers_summary.apply_async(
@@ -122,6 +128,8 @@ def enqueue_daily_cup_nonfinishers_summary(*, tournament_id: str, delay_seconds:
 
 @celery_app.task(name="app.workers.tasks.daily_cup.run_daily_cup_nonfinishers_summary")
 def run_daily_cup_nonfinishers_summary(*, tournament_id: str) -> dict[str, int]:
+    if not is_daily_cup_enabled():
+        return disabled_daily_cup_task_result()
     return run_async_job(run_daily_cup_nonfinishers_summary_async(tournament_id=tournament_id))
 
 
