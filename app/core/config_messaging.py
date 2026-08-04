@@ -4,6 +4,10 @@ from pydantic import Field
 
 
 class MessagingSettingsMixin:
+    daily_cup_enabled: bool = Field(
+        default=True,
+        alias="DAILY_CUP_ENABLED",
+    )
     telegram_bot_token: str = Field(alias="TELEGRAM_BOT_TOKEN")
     telegram_webhook_secret: str = Field(alias="TELEGRAM_WEBHOOK_SECRET")
     telegram_public_bot_username: str = Field(
