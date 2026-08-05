@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
 
 from app.core.config import Settings
 
-from .auth_common import AdminTokenPayload, _auth_state_unavailable, _now_utc
+from .auth_common import AdminAuthError, AdminTokenPayload, _auth_state_unavailable, _now_utc
 from .auth_state import _require_redis_client, _revoked_token_key, is_token_revoked
+
+_REFRESH_SESSION_CLAIM_PATTERN = re.compile(r"[A-Za-z0-9_-]{16,128}")
 
 
 def build_access_token(
@@ -30,7 +33,18 @@ def build_access_token(
     return jwt.encode(payload, settings.admin_jwt_secret, algorithm="HS256")
 
 
-def build_refresh_token(*, settings: Settings, email: str, role: str = "admin") -> str:
+def build_refresh_token(
+    *,
+    settings: Settings,
+    email: str,
+    jti: str,
+    family_id: str,
+    role: str = "admin",
+) -> str:
+    normalized_jti = _normalize_refresh_session_claim(jti)
+    normalized_family_id = _normalize_refresh_session_claim(family_id)
+    if normalized_jti is None or normalized_family_id is None:
+        raise AdminAuthError("Refresh session identity is invalid")
     now = _now_utc()
     expires_at = now + timedelta(days=max(1, settings.admin_refresh_token_ttl_days))
     payload = {
@@ -38,6 +52,8 @@ def build_refresh_token(*, settings: Settings, email: str, role: str = "admin") 
         "role": role,
         "two_factor": True,
         "type": "refresh",
+        "jti": normalized_jti,
+        "family_id": normalized_family_id,
         "iat": int(now.timestamp()),
         "exp": int(expires_at.timestamp()),
     }
@@ -49,7 +65,16 @@ async def decode_access_token(*, settings: Settings, token: str) -> AdminTokenPa
 
 
 async def decode_refresh_token(*, settings: Settings, token: str) -> AdminTokenPayload | None:
-    return await _decode_token(settings=settings, token=token, token_type="refresh")
+    return _decode_token_payload(settings=settings, token=token, token_type="refresh")
+
+
+def _normalize_refresh_session_claim(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    if _REFRESH_SESSION_CLAIM_PATTERN.fullmatch(normalized) is None:
+        return None
+    return normalized
 
 
 def _decode_token_payload(
@@ -79,21 +104,26 @@ def _decode_token_payload(
         return None
 
     expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+    jti = None
+    family_id = None
+    if token_type == "refresh":
+        jti = _normalize_refresh_session_claim(payload.get("jti"))
+        family_id = _normalize_refresh_session_claim(payload.get("family_id"))
+        if jti is None or family_id is None:
+            return None
     return AdminTokenPayload(
         email=sub,
         role=role,
         two_factor_verified=bool(payload.get("two_factor", False)),
         token_type=payload_type,
         expires_at=expires_at,
+        jti=jti,
+        family_id=family_id,
     )
 
 
 async def revoke_access_token(*, settings: Settings, token: str) -> None:
     await _revoke_token(settings=settings, token=token, token_type="access")
-
-
-async def revoke_refresh_token(*, settings: Settings, token: str) -> None:
-    await _revoke_token(settings=settings, token=token, token_type="refresh")
 
 
 async def _decode_token(

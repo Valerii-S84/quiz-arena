@@ -14,6 +14,9 @@ from tests.services.admin_auth_test_support import (
     settings_stub,
 )
 
+REFRESH_JTI = "refresh-jti-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+REFRESH_FAMILY_ID = "refresh-family-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+
 
 @pytest.fixture(autouse=True)
 def _reset_redis_client() -> None:
@@ -34,7 +37,12 @@ async def test_access_and_refresh_tokens_round_trip(monkeypatch: pytest.MonkeyPa
         email="Admin@Example.com",
         two_factor_verified=True,
     )
-    refresh_token = admin_auth.build_refresh_token(settings=settings, email="Admin@Example.com")
+    refresh_token = admin_auth.build_refresh_token(
+        settings=settings,
+        email="Admin@Example.com",
+        jti=REFRESH_JTI,
+        family_id=REFRESH_FAMILY_ID,
+    )
 
     access_payload = await admin_auth.decode_access_token(settings=settings, token=access_token)
     refresh_payload = await admin_auth.decode_refresh_token(settings=settings, token=refresh_token)
@@ -45,6 +53,8 @@ async def test_access_and_refresh_tokens_round_trip(monkeypatch: pytest.MonkeyPa
     assert refresh_payload is not None
     assert refresh_payload.email == "admin@example.com"
     assert refresh_payload.two_factor_verified is True
+    assert refresh_payload.jti == REFRESH_JTI
+    assert refresh_payload.family_id == REFRESH_FAMILY_ID
 
 
 @pytest.mark.parametrize(
@@ -74,6 +84,8 @@ async def test_decode_refresh_token_rejects_invalid_signature() -> None:
     token = admin_auth.build_refresh_token(
         settings=settings_stub(admin_refresh_secret="good-secret"),
         email="admin@example.com",
+        jti=REFRESH_JTI,
+        family_id=REFRESH_FAMILY_ID,
     )
 
     assert (
@@ -117,6 +129,55 @@ async def test_decode_token_rejects_wrong_token_type() -> None:
         await admin_auth.decode_refresh_token(settings=settings_stub(), token=refresh_like_access)
         is None
     )
+
+
+@pytest.mark.parametrize(
+    "claims",
+    [
+        {},
+        {"jti": REFRESH_JTI},
+        {"family_id": REFRESH_FAMILY_ID},
+        {"jti": "short", "family_id": REFRESH_FAMILY_ID},
+        {"jti": REFRESH_JTI, "family_id": {"invalid": "type"}},
+    ],
+)
+async def test_decode_refresh_token_rejects_legacy_or_invalid_session_identity(
+    claims: dict[str, object],
+) -> None:
+    token = jwt.encode(
+        {
+            "sub": "admin@example.com",
+            "role": "admin",
+            "two_factor": True,
+            "type": "refresh",
+            "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
+            **claims,
+        },
+        settings_stub().admin_refresh_secret,
+        algorithm="HS256",
+    )
+
+    assert await admin_auth.decode_refresh_token(settings=settings_stub(), token=token) is None
+
+
+@pytest.mark.parametrize(
+    ("jti", "family_id"),
+    [
+        ("short", REFRESH_FAMILY_ID),
+        (REFRESH_JTI, "contains spaces in family id"),
+    ],
+)
+def test_build_refresh_token_rejects_invalid_session_identity(
+    jti: str,
+    family_id: str,
+) -> None:
+    with pytest.raises(admin_auth.AdminAuthError):
+        admin_auth.build_refresh_token(
+            settings=settings_stub(),
+            email="admin@example.com",
+            jti=jti,
+            family_id=family_id,
+        )
 
 
 @pytest.mark.parametrize(
@@ -167,10 +228,14 @@ async def test_revoke_access_token_blocklists_token(monkeypatch: pytest.MonkeyPa
     assert await admin_auth.decode_access_token(settings=settings_stub(), token=token) is None
 
 
-async def test_revoke_refresh_token_raises_when_redis_unavailable(
+async def test_decode_access_token_raises_when_auth_state_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    token = admin_auth.build_refresh_token(settings=settings_stub(), email="admin@example.com")
+    token = admin_auth.build_access_token(
+        settings=settings_stub(),
+        email="admin@example.com",
+        two_factor_verified=True,
+    )
 
     async def _no_client(_settings: SimpleNamespace) -> None:
         return None
@@ -178,36 +243,26 @@ async def test_revoke_refresh_token_raises_when_redis_unavailable(
     monkeypatch.setattr(admin_auth_state, "_get_redis_client", _no_client)
 
     with pytest.raises(admin_auth.AdminAuthStateError):
-        await admin_auth.revoke_refresh_token(settings=settings_stub(), token=token)
+        await admin_auth.decode_access_token(settings=settings_stub(), token=token)
 
 
-@pytest.mark.parametrize(
-    ("build_token", "decode_token", "build_kwargs"),
-    [
-        (
-            admin_auth.build_access_token,
-            admin_auth.decode_access_token,
-            {"email": "admin@example.com", "two_factor_verified": True},
-        ),
-        (
-            admin_auth.build_refresh_token,
-            admin_auth.decode_refresh_token,
-            {"email": "admin@example.com"},
-        ),
-    ],
-)
-async def test_decode_token_raises_when_auth_state_unavailable(
+async def test_decode_refresh_token_does_not_read_legacy_revocation_state(
     monkeypatch: pytest.MonkeyPatch,
-    build_token,
-    decode_token,
-    build_kwargs: dict[str, object],
 ) -> None:
-    token = build_token(settings=settings_stub(), **build_kwargs)
+    token = admin_auth.build_refresh_token(
+        settings=settings_stub(),
+        email="admin@example.com",
+        jti=REFRESH_JTI,
+        family_id=REFRESH_FAMILY_ID,
+    )
 
-    async def _no_client(_settings: SimpleNamespace) -> None:
-        return None
+    async def _unexpected_client(_settings: SimpleNamespace) -> None:
+        raise AssertionError("refresh decode must not access Redis")
 
-    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _no_client)
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _unexpected_client)
 
-    with pytest.raises(admin_auth.AdminAuthStateError):
-        await decode_token(settings=settings_stub(), token=token)
+    payload = await admin_auth.decode_refresh_token(settings=settings_stub(), token=token)
+
+    assert payload is not None
+    assert payload.jti == REFRESH_JTI
+    assert payload.family_id == REFRESH_FAMILY_ID

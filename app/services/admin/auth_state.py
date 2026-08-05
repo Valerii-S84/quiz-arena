@@ -54,20 +54,20 @@ async def get_totp_secret(settings: Settings, *, strict: bool = False) -> str:
     return ""
 
 
-async def set_totp_secret(*, settings: Settings, secret: str, strict: bool = False) -> None:
+async def set_totp_secret(*, settings: Settings, secret: str, strict: bool = False) -> bool:
     if settings.admin_totp_secret.strip():
-        return
+        return False
     client = await _get_redis_client(settings)
     if client is None:
         if strict:
             raise _auth_state_unavailable()
-        return
+        return False
     try:
-        await client.set(_ADMIN_TOTP_SECRET_KEY, secret)
+        return bool(await client.set(_ADMIN_TOTP_SECRET_KEY, secret, nx=True))
     except Exception as exc:
         if strict:
             raise _auth_state_unavailable() from exc
-        return
+        return False
 
 
 async def _get_redis_client(settings: Settings) -> redis.Redis | None:

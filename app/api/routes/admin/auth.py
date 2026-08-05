@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from app.api.routes.admin import deps as admin_deps
 from app.core.config import Settings, get_settings
 from app.services.admin import auth as admin_auth
+from app.services.admin import auth_refresh_sessions
 from app.services.admin import rate_limit as _admin_rate_limit
 
 from . import auth_helpers, auth_models, auth_rate_limit, auth_responses
@@ -39,10 +40,15 @@ async def login_admin(
 
     await auth_rate_limit.clear_failures(settings=settings, buckets=buckets, action="login")
     if not settings.admin_2fa_required:
+        try:
+            refresh_session = await auth_refresh_sessions.create_refresh_session(settings=settings)
+        except admin_auth.AdminAuthStateError as exc:
+            raise auth_responses.auth_state_unavailable_http_error() from exc
         return auth_responses.issue_login_success_response(
             settings=settings,
             email=payload.email.lower(),
             role=auth_helpers.configured_admin_role(settings),
+            refresh_session=refresh_session,
             build_access_token_fn=admin_auth.build_access_token,
             build_refresh_token_fn=admin_auth.build_refresh_token,
             add_noindex_header_fn=admin_deps.add_admin_noindex_header,
@@ -97,10 +103,15 @@ async def verify_2fa(
             raise HTTPException(status_code=401, detail={"code": "E_INVALID_TOTP"})
 
     await auth_rate_limit.clear_failures(settings=settings, buckets=buckets, action="verify_2fa")
+    try:
+        refresh_session = await auth_refresh_sessions.create_refresh_session(settings=settings)
+    except admin_auth.AdminAuthStateError as exc:
+        raise auth_responses.auth_state_unavailable_http_error() from exc
     return auth_responses.issue_verified_session_response(
         settings=settings,
         email=principal.email,
         role=principal.role,
+        refresh_session=refresh_session,
         build_access_token_fn=admin_auth.build_access_token,
         build_refresh_token_fn=admin_auth.build_refresh_token,
         add_noindex_header_fn=admin_deps.add_admin_noindex_header,
@@ -116,6 +127,9 @@ async def setup_2fa(
 ) -> dict[str, str]:
     admin_deps.add_admin_noindex_header(response)
     try:
-        return await admin_auth.get_totp_setup_payload(settings=settings)
+        payload = await admin_auth.get_totp_setup_payload(settings=settings)
     except admin_auth.AdminAuthStateError as exc:
         raise auth_responses.auth_state_unavailable_http_error() from exc
+    if payload is None:
+        raise HTTPException(status_code=403, detail={"code": "E_FORBIDDEN"})
+    return payload

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
 import pyotp
@@ -25,47 +26,60 @@ async def test_get_totp_setup_payload_generates_secret_when_missing(
 ) -> None:
     stored: list[str] = []
 
-    async def _missing_secret(_settings: SimpleNamespace, *, strict: bool = False) -> str:
-        del strict
-        return ""
-
     async def _store_secret(
         *, settings: SimpleNamespace, secret: str, strict: bool = False
-    ) -> None:
+    ) -> bool:
         del settings, strict
         stored.append(secret)
+        return True
 
-    monkeypatch.setattr(admin_auth_totp, "get_totp_secret", _missing_secret)
     monkeypatch.setattr(admin_auth_totp, "set_totp_secret", _store_secret)
 
     payload = await admin_auth.get_totp_setup_payload(settings=settings_stub())
 
+    assert payload is not None
     assert payload["secret"] == stored[0]
     assert "otpauth://" in payload["otpauth_uri"]
 
 
-async def test_get_totp_setup_payload_reuses_existing_secret(
+async def test_get_totp_setup_payload_denies_existing_enrollment() -> None:
+    payload = await admin_auth.get_totp_setup_payload(
+        settings=settings_stub(admin_totp_secret="existing-secret")
+    )
+
+    assert payload is None
+
+
+async def test_get_totp_setup_payload_has_one_concurrent_winner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    called: list[str] = []
+    attempts: list[str] = []
+    stored_secret: str | None = None
+    both_ready = asyncio.Event()
 
-    async def _existing_secret(_settings: SimpleNamespace, *, strict: bool = False) -> str:
-        del strict
-        return "existing-secret"
-
-    async def _unexpected_store(
-        *, settings: SimpleNamespace, secret: str, strict: bool = False
-    ) -> None:
+    async def _store_once(*, settings: SimpleNamespace, secret: str, strict: bool = False) -> bool:
+        nonlocal stored_secret
         del settings, strict
-        called.append(secret)
+        attempts.append(secret)
+        if len(attempts) == 2:
+            both_ready.set()
+        await both_ready.wait()
+        if stored_secret is not None:
+            return False
+        stored_secret = secret
+        return True
 
-    monkeypatch.setattr(admin_auth_totp, "get_totp_secret", _existing_secret)
-    monkeypatch.setattr(admin_auth_totp, "set_totp_secret", _unexpected_store)
+    monkeypatch.setattr(admin_auth_totp, "set_totp_secret", _store_once)
 
-    payload = await admin_auth.get_totp_setup_payload(settings=settings_stub())
+    results = await asyncio.gather(
+        admin_auth.get_totp_setup_payload(settings=settings_stub()),
+        admin_auth.get_totp_setup_payload(settings=settings_stub()),
+    )
 
-    assert payload["secret"] == "existing-secret"
-    assert called == []
+    winners = [payload for payload in results if payload is not None]
+    assert len(winners) == 1
+    assert winners[0]["secret"] == stored_secret
+    assert len(set(attempts)) == 2
 
 
 async def test_verify_totp_code_rejects_missing_blank_and_invalid_codes(
@@ -179,7 +193,7 @@ async def test_get_totp_secret_returns_empty_for_missing_client_and_redis_failur
     assert await admin_auth.get_totp_secret(settings_stub()) == ""
 
 
-async def test_set_totp_secret_is_noop_for_env_secret_missing_client_and_redis_errors(
+async def test_set_totp_secret_rejects_env_secret_missing_client_and_redis_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client = RedisClient()
@@ -188,9 +202,12 @@ async def test_set_totp_secret_is_noop_for_env_secret_missing_client_and_redis_e
         return client
 
     monkeypatch.setattr(admin_auth_state, "_get_redis_client", _unexpected_client)
-    await admin_auth.set_totp_secret(
-        settings=settings_stub(admin_totp_secret="configured"),
-        secret="new-secret",
+    assert (
+        await admin_auth.set_totp_secret(
+            settings=settings_stub(admin_totp_secret="configured"),
+            secret="new-secret",
+        )
+        is False
     )
     assert client.set_calls == []
 
@@ -198,15 +215,63 @@ async def test_set_totp_secret_is_noop_for_env_secret_missing_client_and_redis_e
         return None
 
     monkeypatch.setattr(admin_auth_state, "_get_redis_client", _no_client)
-    await admin_auth.set_totp_secret(settings=settings_stub(), secret="new-secret")
+    assert await admin_auth.set_totp_secret(settings=settings_stub(), secret="new-secret") is False
 
-    failing_client = RedisClient(set_error=RuntimeError("boom"))
+    class _FailingClient:
+        async def set(self, key: str, value: str, *, nx: bool = False) -> bool:
+            del key, value, nx
+            raise RuntimeError("boom")
 
-    async def _failing_client(_settings: SimpleNamespace) -> RedisClient:
-        return failing_client
+    async def _failing_client(_settings: SimpleNamespace) -> _FailingClient:
+        return _FailingClient()
 
     monkeypatch.setattr(admin_auth_state, "_get_redis_client", _failing_client)
-    await admin_auth.set_totp_secret(settings=settings_stub(), secret="new-secret")
+    assert await admin_auth.set_totp_secret(settings=settings_stub(), secret="new-secret") is False
+
+
+async def test_set_totp_secret_uses_set_nx_and_reports_the_winner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+    results: list[bool | None] = [True, None]
+
+    class _Client:
+        async def set(self, key: str, value: str, *, nx: bool = False) -> bool | None:
+            calls.append({"key": key, "value": value, "nx": nx})
+            return results.pop(0)
+
+    client = _Client()
+
+    async def _client(_settings: SimpleNamespace) -> _Client:
+        return client
+
+    monkeypatch.setattr(admin_auth_state, "_get_redis_client", _client)
+
+    winner_enrolled = await admin_auth.set_totp_secret(
+        settings=settings_stub(),
+        secret="winner-secret",
+        strict=True,
+    )
+    loser_enrolled = await admin_auth.set_totp_secret(
+        settings=settings_stub(),
+        secret="loser-secret",
+        strict=True,
+    )
+
+    assert winner_enrolled is True
+    assert loser_enrolled is False
+    assert calls == [
+        {
+            "key": admin_auth_state._ADMIN_TOTP_SECRET_KEY,
+            "value": "winner-secret",
+            "nx": True,
+        },
+        {
+            "key": admin_auth_state._ADMIN_TOTP_SECRET_KEY,
+            "value": "loser-secret",
+            "nx": True,
+        },
+    ]
 
 
 async def test_get_redis_client_caches_successful_client(monkeypatch: pytest.MonkeyPatch) -> None:

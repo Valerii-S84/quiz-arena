@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from app.api.routes.admin import deps as admin_deps
 from app.core.config import Settings, get_settings
 from app.services.admin import auth as admin_auth
+from app.services.admin import auth_refresh_sessions
 
 from . import auth_helpers, auth_models, auth_responses
 
@@ -30,10 +31,23 @@ async def refresh_session(
         two_factor_verified=payload.two_factor_verified,
         settings=settings,
     )
+    if payload.family_id is None or payload.jti is None:
+        raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
+    try:
+        rotation = await auth_refresh_sessions.rotate_refresh_session(
+            settings=settings,
+            family_id=payload.family_id,
+            jti=payload.jti,
+        )
+    except admin_auth.AdminAuthStateError as exc:
+        raise auth_responses.auth_state_unavailable_http_error() from exc
+    if rotation.session is None:
+        raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
     return auth_responses.issue_verified_session_response(
         settings=settings,
         email=payload.email,
         role=payload.role,
+        refresh_session=rotation.session,
         build_access_token_fn=admin_auth.build_access_token,
         build_refresh_token_fn=admin_auth.build_refresh_token,
         add_noindex_header_fn=admin_deps.add_admin_noindex_header,
@@ -50,10 +64,15 @@ async def logout(
     admin_deps.add_admin_noindex_header(response)
     access_token = admin_deps.extract_admin_access_token(request)
     refresh_token = (request.cookies.get(admin_auth.ADMIN_REFRESH_COOKIE) or "").strip()
+    refresh_payload = await admin_auth.decode_refresh_token(settings=settings, token=refresh_token)
     auth_state_available = True
     try:
         await admin_auth.revoke_access_token(settings=settings, token=access_token)
-        await admin_auth.revoke_refresh_token(settings=settings, token=refresh_token)
+        if refresh_payload is not None and refresh_payload.family_id is not None:
+            await auth_refresh_sessions.revoke_refresh_family(
+                settings=settings,
+                family_id=refresh_payload.family_id,
+            )
     except admin_auth.AdminAuthStateError:
         auth_state_available = False
     return auth_responses.build_logout_response(

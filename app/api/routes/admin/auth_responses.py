@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
 from app.core.config import Settings
+from app.services.admin.auth_refresh_sessions import RefreshSessionIdentity
 
 
 def auth_state_unavailable_http_error() -> HTTPException:
@@ -34,6 +35,7 @@ def issue_login_success_response(
     settings: Settings,
     email: str,
     role: str,
+    refresh_session: RefreshSessionIdentity,
     build_access_token_fn,
     build_refresh_token_fn,
     add_noindex_header_fn,
@@ -51,6 +53,8 @@ def issue_login_success_response(
             settings=settings,
             email=email,
             role=role,
+            jti=refresh_session.jti,
+            family_id=refresh_session.family_id,
         ),
         add_noindex_header_fn=add_noindex_header_fn,
         apply_auth_cookies_fn=apply_auth_cookies_fn,
@@ -106,6 +110,7 @@ def issue_verified_session_response(
     settings: Settings,
     email: str,
     role: str,
+    refresh_session: RefreshSessionIdentity,
     build_access_token_fn,
     build_refresh_token_fn,
     add_noindex_header_fn,
@@ -121,7 +126,13 @@ def issue_verified_session_response(
             role=role,
             two_factor_verified=True,
         ),
-        refresh_token=build_refresh_token_fn(settings=settings, email=email, role=role),
+        refresh_token=build_refresh_token_fn(
+            settings=settings,
+            email=email,
+            role=role,
+            jti=refresh_session.jti,
+            family_id=refresh_session.family_id,
+        ),
         add_noindex_header_fn=add_noindex_header_fn,
         apply_auth_cookies_fn=apply_auth_cookies_fn,
     )

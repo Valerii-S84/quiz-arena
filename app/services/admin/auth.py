@@ -18,7 +18,6 @@ from .auth_tokens import (
     decode_access_token,
     decode_refresh_token,
     revoke_access_token,
-    revoke_refresh_token,
 )
 from .auth_totp import get_totp_setup_payload, verify_totp_code
 
@@ -39,7 +38,6 @@ __all__ = [
     "get_totp_secret",
     "get_totp_setup_payload",
     "revoke_access_token",
-    "revoke_refresh_token",
     "set_totp_secret",
     "verify_login_credentials",
     "verify_totp_code",

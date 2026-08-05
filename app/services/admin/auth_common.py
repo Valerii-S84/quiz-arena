@@ -19,6 +19,8 @@ class AdminTokenPayload:
     two_factor_verified: bool
     token_type: str
     expires_at: datetime
+    jti: str | None = None
+    family_id: str | None = None
 
 
 class AdminAuthError(ValueError):
