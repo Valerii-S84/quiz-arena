@@ -7,11 +7,11 @@ from app.core.config import Settings
 from .auth_state import get_totp_secret, set_totp_secret
 
 
-async def get_totp_setup_payload(*, settings: Settings) -> dict[str, str]:
-    secret = await get_totp_secret(settings, strict=True)
-    if not secret:
-        secret = pyotp.random_base32()
-        await set_totp_secret(settings=settings, secret=secret, strict=True)
+async def get_totp_setup_payload(*, settings: Settings) -> dict[str, str] | None:
+    secret = pyotp.random_base32()
+    enrolled = await set_totp_secret(settings=settings, secret=secret, strict=True)
+    if not enrolled:
+        return None
 
     otpauth_uri = pyotp.TOTP(secret).provisioning_uri(
         name=settings.admin_email,
