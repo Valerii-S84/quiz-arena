@@ -15,7 +15,7 @@ async def test_admins_repo_get_by_email_returns_none_for_missing_admin() -> None
 
 
 @pytest.mark.asyncio
-async def test_admins_repo_get_or_create_creates_and_then_updates_existing_role() -> None:
+async def test_admins_repo_get_or_create_never_updates_existing_authority() -> None:
     email = "admin@example.com"
 
     async with SessionLocal.begin() as session:
@@ -27,6 +27,7 @@ async def test_admins_repo_get_or_create_creates_and_then_updates_existing_role(
 
     assert created.email == email
     assert created.role == "admin"
+    assert created.enabled is False
     assert created.created_at == created.updated_at
 
     async with SessionLocal.begin() as session:
@@ -34,16 +35,19 @@ async def test_admins_repo_get_or_create_creates_and_then_updates_existing_role(
             session,
             email=email,
             role="super_admin",
+            enabled=True,
         )
 
     assert updated.id == created.id
     assert updated.email == email
-    assert updated.role == "super_admin"
-    assert updated.updated_at >= created.updated_at
+    assert updated.role == "admin"
+    assert updated.enabled is False
+    assert updated.updated_at == created.updated_at
 
     async with SessionLocal.begin() as session:
         loaded = await AdminsRepo.get_by_email(session, email=email)
 
     assert loaded is not None
     assert loaded.id == created.id
-    assert loaded.role == "super_admin"
+    assert loaded.role == "admin"
+    assert loaded.enabled is False

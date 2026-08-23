@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.api.routes.admin import deps as admin_deps
 from app.main import app
+from app.services.admin import auth_authority
 from tests.type_helpers import build_settings
 
 
@@ -34,12 +35,40 @@ def principal_stub(*, two_factor_verified: bool = False) -> admin_deps.AdminPrin
     )
 
 
+def authority_stub(
+    *,
+    email: str = "admin@example.com",
+    role: str = "admin",
+) -> auth_authority.CurrentAdminAuthority:
+    return auth_authority.CurrentAdminAuthority(
+        id=uuid4(),
+        email=email,
+        role=role,
+        enabled=True,
+    )
+
+
 @pytest.fixture
-def client() -> Generator[TestClient, None, None]:
+def client(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
+    async def _resolve_authority(
+        *,
+        email: str,
+        expected_role: str | None = None,
+    ) -> auth_authority.CurrentAdminAuthority:
+        return authority_stub(
+            email=email.strip().lower(),
+            role=expected_role or "admin",
+        )
+
+    monkeypatch.setattr(
+        auth_authority,
+        "resolve_current_admin_authority",
+        _resolve_authority,
+    )
     app.dependency_overrides.clear()
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
 
 
-__all__ = ["client", "principal_stub", "settings_stub"]
+__all__ = ["authority_stub", "client", "principal_stub", "settings_stub"]

@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
 from app.core.config import Settings
+from app.services.admin.auth_authority import CurrentAdminAuthority
 from app.services.admin.auth_refresh_sessions import RefreshSessionIdentity
 
 
@@ -33,8 +34,7 @@ def build_login_success_response(
 def issue_login_success_response(
     *,
     settings: Settings,
-    email: str,
-    role: str,
+    authority: CurrentAdminAuthority,
     refresh_session: RefreshSessionIdentity,
     build_access_token_fn,
     build_refresh_token_fn,
@@ -45,14 +45,14 @@ def issue_login_success_response(
         settings=settings,
         access_token=build_access_token_fn(
             settings=settings,
-            email=email,
-            role=role,
+            email=authority.email,
+            role=authority.role,
             two_factor_verified=True,
         ),
         refresh_token=build_refresh_token_fn(
             settings=settings,
-            email=email,
-            role=role,
+            email=authority.email,
+            role=authority.role,
             jti=refresh_session.jti,
             family_id=refresh_session.family_id,
         ),
@@ -108,8 +108,7 @@ def build_verified_session_response(
 def issue_verified_session_response(
     *,
     settings: Settings,
-    email: str,
-    role: str,
+    authority: CurrentAdminAuthority,
     refresh_session: RefreshSessionIdentity,
     build_access_token_fn,
     build_refresh_token_fn,
@@ -118,18 +117,18 @@ def issue_verified_session_response(
 ) -> JSONResponse:
     return build_verified_session_response(
         settings=settings,
-        email=email,
-        role=role,
+        email=authority.email,
+        role=authority.role,
         access_token=build_access_token_fn(
             settings=settings,
-            email=email,
-            role=role,
+            email=authority.email,
+            role=authority.role,
             two_factor_verified=True,
         ),
         refresh_token=build_refresh_token_fn(
             settings=settings,
-            email=email,
-            role=role,
+            email=authority.email,
+            role=authority.role,
             jti=refresh_session.jti,
             family_id=refresh_session.family_id,
         ),

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from app.api.routes.admin import deps as admin_deps
 from app.core.config import Settings, get_settings
 from app.services.admin import auth as admin_auth
-from app.services.admin import auth_refresh_sessions
+from app.services.admin import auth_authority, auth_refresh_sessions
 
 from . import auth_helpers, auth_models, auth_responses
 
@@ -34,6 +34,15 @@ async def refresh_session(
     if payload.family_id is None or payload.jti is None:
         raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
     try:
+        authority = await auth_authority.resolve_current_admin_authority(
+            email=payload.email,
+            expected_role=payload.role,
+        )
+    except admin_auth.AdminAuthStateError as exc:
+        raise auth_responses.auth_state_unavailable_http_error() from exc
+    if authority is None:
+        raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
+    try:
         rotation = await auth_refresh_sessions.rotate_refresh_session(
             settings=settings,
             family_id=payload.family_id,
@@ -45,8 +54,7 @@ async def refresh_session(
         raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
     return auth_responses.issue_verified_session_response(
         settings=settings,
-        email=payload.email,
-        role=payload.role,
+        authority=authority,
         refresh_session=rotation.session,
         build_access_token_fn=admin_auth.build_access_token,
         build_refresh_token_fn=admin_auth.build_refresh_token,

@@ -28,6 +28,7 @@ def test_alembic_env_bootstraps_database_url_from_test_database_url(
 
     fake_context = SimpleNamespace(
         config=SimpleNamespace(
+            attributes={},
             config_file_name=None,
             config_ini_section="alembic",
             set_main_option=lambda key, value: configured.setdefault(key, value),
@@ -54,7 +55,11 @@ def test_alembic_env_bootstraps_database_url_from_test_database_url(
     setattr(db_models_base_module, "Base", SimpleNamespace(metadata=metadata))
 
     def fake_get_settings() -> SimpleNamespace:
-        return SimpleNamespace(database_url=os.environ["DATABASE_URL"])
+        return SimpleNamespace(
+            admin_email="admin@example.com",
+            admin_role="super_admin",
+            database_url=os.environ["DATABASE_URL"],
+        )
 
     setattr(config_module, "get_settings", fake_get_settings)
 
@@ -102,4 +107,8 @@ def test_alembic_env_bootstraps_database_url_from_test_database_url(
         "target_metadata": metadata,
         "literal_binds": True,
         "compare_type": True,
+    }
+    assert fake_context.config.attributes == {
+        "admin_bootstrap_email": "admin@example.com",
+        "admin_bootstrap_role": "super_admin",
     }

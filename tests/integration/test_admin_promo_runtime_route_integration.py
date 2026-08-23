@@ -20,11 +20,13 @@ from tests.integration.admin_promo_test_support import (
     create_user,
     insert_promo,
     redeem_code,
+    set_admin_authority,
 )
 
 
 @pytest.mark.asyncio
 async def test_admin_promo_patch_updates_fields() -> None:
+    await set_admin_authority()
     created = await create_discount_promo_via_api(code="PATCHME50")
     promo_id = int(created["id"])
 
@@ -82,6 +84,7 @@ async def test_admin_promo_patch_updates_fields() -> None:
 
 @pytest.mark.asyncio
 async def test_admin_promo_bulk_generate_100() -> None:
+    await set_admin_authority()
     async with AsyncClient(
         transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
         base_url="http://testserver",
@@ -121,6 +124,7 @@ async def test_admin_promo_bulk_generate_100() -> None:
 
 @pytest.mark.asyncio
 async def test_admin_promo_bulk_generate_collision(monkeypatch: pytest.MonkeyPatch) -> None:
+    await set_admin_authority()
     now_utc = datetime.now(UTC)
     await insert_promo(promo_id=990_001, raw_code="MASSAAAA1111", now_utc=now_utc)
     sequence = [
@@ -160,6 +164,7 @@ async def test_admin_promo_bulk_generate_collision(monkeypatch: pytest.MonkeyPat
 
 @pytest.mark.asyncio
 async def test_admin_promo_stats_endpoint() -> None:
+    await set_admin_authority()
     user_reserved = await create_user("stats-reserved")
     user_applied = await create_user("stats-applied")
     now_utc = datetime.now(UTC)
@@ -252,6 +257,7 @@ async def test_admin_promo_stats_endpoint() -> None:
 
 @pytest.mark.asyncio
 async def test_admin_promo_audit_log_written() -> None:
+    await set_admin_authority()
     user_id = await create_user("audit-user")
     created = await create_discount_promo_via_api(code="AUDIT501")
     promo_id = int(created["id"])
@@ -294,6 +300,7 @@ async def test_admin_promo_audit_log_written() -> None:
 
 @pytest.mark.asyncio
 async def test_admin_promo_check_code_reports_existing_and_available() -> None:
+    await set_admin_authority()
     created = await create_discount_promo_via_api(code="CHECK500")
 
     async with AsyncClient(

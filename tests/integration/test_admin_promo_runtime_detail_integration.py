@@ -6,29 +6,19 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
-from app.core.config import get_settings
 from app.db.models.admin_audit_log import AdminAuditLog
 from app.db.models.promo_audit_log import PromoAuditLog
 from app.db.models.promo_codes import PromoCode
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.main import app
-from app.services.admin.auth import build_access_token
 from app.services.promo_encryption import decrypt_promo_code
-
-
-def _admin_headers(*, role: str) -> dict[str, str]:
-    token = build_access_token(
-        settings=get_settings(),
-        email="admin@example.com",
-        role=role,
-        two_factor_verified=True,
-    )
-    return {"Authorization": f"Bearer {token}"}
+from tests.integration.admin_promo_test_support import admin_headers, set_admin_authority
 
 
 @pytest.mark.asyncio
 async def test_admin_promo_detail_reveals_code_only_for_super_admin() -> None:
+    await set_admin_authority(role="admin")
     async with SessionLocal.begin() as session:
         await UsersRepo.create(
             session,
@@ -43,6 +33,7 @@ async def test_admin_promo_detail_reveals_code_only_for_super_admin() -> None:
         transport=ASGITransport(app=app, client=("127.0.0.1", 8080)),
         base_url="http://testserver",
     ) as client:
+        current_admin_headers = admin_headers(role="admin")
         create_response = await client.post(
             "/admin/promo",
             json={
@@ -54,22 +45,28 @@ async def test_admin_promo_detail_reveals_code_only_for_super_admin() -> None:
                 "max_total_uses": 3,
                 "max_per_user": 1,
             },
-            headers=_admin_headers(role="admin"),
+            headers=current_admin_headers,
         )
         promo_id = int(create_response.json()["id"])
         admin_detail = await client.get(
             f"/admin/promo/{promo_id}",
-            headers=_admin_headers(role="admin"),
+            headers=current_admin_headers,
+        )
+        await set_admin_authority(role="super_admin")
+        stale_admin_detail = await client.get(
+            f"/admin/promo/{promo_id}",
+            headers=current_admin_headers,
         )
         super_admin_detail = await client.get(
             f"/admin/promo/{promo_id}",
             params={"reveal": "true"},
-            headers=_admin_headers(role="super_admin"),
+            headers=admin_headers(role="super_admin"),
         )
 
     assert admin_detail.status_code == 200
     assert admin_detail.json()["raw_code"] is None
     assert admin_detail.json()["can_reveal_code"] is False
+    assert stale_admin_detail.status_code == 401
 
     assert super_admin_detail.status_code == 200
     assert super_admin_detail.json()["raw_code"] == "SECRET30"

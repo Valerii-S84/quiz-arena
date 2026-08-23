@@ -7,7 +7,9 @@ from uuid import uuid4
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import get_settings
+from app.db.models.admins import Admin
 from app.db.models.promo_codes import PromoCode
+from app.db.repo.admins_repo import AdminsRepo
 from app.db.repo.users_repo import UsersRepo
 from app.db.session import SessionLocal
 from app.main import app
@@ -27,6 +29,22 @@ def admin_headers(*, role: str) -> dict[str, str]:
         two_factor_verified=True,
     )
     return {"Authorization": f"Bearer {token}"}
+
+
+async def set_admin_authority(*, role: str = "admin") -> None:
+    async with SessionLocal.begin() as session:
+        admin = await AdminsRepo.get_by_email(session, email="admin@example.com")
+        if admin is None:
+            session.add(
+                Admin(
+                    email="admin@example.com",
+                    role=role,
+                    enabled=True,
+                )
+            )
+            return
+        admin.role = role
+        admin.enabled = True
 
 
 async def create_user(seed: str) -> int:
