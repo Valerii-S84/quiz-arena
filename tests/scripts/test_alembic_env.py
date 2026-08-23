@@ -57,6 +57,7 @@ def test_alembic_env_bootstraps_database_url_from_test_database_url(
     def fake_get_settings() -> SimpleNamespace:
         return SimpleNamespace(
             admin_email="admin@example.com",
+            admin_role="super_admin",
             database_url=os.environ["DATABASE_URL"],
         )
 
@@ -107,4 +108,7 @@ def test_alembic_env_bootstraps_database_url_from_test_database_url(
         "literal_binds": True,
         "compare_type": True,
     }
-    assert fake_context.config.attributes == {"admin_bootstrap_email": "admin@example.com"}
+    assert fake_context.config.attributes == {
+        "admin_bootstrap_email": "admin@example.com",
+        "admin_bootstrap_role": "super_admin",
+    }

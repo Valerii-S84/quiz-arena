@@ -18,6 +18,7 @@ revision: str = "e8f9a0b1c234"
 down_revision: str | None = "d7e8f9a0b123"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
+_ALLOWED_ADMIN_ROLES = frozenset({"admin", "super_admin"})
 
 admins = sa.table(
     "admins",
@@ -37,8 +38,21 @@ def _normalize_bootstrap_email(raw_email: object) -> str:
     return email
 
 
-def _backfill_admin_authority(bind: Connection, *, bootstrap_email: str) -> None:
+def _normalize_bootstrap_role(raw_role: object) -> str:
+    role = str(raw_role or "").strip().lower().replace("-", "_")
+    if role not in _ALLOWED_ADMIN_ROLES:
+        raise RuntimeError("Configured admin bootstrap role is invalid")
+    return role
+
+
+def _backfill_admin_authority(
+    bind: Connection,
+    *,
+    bootstrap_email: str,
+    bootstrap_role: str,
+) -> None:
     email = _normalize_bootstrap_email(bootstrap_email)
+    role = _normalize_bootstrap_role(bootstrap_role)
     normalized_db_email = sa.func.lower(sa.func.trim(admins.c.email))
     matching_ids = list(
         bind.execute(sa.select(admins.c.id).where(normalized_db_email == email)).scalars().all()
@@ -56,7 +70,7 @@ def _backfill_admin_authority(bind: Connection, *, bootstrap_email: str) -> None
             admins.insert().values(
                 id=uuid4(),
                 email=email,
-                role="admin",
+                role=role,
                 enabled=True,
                 created_at=now_utc,
                 updated_at=now_utc,
@@ -69,7 +83,6 @@ def _backfill_admin_authority(bind: Connection, *, bootstrap_email: str) -> None
         .where(admins.c.id == matching_ids[0])
         .values(
             email=email,
-            role="admin",
             enabled=True,
             updated_at=now_utc,
         )
@@ -82,6 +95,9 @@ def upgrade() -> None:
     bootstrap_email = _normalize_bootstrap_email(
         op.get_context().config.attributes.get("admin_bootstrap_email")
     )
+    bootstrap_role = _normalize_bootstrap_role(
+        op.get_context().config.attributes.get("admin_bootstrap_role")
+    )
     op.add_column(
         "admins",
         sa.Column(
@@ -91,7 +107,11 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
-    _backfill_admin_authority(op.get_bind(), bootstrap_email=bootstrap_email)
+    _backfill_admin_authority(
+        op.get_bind(),
+        bootstrap_email=bootstrap_email,
+        bootstrap_role=bootstrap_role,
+    )
 
 
 def downgrade() -> None:
