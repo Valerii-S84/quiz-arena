@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from app.api.routes.admin import deps as admin_deps
 from app.core.config import Settings, get_settings
 from app.services.admin import auth as admin_auth
-from app.services.admin import auth_refresh_sessions
+from app.services.admin import auth_authority, auth_refresh_sessions
 from app.services.admin import rate_limit as _admin_rate_limit
 
 from . import auth_helpers, auth_models, auth_rate_limit, auth_responses
@@ -38,6 +38,15 @@ async def login_admin(
         )
         raise HTTPException(status_code=401, detail={"code": "E_INVALID_CREDENTIALS"})
 
+    if auth_helpers.configured_admin_role(settings) is None:
+        raise HTTPException(status_code=401, detail={"code": "E_INVALID_CREDENTIALS"})
+    try:
+        authority = await auth_authority.resolve_current_admin_authority(email=payload.email)
+    except admin_auth.AdminAuthStateError as exc:
+        raise auth_responses.auth_state_unavailable_http_error() from exc
+    if authority is None:
+        raise HTTPException(status_code=401, detail={"code": "E_INVALID_CREDENTIALS"})
+
     await auth_rate_limit.clear_failures(settings=settings, buckets=buckets, action="login")
     if not settings.admin_2fa_required:
         try:
@@ -46,8 +55,7 @@ async def login_admin(
             raise auth_responses.auth_state_unavailable_http_error() from exc
         return auth_responses.issue_login_success_response(
             settings=settings,
-            email=payload.email.lower(),
-            role=auth_helpers.configured_admin_role(settings),
+            authority=authority,
             refresh_session=refresh_session,
             build_access_token_fn=admin_auth.build_access_token,
             build_refresh_token_fn=admin_auth.build_refresh_token,
@@ -57,8 +65,8 @@ async def login_admin(
 
     access_token = admin_auth.build_access_token(
         settings=settings,
-        email=payload.email.lower(),
-        role=auth_helpers.configured_admin_role(settings),
+        email=authority.email,
+        role=authority.role,
         two_factor_verified=False,
     )
     return auth_responses.build_partial_login_response(
@@ -102,6 +110,16 @@ async def verify_2fa(
             )
             raise HTTPException(status_code=401, detail={"code": "E_INVALID_TOTP"})
 
+    try:
+        authority = await auth_authority.resolve_current_admin_authority(
+            email=principal.email,
+            expected_role=principal.role,
+        )
+    except admin_auth.AdminAuthStateError as exc:
+        raise auth_responses.auth_state_unavailable_http_error() from exc
+    if authority is None:
+        raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
+
     await auth_rate_limit.clear_failures(settings=settings, buckets=buckets, action="verify_2fa")
     try:
         refresh_session = await auth_refresh_sessions.create_refresh_session(settings=settings)
@@ -109,8 +127,7 @@ async def verify_2fa(
         raise auth_responses.auth_state_unavailable_http_error() from exc
     return auth_responses.issue_verified_session_response(
         settings=settings,
-        email=principal.email,
-        role=principal.role,
+        authority=authority,
         refresh_session=refresh_session,
         build_access_token_fn=admin_auth.build_access_token,
         build_refresh_token_fn=admin_auth.build_refresh_token,

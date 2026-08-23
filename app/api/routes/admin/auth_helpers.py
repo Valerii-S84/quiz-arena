@@ -7,9 +7,9 @@ from dataclasses import dataclass
 import structlog
 from fastapi import HTTPException, Request, Response
 
-from app.api.routes.admin.deps import ALLOWED_ADMIN_ROLES, normalize_admin_role
 from app.core.config import Settings
 from app.services.admin.auth import ADMIN_ACCESS_COOKIE
+from app.services.admin.auth_authority import ALLOWED_ADMIN_ROLES, normalize_admin_role
 from app.services.internal_auth import extract_client_ip
 
 logger = structlog.get_logger(__name__)
@@ -21,11 +21,11 @@ class RateLimitBuckets:
     client_ip: str | None
 
 
-def configured_admin_role(settings: Settings) -> str:
+def configured_admin_role(settings: Settings) -> str | None:
     resolved_role = normalize_admin_role(settings.admin_role)
     if resolved_role in ALLOWED_ADMIN_ROLES:
         return resolved_role
-    return "admin"
+    return None
 
 
 def _rate_limit_client_ip(*, request: Request, settings: Settings) -> str | None:

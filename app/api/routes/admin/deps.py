@@ -6,12 +6,10 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, Request, Response
 
 from app.core.config import Settings, get_settings
-from app.db.repo.admins_repo import AdminsRepo
-from app.db.session import SessionLocal
+from app.services.admin import auth_authority
 from app.services.admin.auth import AdminAuthStateError, decode_access_token
+from app.services.admin.auth_authority import ALLOWED_ADMIN_ROLES, normalize_admin_role
 from app.services.internal_auth import extract_client_ip
-
-ALLOWED_ADMIN_ROLES = frozenset({"admin", "super_admin"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,10 +23,6 @@ class AdminPrincipal:
     @property
     def is_super_admin(self) -> bool:
         return normalize_admin_role(self.role) == "super_admin"
-
-
-def normalize_admin_role(raw_role: str) -> str:
-    return raw_role.strip().lower().replace("-", "_")
 
 
 def _extract_bearer_token(request: Request) -> str:
@@ -63,19 +57,20 @@ async def get_pending_admin(
     if payload is None:
         raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
 
-    normalized_email = payload.email.strip().lower()
-    normalized_role = normalize_admin_role(payload.role)
-    async with SessionLocal.begin() as session:
-        admin = await AdminsRepo.get_or_create(
-            session,
-            email=normalized_email,
-            role=normalized_role if normalized_role in ALLOWED_ADMIN_ROLES else "admin",
+    try:
+        authority = await auth_authority.resolve_current_admin_authority(
+            email=payload.email,
+            expected_role=payload.role,
         )
+    except AdminAuthStateError as exc:
+        raise HTTPException(status_code=503, detail={"code": "E_AUTH_STATE_UNAVAILABLE"}) from exc
+    if authority is None:
+        raise HTTPException(status_code=401, detail={"code": "E_UNAUTHORIZED"})
 
     return AdminPrincipal(
-        id=admin.id,
-        email=normalized_email,
-        role=normalized_role,
+        id=authority.id,
+        email=authority.email,
+        role=authority.role,
         two_factor_verified=payload.two_factor_verified,
         client_ip=extract_client_ip(
             request,

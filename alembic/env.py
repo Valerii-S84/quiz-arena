@@ -63,6 +63,7 @@ def _load_settings_and_metadata() -> tuple[Settings, MetaData]:
 
 config = context.config
 settings, target_metadata = _load_settings_and_metadata()
+config.attributes["admin_bootstrap_email"] = settings.admin_email
 database_url = _configured_database_url() or settings.database_url
 config.set_main_option("sqlalchemy.url", database_url)
 

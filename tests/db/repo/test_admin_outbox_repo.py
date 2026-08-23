@@ -16,11 +16,12 @@ UTC = timezone.utc
 
 
 async def test_admin_repo_creates_updates_and_logs_audit_entries() -> None:
-    existing = Admin(email="admin@example.com", role="admin")
+    existing = Admin(email="admin@example.com", role="admin", enabled=True)
 
     lookup_session = RecordingSession(_ScalarResult(existing))
     assert await AdminsRepo.get_by_email(lookup_session, email="admin@example.com") is existing
-    assert "admins.email = 'admin@example.com'" in compile_statement(lookup_session.statement)
+    lookup_sql = compile_statement(lookup_session.statement)
+    assert "lower(trim(admins.email)) = 'admin@example.com'" in lookup_sql
 
     create_session = RecordingSession(_ScalarResult(None))
     created = await AdminsRepo.get_or_create(
@@ -29,6 +30,7 @@ async def test_admin_repo_creates_updates_and_logs_audit_entries() -> None:
         role="admin",
     )
     assert created.email == "new-admin@example.com"
+    assert created.enabled is False
     assert create_session.added == [created]
     assert create_session.flushed is True
 
@@ -39,7 +41,8 @@ async def test_admin_repo_creates_updates_and_logs_audit_entries() -> None:
         role="super_admin",
     )
     assert updated is existing
-    assert existing.role == "super_admin"
+    assert existing.role == "admin"
+    assert existing.enabled is True
     assert update_session.added == []
 
     audit_session = RecordingSession()
