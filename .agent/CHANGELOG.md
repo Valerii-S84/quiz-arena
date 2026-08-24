@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 1.1.0 - 2026-08-24
+
+- Added universal task/context, execution-planning, and budget
+  discipline sections.
+- Added a `/status` availability fallback for interfaces that do
+  not expose it.
+- Aligned out-of-scope follow-up reporting with the existing rule
+  that recommendations require an explicit user request.
+
 ## 1.0.1 - 2026-04-06
 
 - Added explicit `version:` frontmatter to `.agent/AGENTS.md`
