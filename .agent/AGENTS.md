@@ -686,7 +686,7 @@ pytest tests/ -q --tb=short
 
 - Do not poll or call `wait` without a necessary already-running operation. Use an appropriate timeout in the original call, avoid short repeated waits, and stop waiting when the user asks for the requested action directly.
 
-- Do not rerun a successful test or check unless a relevant implementation or test artifact changed after that successful run, or the user explicitly requests the rerun. A commit alone is not a reason to rerun tests.
+- Do not rerun a successful test or check unless a relevant artifact changed after that successful run, or the user explicitly requests the rerun. A commit alone is not a reason to rerun tests.
 
 - Batch independent read-only shell checks into one orchestrated tool call. Minimize model/tool round trips, especially when the conversation context is large.
 
@@ -696,11 +696,13 @@ pytest tests/ -q --tb=short
 
 ## 18. Execution planning protocol
 
-- Before the first tool call, state a short execution plan containing: the one narrow objective, explicit non-goals, governing authority, files expected to change, the exact verification command or evidence gate, and the maximum planned model passes.
+- Before the first state-changing tool call, state a short execution plan containing: the one narrow objective, explicit non-goals, governing authority, files expected to change, the exact verification command or evidence gate, and the maximum planned model passes.
+
+- If the prompt and established repository context do not identify expected files or an exact verification gate, one bounded read-only scoping call is allowed first. Before that call, state the objective, explicit non-goals, governing authority, and maximum planned model passes; after it, name expected files and the exact gate before any write.
 
 - Define completion in observable terms before starting, for example an exact test count plus `OK`, a named artifact plus a validation result, or a successful commit of an explicit file whitelist. Do not use open-ended goals such as "improve", "investigate everything", or "make tests better" without a bounded gate.
 
-- Estimate `current context tokens × planned model passes` before tooling. If the estimate does not fit the active budget, reduce reads and passes, or stop with `BUDGET LIMIT` before spending the budget.
+- Estimate cumulative model usage as the sum of the expected context size for each planned pass, including projected model responses, tool-result growth, and a safety reserve. If the estimate does not fit the active budget, reduce reads and passes, or stop with `BUDGET LIMIT` before spending the budget.
 
 - Reuse established repository state and exact user handoffs. Do not rediscover architecture, recompute known evidence, or reread unchanged governing files unless the current decision requires an exact passage, the files may have changed, or context loss removed the prior read.
 
@@ -732,7 +734,7 @@ pytest tests/ -q --tb=short
 
 - A narrow task is limited to at most five model passes, including passes caused by tool results, retries, waits, or intermediate responses. A sixth pass requires explicit user approval after reporting why it is necessary and what it will cost.
 
-- Before tool use, estimate `current context tokens × planned model passes`. If the estimate exceeds the task budget, do not start the operation in the current thread. For an independent task, the default hard ceiling is 300,000 total tokens unless the user explicitly sets another budget.
+- Before tool use, estimate cumulative model usage across planned passes from the expected context size of each pass, including projected model responses, tool-result growth, and a safety reserve. If the estimate exceeds the task budget, do not start the operation in the current thread. For an independent task, the default hard ceiling is 300,000 total tokens unless the user explicitly sets another budget.
 
 - Before starting an independent tool-using task, use `/status` when the interface provides it. If `/status` is unavailable, estimate the current context size from available interface state and apply the same 300,000-token ceiling. If the ceiling cannot be met in the current context, require a new thread. Do not spend the budget first and report the overrun afterward.
 
@@ -740,7 +742,9 @@ pytest tests/ -q --tb=short
 
 - Limit tool output to the smallest useful evidence, normally no more than 2,000–3,000 tokens or 100–200 lines. Never dump a full minified workflow JSON, full HTML report, large embedded provenance/semantic JSON, or full diff of a large generated file when targeted fields, counts, hashes, or a bounded excerpt answer the task.
 
-- Allow at most one retry, and only after identifying a concrete failure cause and correcting it. A second retry requires explicit user approval. Polling attempts count as retries/model passes.
+- Allow at most one re-execution retry, and only after identifying a concrete failure cause and correcting it. A second re-execution retry requires explicit user approval.
+
+- Necessary waits for an already-running operation do not consume the retry allowance, but each wait counts as a model pass.
 
 - After the last relevant change, allow one verification phase only. Batch all required independent checks into that phase. Do not separately repeat tests, diff checks, status checks, or validations.
 

@@ -8,6 +8,8 @@
   not expose it.
 - Aligned out-of-scope follow-up reporting with the existing rule
   that recommendations require an explicit user request.
+- Clarified read-only scoping, relevant-artifact rechecks,
+  cumulative budget estimates, and wait/retry accounting.
 
 ## 1.0.1 - 2026-04-06
 
