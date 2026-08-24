@@ -10,6 +10,8 @@
   that recommendations require an explicit user request.
 - Clarified read-only scoping, relevant-artifact rechecks,
   cumulative budget estimates, and wait/retry accounting.
+- Reconciled completion-gate timing with bounded scoping and
+  preserved the single causal verification rerun.
 
 ## 1.0.1 - 2026-04-06
 

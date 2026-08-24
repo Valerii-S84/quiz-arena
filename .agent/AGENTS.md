@@ -746,9 +746,9 @@ pytest tests/ -q --tb=short
 
 - Necessary waits for an already-running operation do not consume the retry allowance, but each wait counts as a model pass.
 
-- After the last relevant change, allow one verification phase only. Batch all required independent checks into that phase. Do not separately repeat tests, diff checks, status checks, or validations.
+- After the last relevant change, allow one verification phase only, plus the single corrected rerun permitted by the causal retry rule when that phase fails. Batch all required independent checks into that phase. Do not separately repeat tests, diff checks, status checks, or validations.
 
-- Define the task's exact completion condition before the first tool call. Once that condition is met, stop. Post-completion status, verification, explanation, cleanup, optimization, or documentation is prohibited unless explicitly requested or required by an approved acceptance gate.
+- Define the task's exact completion condition before the first state-changing tool call. If the exact condition depends on the permitted bounded read-only scoping call, define that call's provisional observable outcome before it, then set the exact completion condition after scoping and before any write. Once that condition is met, stop. Post-completion status, verification, explanation, cleanup, optimization, or documentation is prohibited unless explicitly requested or required by an approved acceptance gate.
 
 - For a request whose complete objective is a Git commit: verify only the exact file whitelist needed to prevent unrelated inclusion; do not rerun already-successful tests when no relevant file changed afterward; do not read a full diff without a concrete need; request known-required Git escalation on the first attempt; and treat successful commit output as sufficient evidence without a post-commit status check.
 
