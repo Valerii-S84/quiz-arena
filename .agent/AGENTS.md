@@ -1,6 +1,6 @@
 ---
-version: 1.0.1
-bundle_version: 1.0.1
+version: 1.1.0
+bundle_version: 1.1.0
 status: normative
 ---
 
@@ -57,14 +57,15 @@ rg -n '\[FILL_PER_PROJECT\]' .agent/project
 
 1. `.agent/AGENTS.md`
 2. `.agent/core/WORK_SCOPE.md`
-3. `.agent/core/DEFINITION_OF_DONE.md`
-4. `.agent/core/TASK_OUTPUT_FORMAT.md`
-5. `.agent/core/AUTO_CHECKLIST.md`
-6. `.agent/core/SECURITY_RULES.md`
-7. `.agent/core/GIT_WORKFLOW.md`
-8. `.agent/core/PRINCIPLES.md`
-9. `.agent/project/PROJECT_CONTEXT.md`
-10. `.agent/project/CODE_STYLE.md`
+3. `.agent/core/TASK_DISCIPLINE.md`
+4. `.agent/core/DEFINITION_OF_DONE.md`
+5. `.agent/core/TASK_OUTPUT_FORMAT.md`
+6. `.agent/core/AUTO_CHECKLIST.md`
+7. `.agent/core/SECURITY_RULES.md`
+8. `.agent/core/GIT_WORKFLOW.md`
+9. `.agent/core/PRINCIPLES.md`
+10. `.agent/project/PROJECT_CONTEXT.md`
+11. `.agent/project/CODE_STYLE.md`
 
 ### 1.4. Обов'язкова зупинка перед початком роботи
 
@@ -531,6 +532,7 @@ B) [дія — наслідок]
 
 - `.agent/AGENTS.md`: єдиний entrypoint;
 - `.agent/core/WORK_SCOPE.md`: scope rules;
+- `.agent/core/TASK_DISCIPLINE.md`: task, execution, and budget discipline;
 - `.agent/core/DEFINITION_OF_DONE.md`: done criteria;
 - `.agent/core/TASK_OUTPUT_FORMAT.md`: final response format;
 - `.agent/core/AUTO_CHECKLIST.md`: close-out checklist;
@@ -632,6 +634,7 @@ pytest tests/ -q --tb=short
 Пов'язані документи:
 
 - Scope задачі: `.agent/core/WORK_SCOPE.md`
+- Task, execution і budget discipline: `.agent/core/TASK_DISCIPLINE.md`
 - Критерії завершення: `.agent/core/DEFINITION_OF_DONE.md`
 - Передзакривальний чекліст: `.agent/core/AUTO_CHECKLIST.md`
 - Формат відповіді: `.agent/core/TASK_OUTPUT_FORMAT.md`
@@ -646,6 +649,9 @@ pytest tests/ -q --tb=short
 
 - `WORK_SCOPE`: scope = явний запит користувача + прямі
   обмеження + мінімум змін без яких задачу не завершити;
+- `TASK_DISCIPLINE`: одна вузька ціль; bounded read-only scoping
+  за потреби; точний план до першого запису; cumulative budget;
+  одна verification phase з одним causal corrected rerun;
 - `DEFINITION_OF_DONE`: `Done` можливий лише коли scope
   виконано, змінено тільки потрібні файли, релевантні перевірки
   запущені або їх пропуск явно зафіксований, а звіт відповідає

@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 1.1.0 - 2026-08-24
+
+- Added `.agent/core/TASK_DISCIPLINE.md` for universal
+  task/context, execution-planning, and budget discipline rules.
+- Added a `/status` availability fallback for interfaces that do
+  not expose it.
+- Aligned out-of-scope follow-up reporting with the existing rule
+  that recommendations require an explicit user request.
+- Clarified read-only scoping, relevant-artifact rechecks,
+  cumulative budget estimates, and wait/retry accounting.
+- Reconciled completion-gate timing with bounded scoping and
+  preserved the single causal verification rerun.
+- Raised the narrow-task pass cap to eight so the permitted
+  causal correction, rerun, commit, and close-out can complete.
+
 ## 1.0.1 - 2026-04-06
 
 - Added explicit `version:` frontmatter to `.agent/AGENTS.md`
