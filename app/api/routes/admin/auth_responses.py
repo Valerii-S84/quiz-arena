@@ -152,7 +152,8 @@ def build_logout_response(
         )
     )
     add_noindex_header_fn(response)
-    clear_auth_cookies_fn(response)
+    if auth_state_available:
+        clear_auth_cookies_fn(response)
     return response
 
 

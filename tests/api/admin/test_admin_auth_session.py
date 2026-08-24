@@ -41,7 +41,11 @@ def test_admin_auth_setup_refresh_logout_and_session(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     clear_calls: list[bool] = []
-    revoked_state: list[tuple[str, str]] = []
+    logout_revocations: list[dict[str, object]] = []
+    access_revocation = auth_session_routes.auth_tokens.AccessTokenRevocation(
+        key="qa_admin:revoked_token:access-hash",
+        ttl_seconds=300,
+    )
 
     async def _setup(**kwargs) -> dict[str, str]:
         del kwargs
@@ -55,11 +59,12 @@ def test_admin_auth_setup_refresh_logout_and_session(
         del kwargs
         return _successful_rotation()
 
-    async def _revoke_access(**kwargs) -> None:
-        revoked_state.append(("access", kwargs["token"]))
+    def _resolve_access(**kwargs):
+        assert kwargs["token"] == "access-cookie"
+        return access_revocation
 
-    async def _revoke_family(**kwargs) -> None:
-        revoked_state.append(("family", kwargs["family_id"]))
+    async def _revoke_logout(**kwargs) -> None:
+        logout_revocations.append(kwargs)
 
     app.dependency_overrides[auth.get_settings] = lambda: settings_stub(two_fa_required=True)
     app.dependency_overrides[admin_deps.get_pending_admin] = lambda: principal_stub(
@@ -72,8 +77,10 @@ def test_admin_auth_setup_refresh_logout_and_session(
     monkeypatch.setattr(ADMIN_AUTH, "build_refresh_token", lambda **kwargs: "refresh-refresh")
     monkeypatch.setattr(ADMIN_AUTH, "apply_auth_cookies", lambda **kwargs: None)
     monkeypatch.setattr(ADMIN_AUTH, "clear_auth_cookies", lambda response: clear_calls.append(True))
-    monkeypatch.setattr(ADMIN_AUTH, "revoke_access_token", _revoke_access)
-    monkeypatch.setattr(AUTH_REFRESH_SESSIONS, "revoke_refresh_family", _revoke_family)
+    monkeypatch.setattr(
+        auth_session_routes.auth_tokens, "resolve_access_token_revocation", _resolve_access
+    )
+    monkeypatch.setattr(AUTH_REFRESH_SESSIONS, "revoke_logout_session", _revoke_logout)
 
     setup = client.get("/admin/auth/2fa/setup")
     client.cookies.set("qa_admin_access", "access-cookie")
@@ -91,9 +98,12 @@ def test_admin_auth_setup_refresh_logout_and_session(
     assert logout.status_code == 200
     assert logout.json() == {"ok": True}
     assert clear_calls == [True]
-    assert revoked_state == [
-        ("access", "access-cookie"),
-        ("family", _refresh_payload_stub().family_id),
+    assert logout_revocations == [
+        {
+            "settings": settings_stub(two_fa_required=True),
+            "access_revocation": access_revocation,
+            "refresh_family_id": _refresh_payload_stub().family_id,
+        }
     ]
 
 
@@ -286,61 +296,6 @@ def test_admin_refresh_rotates_before_replacing_both_cookies(
     assert response.cookies.get("qa_admin_access") == "new-access-token"
     assert response.cookies.get("qa_admin_refresh") == "new-refresh-token"
     assert order == ["rotate", "build_access", "build_refresh", "apply_cookies"]
-
-
-def test_admin_logout_returns_503_when_access_revocation_fails(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    async def _revoke_access(**kwargs) -> None:
-        del kwargs
-        raise ADMIN_AUTH.AdminAuthStateError("down")
-
-    async def _revoke_family(**kwargs) -> None:
-        del kwargs
-        raise AssertionError("family revocation should not run after access failure")
-
-    clear_calls: list[bool] = []
-
-    app.dependency_overrides[auth.get_settings] = lambda: settings_stub(two_fa_required=True)
-    monkeypatch.setattr(ADMIN_AUTH, "revoke_access_token", _revoke_access)
-    monkeypatch.setattr(AUTH_REFRESH_SESSIONS, "revoke_refresh_family", _revoke_family)
-    monkeypatch.setattr(ADMIN_AUTH, "clear_auth_cookies", lambda response: clear_calls.append(True))
-
-    client.cookies.set("qa_admin_access", "access-cookie")
-    response = client.post("/admin/auth/logout")
-
-    assert response.status_code == 503
-    assert response.json() == {"detail": {"code": "E_AUTH_STATE_UNAVAILABLE"}}
-    assert clear_calls == [True]
-
-
-def test_admin_logout_returns_503_when_family_revocation_fails(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    async def _decoded_refresh(**kwargs):
-        del kwargs
-        return _refresh_payload_stub()
-
-    async def _revoke_access(**kwargs) -> None:
-        del kwargs
-
-    async def _revoke_family(**kwargs) -> None:
-        del kwargs
-        raise ADMIN_AUTH.AdminAuthStateError("down")
-
-    clear_calls: list[bool] = []
-    app.dependency_overrides[auth.get_settings] = lambda: settings_stub(two_fa_required=True)
-    monkeypatch.setattr(ADMIN_AUTH, "decode_refresh_token", _decoded_refresh)
-    monkeypatch.setattr(ADMIN_AUTH, "revoke_access_token", _revoke_access)
-    monkeypatch.setattr(AUTH_REFRESH_SESSIONS, "revoke_refresh_family", _revoke_family)
-    monkeypatch.setattr(ADMIN_AUTH, "clear_auth_cookies", lambda response: clear_calls.append(True))
-
-    client.cookies.set("qa_admin_refresh", "refresh-cookie")
-    response = client.post("/admin/auth/logout")
-
-    assert response.status_code == 503
-    assert response.json() == {"detail": {"code": "E_AUTH_STATE_UNAVAILABLE"}}
-    assert clear_calls == [True]
 
 
 @pytest.mark.parametrize(

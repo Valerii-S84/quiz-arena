@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from app.api.routes.admin import deps as admin_deps
 from app.core.config import Settings, get_settings
 from app.services.admin import auth as admin_auth
-from app.services.admin import auth_authority, auth_refresh_sessions
+from app.services.admin import auth_authority, auth_refresh_sessions, auth_tokens
 
 from . import auth_helpers, auth_models, auth_responses
 
@@ -72,15 +72,21 @@ async def logout(
     admin_deps.add_admin_noindex_header(response)
     access_token = admin_deps.extract_admin_access_token(request)
     refresh_token = (request.cookies.get(admin_auth.ADMIN_REFRESH_COOKIE) or "").strip()
-    refresh_payload = await admin_auth.decode_refresh_token(settings=settings, token=refresh_token)
     auth_state_available = True
     try:
-        await admin_auth.revoke_access_token(settings=settings, token=access_token)
-        if refresh_payload is not None and refresh_payload.family_id is not None:
-            await auth_refresh_sessions.revoke_refresh_family(
-                settings=settings,
-                family_id=refresh_payload.family_id,
-            )
+        access_revocation = auth_tokens.resolve_access_token_revocation(
+            settings=settings,
+            token=access_token,
+        )
+        refresh_payload = await admin_auth.decode_refresh_token(
+            settings=settings,
+            token=refresh_token,
+        )
+        await auth_refresh_sessions.revoke_logout_session(
+            settings=settings,
+            access_revocation=access_revocation,
+            refresh_family_id=refresh_payload.family_id if refresh_payload else None,
+        )
     except admin_auth.AdminAuthStateError:
         auth_state_available = False
     return auth_responses.build_logout_response(

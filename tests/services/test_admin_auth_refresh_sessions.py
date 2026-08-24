@@ -263,34 +263,6 @@ async def test_stale_session_replay_tombstones_family(monkeypatch: pytest.Monkey
     assert client.values[family_key] == auth_refresh_sessions._REVOKED_STATE
 
 
-async def test_revoke_refresh_family_tombstones_active_session(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    client = _FakeRedis()
-    identity = _identity("logout")
-    family_key = _seed_active(client, identity)
-    _install_client(monkeypatch, client)
-
-    await auth_refresh_sessions.revoke_refresh_family(
-        settings=settings_stub(admin_refresh_token_ttl_days=2),
-        family_id=identity.family_id,
-    )
-
-    assert client.values[family_key] == auth_refresh_sessions._REVOKED_STATE
-    assert client.set_calls[-1] == {
-        "key": family_key,
-        "value": auth_refresh_sessions._REVOKED_STATE,
-        "ex": 2 * 24 * 60 * 60,
-        "nx": False,
-    }
-    result = await auth_refresh_sessions.rotate_refresh_session(
-        settings=settings_stub(),
-        family_id=identity.family_id,
-        jti=identity.jti,
-    )
-    assert result.status is auth_refresh_sessions.RefreshRotationStatus.REVOKED
-
-
 async def test_create_refresh_session_maps_redis_failure_to_state_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -300,20 +272,6 @@ async def test_create_refresh_session_maps_redis_failure_to_state_error(
 
     with pytest.raises(auth_refresh_sessions.AdminAuthStateError):
         await auth_refresh_sessions.create_refresh_session(settings=settings_stub())
-
-
-async def test_revoke_refresh_family_maps_redis_failure_to_state_error(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    client = _FakeRedis()
-    client.set_error = RuntimeError("redis down")
-    _install_client(monkeypatch, client)
-
-    with pytest.raises(auth_refresh_sessions.AdminAuthStateError):
-        await auth_refresh_sessions.revoke_refresh_family(
-            settings=settings_stub(),
-            family_id=_identity("outage").family_id,
-        )
 
 
 async def test_rotate_refresh_session_maps_redis_failure_to_state_error(

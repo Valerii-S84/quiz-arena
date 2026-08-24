@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
@@ -11,6 +12,12 @@ from .auth_common import AdminAuthError, AdminTokenPayload, _auth_state_unavaila
 from .auth_state import _require_redis_client, _revoked_token_key, is_token_revoked
 
 _REFRESH_SESSION_CLAIM_PATTERN = re.compile(r"[A-Za-z0-9_-]{16,128}")
+
+
+@dataclass(frozen=True, slots=True)
+class AccessTokenRevocation:
+    key: str
+    ttl_seconds: int
 
 
 def build_access_token(
@@ -124,6 +131,23 @@ def _decode_token_payload(
 
 async def revoke_access_token(*, settings: Settings, token: str) -> None:
     await _revoke_token(settings=settings, token=token, token_type="access")
+
+
+def resolve_access_token_revocation(
+    *,
+    settings: Settings,
+    token: str,
+) -> AccessTokenRevocation | None:
+    payload = _decode_token_payload(settings=settings, token=token, token_type="access")
+    if payload is None:
+        return None
+    ttl_seconds = int((payload.expires_at - _now_utc()).total_seconds())
+    if ttl_seconds <= 0:
+        return None
+    return AccessTokenRevocation(
+        key=_revoked_token_key(token),
+        ttl_seconds=max(1, ttl_seconds),
+    )
 
 
 async def _decode_token(

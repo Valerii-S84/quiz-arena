@@ -11,9 +11,12 @@ from app.core.config import Settings
 
 from .auth_common import AdminAuthStateError, _auth_state_unavailable
 from .auth_state import _require_redis_client
+from .auth_tokens import AccessTokenRevocation
 
 _REFRESH_FAMILY_KEY_PREFIX = "qa_admin:refresh_family:"
 _REVOKED_STATE = "revoked"
+_LOGOUT_ACCESS_PLACEHOLDER_KEY = "qa_admin:logout:no_access"
+_LOGOUT_REFRESH_PLACEHOLDER_KEY = "qa_admin:logout:no_refresh"
 
 logger = structlog.get_logger(__name__)
 
@@ -40,6 +43,18 @@ if current ~= ARGV[1] then
 end
 
 redis.call('SET', KEYS[1], ARGV[2], 'EX', ARGV[4])
+return 1
+"""
+
+_REVOKE_LOGOUT_SESSION_SCRIPT = """
+if ARGV[1] == '1' then
+  redis.call('SET', KEYS[1], '1', 'EX', ARGV[2])
+end
+if ARGV[3] == '1' then
+  local ttl = redis.call('TTL', KEYS[2])
+  if ttl < 1 then ttl = tonumber(ARGV[4]) end
+  redis.call('SET', KEYS[2], ARGV[5], 'EX', ttl)
+end
 return 1
 """
 
@@ -100,17 +115,35 @@ async def create_refresh_session(*, settings: Settings) -> RefreshSessionIdentit
     return session
 
 
-async def revoke_refresh_family(*, settings: Settings, family_id: str) -> None:
-    if not family_id:
+async def revoke_logout_session(
+    *,
+    settings: Settings,
+    access_revocation: AccessTokenRevocation | None,
+    refresh_family_id: str | None,
+) -> None:
+    family_id = (refresh_family_id or "").strip()
+    if access_revocation is None and not family_id:
         return
-    client = await _require_redis_client(settings)
     try:
-        await client.set(
-            _refresh_family_key(family_id),
+        client = await _require_redis_client(settings)
+        eval_result = client.eval(
+            _REVOKE_LOGOUT_SESSION_SCRIPT,
+            2,
+            access_revocation.key if access_revocation else _LOGOUT_ACCESS_PLACEHOLDER_KEY,
+            _refresh_family_key(family_id) if family_id else _LOGOUT_REFRESH_PLACEHOLDER_KEY,
+            "1" if access_revocation else "0",
+            str(access_revocation.ttl_seconds if access_revocation else 1),
+            "1" if family_id else "0",
+            str(_refresh_session_ttl_seconds(settings)),
             _REVOKED_STATE,
-            ex=_refresh_session_ttl_seconds(settings),
         )
+        if isinstance(eval_result, Awaitable):
+            await eval_result
     except Exception as exc:
+        logger.warning(
+            "admin_logout_revocation_failed",
+            reason="state_store_unavailable",
+        )
         raise _auth_state_unavailable() from exc
 
 
@@ -163,6 +196,6 @@ __all__ = [
     "RefreshRotationStatus",
     "RefreshSessionIdentity",
     "create_refresh_session",
-    "revoke_refresh_family",
+    "revoke_logout_session",
     "rotate_refresh_session",
 ]

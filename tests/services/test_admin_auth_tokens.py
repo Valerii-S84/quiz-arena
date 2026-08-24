@@ -97,6 +97,24 @@ async def test_decode_refresh_token_rejects_invalid_signature() -> None:
     )
 
 
+async def test_decode_refresh_token_rejects_expired_session() -> None:
+    token = jwt.encode(
+        {
+            "sub": "admin@example.com",
+            "role": "admin",
+            "two_factor": True,
+            "type": "refresh",
+            "jti": REFRESH_JTI,
+            "family_id": REFRESH_FAMILY_ID,
+            "exp": int((datetime.now(timezone.utc) - timedelta(minutes=1)).timestamp()),
+        },
+        settings_stub().admin_refresh_secret,
+        algorithm="HS256",
+    )
+
+    assert await admin_auth.decode_refresh_token(settings=settings_stub(), token=token) is None
+
+
 async def test_decode_token_rejects_wrong_token_type() -> None:
     access_like_refresh = jwt.encode(
         {
