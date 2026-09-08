@@ -49,8 +49,10 @@ jobs:
           python -m pip install --upgrade "pip==26.1.2" "pip-tools==7.6.0"
           cp requirements.lock /tmp/requirements.lock.prev
           cp requirements-dev.lock /tmp/requirements-dev.lock.prev
-          pip-compile --strip-extras pyproject.toml --output-file requirements.lock
-          pip-compile --strip-extras --extra dev pyproject.toml --output-file requirements-dev.lock
+          CUSTOM_COMPILE_COMMAND="pip-compile --output-file=requirements.lock --strip-extras pyproject.toml" \
+            pip-compile --strip-extras pyproject.toml --output-file requirements.lock
+          CUSTOM_COMPILE_COMMAND="pip-compile --extra=dev --output-file=requirements-dev.lock --strip-extras pyproject.toml" \
+            pip-compile --strip-extras --extra dev pyproject.toml --output-file requirements-dev.lock
           diff -u /tmp/requirements.lock.prev requirements.lock
           diff -u /tmp/requirements-dev.lock.prev requirements-dev.lock
 
