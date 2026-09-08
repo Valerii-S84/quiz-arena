@@ -5,7 +5,9 @@ from uuid import uuid4
 
 import pytest
 
+from app.api.routes.admin.overview_metrics import sum_revenue_stars
 from app.api.routes.admin.overview_queries import build_overview_payload
+from app.api.routes.admin.overview_series import fetch_revenue_series, fetch_top_products
 from app.core.analytics_events import EVENT_SOURCE_BOT, emit_analytics_event
 from app.db.models.purchases import Purchase
 from app.db.models.quiz_sessions import QuizSession
@@ -190,3 +192,41 @@ async def test_overview_payload_uses_first_milestones_and_consistent_activity_mo
         {"step": "Streak 3+", "value": 1},
         {"step": "Purchase", "value": 1},
     ]
+
+
+@pytest.mark.parametrize("days", [7, 30, 90])
+@pytest.mark.parametrize("include_paid", [False, True])
+async def test_revenue_card_series_and_products_exclude_refunds(
+    days: int, include_paid: bool
+) -> None:
+    now_utc = datetime(2026, 9, 8, 12, tzinfo=UTC)
+    from_utc = now_utc - timedelta(days=days)
+    user_id = await _create_user(seed="revenue-refund", created_at=from_utc, last_seen_at=None)
+    cases: list[tuple[str, datetime | None]] = [("REFUNDED", from_utc)]
+    if include_paid:
+        cases += [
+            ("PAID_UNCREDITED", from_utc),
+            ("CREDITED", now_utc - timedelta(microseconds=1)),
+            ("CREDITED", from_utc - timedelta(microseconds=1)),
+            ("CREDITED", now_utc),
+            ("CREDITED", None),
+            ("FAILED", from_utc),
+            ("FAILED_CREDIT_PENDING_REVIEW", from_utc),
+        ]
+    async with SessionLocal.begin() as session:
+        for index, (status, paid_at) in enumerate(cases):
+            purchase = _purchase(user_id=user_id, paid_at=from_utc, suffix=str(index))
+            purchase.status = status
+            purchase.paid_at = paid_at
+            session.add(purchase)
+    async with SessionLocal() as session:
+        card = await sum_revenue_stars(session, from_utc=from_utc, to_utc=now_utc)
+        series = await fetch_revenue_series(session, from_utc=from_utc, to_utc=now_utc)
+        products = await fetch_top_products(session, from_utc=from_utc, to_utc=now_utc)
+    expected = 200 if include_paid else 0
+    assert card == expected
+    assert sum(as_any_dict(row)["stars"] for row in series) == expected
+    assert sum(as_any_dict(row)["eur"] for row in series) == pytest.approx(expected * 0.02)
+    assert products == (
+        [{"product": "PREMIUM_MONTH", "revenue_stars": expected}] if expected else []
+    )
