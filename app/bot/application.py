@@ -3,6 +3,7 @@ from aiogram.client.default import DefaultBotProperties
 
 from app.bot.diagnostics import install_outgoing_trace
 from app.bot.fsm_storage import LoopAwareRedisStorage
+from app.bot.handlers.channel_bonus_compat import router as channel_bonus_compat_router
 from app.bot.handlers.gameplay import router as gameplay_router
 from app.bot.handlers.gameplay_inline_share import router as gameplay_inline_share_router
 from app.bot.handlers.offers import router as offers_router
@@ -31,6 +32,7 @@ def build_dispatcher() -> Dispatcher:
     dispatcher.message.middleware(FsmCleanupMiddleware())
     dispatcher.callback_query.middleware(FsmCleanupMiddleware())
     dispatcher.include_router(start_router)
+    dispatcher.include_router(channel_bonus_compat_router)
     dispatcher.include_router(gameplay_inline_share_router)
     dispatcher.include_router(gameplay_router)
     dispatcher.include_router(offers_router)
