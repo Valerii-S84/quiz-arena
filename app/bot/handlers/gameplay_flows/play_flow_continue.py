@@ -100,7 +100,6 @@ async def _resolve_continue_with_session(
             offer_service=services.offer_service,
             offer_logging_error=services.offer_logging_error,
             offer_idempotency_key=f"offer:energy:auto:{callback.id}",
-            channel_bonus_service=services.channel_bonus_service,
         )
         await callback.answer()
         return ContinueOutcome(handled=True)

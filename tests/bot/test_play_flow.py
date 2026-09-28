@@ -77,7 +77,6 @@ async def test_start_mode_shows_system_error_when_callback_is_incomplete(
         game_session_service=SimpleNamespace(),
         offer_service=SimpleNamespace(),
         offer_logging_error=RuntimeError,
-        channel_bonus_service=SimpleNamespace(),
         build_question_text=lambda **kwargs: str(kwargs),
     )
 
@@ -105,7 +104,6 @@ async def test_start_mode_sends_first_question_for_happy_path() -> None:
         game_session_service=game_session_service,
         offer_service=SimpleNamespace(),
         offer_logging_error=RuntimeError,
-        channel_bonus_service=SimpleNamespace(),
         build_question_text=lambda **kwargs: "question-text",
     )
 
@@ -144,7 +142,6 @@ async def test_start_mode_delegates_energy_insufficient_handling() -> None:
             game_session_service=game_session_service,
             offer_service=SimpleNamespace(),
             offer_logging_error=RuntimeError,
-            channel_bonus_service=SimpleNamespace(),
             build_question_text=lambda **kwargs: "unused",
         )
 
@@ -177,7 +174,6 @@ async def test_start_mode_handles_daily_challenge_already_played() -> None:
             game_session_service=game_session_service,
             offer_service=SimpleNamespace(),
             offer_logging_error=RuntimeError,
-            channel_bonus_service=SimpleNamespace(),
             build_question_text=lambda **kwargs: "unused",
         )
 

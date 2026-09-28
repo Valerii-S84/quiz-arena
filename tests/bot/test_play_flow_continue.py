@@ -76,7 +76,6 @@ async def test_continue_regular_mode_after_answer_sends_next_question() -> None:
         game_session_service=SimpleNamespace(start_session=_start_session),
         offer_service=SimpleNamespace(),
         offer_logging_error=RuntimeError,
-        channel_bonus_service=SimpleNamespace(),
         build_question_text=lambda **kwargs: "next-question",
     )
 
@@ -109,7 +108,6 @@ async def test_continue_regular_mode_after_answer_uses_home_snapshot_for_continu
         game_session_service=SimpleNamespace(start_session=_start_session),
         offer_service=SimpleNamespace(),
         offer_logging_error=RuntimeError,
-        channel_bonus_service=SimpleNamespace(),
         build_question_text=lambda **kwargs: (
             f"energy={kwargs['snapshot_free_energy']}+{kwargs['snapshot_paid_energy']}"
         ),
@@ -153,7 +151,6 @@ async def test_continue_regular_mode_after_answer_handles_energy_insufficient() 
             game_session_service=SimpleNamespace(start_session=_start_session),
             offer_service=SimpleNamespace(),
             offer_logging_error=RuntimeError,
-            channel_bonus_service=SimpleNamespace(),
             build_question_text=lambda **kwargs: "unused",
         )
 

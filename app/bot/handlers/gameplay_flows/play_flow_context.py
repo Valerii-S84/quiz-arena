@@ -15,7 +15,6 @@ class StartModeFlowServices:
     game_session_service: Any
     offer_service: Any
     offer_logging_error: type[Exception]
-    channel_bonus_service: Any
     build_question_text: BuildQuestionText
     energy_handler: EnergyHandler
     home_keyboard_factory: HomeKeyboardFactory
@@ -28,7 +27,6 @@ class ContinueModeFlowServices:
     game_session_service: Any
     offer_service: Any
     offer_logging_error: type[Exception]
-    channel_bonus_service: Any
     build_question_text: BuildQuestionText
     energy_handler: EnergyHandler
     event_logger: Any

@@ -93,8 +93,6 @@ def build_settings(**overrides: object) -> Settings:
         "telegram_bot_token": "test-token",
         "telegram_webhook_secret": "secret-token",
         "duels_rollout_enabled": True,
-        "bonus_channel_id": "",
-        "bonus_check_bot_token": "",
         "internal_api_token": "internal-token",
         "internal_api_allowlist": "127.0.0.1/32,::1/128",
         "internal_api_trusted_proxies": "127.0.0.1/32,::1/128",

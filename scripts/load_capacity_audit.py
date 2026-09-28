@@ -45,7 +45,6 @@ from app.economy.referrals.service import ReferralService
 from app.game.questions.runtime_bank import clear_question_pool_cache
 from app.game.sessions.service import GameSessionService, select_question_for_mode
 from app.main import app
-from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
 from app.workers.tasks import telegram_updates
 
@@ -751,7 +750,6 @@ async def seed_users(target_count: int, *, existing_count: int) -> None:
                     "created_at": now_utc - timedelta(days=idx % 30),
                     "last_seen_at": now_utc - timedelta(minutes=idx % 1440),
                     "referral_prompt_shown_at": None,
-                    "channel_bonus_claimed_at": None,
                 }
                 for idx in chunk
             ]
@@ -1181,17 +1179,11 @@ async def service_flow_for_user(index: int) -> None:
                     now_utc=answer_now,
                 )
             with query_step("post_game_prompts"):
-                show_bonus = await ChannelBonusService.should_show_post_game_prompt(
+                await ReferralService.reserve_post_game_prompt(
                     session,
                     user_id=user_id,
-                    idempotent_replay=answered.idempotent_replay,
+                    now_utc=answer_now,
                 )
-                if not show_bonus:
-                    await ReferralService.reserve_post_game_prompt(
-                        session,
-                        user_id=user_id,
-                        now_utc=answer_now,
-                    )
 
         async with measured_session("full_service_next_question_db_acquire") as session:
             with query_step("next_question_start_session"):

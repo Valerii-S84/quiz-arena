@@ -84,7 +84,6 @@ Delivery model:
 
 Dispatcher routers (`app.bot.application`):
 - `start`
-- `channel_bonus`
 - `gameplay_inline_share`
 - `gameplay`
 - `offers`

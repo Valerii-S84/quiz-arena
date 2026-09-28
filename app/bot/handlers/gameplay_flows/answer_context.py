@@ -26,7 +26,6 @@ from app.db.session import SessionLocal
 from app.economy.offers.service import OfferLoggingError, OfferService
 from app.economy.referrals.service import ReferralService
 from app.game.sessions.service import GameSessionService
-from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
 
 EVENT_SOURCE_BOT = "BOT"
@@ -37,7 +36,6 @@ class AnswerFlowServices:
     session_local: Any
     user_onboarding_service: Any
     referral_service: Any
-    channel_bonus_service: Any
     game_session_service: Any
     offer_service: Any
     offer_logging_error: type[Exception]
@@ -91,7 +89,6 @@ class AnswerRequest:
 
 @dataclass(frozen=True, slots=True)
 class PostGamePromptState:
-    show_channel_bonus: bool = False
     show_referral: bool = False
 
 
@@ -117,7 +114,6 @@ def build_answer_flow_context() -> AnswerFlowContext:
             session_local=SessionLocal,
             user_onboarding_service=UserOnboardingService,
             referral_service=ReferralService,
-            channel_bonus_service=ChannelBonusService,
             game_session_service=GameSessionService,
             offer_service=OfferService,
             offer_logging_error=OfferLoggingError,

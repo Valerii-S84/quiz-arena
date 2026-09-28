@@ -34,7 +34,6 @@ async def start_mode(
     game_session_service,
     offer_service,
     offer_logging_error,
-    channel_bonus_service,
     build_question_text,
 ) -> None:
     services = StartModeFlowServices(
@@ -43,7 +42,6 @@ async def start_mode(
         game_session_service=game_session_service,
         offer_service=offer_service,
         offer_logging_error=offer_logging_error,
-        channel_bonus_service=channel_bonus_service,
         build_question_text=build_question_text,
         energy_handler=handle_energy_insufficient,
         home_keyboard_factory=build_home_keyboard,
@@ -84,7 +82,6 @@ async def continue_regular_mode_after_answer(
     game_session_service,
     offer_service,
     offer_logging_error,
-    channel_bonus_service,
     build_question_text,
 ) -> None:
     services = ContinueModeFlowServices(
@@ -93,7 +90,6 @@ async def continue_regular_mode_after_answer(
         game_session_service=game_session_service,
         offer_service=offer_service,
         offer_logging_error=offer_logging_error,
-        channel_bonus_service=channel_bonus_service,
         build_question_text=build_question_text,
         energy_handler=handle_energy_insufficient,
         event_logger=logger,

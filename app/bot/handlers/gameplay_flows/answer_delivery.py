@@ -9,10 +9,8 @@ from app.bot.handlers.gameplay_flows.answer_context import (
     AnswerRequest,
     PostGamePromptState,
 )
-from app.bot.keyboards.channel_bonus import build_channel_bonus_keyboard
 from app.bot.keyboards.referral_prompt import build_referral_prompt_keyboard
 from app.bot.texts.de import TEXTS_DE
-from app.economy.energy.constants import FREE_ENERGY_CAP
 from app.game.sessions.types import AnswerSessionResult
 
 
@@ -27,24 +25,7 @@ async def resolve_post_game_prompts(
     if result.source not in {"MENU", "DAILY_CHALLENGE"}:
         return PostGamePromptState()
 
-    services = context.services
-    show_channel_bonus = await services.channel_bonus_service.should_show_post_game_prompt(
-        session,
-        user_id=user_id,
-        idempotent_replay=result.idempotent_replay,
-    )
-    if show_channel_bonus:
-        await context.analytics.emit_event(
-            session,
-            event_type="channel_bonus_shown",
-            source=context.analytics.event_source_bot,
-            happened_at=request.now_utc,
-            user_id=user_id,
-            payload={"source": "post_game"},
-        )
-        return PostGamePromptState(show_channel_bonus=True)
-
-    show_referral = await services.referral_service.reserve_post_game_prompt(
+    show_referral = await context.services.referral_service.reserve_post_game_prompt(
         session,
         user_id=user_id,
         now_utc=request.now_utc,
@@ -85,14 +66,7 @@ async def send_post_game_prompt(
     prompts: PostGamePromptState,
     context: AnswerFlowContext,
 ) -> None:
-    if prompts.show_channel_bonus:
-        await message.answer(
-            TEXTS_DE["msg.channel.bonus.offer"].format(max_energy=FREE_ENERGY_CAP),
-            reply_markup=build_channel_bonus_keyboard(
-                channel_url=context.services.channel_bonus_service.resolve_channel_url()
-            ),
-        )
-    elif prompts.show_referral:
+    if prompts.show_referral:
         await message.answer(
             TEXTS_DE["msg.referral.prompt.after_game"],
             reply_markup=build_referral_prompt_keyboard(),

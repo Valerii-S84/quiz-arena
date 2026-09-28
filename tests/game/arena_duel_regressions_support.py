@@ -79,7 +79,6 @@ async def _continue_arena(
         ),
         offer_service=SimpleNamespace(),
         offer_logging_error=RuntimeError,
-        channel_bonus_service=SimpleNamespace(),
         build_question_text=lambda **_kw: text,
     )
     return callback
