@@ -13,15 +13,15 @@ install: venv
 
 lock:
 	$(PIP) install --upgrade pip pip-tools
-	$(PIP_COMPILE) --strip-extras pyproject.toml --output-file requirements.lock
-	$(PIP_COMPILE) --strip-extras --extra dev pyproject.toml --output-file requirements-dev.lock
+	$(PIP_COMPILE) --no-index --output-file=requirements.lock --strip-extras pyproject.toml
+	$(PIP_COMPILE) --extra=dev --no-index --output-file=requirements-dev.lock --strip-extras pyproject.toml
 
 lock-check:
 	@TMP_REQ=$$(mktemp); TMP_DEV=$$(mktemp); \
 	cp requirements.lock $$TMP_REQ; \
 	cp requirements-dev.lock $$TMP_DEV; \
-	$(PIP_COMPILE) --strip-extras pyproject.toml --output-file requirements.lock; \
-	$(PIP_COMPILE) --strip-extras --extra dev pyproject.toml --output-file requirements-dev.lock; \
+	$(PIP_COMPILE) --no-index --output-file=requirements.lock --strip-extras pyproject.toml; \
+	$(PIP_COMPILE) --extra=dev --no-index --output-file=requirements-dev.lock --strip-extras pyproject.toml; \
 	diff -u $$TMP_REQ requirements.lock; \
 	diff -u $$TMP_DEV requirements-dev.lock; \
 	rm -f $$TMP_REQ $$TMP_DEV
