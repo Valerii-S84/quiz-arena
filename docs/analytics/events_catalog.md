@@ -18,17 +18,7 @@ Catalog of runtime product/operational events as implemented in code.
 
 ## 2) `analytics_events` Catalog
 
-### 2.1 Channel bonus
-
-| Event | Producer(s) | Primary consumer(s) |
-|---|---|---|
-| `channel_bonus_shown` | `app/bot/handlers/channel_bonus.py`, gameplay flows (`answer_flow.py`, `energy_zero_flow.py`) | `analytics_daily` (indirect context), internal analytics dashboards |
-| `channel_bonus_check_started` | `app/bot/handlers/channel_bonus.py` | internal analytics dashboards |
-| `channel_bonus_claimed` | `app/bot/handlers/channel_bonus.py` | internal analytics dashboards |
-| `channel_bonus_check_failed_not_subscribed` | `app/bot/handlers/channel_bonus.py` | internal analytics dashboards |
-| `channel_bonus_check_failed_error` | `app/bot/handlers/channel_bonus.py` | internal analytics dashboards |
-
-### 2.2 Daily challenge and core gameplay
+### 2.1 Daily challenge and core gameplay
 
 | Event | Producer(s) | Primary consumer(s) |
 |---|---|---|
@@ -39,7 +29,7 @@ Catalog of runtime product/operational events as implemented in code.
 | `gameplay_energy_zero` | `app/economy/energy/energy_consume.py` | `analytics_daily` aggregation + dashboards |
 | `streak_lost` | `app/economy/streak/service.py` | `analytics_daily` aggregation + dashboards |
 
-### 2.3 Daily Cup
+### 2.2 Daily Cup
 
 | Event | Producer(s) | Primary consumer(s) |
 |---|---|---|
@@ -51,7 +41,7 @@ Catalog of runtime product/operational events as implemented in code.
 | `daily_cup_round_started` | `app/workers/tasks/daily_cup_async.py`, `app/workers/tasks/daily_cup_rounds.py`, session service path for cup match progress | internal analytics dashboards |
 | `daily_cup_match_completed` | `app/workers/tasks/daily_cup_rounds.py`, session service path | internal analytics dashboards |
 
-### 2.4 Duel / friend challenge
+### 2.3 Duel / friend challenge
 
 | Event | Producer(s) | Primary consumer(s) |
 |---|---|---|
@@ -99,7 +89,7 @@ Arena/Duelle payload contract:
 Friend duel funnel rule:
 - Use `friend_duel_opened`, `friend_duel_created`, `friend_duel_joined`, `friend_duel_started`, `friend_duel_completed`, `friend_duel_share_clicked`, `friend_duel_revanche_clicked`, and `friend_duel_published_to_arena` as canonical friend-mode events; do not infer them from `duel_mode_selected` or `arena_duel_published` payload actions.
 
-### 2.5 Private tournaments
+### 2.4 Private tournaments
 
 | Event | Producer(s) | Primary consumer(s) |
 |---|---|---|
@@ -110,7 +100,7 @@ Friend duel funnel rule:
 | `private_tournament_completed` | `app/workers/tasks/tournaments_async.py` | internal analytics dashboards |
 | `private_tournament_result_shared` | `app/bot/handlers/gameplay_flows/tournament_flow.py` | internal analytics dashboards |
 
-### 2.6 Purchases and referrals
+### 2.5 Purchases and referrals
 
 | Event | Producer(s) | Primary consumer(s) |
 |---|---|---|
@@ -126,7 +116,7 @@ Friend duel funnel rule:
 | `referral_reward_milestone_available` | `app/workers/tasks/referrals.py` | `analytics_daily` aggregation + internal referrals ops |
 | `referral_reward_granted` | `app/workers/tasks/referrals.py` | `analytics_daily` aggregation + internal referrals ops |
 
-### 2.7 Current `analytics_daily` event subset
+### 2.6 Current `analytics_daily` event subset
 
 The hourly daily aggregator (`app/workers/tasks/analytics_daily.py`) currently counts these event types from `analytics_events`:
 - `gameplay_energy_zero`

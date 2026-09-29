@@ -50,7 +50,6 @@ async def start_mode_impl(
                 offer_service=services.offer_service,
                 offer_logging_error=services.offer_logging_error,
                 offer_idempotency_key=f"offer:energy:{callback.id}",
-                channel_bonus_service=services.channel_bonus_service,
             )
             await callback.answer()
             return

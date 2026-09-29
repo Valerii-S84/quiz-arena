@@ -50,7 +50,3 @@ class User(Base):
         DateTime(timezone=True),
         nullable=True,
     )
-    channel_bonus_claimed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )

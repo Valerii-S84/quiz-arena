@@ -40,7 +40,6 @@ from app.economy.offers.service import OfferLoggingError, OfferService
 from app.economy.referrals.service import ReferralService
 from app.game.sessions.errors import SessionNotFoundError, TournamentSessionStopNotAllowedError
 from app.game.sessions.service import GameSessionService
-from app.services.channel_bonus import ChannelBonusService
 from app.services.user_onboarding import UserOnboardingService
 
 router = Router(name="gameplay")
@@ -79,7 +78,6 @@ _start_mode = cast(
         game_session_service=GameSessionService,
         offer_service=OfferService,
         offer_logging_error=OfferLoggingError,
-        channel_bonus_service=ChannelBonusService,
         build_question_text=_build_question_text,
     ),
 )
@@ -166,7 +164,6 @@ def _build_answer_flow_context() -> answer_context.AnswerFlowContext:
             session_local=SessionLocal,
             user_onboarding_service=UserOnboardingService,
             referral_service=ReferralService,
-            channel_bonus_service=ChannelBonusService,
             game_session_service=GameSessionService,
             offer_service=OfferService,
             offer_logging_error=OfferLoggingError,

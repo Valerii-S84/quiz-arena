@@ -11,15 +11,8 @@ def _row(text: str, callback_data: str) -> list[InlineKeyboardButton]:
     return [_button(text, callback_data)]
 
 
-def _channel_bonus_row(*, channel_bonus_claimed: bool) -> list[InlineKeyboardButton]:
-    if channel_bonus_claimed:
-        return _row("✅ Kanal-Bonus bereits erhalten", "channel_bonus:claimed")
-    return _row("📺 Kanal abonnieren → volle Energie", "channel_bonus:open")
-
-
 def build_shop_keyboard(
     *,
-    channel_bonus_claimed: bool = False,
     promo_nonce: str | None = None,
 ) -> InlineKeyboardMarkup:
     resolved_promo_nonce = promo_nonce or generate_promo_menu_nonce()
@@ -31,7 +24,6 @@ def build_shop_keyboard(
             _row("💎 Arena Pass 30 Tage | 99⭐", "buy:PREMIUM_MONTH"),
             _row("💎 Arena Pass Saison | 249⭐", "buy:PREMIUM_SEASON"),
             _row("💎 Arena Pass Jahr | 499⭐", "buy:PREMIUM_YEAR"),
-            _channel_bonus_row(channel_bonus_claimed=channel_bonus_claimed),
             _row("👥 Freunde einladen → Belohnung", "referral:open"),
             _row("🎟️ Promo-Code eingeben", build_promo_open_callback_data(resolved_promo_nonce)),
             _row("⬅️ Zurück", "home:open"),

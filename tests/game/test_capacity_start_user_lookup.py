@@ -63,7 +63,6 @@ async def test_menu_start_uses_home_snapshot_path() -> None:
         game_session_service=SimpleNamespace(start_session=_start_session),
         offer_service=SimpleNamespace(),
         offer_logging_error=RuntimeError,
-        channel_bonus_service=SimpleNamespace(),
         build_question_text=lambda **kwargs: (
             f"energy={kwargs['snapshot_free_energy']}+{kwargs['snapshot_paid_energy']};"
             f"after={kwargs['start_result'].energy_free}+{kwargs['start_result'].energy_paid}"
@@ -100,7 +99,6 @@ async def test_zero_cost_start_keeps_full_home_snapshot_path() -> None:
         game_session_service=SimpleNamespace(start_session=_start_session),
         offer_service=SimpleNamespace(),
         offer_logging_error=RuntimeError,
-        channel_bonus_service=SimpleNamespace(),
         build_question_text=lambda **kwargs: f"energy={kwargs['snapshot_free_energy']}",
     )
 

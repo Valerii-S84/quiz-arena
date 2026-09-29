@@ -18,7 +18,6 @@ def test_shop_keyboard_contains_products_and_back() -> None:
         "💎 Arena Pass 30 Tage | 99⭐",
         "💎 Arena Pass Saison | 249⭐",
         "💎 Arena Pass Jahr | 499⭐",
-        "📺 Kanal abonnieren → volle Energie",
         "👥 Freunde einladen → Belohnung",
         "🎟️ Promo-Code eingeben",
         "⬅️ Zurück",
@@ -30,24 +29,7 @@ def test_shop_keyboard_contains_products_and_back() -> None:
     assert "buy:PREMIUM_MONTH" in callbacks
     assert "buy:PREMIUM_SEASON" in callbacks
     assert "buy:PREMIUM_YEAR" in callbacks
-    assert "channel_bonus:open" in callbacks
     assert "friend:challenge:type:tournament" not in callbacks
     assert "referral:open" in callbacks
     assert any(callback.startswith("promo:open:") for callback in callbacks)
     assert "home:open" in callbacks
-
-
-def test_shop_keyboard_marks_channel_bonus_when_already_claimed() -> None:
-    keyboard = build_shop_keyboard(channel_bonus_claimed=True)
-    texts = [button.text for row in keyboard.inline_keyboard for button in row]
-    callbacks = [
-        button.callback_data
-        for row in keyboard.inline_keyboard
-        for button in row
-        if button.callback_data is not None
-    ]
-
-    assert texts[6] == "✅ Kanal-Bonus bereits erhalten"
-    assert "channel_bonus:open" not in callbacks
-    assert "channel_bonus:claimed" in callbacks
-    assert any(callback.startswith("promo:open:") for callback in callbacks)

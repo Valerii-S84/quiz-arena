@@ -16,8 +16,6 @@ class MessagingSettingsMixin:
     )
     welcome_image_file_id: str = Field(default="", alias="WELCOME_IMAGE_FILE_ID")
     telegram_home_header_file_id: str = Field(default="", alias="TELEGRAM_HOME_HEADER_FILE_ID")
-    bonus_channel_id: str = Field(default="", alias="BONUS_CHANNEL_ID")
-    bonus_check_bot_token: str = Field(default="", alias="BONUS_CHECK_BOT_TOKEN")
     telegram_webhook_enqueue_timeout_ms: int = Field(
         default=250,
         alias="TELEGRAM_WEBHOOK_ENQUEUE_TIMEOUT_MS",

@@ -64,7 +64,6 @@ async def continue_regular_answer(
         game_session_service=context.services.game_session_service,
         offer_service=context.services.offer_service,
         offer_logging_error=context.services.offer_logging_error,
-        channel_bonus_service=context.services.channel_bonus_service,
         build_question_text=context.rendering.build_question_text,
     )
     await send_post_game_prompt(request.message, prompts=prompts, context=context)
