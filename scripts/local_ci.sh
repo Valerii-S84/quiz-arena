@@ -116,8 +116,8 @@ lockfile_check() {
   trap 'rm -f "$tmp_req" "$tmp_dev"' RETURN
   cp requirements.lock "$tmp_req"
   cp requirements-dev.lock "$tmp_dev"
-  "$PYTHON_BIN" -m piptools compile --no-index --output-file=requirements.lock --strip-extras pyproject.toml
-  "$PYTHON_BIN" -m piptools compile --extra=dev --no-index --output-file=requirements-dev.lock --strip-extras pyproject.toml
+  "$PYTHON_BIN" -m piptools compile --strip-extras pyproject.toml --output-file requirements.lock
+  "$PYTHON_BIN" -m piptools compile --strip-extras --extra dev pyproject.toml --output-file requirements-dev.lock
   diff -u "$tmp_req" requirements.lock
   diff -u "$tmp_dev" requirements-dev.lock
 }
