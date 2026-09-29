@@ -76,7 +76,11 @@ async def fetch_revenue_series(
     rows = (
         await session.execute(
             select(func.date(Purchase.paid_at), func.coalesce(func.sum(Purchase.stars_amount), 0))
-            .where(Purchase.paid_at >= from_utc, Purchase.paid_at < to_utc)
+            .where(
+                Purchase.paid_at >= from_utc,
+                Purchase.paid_at < to_utc,
+                Purchase.status.in_(("PAID_UNCREDITED", "CREDITED")),
+            )
             .group_by(func.date(Purchase.paid_at))
             .order_by(func.date(Purchase.paid_at))
         )
@@ -168,7 +172,11 @@ async def fetch_top_products(
     rows = (
         await session.execute(
             select(Purchase.product_code, func.coalesce(func.sum(Purchase.stars_amount), 0))
-            .where(Purchase.paid_at >= from_utc, Purchase.paid_at < to_utc)
+            .where(
+                Purchase.paid_at >= from_utc,
+                Purchase.paid_at < to_utc,
+                Purchase.status.in_(("PAID_UNCREDITED", "CREDITED")),
+            )
             .group_by(Purchase.product_code)
             .order_by(func.coalesce(func.sum(Purchase.stars_amount), 0).desc())
             .limit(5)

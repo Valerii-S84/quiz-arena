@@ -307,7 +307,9 @@ async def test_apply_bonus_handles_supported_bonus_types(
         gets[("EnergyState", 101)] = None
     elif bonus_type == "streak_token":
         gets[("StreakState", 101)] = None
-    session = _Session(gets=gets)
+    session = _Session(
+        gets=gets, exec_results=[_ScalarResult(None)] if bonus_type == "premium_days" else []
+    )
 
     result = cast(
         _BonusPayload,
